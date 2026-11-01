@@ -173,7 +173,7 @@ class TestBenzeneRows:
                 == "4-azido-1-fluoro-2-nitrobenzene")
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("C[N+](C)(C)CC(=O)[O-]", "(trimethylazaniumyl)acetate"),
+        ("C[N+](C)(C)CC(=O)[O-]", "(N,N-dimethylmethanaminiumyl)acetate"),
         ("[O-][n+]1ccccc1", "pyridine 1-oxide"),
     ])
     def test_zwitterion_detection_protected(self, smiles, expected):

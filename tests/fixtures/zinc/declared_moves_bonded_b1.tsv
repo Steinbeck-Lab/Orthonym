@@ -13,4 +13,5 @@ Cl[Pd]Cl.c1ccccc1P(c1ccccc1)c1ccccc1.c1ccccc1P(c1ccccc1)c1ccccc1	best-effort	tri
 Cl[Pd-2](Cl)([P+](c1ccccc1)(c1ccccc1)c1ccccc1)[P+](c1ccccc1)(c1ccccc1)c1ccccc1	best-effort	triphenylphosphane—chloride—palladium(2+) (2/2/1)	systematic_verified	false	
 [Na+].[Na+].Cl[Pd-2](Cl)(Cl)Cl	pin	unknown organic compound	abstain	false	NO_VERIFIED_PIN
 [Na+].[Na+].Cl[Pd-2](Cl)(Cl)Cl	best-effort	palladium(II) disodium tetrachloride	systematic_verified	false	
-CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pd+2]	best-effort	palladium bis(2-oxido-4-oxopent-2-ene)	systematic_verified	false	
+CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pd+2]	best-effort	palladium bis(4-oxopent-2-en-2-olate)	systematic_verified	false	
+CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pd+2]	pin	unknown organic compound	abstain	false	NO_VERIFIED_PIN

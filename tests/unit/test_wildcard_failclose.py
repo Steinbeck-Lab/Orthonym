@@ -48,7 +48,7 @@ def test_hash0_raise_on_limit_raises():
 
 @pytest.mark.parametrize("smiles,expected_contains", [
     ("CC[CH2+]", "propylium"),                     # charged, RT-valid — unchanged
-    ("[O-]C(=O)CC[N+](C)(C)C", "azaniumyl"),       # zwitterion — unchanged
+    ("[O-]C(=O)CC[N+](C)(C)C", "aminiumyl"),       # zwitterion: the aminiumyl PIN prefix,:42473; R5)
 ])
 def test_charged_probes_unchanged(smiles, expected_contains):
     assert expected_contains in _name(smiles)

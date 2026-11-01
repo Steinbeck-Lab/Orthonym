@@ -224,7 +224,6 @@ CONTROLS = [
     ("C[Si+](C)C", "trimethylsilylium"),
     ("C[SiH2][Si-](C)C", "1,1,2-trimethyldisilanide"),
     ("CS[O-]", "methane(SO-thioperoxolate)"),
-    ("CN(C)[O-]", "[methyl(oxido)amino]methane"),
     ("C(=O)([NH-])N", "carbamoylazanide"),
     ("C[Si]1(C)CCCC1", "1,1-dimethylsilolane"),
     ("CCOS(=O)(=O)[O-]", "ethyl sulfate"),
@@ -240,6 +239,17 @@ CONTROLS = [
 @pytest.mark.parametrize("smiles,expected", CONTROLS, ids=[c[0] for c in CONTROLS])
 def test_controls_keep_their_names(smiles, expected):
     assert name_best_effort(smiles)["name"] == expected
+
+
+def test_the_dimethyl_hydroxylamine_anion_takes_the_name_of_the_book():
+    """The control '[methyl(oxido)amino]methane' of this lane is replaced by the Blue Book's own name,
+    "Anions derived from hydroxy compounds" (the Blue Book),:41031 '(CH3)2N-O- dimethylaminoxide (PIN)'
+    (``rules.olate_anions``). The new value is read back by an independent OPSIN call, and the old one would fail the
+    first assertion."""
+    from tests.support.rt_assert import name_is_rt_exact
+    res = name_best_effort("CN(C)[O-]")
+    assert res["name"] == "dimethylaminoxide" and res["name"] != "[methyl(oxido)amino]methane", res
+    assert name_is_rt_exact(res["name"], "CN(C)[O-]"), res
 
 
 # -- the bonding number of the boron of a mancude ring, without a JVM,:41089)

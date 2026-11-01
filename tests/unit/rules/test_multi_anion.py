@@ -52,7 +52,7 @@ def test_integration_mixed_dianion_names(namer, smi, expected):
     # acid-ester anion (a phase Slice A) — must stay unchanged.
     ("CCCCCCCCCCCCOS(=O)(=O)[O-]", "dodecyl sulfate"),
     # zwitterion (unrelated path) — must stay unchanged.
-    ("C[N+](C)(C)CCC(=O)[O-]", "3-(trimethylazaniumyl)propanoate"),
+    ("C[N+](C)(C)CCC(=O)[O-]", "3-(N,N-dimethylmethanaminiumyl)propanoate"),
     # plain sulfonate / methanesulfonate — must stay unchanged.
     ("C1=CC=CC=C1S(=O)(=O)[O-]", "benzenesulfonate"),
     ("CS(=O)(=O)[O-]", "methanesulfonate"),
@@ -106,7 +106,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CC([O-])CC(C)CC([O-])=O.[Na+].[Na+]",
-    "C[N+](C)(C)CCC(=O)[O-]",
     "Cc1ccc([O-])c(C([O-])=O)c1.[Na+].[Na+]",
     "[O-]CC(C)C([O-])=O.[Na+].[Na+]",
     # '[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]' left this set (leads program L4, item 30b): the

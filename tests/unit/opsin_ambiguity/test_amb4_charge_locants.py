@@ -295,8 +295,6 @@ def test_zwitterion_cites_the_locant_of_the_cation_on_a_ring_parent(smiles, name
     ("C1CCCC(CC1)(C(=O)[O-])[P+](c2ccccc2)(c2ccccc2)c2ccccc2",
      "1-(triphenylphosphaniumyl)cycloheptanecarboxylate"),
     ("C[N+](C)(C)C1CCCCC1C(=O)[O-]", "2-(trimethylazaniumyl)cyclohexanecarboxylate"),
-    ("C[N+](C)(C)c1ccccc1C(=O)[O-]", "2-(trimethylazaniumyl)benzoate"),
-    ("C[N+](C)(C)c1cccc(c1)C(=O)[O-]", "3-(trimethylazaniumyl)benzoate"),
 ])
 def test_zwitterion_of_a_ring_carboxylate_cites_the_locant_of_the_cation(smiles, name):
     # (the Blue Book): the locant of the substituent of the ring parent is cited,
@@ -308,6 +306,23 @@ def test_zwitterion_of_a_ring_carboxylate_cites_the_locant_of_the_cation(smiles,
     row = assert_clean(smiles)
     assert row["name"] == name
     assert name_row(smiles, tier="pin")["tier"] != "pin_verified"
+
+
+@pytest.mark.parametrize("smiles,pin,wider", [
+    ("C[N+](C)(C)c1ccccc1C(=O)[O-]",
+     "2-(N,N-dimethylmethanaminiumyl)benzoate", "2-(trimethylazaniumyl)benzoate"),
+    ("C[N+](C)(C)c1cccc(c1)C(=O)[O-]",
+     "3-(N,N-dimethylmethanaminiumyl)benzoate", "3-(trimethylazaniumyl)benzoate"),
+])
+def test_zwitterion_of_benzoate_is_the_aminiumyl_pin_and_its_twin(smiles, pin, wider):
+    # The locant of the cation is cited as in the rows above, the Blue Book). The onium prefix of the
+    # PIN is '(N,N-dimethylmethanaminiumyl)' method (1) leads to the PIN,:42299;, example:42473), so
+    # the default tier ships the name pin_verified (ruling R5, RULINGS-ANION.md); the wider tiers spell the same atoms
+    # '(trimethylazaniumyl)', which OPSIN 2.9.0 reads (validation/twin_spellings.py), without the PIN label.
+    row = assert_clean(smiles)
+    assert row["name"] == wider
+    pin_row = name_row(smiles, tier="pin")
+    assert (pin_row["name"], pin_row["tier"]) == (pin, "pin_verified")
 
 
 def test_zwitterion_ring_locant_is_the_lower_direction_round_the_ring():

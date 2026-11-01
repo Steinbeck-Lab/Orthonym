@@ -160,10 +160,12 @@ def test_non_standard_zwitterion_builds_azaniumyl_pin():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # Standard-AA zwitterions (Table 10.4, dispensation) are
-    # UNCHANGED by the veto.
-    ("[NH3+]CC(=O)[O-]", "glycine"),
-    ("C[C@H]([NH3+])C(=O)[O-]", "L-alanine"),
+    # Standard-AA zwitterions are named by method (1) of "Zwitterionic amino acids are named in two
+    # ways" (the Blue Book, example:54561 'azaniumylacetate'), the cationic prefix on the anionic parent
+    #,:42473);:50943 gives no PIN in Chapter for the retained names, which name the
+    # neutral acids (ruling R6, RULINGS-ANION.md). The veto of the retained name is no longer what decides them.
+    ("[NH3+]CC(=O)[O-]", "azaniumylacetate"),
+    ("C[C@H]([NH3+])C(=O)[O-]", "(2S)-2-azaniumylpropanoate"),
 ])
 def test_standard_aa_zwitterion_unaffected(smiles, expected):
     assert RAW.name(smiles) == expected

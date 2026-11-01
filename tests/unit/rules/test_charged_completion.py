@@ -68,11 +68,11 @@ def test_retained_aa_zwitterion_table_is_stereo_correct():
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi", [
     "[NH3+][C@@H](CC[SeH])C(=O)[O-]",   # selenohomocysteine zwitterion
-    "CC(C)C[C@@H]([NH3+])C(=O)[O-]",     # leucine zwitterion (retained path)
+    "CC(C)C[C@@H]([NH3+])C(=O)[O-]",     # leucine zwitterion (azaniumyl name, R6)
 ])
 def test_netzero_aa_zwitterion_names_and_roundtrips(smi):
     # Best-effort tier: any name that full-InChIKey round-trips is acceptable
-    # (selenohomocysteine now -> azaniumyl PIN; leucine -> retained D-leucine).
+    # (selenohomocysteine and leucine are both the azaniumyl name now, ruling R6).
     n = Orthonym(general_fallback=True, general_fallback_unverified=True,
                   allow_aromatic_general=True).name(smi)
     assert n and n != "unknown organic compound"
@@ -81,15 +81,20 @@ def test_netzero_aa_zwitterion_names_and_roundtrips(smi):
         Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
-# --- 1. standard AA retained table unchanged, fires first) ----
+# --- 1. a standard AA zwitterion is the name at every tier -------------
 @pytest.mark.opsin_gate
-def test_leucine_zwitterion_retained_unchanged():
-    # D-leucine is a Table-10.4 standard AA -> the retained name (fired before
-    # route_charged); azaniumyl only fires for NON-standard / net-charged.:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes):
-    # the default (PIN) tier declines it, the best-effort tier ships the retained name.
+def test_leucine_zwitterion_is_the_azaniumyl_name_at_every_tier():
+    # "Zwitterionic amino acids are named in two ways" (the Blue Book): method (1) prefixes the
+    # cationic substituent group to the anionic parent,:42473); the example at:54561 is 'azaniumylacetate'.
+    #:50943 gives no PIN in Chapter for the retained name 'leucine', which names the neutral acid, so
+    # the retained name no longer stands in front of the zwitterion name (ruling R6, RULINGS-ANION.md). Read back
+    # by OPSIN to the input's full InChIKey (D-leucine is the R enantiomer).
     from orthonym.cli import _emit_tier_flags
+    smi = "CC(C)C[C@@H]([NH3+])C(=O)[O-]"
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    assert be.name("CC(C)C[C@@H]([NH3+])C(=O)[O-]") == "D-leucine"
+    assert be.name(smi) == "(2R)-2-azaniumyl-4-methylpentanoate"
+    assert G.name(smi) == "(2R)-2-azaniumyl-4-methylpentanoate"
+    _full_ik_rt(smi, "(2R)-2-azaniumyl-4-methylpentanoate")
 
 
 # --- 2. single-cation net-0 amino-acid zwitterion -> azaniumyl PIN ----------

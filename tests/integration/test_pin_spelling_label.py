@@ -113,14 +113,14 @@ def test_the_check_still_fails_the_numbering_the_producer_no_longer_builds():
 def test_name_with_confidence_declines_with_the_failures():
     """``name_with_confidence`` applies the default tier's rule to the name it returns: the
     lowered name is declined with NO_VERIFIED_PIN, and the record keeps the spelling failures as
-    the reason, as the ``name_tiered`` decline row does. A decline for another reason (betaine:
-    the strict path labels it systematic_verified) records none."""
+    the reason, as the ``name_tiered`` decline row does. A decline for another reason (an organometallic
+    compound of a Group 12 metal, for which:39735 notes no PIN) records none."""
     smiles, _name, rule = LOWERED[2]
     md = Orthonym().name_with_confidence(smiles)
     assert md["limit"]["code"] == "NO_VERIFIED_PIN", md
     assert rule in [f["rule"] for f in md["spelling_failures"]], md
     assert md["spelling_failures"] == default_tier_row(smiles)["spelling_failures"]
-    other = Orthonym().name_with_confidence("C[N+](C)(C)CC(=O)[O-]")
+    other = Orthonym().name_with_confidence("c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1")
     assert other["limit"]["code"] == "NO_VERIFIED_PIN" and other["spelling_failures"] == [], other
 
 

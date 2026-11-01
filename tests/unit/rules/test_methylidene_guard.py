@@ -53,7 +53,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "C[N+](C)(C)CCCC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -199,7 +198,7 @@ def test_bare_substituted_methylidene_leak_rejected():
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
+    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate"),
     ("[NH3+]C(CCC(=O)[O-])C(=O)[O-]", "2-azaniumylpentanedioate"),
     ("CCCCCCCCCCCCOS(=O)(=O)[O-]", "dodecyl sulfate"),
     ("C[N+]1=CC=CC=C1", "1-methylpyridin-1-ium"),

@@ -112,7 +112,7 @@ MOVED_ROWS = [
     ("[Pt]=O", "oxoplatinum"),
     ("[Ti]=O", "oxotitanium"),
     ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Pt+2]", "platinum bis(1-oxido-2-sulfidopyridin-1-ium)"),
-    ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pt+2]", "platinum bis(2-oxido-4-oxopent-2-ene)"),
+    ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pt+2]", "platinum bis(4-oxopent-2-en-2-olate)"),
     # the ionic drawing wins a tie of ranks (``assembly.metal_offer.name_with_metal_offer``), as for zinc:
     # 'ethanol—chloride—zinc(2+) (1/2/1)' for Cl[Zn]Cl.CCO
     ("C1CC=CCCC=C1.Cl[Pd]Cl", "cycloocta-1,5-diene—chloride—palladium(2+) (1/2/1)"),
@@ -157,7 +157,7 @@ def test_every_declared_move_holds():
     namers = {tier: Orthonym(style="pin", **_emit_tier_flags(tier)) for tier in ("pin", "best-effort")}
     moves = declared_bonded_metal_moves()
     assert len(DECLARED_BONDED_MOVE_FILES) == 2
-    assert len(moves) == 15 + 22                      # the rows of lane B1 and of lane B2
+    assert len(moves) == 16 + 24                      # the rows of lane B1 and of lane B2 (three of the acetylacetonates' PIN rows: olate)
     for (smiles, tier_req), view in sorted(moves.items()):
         now = namers[tier_req].name_tiered(smiles)
         assert identity_view(now) == view, (smiles, tier_req)
@@ -315,7 +315,7 @@ MORE_METAL_ROWS = [
     ("CC(=O)[O-].[Tl+]", "thallium acetate"),
     ("CC[Tl+2]CC", "diethylthallium(2+)"),
     ("C1CC=CCCC=C1.Cl[Ni]Cl", "cycloocta-1,5-diene\u2014chloride\u2014nickel(2+) (1/2/1)"),
-    ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Cu+2]", "copper bis(2-oxido-4-oxopent-2-ene)"),
+    ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Cu+2]", "copper bis(4-oxopent-2-en-2-olate)"),
     ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Cu+2]", "copper bis(1-oxido-2-sulfidopyridin-1-ium)"),
     ("C[Cu+].[Cl-]", "methylcopper(1+)\u2014chloride (1/1)"),             # OPSIN 2.9.0 cannot read it: no name there
     # a dative drawing is named through the drawing without its dative bonds (DATIVE)

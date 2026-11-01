@@ -35,6 +35,13 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   reads the former locant: '1,9b,4,9-tetraazaphenalene'. The numbering of the peripheral atoms is the
   same in both, so the twin is the same structure; the rule applies to a name of the parent
   'phenalene' only.
+* ``aminiumyl_azaniumyl``: "Cationic substituent groups" (the Blue Book), method (1):42296 "all prefix names
+  are formed by adding the suffixes 'yl', 'ylidene', etc. to the cation name" and:42299 "Method (1) leads to preferred
+  IUPAC names", with the cation name 'N,N,N-trimethylmethanaminium (PIN)' (:41438); (:42473)
+  '(N,N-dimethylmethanaminiumyl)acetate (PIN)', whose general-nomenclature name is '(trimethylammoniumyl)acetate'. OPSIN reads
+  no '-aminiumyl' prefix and reads the azane-based spelling '(trimethylazaniumyl)acetate'. The rule is the one group of the
+  book's own example, a nitrogen with three methyl groups: ``cation_to_prefix`` spells it so at the default tier
+  (:func:`pin_spellings_on`); a nitrogen with other groups has no rule (its name stays '...azaniumyl', recorded as no PIN).
 * ``isotope_letter_once``: (heading NAMES,:43824, example:43830) "In a name
   consisting of one word, the isotopic descriptor is placed before the name, with an appropriate
   locant", '(N-2H2)aniline (PIN)': a letter locant is cited once for a nuclide that is multiplied.
@@ -110,6 +117,14 @@ _PHENALENE = re.compile(r"phenalen(?:e(?![a-z])|(?=[-(]))")
 
 def _interior_phenalene(name: str) -> str:
     return _INTERIOR.sub("9b", name) if _PHENALENE.search(name) else name
+
+
+#: the PIN prefix of a nitrogen with three methyl groups,:42473) and the spelling OPSIN reads for it
+_AMINIUMYL = re.compile(r"N,N-dimethylmethanaminiumyl")
+
+
+def _aminiumyl_azaniumyl(name: str) -> str:
+    return _AMINIUMYL.sub("trimethylazaniumyl", name)
 
 
 #: a locant of an isotopic descriptor: a number with an optional letter and primes, or an
@@ -195,6 +210,7 @@ TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("interior_phenalene", _interior_phenalene),
     ("isotope_letter_once", _letter_once),
     ("isotope_count_one", _count_one),
+    ("aminiumyl_azaniumyl", _aminiumyl_azaniumyl),
     ("polyester_acyloxy", polyester_twin),
     ("halido_o", halido_twin),
 )

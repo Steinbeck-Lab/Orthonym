@@ -433,10 +433,15 @@ UNCHANGED = [
     ("CC(=O)O", "acetic acid"),
     ("c1ccccc1", "benzene"),
     ("CCO", "ethanol"),
-    ("[NH3+]CC(=O)[O-]", "glycine"),                    # amino-acid zwitterion
-    ("C[N+](C)(C)CC(=O)[O-]", "(trimethylazaniumyl)acetate"),      # betaine
+    # (the Blue Book, example:54561): the glycine zwitterion is 'azaniumylacetate' (ruling R6)
+    ("[NH3+]CC(=O)[O-]", "azaniumylacetate"),           # amino-acid zwitterion
     ("[O-]C(=O)c1ccc[nH+]c1", "pyridin-1-ium-3-carboxylate"),      #
 ]
+
+# The betaine is spelled two ways (ruling R5, RULINGS-ANION.md): the PIN '(N,N-dimethylmethanaminiumyl)acetate'
+#, the Blue Book; method (1) leads to the PIN,:42299) at the default tier, and its twin
+# '(trimethylazaniumyl)acetate', the spelling OPSIN 2.9.0 reads, at the wider tiers (validation/twin_spellings.py).
+BETAINE = "C[N+](C)(C)CC(=O)[O-]"
 
 
 @pytest.mark.parametrize("smiles,expected", UNCHANGED)
@@ -447,6 +452,11 @@ def test_charged_species_unchanged_pin_tier(smiles, expected):
 @pytest.mark.parametrize("smiles,expected", UNCHANGED)
 def test_charged_species_unchanged_best_effort_tier(smiles, expected):
     assert _name(smiles, "best-effort") == expected
+
+
+def test_the_betaine_is_spelled_by_its_tier():
+    assert _name(BETAINE, "pin") == "(N,N-dimethylmethanaminiumyl)acetate"
+    assert _name(BETAINE, "best-effort") == "(trimethylazaniumyl)acetate"
 
 
 # --------------------------------------------------------------------------

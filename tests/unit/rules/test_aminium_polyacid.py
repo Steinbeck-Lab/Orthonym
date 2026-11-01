@@ -45,12 +45,8 @@ DEFAULT_TIER_DECLINES = frozenset({
     # the zwitterion arms of the acid-salt branch (merged after the rule): the
     # 'azaniumyl' of a carbon-substituted N+ is recorded as not the PIN,
     # the Blue Book '(N,N-dimethylmethanaminiumyl)acetate (PIN)')
-    "C[N+](C)(C)CC(CC(=O)[O-])C(=O)[O-]",
     "C[NH+](C)CC(CC(=O)[O-])C(=O)[O-]",
     "NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]",
-    "C[N+](C)(C)C(CC(=O)[O-])C(=O)[O-]",
-    "C[N+](C)(C)CCC(=O)[O-]",
-    "C[N+](C)(C)CCOS(=O)(=O)[O-]",
     "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
@@ -130,7 +126,7 @@ def test_aminium_polyacid_zwitterion(namer, smi, expected):
 def test_carboxylate_betaine_unchanged(namer):
     # Single-anion GUARD-4 betaine path is a completely separate
     # branch (len(anions) == 1) -- must stay byte-identical.
-    assert _dt_obj_name(namer, "C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
+    assert _dt_obj_name(namer, "C[N+](C)(C)CCC(=O)[O-]") == "3-(N,N-dimethylmethanaminiumyl)propanoate"
 
 
 @pytest.mark.opsin_gate
@@ -144,14 +140,16 @@ def test_l_carnitine_unchanged(namer):
 
 
 @pytest.mark.opsin_gate
-def test_l_serine_zwitterion_unchanged(namer):
-    # Single-anion protonated-amine zwitterion -- the established
-    # retained/neutral-form amino-acid path (defer), unaffected by the
-    # new multi-anion branch (len(anions) == 1 here).:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes): read at the
-    # best-effort tier, where the retained name ships below the PIN.
+def test_l_serine_zwitterion_is_the_azaniumyl_name(namer):
+    # Single-anion protonated-amine zwitterion (len(anions) == 1, unaffected by the multi-anion branch above).
+    # "Zwitterionic amino acids are named in two ways" (the Blue Book): method (1), the cationic
+    # prefix on the anionic parent,:42473; example:54561 'azaniumylacetate').:50943 gives no PIN
+    # in Chapter for the retained 'serine', which names the neutral acid (ruling R6, RULINGS-ANION.md). OPSIN
+    # reads (2S)-2-azaniumyl-3-hydroxypropanoate to the input's full InChIKey.
     from orthonym.cli import _emit_tier_flags
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    assert be.name("[NH3+][C@@H](CO)C(=O)[O-]") == "L-serine"
+    assert be.name("[NH3+][C@@H](CO)C(=O)[O-]") == "(2S)-2-azaniumyl-3-hydroxypropanoate"
+    assert _dt_obj_name(namer, "[NH3+][C@@H](CO)C(=O)[O-]") == "(2S)-2-azaniumyl-3-hydroxypropanoate"
 
 
 @pytest.mark.opsin_gate
@@ -164,7 +162,7 @@ def test_dicarboxylate_dianion_no_cation_unchanged(namer):
 
 @pytest.mark.opsin_gate
 def test_phase3_choline_sulfate_unchanged(namer):
-    assert _dt_obj_name(namer, "C[N+](C)(C)CCOS(=O)(=O)[O-]") == "2-(trimethylazaniumyl)ethyl sulfate"
+    assert _dt_obj_name(namer, "C[N+](C)(C)CCOS(=O)(=O)[O-]") == "2-(N,N-dimethylmethanaminiumyl)ethyl sulfate"
 
 
 @pytest.mark.opsin_gate
@@ -288,7 +286,7 @@ def test_compound_cation_prefix_polyacid_branch(namer):
     # on the poly-acid branch, pinning `enclose_if_compound`'s parens arm
     # here (RT-verified 2026-08-17).
     assert _dt_obj_name(namer, "C[N+](C)(C)C(CC(=O)[O-])C(=O)[O-]") == \
-        "2-(trimethylazaniumyl)butanedioate"
+        "2-(N,N-dimethylmethanaminiumyl)butanedioate"
 
 
 def test_multi_branch_onium_atom_drop_declines_directly():
@@ -329,7 +327,7 @@ def test_multi_branch_onium_atom_drop_declines_directly():
     ("[NH3+]CC(CC(=O)[O-])C(=O)[O-].[Na+]", "sodium 2-(azaniumylmethyl)butanedioate"),
     ("[NH3+]CCC(CC(=O)[O-])C(=O)[O-]", "2-(2-azaniumylethyl)butanedioate"),
     ("[NH3+]CC(CC(=O)[O-])CC(=O)[O-]", "3-(azaniumylmethyl)pentanedioate"),
-    ("C[N+](C)(C)CC(CC(=O)[O-])C(=O)[O-]", "2-[(trimethylazaniumyl)methyl]butanedioate"),
+    ("C[N+](C)(C)CC(CC(=O)[O-])C(=O)[O-]", "2-[(N,N-dimethylmethanaminiumyl)methyl]butanedioate"),
     ("C[NH+](C)CC(CC(=O)[O-])C(=O)[O-]", "2-[(dimethylazaniumyl)methyl]butanedioate"),
     # a parent with a prefix of its own: the neutral name carries both
     ("[NH3+]C(C)(CCC(=O)[O-])C(=O)[O-]", "2-azaniumyl-2-methylpentanedioate"),

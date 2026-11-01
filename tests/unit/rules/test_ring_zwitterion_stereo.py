@@ -188,20 +188,20 @@ def test_names_that_existed_are_unchanged(smiles, name):
     _named(smiles, name)
 
 
-def test_l_proline_zwitterion_keeps_its_retained_name():
-    """The retained name of (:54518) stands for the L-proline zwitterion: it had a name and a tier
-    before this change, and a name that had a PIN is not withdrawn. OPSIN reads 'L-proline' as the neutral acid:
-    the standard InChIKey (stereo included) is the input's, the fixed-H InChI is not (the hydron is on the
-    carboxylate), which is the amino-acid case that ``validation.protonation_identity`` accepts."""
+def test_l_proline_zwitterion_is_the_ring_azanium_carboxylate():
+    """The L-proline zwitterion is named by method (1) of "Zwitterionic amino acids are named in two
+    ways" (the Blue Book): the cation in the parent, 'pyrrolidin-1-ium',:41366), the carboxylate
+    the suffix.:50943 gives no PIN in Chapter for the retained 'L-proline', which names the neutral acid
+    (ruling R6, RULINGS-ANION.md), so the retained name no longer stands in front of it. The name is OPSIN
+    full-InChIKey exact and carries the PIN label at both tiers."""
     jar_or_skip()
     from orthonym import Orthonym
     from tests.support.rt_assert import _independent_parse
     smiles = "O=C([O-])[C@@H]1CCC[NH2+]1"
-    #:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes): the name stands at the best-effort tier, labelled below the PIN
     from orthonym.cli import _emit_tier_flags
     r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert r["name"] == "L-proline" and r["tier"] == "systematic_verified", r
-    assert _key(_independent_parse("L-proline")) == _key(smiles)
+    assert r["name"] == "(2S)-pyrrolidin-1-ium-2-carboxylate" and r["tier"] == "pin_verified", r
+    assert _key(_independent_parse("(2S)-pyrrolidin-1-ium-2-carboxylate")) == _key(smiles)
 
 
 def test_the_emitter_cites_the_descriptors_in_its_own_numbering():

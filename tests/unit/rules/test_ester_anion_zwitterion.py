@@ -21,10 +21,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "C[N+](C)(C)CCC(=O)[O-]",
-    "C[N+](C)(C)CCOP(=O)([O-])O",
-    "C[N+](C)(C)CCOP(=O)([O-])[O-]",
-    "C[N+](C)(C)CCOS(=O)(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -77,9 +73,9 @@ def namer():
 # --- the 3 goal molecules -----------------------------------------------
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(trimethylazaniumyl)ethyl sulfate"),
-    ("C[N+](C)(C)CCOP(=O)([O-])[O-]", "2-(trimethylazaniumyl)ethyl phosphate"),
-    ("C[N+](C)(C)CCOP(=O)([O-])O", "2-(trimethylazaniumyl)ethyl hydrogen phosphate"),
+    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(N,N-dimethylmethanaminiumyl)ethyl sulfate"),
+    ("C[N+](C)(C)CCOP(=O)([O-])[O-]", "2-(N,N-dimethylmethanaminiumyl)ethyl phosphate"),
+    ("C[N+](C)(C)CCOP(=O)([O-])O", "2-(N,N-dimethylmethanaminiumyl)ethyl hydrogen phosphate"),
 ])
 def test_choline_ester_anion_zwitterion(namer, smi, expected):
     assert _dt_obj_name(namer, smi) == expected
@@ -91,7 +87,7 @@ def test_carboxylate_betaine_unchanged(namer):
     # GUARD 4's existing (…azaniumyl)-prefix betaine path must be
     # completely unaffected by the new ester-anion helper (its central-atom
     # check declines instantly for a carboxylate O, whose neighbour is C).
-    assert _dt_obj_name(namer, "C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
+    assert _dt_obj_name(namer, "C[N+](C)(C)CCC(=O)[O-]") == "3-(N,N-dimethylmethanaminiumyl)propanoate"
 
 
 @pytest.mark.opsin_gate

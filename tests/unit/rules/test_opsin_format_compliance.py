@@ -586,10 +586,6 @@ CANARY_KNOWN_DEFECTS = {
         "glutamyllysylthreonine",
         "DK-PEP", (572,),
     ),
-    "C[C@H](O)[C@H]([NH3+])C(=O)[O-]": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (582,),
-    ),
     "CC(C)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CC(N)=O)C(=O)O": (
         "asparaginylglutamylleucine",
         "DK-PEP", (596,),

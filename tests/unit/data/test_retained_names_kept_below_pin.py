@@ -30,7 +30,8 @@ list denies as a non-PIN fragment, so the name is labelled systematic_verified a
 declines it. The glycine ZWITTERION is named from its own lookup (``rules.salts.name_zwitterion``,
 ``RETAINED_AMINO_ACID_ZWITTERIONS``) that never passes the table-hit site; it records its name
 through ``data.amino_acids.record_if_non_pin_amino_acid_name``, which reads the same deny set, so
-the name 'glycine' carries one label whichever drawing is named. Only 'glycine' is a denied name
+the name 'glycine' carries one label whichever drawing is named (the zwitterion drawing is named by its azaniumyl name
+since ruling R6, see ``test_an_amino_acid_zwitterion_is_the_azaniumyl_pin_at_every_tier``). Only 'glycine' is a denied name
 of the amino-acid tables (alanine, serine, beta-alanine... keep pin_verified). A deny WITHOUT hc_override would have withdrawn the name: measured, glycine then ships
 '2-aminoethanoic acid' and the nucleosides ship long substitutive names labelled pin_verified.
 
@@ -110,40 +111,23 @@ def test_other_table_names_keep_their_pin_label(smiles, name):
         assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (name, "pin_verified", True), row
 
 
-# the other drawing of glycine, named from the zwitterion lookup of rules/salts.py
-_ZWITTERION_ROWS = [("[NH3+]CC(=O)[O-]", "glycine")]
-
-
-@pytest.mark.parametrize("smiles, name", _ZWITTERION_ROWS)
-def test_the_glycine_zwitterion_is_declined_at_default_and_labelled_below_pin_at_best_effort(smiles, name):
-    row = name_default(smiles)
-    assert (row.get("tier"), row.get("is_pin"), row.get("limit_code")) == (
-        "abstain", False, "NO_VERIFIED_PIN"), row
-    row = name_breadth(smiles)
-    assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (
-        name, "systematic_verified", False), row
-    assert name_is_rt_exact(name, smiles), name
-
-
+# the other drawing of glycine, and of the other amino acids: the zwitterions. A zwitterion is named by method (1) of
+# "Zwitterionic amino acids are named in two ways" (the Blue Book, example:54561 'azaniumylacetate
+# glycine zwitterion'): the cationic prefix on the anionic parent,:42473). The retained names glycine,
+# L-alanine, L-serine, beta-alanine name the neutral acid and carry no PIN:50943), so they no longer name
+# the zwitterion at any tier (ruling R6, RULINGS-ANION.md). Changed asserted values: 'abstain' at the default tier and
+# the retained name at best-effort -> the azaniumyl name, pin_verified at both tiers; independent check:
+# name_is_rt_exact (OPSIN reads the name back to the input); mutation: with the zwitterion producer first removed
+# (rules/salts.py name_zwitterion) the retained name returns and the default tier abstains again.
 @pytest.mark.parametrize("smiles, name", [
-    # relabel (2026-10-31, the user's delegated ruling, internal notes): the
-    # other amino-acid names are no PIN either:50943, the Table 10.4 rows print no '(PIN)'); the
-    # spelling check validation/spelling/checks_natural_products.py lowers them. Changed asserted value:
-    # 'pin_verified' -> declined at the default tier and systematic_verified at best-effort; independent
-    # check: name_is_rt_exact (OPSIN reads the name back to the input); mutation: with the check removed
-    # from pin_spelling.BUILTIN_CHECK_MODULES the default tier ships the name pin_verified again.
-    # the neutral drawings take their systematic PIN since E-AA (test below); the zwitterions keep the names
-    ("C[C@H]([NH3+])C(=O)[O-]", "L-alanine"),
-    ("[NH3+][C@@H](CO)C(=O)[O-]", "L-serine"),
-    ("[NH3+]CCC(=O)[O-]", "beta-alanine"),
+    ("[NH3+]CC(=O)[O-]", "azaniumylacetate"),
+    ("C[C@H]([NH3+])C(=O)[O-]", "(2S)-2-azaniumylpropanoate"),
+    ("[NH3+][C@@H](CO)C(=O)[O-]", "(2S)-2-azaniumyl-3-hydroxypropanoate"),
+    ("[NH3+]CCC(=O)[O-]", "3-azaniumylpropanoate"),
 ])
-def test_other_amino_acid_names_are_labelled_below_pin(smiles, name):
-    row = name_default(smiles)
-    assert (row.get("tier"), row.get("is_pin"), row.get("limit_code")) == (
-        "abstain", False, "NO_VERIFIED_PIN"), row
-    row = name_breadth(smiles)
-    assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (
-        name, "systematic_verified", False), row
+def test_an_amino_acid_zwitterion_is_the_azaniumyl_pin_at_every_tier(smiles, name):
+    for row in (name_default(smiles), name_breadth(smiles)):
+        assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (name, "pin_verified", True), row
     assert name_is_rt_exact(name, smiles), name
 
 

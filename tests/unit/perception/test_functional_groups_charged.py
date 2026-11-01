@@ -60,4 +60,5 @@ def test_charged_route_unchanged():
     o = Orthonym()
     assert o.name("CC(=O)[O-]") == "acetate"
     assert o.name("CCC(=O)[O-].[K+]") == "potassium propanoate"
-    assert o.name("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
+    # the aminiumyl PIN, the Blue Book; ruling R5, RULINGS-ANION.md)
+    assert o.name("C[N+](C)(C)CC(=O)[O-]") == "(N,N-dimethylmethanaminiumyl)acetate"

@@ -9368,6 +9368,13 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
         # amino-acid neutral/retained form (sequenced first,).
         return lambda_ion_name(cat, '', _onium_suffix)
 
+    # (the Blue Book) '(N,N-dimethylmethanaminiumyl)acetate (PIN)': a nitrogen with three methyl groups is
+    # the '-aminiumyl' prefix at the default tier, which OPSIN does not read; the twin spelling ``aminiumyl_azaniumyl``
+    # (``validation.twin_spellings``) proves the structure. A wider tier spells the form OPSIN reads, 'trimethylazaniumyl'.
+    from ..validation.twin_spellings import pin_spellings_on
+    if (pin_spellings_on() and not as_free_ion and cat.GetSymbol() == 'N' and cat.GetDegree() == 4
+            and cat.GetTotalNumHs() == 0 and sub_prefixes == ['methyl'] * 3):
+        return 'N,N-dimethylmethanaminiumyl'
     # a five-bond S+ is a λ4-sulfanium: '(tetramethyl-λ4-sulfaniumyl)'
     prefix = lambda_ion_name(cat, _compose_n_substituent_prefix(sub_prefixes), _onium_suffix)
     if cat.GetSymbol() == 'N' and any(

@@ -255,7 +255,7 @@ class TestP74AcyclicZwitterionReclaim8G:
 
     @pytest.mark.parametrize("smi,expected", [
         # RC-D must NOT regress a SIMPLE onium prefix (no inner parens -> round)
-        ("C[N+](C)(C)[C-](C)C", "2-(trimethylazaniumyl)propan-2-ide"),
+        ("C[N+](C)(C)[C-](C)C", "2-(N,N-dimethylmethanaminiumyl)propan-2-ide"),
         ("CC[C-](CC)[O+](C)C", "3-(dimethyloxidaniumyl)pentan-3-ide"),
     ])
     def test_simple_prefix_keeps_parentheses(self, smi, expected):

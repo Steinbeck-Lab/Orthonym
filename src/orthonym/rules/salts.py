@@ -1431,6 +1431,16 @@ def _apply_stoichiometric_prefix(name: str, count: int, *,
 
 # === ZWITTERION NAMING ===
 
+def _breaks_a_pin_spelling_rule_with_a_retained_name_at_hand(mol, name: str, style: str) -> bool:
+    """True when the ``name`` of ``mol`` breaks a rule of the PIN spelling (the composed betaine
+    '4-(N,N-dimethylmethanaminiumyl)(3S)-3-hydroxybutanoate' puts its prefix before the locant of the next, and
+    the retained table has a name for the molecule: the wider tiers keep the retained name rather than the misspelt one."""
+    if style == 'systematic' or Chem.MolToSmiles(mol, canonical=True) not in RETAINED_AMINO_ACID_ZWITTERIONS:
+        return False
+    from ..validation.pin_spelling import check_pin_spelling
+    return bool(check_pin_spelling(mol, name))
+
+
 def name_zwitterion(mol, style: str = 'pin') -> str:
     """
     Name a zwitterionic compound.
@@ -1458,9 +1468,21 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     if mol is None:
         return ''
 
-    # Check for retained amino acid names first (: amino-acid zwitterions +
-    # betaines sequenced first). These (glycine / L-alanine /...) are valid
-    # OPSIN-parseable retained names per (which allows retained names).
+    # first, at every tier (the maintainers' ruling of 2026-11-01): the anion is the parent and each ammonium group
+    # a prefix ('azaniumylacetate', '(2S)-2-azaniumylpropanoate', '(2-azaniumylacetamido)acetate'): (the Blue Book)
+    # names a zwitterion on its anion, "Ionization of characteristic groups" (:54556) gives 'azaniumylacetate glycine
+    # zwitterion' (:54561), and the retained names of Chapter have no PIN,:50943). GUARD 4: the
+    # route_charged chokepoint owns the anion-is-parent override + the structured (...azaniumyl) cation prefix. This
+    # REPLACES the deleted hardcoded "2-azaniumyl{base}" / "betaine" / "ammonio{base}" f-string band-aids
+    # (fix-methodology.md: structured, not literal).
+    from .charged_router import route_charged
+    routed = route_charged(mol, style)
+    if routed and not _breaks_a_pin_spelling_rule_with_a_retained_name_at_hand(mol, routed, style):
+        return routed
+
+    # The retained zwitterion table ('glycine', 'L-alanine',...) is the fallback when no name is built: a name of
+    # the neutral drawing, no PIN, shipped at the wider tiers (: amino-acid zwitterions + betaines sequenced
+    # first). Checked after the route, no longer before it.
     if style != 'systematic':
         canonical = Chem.MolToSmiles(mol, canonical=True)
         if canonical in RETAINED_AMINO_ACID_ZWITTERIONS:
@@ -1471,15 +1493,6 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
             from ..data.amino_acids import record_if_non_pin_amino_acid_name
             record_if_non_pin_amino_acid_name(_retained)
             return _retained
-
-    # GUARD 4: the route_charged chokepoint owns the anion-is-parent
-    # override + the structured (…azaniumyl) cation prefix. This
-    # REPLACES the deleted hardcoded "2-azaniumyl{base}" / "betaine" / "ammonium
-    # {base}" f-string band-aids (fix-methodology.md: structured, not literal).
-    from .charged_router import route_charged
-    routed = route_charged(mol, style)
-    if routed:
-        return routed
 
     # charged Slice B, correcting the 4782742f over-reach): the
     # NEUTRAL-form name of a zwitterion is NOT its PIN. (the Blue Book

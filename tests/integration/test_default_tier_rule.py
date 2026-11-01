@@ -37,11 +37,14 @@ from tests.unit.rules.test_d1_coordination_v36 import HEME_B
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
-# '(trimethylazaniumyl)acetate': the code records a carbon-substituted N+ cited as
-# 'azaniumyl' as not the PIN, the Blue Book,
-# '(N,N-dimethylmethanaminiumyl)acetate (PIN) (trimethylammoniumyl)acetate').
-BETAINE = "C[N+](C)(C)CC(=O)[O-]"
-BETAINE_NAME = "(trimethylazaniumyl)acetate"
+# '[ethyldi(methyl)azaniumyl]acetate': the code records a carbon-substituted N+ cited as 'azaniumyl' as not the PIN
+#, the Blue Book, '(N,N-dimethylmethanaminiumyl)acetate (PIN) (trimethylammoniumyl)acetate'). The
+# nitrogen with THREE methyl groups is the one group of that example that has the '-aminiumyl' spelling (twin rule
+# ``aminiumyl_azaniumyl``, ruling of 2026-11-01), so this canonical decline is the ethyl-dimethyl analogue; the
+# trimethyl betaine is pin_verified through its twin (``test_the_trimethyl_betaine_is_the_aminiumyl_pin``).
+BETAINE = "CC[N+](C)(C)CC(=O)[O-]"
+BETAINE_NAME = "[ethyldi(methyl)azaniumyl]acetate"
+TRIMETHYL_BETAINE = "C[N+](C)(C)CC(=O)[O-]"
 CAFFEINE = "Cn1cnc2c1c(=O)n(C)c(=O)n2C"
 
 
@@ -53,10 +56,19 @@ def test_a_pin_verified_name_is_emitted():
     assert name_compound(CAFFEINE) == row["name"]
 
 
+def test_the_trimethyl_betaine_is_the_aminiumyl_pin():
+    """ (the Blue Book) '(N,N-dimethylmethanaminiumyl)acetate (PIN)': OPSIN reads no '-aminiumyl' prefix, the
+    twin '(trimethylazaniumyl)acetate' proves the structure (``validation.twin_spellings``, ``aminiumyl_azaniumyl``)."""
+    row = Orthonym().name_tiered(TRIMETHYL_BETAINE)
+    assert (row["name"], row["tier"], row["is_pin"], row["opsin"]) == (
+        "(N,N-dimethylmethanaminiumyl)acetate", "pin_verified", True, "verified_twin"), row
+    assert_full_rt(row["name"], TRIMETHYL_BETAINE)   # the independent read reads the twin spelling of the same group
+
+
 def test_a_name_the_code_records_as_not_the_pin_is_declined_everywhere():
     row = assert_default_tier_declines(BETAINE)
     assert row["source"] == "abstain" and row["gate_outcome"] == "suppressed", row
-    assert row["formula"] == "C5H11NO2", row
+    assert row["formula"] == "C6H13NO2", row
     # the plain call, name_compound, raise_on_limit, classify_limit, confidence
     assert is_failure_name(Orthonym().name(BETAINE, on_failure="label"))
     assert name_compound(BETAINE, emit_tier="pin", on_failure="label") == row["name"]

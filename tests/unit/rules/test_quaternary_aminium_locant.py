@@ -85,7 +85,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "C[N+](C)(C)CCCC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -147,7 +146,7 @@ def test_quaternary_aminium_bug_fixes_rt_exact(smiles, expected):
 @pytest.mark.parametrize("smiles,expected", [
     ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
     ("c1cccc[n+]1C", "1-methylpyridin-1-ium"),
-    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
+    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate"),
     # / substitutive '-bis(aminium)' PIN (the Blue Book,:42366)
     ("C[N+](C)(C)CCCCCC[N+](C)(C)C",
      "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)"),

@@ -31,14 +31,21 @@ def _terminal_attach(m):
     return candidates[-1]
 
 
+# The aminiumyl PIN prefix (ruling R5, RULINGS-ANION.md): "Prefix names" method (1) (the Blue Book, "all
+# prefix names are formed by adding the suffixes 'yl', 'ylidene', etc. to the cation name") leads to the PIN (:42299);
+# the example at:42473 is '(N,N-dimethylmethanaminiumyl)acetate (PIN)' for what was '(trimethylazaniumyl)acetate'. The
+# substituent namer spells it so at the PIN-spelling default; each name reads back to the input's full InChIKey through its
+# azaniumyl twin (validation/twin_spellings.py), the spelling OPSIN 2.9.0 reads.
+
+
 def test_cationic_branch_substituent():
     """C[N+](C)(C)CC rooted at the terminal ethyl carbon ->
-    2-(trimethylazaniumyl)ethyl -- the exact RT-verified target in the spec
-    (docs/the workflow tooling/specs/2026-08-17--phase3-cationic-substituent-capability.md)."""
+    2-(N,N-dimethylmethanaminiumyl)ethyl method (1), the aminiumyl PIN prefix; was
+    2-(trimethylazaniumyl)ethyl, spec docs/the workflow tooling/specs/2026-08-17--phase3-cationic-substituent-capability.md)."""
     m = Chem.MolFromSmiles("C[N+](C)(C)CC")
     attach = _terminal_attach(m)
     frag = frozenset(a.GetIdx() for a in m.GetAtoms())
-    assert name_substituent(m, frag, attach) == "2-(trimethylazaniumyl)ethyl"
+    assert name_substituent(m, frag, attach) == "2-(N,N-dimethylmethanaminiumyl)ethyl"
 
 
 def test_cationic_branch_substituent_three_carbon_chain():
@@ -48,7 +55,7 @@ def test_cationic_branch_substituent_three_carbon_chain():
     m = Chem.MolFromSmiles("C[N+](C)(C)CCC")
     attach = _terminal_attach(m)
     frag = frozenset(a.GetIdx() for a in m.GetAtoms())
-    assert name_substituent(m, frag, attach) == "3-(trimethylazaniumyl)propyl"
+    assert name_substituent(m, frag, attach) == "3-(N,N-dimethylmethanaminiumyl)propyl"
 
 
 def test_cationic_branch_one_carbon_locant_elided():
@@ -59,7 +66,7 @@ def test_cationic_branch_one_carbon_locant_elided():
     m = Chem.MolFromSmiles("C[N+](C)(C)C")
     attach = 0  # the first carbon (the methyl that is the sole backbone)
     frag = frozenset(a.GetIdx() for a in m.GetAtoms())
-    assert name_substituent_fragment(m, frag, attach, set()) == "(trimethylazaniumyl)methyl"
+    assert name_substituent_fragment(m, frag, attach, set()) == "(N,N-dimethylmethanaminiumyl)methyl"
 
 
 def test_direct_attach_shape_unaffected_by_generic_namer():
@@ -107,7 +114,7 @@ def test_choline_sulfate_via_capability(namer):
     # this enabler alone may still leave the zwitterion abstaining. Either the
     # RT-valid target or an honest abstention is acceptable here -- never a
     # wrong-molecule name.
-    assert out in ("2-(trimethylazaniumyl)ethyl sulfate", "unknown organic compound")
+    assert out in ("2-(N,N-dimethylmethanaminiumyl)ethyl sulfate", "unknown organic compound")
 
 
 # ---------------------------------------------------------------------------

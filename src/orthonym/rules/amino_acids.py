@@ -13,6 +13,7 @@ Peptide guard: molecules with peptide bonds (-C(=O)-NH-) are NOT simple amino
 acids and must NOT be flattened to "2-aminoXXXanoic acid".
 """
 
+import contextlib
 import contextvars
 from typing import Optional, Tuple
 
@@ -248,6 +249,20 @@ _RETAINED_OFF: contextvars.ContextVar = contextvars.ContextVar("orthonym_retaine
 def retained_amino_acid_names_off() -> bool:
     """Whether the running naming leaves the retained amino-acid names out (:func:`systematic_amino_acid_name`)."""
     return _RETAINED_OFF.get()
+
+
+@contextlib.contextmanager
+def retained_amino_acid_names_left_out():
+    """Within the block the retained amino-acid names are not offered (:func:`retained_amino_acid_names_off` holds).
+
+    For a producer that names the NEUTRAL molecule of an amino-acid ion to build the ion's name from it: the
+    zwitterion of is 'azaniumylacetate', built from the systematic 'aminoacetic acid', the Blue Book,
+    Table 10.4:54186), not from 'glycine', a Chapter name with no PIN,:50943) that has no 'amino' to change."""
+    token = _RETAINED_OFF.set(True)
+    try:
+        yield
+    finally:
+        _RETAINED_OFF.reset(token)
 
 
 def systematic_amino_acid_name(mol) -> Optional[str]:

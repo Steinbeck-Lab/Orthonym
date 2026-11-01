@@ -4,9 +4,11 @@
 the ionic centers in the same parent structure are not considered as neutral compounds". The standard InChIKey does
 not see where the hydrons sit, so the round trip passes for the neutral name; the label is systematic_verified (the
 drawing as written is the structure to name, the contributor guide "Scope"), where it was pin_unverified. Only a name the strict
-path does not build is lowered: ``L-alanine`` for the alanine zwitterion is the strict path's own name,
-:54518: "to name the amino acid alanine as 2-aminopropanoic acid rather than as 2-azaniumylpropanoate") and keeps
-pin_verified.
+path does not build is lowered. A zwitterionic amino acid is named by the strict path itself, by method (1) of
+ "Zwitterionic amino acids are named in two ways" (the Blue Book, example:54561 'azaniumylacetate'),
+the cationic prefix on the anionic parent,:42473): ``(2S)-2-azaniumylpropanoate`` for the alanine
+zwitterion, a PIN at every tier (ruling R6, RULINGS-ANION.md). (:54518) names the neutral drawing
+'2-aminopropanoic acid', which is the other drawing.
 """
 import pytest
 
@@ -41,9 +43,9 @@ def test_no_structure_or_no_name_is_not_a_zwitterion_drawing():
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles, name, label", [
-    ("[NH3+][C@@H](CS)C(=O)[O-]", "(2R)-2-amino-3-sulfanylpropanoic acid", "systematic_verified"),
+    ("[NH3+][C@@H](CS)C(=O)[O-]", "(2R)-2-azaniumyl-3-sulfanylpropanoate", "pin_verified"),
     ("NC(=[NH2+])NCC(=O)[O-]", "(carbamimidoylamino)acetic acid", "systematic_verified"),
-    ("C[C@H]([NH3+])C([O-])=O", "L-alanine", "systematic_verified"),         # the strict path's own name, no PIN
+    ("C[C@H]([NH3+])C([O-])=O", "(2S)-2-azaniumylpropanoate", "pin_verified"),  # the strict path's own name
     ("C[N+]1=CC=CC=C1C([O-])=O", "1-methylpyridin-1-ium-2-carboxylate", "pin_verified"),
 ])
 def test_the_label_of_a_zwitterion_drawing_at_the_best_effort_tier(smiles, name, label):
@@ -52,7 +54,7 @@ def test_the_label_of_a_zwitterion_drawing_at_the_best_effort_tier(smiles, name,
 
 
 @pytest.mark.opsin_gate
-def test_the_pin_tier_is_unchanged():
-    #:50943: the retained amino-acid name is no PIN, so the PIN tier declines it
-    assert not name_compound("C[C@H]([NH3+])C([O-])=O", emit_tier="pin")
+def test_the_pin_tier_names_the_zwitterion():
+    # (the Blue Book): method (1), the name;:50943 gives the retained name no PIN
+    assert name_compound("C[C@H]([NH3+])C([O-])=O", emit_tier="pin") == "(2S)-2-azaniumylpropanoate"
     assert name_compound("C[N+]1=CC=CC=C1C([O-])=O", emit_tier="pin") == "1-methylpyridin-1-ium-2-carboxylate"

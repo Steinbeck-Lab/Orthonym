@@ -16,6 +16,8 @@ import contextvars
 import re
 from typing import Callable, Optional
 
+from rdkit import Chem
+
 _HETERO_A = (r"(?:oxa|thia|selena|tellura|aza|phospha|arsa|stiba|bisma|sila|germa"
              r"|stanna|plumba|bora)")
 
@@ -551,9 +553,16 @@ def _di_compound(name: str) -> Optional[str]:
 
 # (multiplicative nomenclature) with: identical parent acids on
 # one central unit are multiplied -- '2,2'-(naphthalene-2,3-diyl)diacetic acid (PIN)',
-# '2,2'-azanediyldiacetic acid' -- so an acetic acid (acetate) parent carrying a
-# 'carboxymethyl' (another acetic acid unit) is not the PIN spelling.
-_CARBOXYMETHYL_ON_ACETIC = re.compile(r"carboxymethyl.*acet(?:ic acid|ate)$")
+# '2,2'-azanediyldiacetic acid' -- so an acetic acid parent carrying a 'carboxymethyl'
+# (another acetic acid unit) is not the PIN spelling. An ACETATE parent carrying one is: the anion beside an acid is the
+# partial anion of method (1) (the Blue Book, "by substitutive nomenclature in which the free acid is
+# cited as a prefix to the name of the anion",:31596 "Method (1) generates preferred IUPAC names"), and multiplicative
+# nomenclature does not apply: its parents are two different classes, an anion and an acid (the maintainers' ruling of
+# 2026-11-01, '[bis(carboxymethyl)amino]acetate (PIN)').
+_CARBOXYMETHYL_ON_ACETIC = re.compile(r"carboxymethyl.*acetic acid$")
+
+#: a free carboxylic acid group (``_acid_beside_a_carboxylate``)
+_FREE_CARBOXYLIC_ACID = Chem.MolFromSmarts("[CX3](=O)[OX2H1]")
 
 # (the Blue Book, a -CO-NH2 group that is not the suffix):
 # "For generation of IUPAC preferred names, method (1) is preferred for chains"
@@ -1277,9 +1286,29 @@ def multiplicative_pin_expected(mol) -> bool:
     Nothing but a substitutive name is judged by it: the caller leaves the names of the
     multiplicative, skeletal-replacement, retained-name, amino-acid and inorganic-acid
     routes alone."""
+    if _acid_beside_a_carboxylate(mol):
+        return False
     return bool(_ring_unit_multiplicative_pin_expected(mol)
                 or _chain_unit_multiplicative_expected(mol)
                 or _pg_free_unit_multiplicative_expected(mol))
+
+
+def _acid_beside_a_carboxylate(mol) -> bool:
+    """True for a molecule that holds a carboxylate beside a carboxylic acid group: the partial anion of an acid.
+
+    Multiplicative nomenclature is preferred for "multiple occurrences of identical parent structures",
+    the Blue Book), and condition (3) requires the suffix groups on them to be identical (:23184). The anion is the
+    principal characteristic group, class 4 'Anions',:18167, before class 7 'Acids';,:41261), and an
+    'ate' and an 'ic acid' are two parents: method (1) (:31593) names the partial anion with the free acid as a
+    prefix, '[bis(carboxymethyl)amino]acetate (PIN)' (the maintainers' ruling of 2026-11-01). The principal-group perception
+    reports the acid groups only, so the rules below would count the acid units of the anion as all the units."""
+    try:
+        from ..perception.ions import get_ion_sites
+        from .ions import classify_anion
+        return (any(classify_anion(mol, a) == 'carboxylate' for a in get_ion_sites(mol)['anions'])
+                and mol.HasSubstructMatch(_FREE_CARBOXYLIC_ACID))
+    except Exception:  # noqa: BLE001 - unknown: no claim
+        return False
 
 
 def _ring_unit_multiplicative_pin_expected(mol) -> bool:

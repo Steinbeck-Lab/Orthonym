@@ -77,8 +77,8 @@ def test_other_metals_keep_the_adduct_form_of_organic_ion_salts():
     for smiles, name in [
         ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Tc+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}technetium(2+) (2/1)"),
         ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Pu+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}plutonium(2+) (2/1)"),
-        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Tc+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}technetium(2+) (2/1)"),
-        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pu+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}plutonium(2+) (2/1)"),
+        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Tc+2]", f"4-oxopent-2-en-2-olate{EM_DASH}technetium(2+) (2/1)"),
+        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pu+2]", f"4-oxopent-2-en-2-olate{EM_DASH}plutonium(2+) (2/1)"),
     ]:
         row = _row(smiles, "best-effort")
         assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), smiles

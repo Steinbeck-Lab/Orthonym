@@ -91,10 +91,12 @@ def test_a_name_that_states_every_element_is_not_flagged(smiles, name, tier):
     assert row["stereo_unexpressed"] is False
 
 
-def test_a_retained_amino_acid_name_states_its_centre():
-    #:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes): the name is read at the best-effort tier only (the PIN tier declines it)
+def test_an_amino_acid_zwitterion_name_states_its_centre():
+    # (the Blue Book, example:54561): the zwitterion is named by the name, which cites the
+    # configuration with its descriptor; the retained 'L-phenylalanine' names the neutral acid and has no PIN
+    #:50943), so it no longer names the zwitterion (ruling R6, RULINGS-ANION.md)
     row = _namer("best-effort").name_tiered("[NH3+][C@@H](Cc1ccccc1)C(=O)[O-]")
-    assert row["name"] == "L-phenylalanine"
+    assert row["name"] == "(2S)-2-azaniumyl-3-phenylpropanoate"
     assert row["stereo_unexpressed"] is False
 
 
