@@ -164,7 +164,8 @@ def test_zinc_has_its_mechanisms():
         frozenset({2}),
         complete=True)
     assert has_mechanism("Zn", MACROCYCLE) is True
-    assert all(has_mechanism(s, MACROCYCLE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
+    assert all(has_mechanism(s, MACROCYCLE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED if s != "Mg")
+    assert has_mechanism("Mg", MACROCYCLE) is True     # magnesium porphyrins, the chlorophyll core
     assert has_mechanism("Zn", DATIVE) is True
     assert all(has_mechanism(s, DATIVE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", AMMINE) is True
@@ -178,7 +179,8 @@ def test_zinc_has_its_mechanisms():
     assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", ION_SALTS) is True
     assert has_mechanism("Zn", CARBANION_SALTS) is True
-    assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_1 + GROUP_2)
+    assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_1 + GROUP_2 if s != "Mg")
+    assert has_mechanism("Mg", DISCONNECT) is True     # a bonded Mg-N / Mg-X drawing is named through its ionic drawing
     assert all(has_mechanism(s, DISCONNECT) is False for s in NOT_ADMITTED)
 
 
@@ -198,7 +200,8 @@ def test_mechanism_lookup():
     assert has_mechanism("Xx", ION_SALTS) is False                         # an unknown symbol
     assert has_mechanism("Na", "no_such_mechanism") is False
     for symbol in GROUP_1 + GROUP_2:
-        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), symbol
+        extra = frozenset({MACROCYCLE, DISCONNECT}) if symbol == "Mg" else frozenset()
+        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}) | extra, symbol
         assert is_named_metal(symbol) is True, symbol
     assert is_named_metal("Xx") is False
 

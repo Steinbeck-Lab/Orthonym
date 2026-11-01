@@ -293,7 +293,7 @@ def test_the_predicate_is_no_longer_the_only_thing_that_lowers_the_label(monkeyp
     (TPP_BONDED_2, False),                       # one fragment: the label of a rewritten drawing is the rewrite's
     (TPP_DIANION + ".[Cu+2]", True),             # copper is admitted to MACROCYCLE since lane B2
     (TPP_DIANION + ".[Tc+2]", False),            # technetium is not
-    (TPP_DIANION + ".[Mg+2]", False),
+    (TPP_DIANION + ".[Mg+2]", True),             # magnesium is (the chlorophyll core)
     (TPP_DIANION, False),                        # no metal
     (TPP_FREE_BASE + ".[Zn+2]", False),          # the free base is no ion; the adduct predicate labels its name
     (PHTHALOCYANINE_ZN, False),                  # no porphyrin core
@@ -352,7 +352,7 @@ def test_the_ion_fragments_are_the_porphyrin_ions_of_an_admitted_assembly():
     (TPP_DIANION + ".[Tc+2]", False),
     (TPP_DIANION + ".[Zn+2].[Tc+2]", False),     # one metal outside: the whole assembly is outside
     (TPP_DIANION + ".[Na+].[Na+]", False),
-    (TPP_DIANION + ".[Mg+2]", False),
+    (TPP_DIANION + ".[Mg+2]", True),
     ("[Zn+2].[Cl-].[Cl-]", True),                # the guard reads the metals; the producer reads the fragments
 ])
 def test_the_guard_reads_the_table_for_every_metal_of_the_assembly(smiles, expected):
@@ -383,9 +383,9 @@ def test_the_guard_follows_the_scope_table(monkeypatch):
     assert assembly_admits_macrocycle(Chem.MolFromSmiles(TPP_DIANION + ".[Zn+2]")) is False
 
 
-def test_zinc_and_the_bonded_metals_alone_are_admitted_to_macrocycle():
+def test_zinc_magnesium_and_the_bonded_metals_alone_are_admitted_to_macrocycle():
     assert sorted(s for s, sc in METAL_SCOPE.items() if MACROCYCLE in sc.mechanisms) == sorted(
-        ["Zn", *BONDED_METALS])
+        ["Zn", "Mg", *BONDED_METALS])
 
 
 def test_the_adduct_reads_the_names_in_the_unverified_call_only():
@@ -426,10 +426,10 @@ START_ROWS = {
     PORPHINE_DIANION + ".[Pu+2]": (
         (_ABSTAIN_PIN["Tc"], "abstain", False, "UNSUPPORTED_ELEMENT"),
         (_VB_PORPHINE + "—plutonium(2+) (1/1)", "systematic_verified", False, None)),
-    # the salts of Groups 1 and 2 are named from their ions; the table does not admit them to MACROCYCLE
+    # the salts of Groups 1 and 2 are named from their ions; the table admits magnesium alone to MACROCYCLE
     TPP_DIANION + ".[Mg+2]": (
         (_ABSTAIN_PIN["Mg"], "abstain", False, "UNSUPPORTED_ELEMENT"),
-        ("magnesium " + _VB, "systematic_verified", False, None)),
+        ("magnesium 5,10,15,20-tetraphenylporphyrin-21,23-diide", "systematic_verified", False, None)),
     TPP_DIANION + ".[Ca+2]": (
         (_ABSTAIN_PIN["Ca"], "abstain", False, "UNSUPPORTED_ELEMENT"),
         ("calcium " + _VB, "systematic_verified", False, None)),
