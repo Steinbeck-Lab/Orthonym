@@ -1221,7 +1221,47 @@ def name_salt(mol, style: str = 'pin', *,
             mol, result, formatted_cations, anion_counts, systematic_anion_words)
     result = _charge_fixed_ratio_name(mol, result, cation_counts, anion_counts, hydrogen_prefix, frags,
                                       organic_cation_names)
-    return result + solvate_suffix
+    return _with_solvate_suffix(mol, result, solvate_suffix, hydrogen_prefix, frags['anions'])
+
+
+#: an acid group bonded to carbon with its hydron drawn on it: the site of the hydron is known
+_ORGANIC_ACID_ANION = Chem.MolFromSmarts('[#6][$([CX3](=O)[OX2H1]),$([SX4](=O)(=O)[OX2H1]),$([SX3](=O)[OX2H1])]')
+
+
+def _hydrogen_word_of_an_organic_acid(hydrogen_prefix: str, anions) -> bool:
+    """True when the word 'hydrogen' (method (2)) stands in the name of the salt of a polybasic ORGANIC acid.
+
+     (the Blue Book): "Method (1) generates preferred IUPAC names, except when the structure of the
+    acid salt is unknown": the free acid is cited as a prefix of the anion, 'potassium 6-carboxyhexanoate (PIN)' (:31602),
+    'sodium 3-carboxypropanoate'; the drawing of a salt gives the site of the hydron, so method (2), 'potassium hydrogen
+    heptanedioate', is the name of general nomenclature; a hydron written as a fragment of its own, '[K+].[H+].
+    [O-]C(=O)CCCCCC(=O)[O-]', has no site: the structure is unknown and method (2) is the PIN, 'sodium hydrogen
+    2-(carboxylatomethyl)benzoate (PIN)' (:31608). The acid salts of organic derivatives of polybasic INORGANIC
+    oxoacids (carbonic acid, methylphosphonic acid) are named by method (2) in a PIN,:31620), and their
+    acid group is not bonded to carbon: 'sodium hydrogen carbonate (PIN)'."""
+    return bool(hydrogen_prefix) and any(
+        a['mol'].HasSubstructMatch(_ORGANIC_ACID_ANION) for a in anions)
+
+
+def _with_solvate_suffix(mol, result: str, solvate_suffix: str, hydrogen_prefix: str = '', anions=()) -> str:
+    """``result`` with the water of crystallization cited as the word 'hydrate', labelled below the PIN.
+
+     Organic adducts (the Blue Book): "Solvates, including hydrates (see, are treated as
+    adducts and preferred IUPAC names must use the notation for denoting the proportion of components described
+    above. In general nomenclature, hydrates may be named by adding the words 'hydrate' to the name preceded by an
+    appropriate numerical prefix". The word 'hydrate' is the general-nomenclature form, and (:4667) gives
+    a mixed organic - inorganic adduct no preferred name. A carbon-free compound keeps the label of its naming path
+    (user decision 2026-09-30, ``namer._is_carbon_free_compound``). Label only: the name is unchanged."""
+    name = result + solvate_suffix
+    if solvate_suffix and result and any(a.GetAtomicNum() == 6 for a in mol.GetAtoms()):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name, rule="P-14.8.1",
+                             detail="the word 'hydrate' is general nomenclature; a hydrate is an adduct (1/1) in a PIN")
+    elif result and _hydrogen_word_of_an_organic_acid(hydrogen_prefix, anions):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name, rule="P-65.6.2.3.1",
+                             detail="method (1), the free acid cited as a prefix of the anion, generates the preferred name")
+    return name
 
 
 #: A cation word that states its charge: an oxidation number '(III)' or a charge

@@ -99,19 +99,18 @@ def test_control(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
 
 
-# The multiplier of a hydro-prefixed prefix is 'bis' where the free valence is on the nitrogen of a hydro-azine too,
-# but those two names are no PINs: the nitrogen of quinoline and isoquinoline has no hydrogen to give, so the
-# attachment is expressed by added hydrogen, (the Blue Book), '1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one
-# (PIN)' (:29376), 'bis(3,4-dihydroquinolin-1(2H)-yl)methanone'. They were pin_verified rows of this test before; the
-# PIN tier declines them now and the best-effort tier keeps them (the spelling check, checks_hydrogen.py).
+# The multiplier of a hydro-prefixed prefix is 'bis' where the free valence is on the nitrogen of a hydro-azine too.
+# The nitrogen of quinoline and isoquinoline has no hydrogen to give, so the attachment is expressed by added hydrogen,
+# (the Blue Book), '1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one (PIN)' (:29376): 'bis(3,4-dihydroquinolin-
+# 1(2H)-yl)methanone'. These two were below the PIN while the prefix was written with 'hydro' only
+# ('bis(1,2,3,4-tetrahydroquinolin-1-yl)methanone'); the prefix is built now (lane PINREST) and 'bis' is.
 @pytest.mark.parametrize("smiles,name", [
-    ("O=C(N1CCc2ccccc2C1)N1CCc2ccccc2C1", "bis(1,2,3,4-tetrahydroisoquinolin-2-yl)methanone"),
-    ("O=C(N1CCCc2ccccc21)N1CCCc2ccccc21", "bis(1,2,3,4-tetrahydroquinolin-1-yl)methanone"),
+    ("O=C(N1CCc2ccccc2C1)N1CCc2ccccc2C1", "bis(3,4-dihydroisoquinolin-2(1H)-yl)methanone"),
+    ("O=C(N1CCCc2ccccc21)N1CCCc2ccccc21", "bis(3,4-dihydroquinolin-1(2H)-yl)methanone"),
 ])
-def test_bis_below_the_pin_where_the_attachment_needs_added_hydrogen(smiles, name):
-    from tests.support.pin_tiers import assert_declined_at_default, name_breadth
-    assert_declined_at_default(smiles)
-    assert name_breadth(smiles)["name"] == name
+def test_bis_where_the_attachment_needs_added_hydrogen(smiles, name):
+    from tests.support.pin_tiers import assert_pin_at_both_tiers
+    assert_pin_at_both_tiers(smiles, name)
 
 
 @pytest.mark.parametrize("prefix,hydro,mult", HELPER_ROWS)

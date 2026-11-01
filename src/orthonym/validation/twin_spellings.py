@@ -59,6 +59,9 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   and its acyloxy spelling '1,3-bis[acetyloxy]-2-[propanoyloxy]propane', substitutive nomenclature of
   the same ester,:31968). OPSIN reads the second and not the first. A half ester of a
   polybasic acid has no acyloxy spelling OPSIN reads, and its name does not ship.
+* ``preselected_cage`` (``validation.preselected_cage_twin``): (the Blue Book) 'bicyclo[4.2.1]nonasilane
+  (preselected name)' (:23618) and its general-nomenclature spelling by skeletal replacement 'nonasilabicyclo[4.2.1]nonane',
+  which OPSIN reads; the preselected name of a von Baeyer or spiro system of one noncarbon element.
 * ``halido_o`` (``validation.halido_twin``): (the Blue Book) 'trichlorido(methyl)titanium'
   (:39789) and the long-established ligand spelling 'trichloro(methyl)titanium',:39761,:39767),
   which OPSIN reads; the additive names of the transition-metal producer, without a hapto descriptor.
@@ -96,6 +99,7 @@ from .halido_twin import halido_twin
 from .long_count_read_back import LONG_COUNT_RULE, long_count_round_trip
 from .opsin_ambiguity import ambiguity_messages
 from .polyester_twin import polyester_has_free_acid, polyester_twin
+from .preselected_cage_twin import preselected_cage_twin
 from .thioperoxol_twin import ships_at_general_tier, thioperoxol_twin_round_trip
 from .uide_twin import uide_twin_round_trip
 
@@ -213,6 +217,7 @@ TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("aminiumyl_azaniumyl", _aminiumyl_azaniumyl),
     ("polyester_acyloxy", polyester_twin),
     ("halido_o", halido_twin),
+    ("preselected_cage", preselected_cage_twin),
 )
 
 

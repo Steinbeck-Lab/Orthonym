@@ -47,7 +47,6 @@ RETAINED_NAMES = {
     "c1ccc2cc3ccccc3cc2c1": "anthracene",
     "c1ccc2c(c1)ccc1ccccc12": "phenanthrene",
     "c1ccc2c(c1)Cc1ccccc1-2": "fluorene",  # Has sp3 carbon (methylene bridge)
-    "c1cc2c3c(cccc3c1)CC2": "acenaphthene",  # Has two sp3 carbons
     "C1=Cc2cccc3cccc1c23": "acenaphthylene",  # Fully aromatic
     "c1ccc2c(c1)ccc1c3ccccc3ccc21": "chrysene",
     "c1cc2cccc3c4cccc5cccc(c(c1)c23)c54": "perylene",

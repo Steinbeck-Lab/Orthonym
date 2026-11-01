@@ -31,7 +31,7 @@ class TestPolycyclicDataLookup:
         """All common PAHs should be in POLYCYCLIC_DATA."""
         expected_pahs = [
             'naphthalene', 'anthracene', 'phenanthrene', 'pyrene',
-            'fluorene', 'acenaphthene', 'acenaphthylene', 'chrysene'
+            'fluorene', 'acenaphthylene', 'chrysene'
         ]
         for pah in expected_pahs:
             assert pah in POLYCYCLIC_DATA, f"{pah} not in POLYCYCLIC_DATA"
@@ -128,9 +128,11 @@ class TestPolycyclicRetainedNames:
         """Fluorene -> 9H-fluorene: (the Blue Book-11400): '(9H-isomer shown; the PIN is 9H-fluorene)'."""
         assert name_compound('c1ccc2c(c1)Cc1ccccc1-2') == '9H-fluorene'
 
-    def test_acenaphthene_retained(self):
-        """Acenaphthene -> acenaphthene"""
-        assert name_compound('c1cc2c3c(cccc3c1)CC2') == 'acenaphthene'
+    def test_acenaphthene_is_the_hydro_parent(self):
+        """Acenaphthene -> 1,2-dihydroacenaphthylene: the Blue Book has no name 'acenaphthene' ('acenaphthylene (PIN)',
+        the Blue Book; no other occurrence of the stem except the prefix 'acenaphtho'), and the hydro compound of a
+        retained parent is named with 'hydro' prefixes,. OPSIN reads the name to the structure."""
+        assert name_compound('c1cc2c3c(cccc3c1)CC2') == '1,2-dihydroacenaphthylene'
 
     def test_acenaphthylene_retained(self):
         """Acenaphthylene -> acenaphthylene"""

@@ -277,6 +277,77 @@ def a_chain_applies(mol) -> bool:
     return any(_is_a_chain(mol, path) for path in _paths(mol, allowed, ends))
 
 
+def _hanging_path(mol, ring_atoms, root):
+    """The atoms of the part of the molecule that hangs from the ring atom ``root`` by one bond, in order from the atom bonded
+    to the ring, when that part is an unbranched path of neutral atoms (no ring, no other attachment); else None."""
+    part, previous = [], None
+    here = root
+    while True:
+        part.append(here)
+        onward = [n.GetIdx() for n in mol.GetAtomWithIdx(here).GetNeighbors()
+                  if n.GetIdx() != previous and n.GetIdx() not in ring_atoms]
+        ring_nb = [n.GetIdx() for n in mol.GetAtomWithIdx(here).GetNeighbors() if n.GetIdx() in ring_atoms]
+        if len(onward) > 1 or (len(part) > 1 and ring_nb) or len(part) > _MAX_HEAVY_ATOMS:
+            return None
+        if not onward:
+            return part
+        previous, here = here, onward[0]
+
+
+def a_substituent_chain_applies(mol) -> bool:
+    """True when a chain that hangs from a ring by one bond has four or more heterounits between its carbon ends.
+
+     (the Blue Book) gives the 'a' name to "four or more heterounits... in a unbranched chain
+    containing at least one carbon atom", (:23430) ends the chain in carbon, so the atom bonded to the ring is
+    outside the chain when it is a heteroatom ('tetraoxatridecan-13-yl' of a '(...)oxy' group), and the substituent
+    group of the book's own example, 'N-(14-amino-3,6,9,12-tetraazatetradecan-1-yl)' (:23415, "since four heteroatoms are
+    also present in the N-substituent group, it must also be named by skeletal replacement ('a') nomenclature"),
+    is named the same way. The reading is conservative as the whole-chain one is: one neutral fragment, the hanging part an
+    unbranched path of saturated atoms with a carbon at the free end, nothing else."""
+    if mol is None or mol.GetNumHeavyAtoms() > _MAX_HEAVY_ATOMS or len(Chem.GetMolFrags(mol)) != 1:
+        return False
+    ring_atoms = {i for ring in mol.GetRingInfo().AtomRings() for i in ring}
+    if not ring_atoms:
+        return False
+    for root in sorted({n.GetIdx() for i in ring_atoms for n in mol.GetAtomWithIdx(i).GetNeighbors()} - ring_atoms):
+        if sum(1 for n in mol.GetAtomWithIdx(root).GetNeighbors() if n.GetIdx() in ring_atoms) != 1:
+            continue
+        part = _hanging_path(mol, ring_atoms, root)
+        if part is None:
+            continue
+        # a terminal -OH / -SH is a suffix group on the chain's carbon end, not a unit of the chain ('...tetraoxatetradecan-1-ol')
+        if (len(part) > 2 and mol.GetAtomWithIdx(part[-1]).GetSymbol() in ("O", "S")
+                and mol.GetAtomWithIdx(part[-1]).GetDegree() == 1):
+            part = part[:-1]
+        atoms = [mol.GetAtomWithIdx(i) for i in part]
+        if any(a.GetFormalCharge() or a.GetNumRadicalElectrons() or a.GetIsAromatic() for a in atoms):
+            continue
+        symbols = [a.GetSymbol() for a in atoms]
+        if symbols[-1] != "C" or any(sym != "C" and sym not in _HETERO for sym in symbols):
+            continue
+        if any(b.GetBondType() != _SINGLE for a in atoms for b in a.GetBonds()):
+            continue
+        chain = part[1:] if symbols[0] != "C" else part
+        # a nitrogen of the chain is read only for a whole chain (``_n_policy_ok``): here the units are carbon and chalcogens
+        if chain and all(mol.GetAtomWithIdx(i).GetSymbol() == "C"
+                         or (mol.GetAtomWithIdx(i).GetSymbol() in _CHALCOGEN and _plain(mol.GetAtomWithIdx(i)))
+                         for i in chain):
+            units = _heterounits(mol, chain)
+            if units is not None and units >= 4 and mol.GetAtomWithIdx(chain[0]).GetSymbol() == "C":
+                return True
+    return False
+
+
+@register(RULE)
+def a_substituent_chain_name_check(mol, name) -> Optional[SpellingFailure]:
+    """A failure when a chain of four or more heterounits hangs from a ring of ``mol`` and ``name`` has no 'a' block."""
+    if not name or not a_substituent_chain_applies(mol) or names_an_a_chain(name):
+        return None
+    return SpellingFailure(
+        RULE, "skeletal replacement 'a' name required: a chain hanging from a ring has four or more heterounits "
+              "between its carbon ends (P-51.4.1.1, P-51.4.1.4), and the name has no 'a' prefix block on an acyclic stem")
+
+
 @register(RULE)
 def a_chain_name_check(mol, name) -> Optional[SpellingFailure]:
     """A failure when ``mol`` is a chain that gives an 'a' PIN and ``name`` has no 'a' block; None when

@@ -40,12 +40,8 @@ from tests.support.pin_tiers import assert_declined_at_default, assert_pin_at_bo
 pytestmark = pytest.mark.opsin_gate
 
 DECLINED_ROWS = [
-    #:3725
-    "CC(=O)N1CCCc2ccccc21",
-    "CCC(=O)N1CCCc2ccccc21",
+    #:3725 (the carboxylic acid 'quinoline-1(2H)-carboxylic acid' form,:24701, is not built)
     "OC(=O)N1CCCc2ccccc21",
-    "CC(=O)N1CCc2ccccc2C1",
-    "CC(=O)N1CCNc2ccccc21",
     #:21730
     "CNC(=O)CCc1cc(CC(C)C(N)=O)ccc1C",
     "CNC(=O)CCc1ccccc1CC(C)C(N)=O",
@@ -67,6 +63,17 @@ DECLINED_ROWS = [
     "SSc1ccc(SS)cc1",
     "SSc1ccccc1",
     "SSCCSS",
+]
+
+# The ring-nitrogen prefixes of (:3725) are built since lane PINREST: the retained 'hydro' stem is not used for
+# a free valence on the nitrogen of a hydroquinoline, hydroisoquinoline or hydroquinoxaline, and the fusion-name
+# builder writes the added hydrogen. The first row is the book's own PIN (:29376, under; the others are the
+# same rule on the isomer, the homologue and the diaza analogue, each read back by an independent OPSIN call.
+ADDED_HYDROGEN_PINS = [
+    ("CC(=O)N1CCCc2ccccc21", "1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one"),
+    ("CCC(=O)N1CCCc2ccccc21", "1-(3,4-dihydroquinolin-1(2H)-yl)propan-1-one"),
+    ("CC(=O)N1CCc2ccccc2C1", "1-(3,4-dihydroisoquinolin-2(1H)-yl)ethan-1-one"),
+    ("CC(=O)N1CCNc2ccccc21", "1-(3,4-dihydroquinoxalin-1(2H)-yl)ethan-1-one"),
 ]
 
 CONTROL_ROWS = [
@@ -92,6 +99,21 @@ def test_declined_at_the_pin_tier_and_kept_below(smiles):
     assert_declined_at_default(smiles)
 
 
+@pytest.mark.parametrize("smiles,pin", ADDED_HYDROGEN_PINS)
+def test_added_hydrogen_at_the_ring_nitrogen_is_the_pin(smiles, pin):
+    assert_pin_at_both_tiers(smiles, pin)
+
+
 @pytest.mark.parametrize("smiles,pin", CONTROL_ROWS)
 def test_the_class_controls_stay_pins(smiles, pin):
+    assert_pin_at_both_tiers(smiles, pin)
+
+
+@pytest.mark.parametrize("smiles,pin", [
+    # no name 'acenaphthene' stands in the Blue Book ('acenaphthylene (PIN)',:11493); the hydro compound is named with
+    # 'hydro' prefixes,, as the substituted compounds already were
+    ("C1Cc2cccc3cccc1c23", "1,2-dihydroacenaphthylene"),
+    ("Clc1ccc2CCc3cccc1c23", "5-chloro-1,2-dihydroacenaphthylene"),
+])
+def test_acenaphthene_is_named_by_hydro_prefixes(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)

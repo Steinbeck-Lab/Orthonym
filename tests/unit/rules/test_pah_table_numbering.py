@@ -59,11 +59,11 @@ OPSIN_ROWS = {
 
 # the four rows of the table that are a hydro or indicated-hydrogen FORM of another parent keep an
 # empty numbering (see the comment on each row); the other ten above are filled
-HYDRO_FORM_ROWS = ('fluorene', 'acenaphthene', '9,10-dihydroanthracene', '1,2-dihydronaphthalene')
+HYDRO_FORM_ROWS = ('fluorene', '9,10-dihydroanthracene', '1,2-dihydronaphthalene')
 
 # the name an entry is read under: the retained 'fluorene' needs its indicated hydrogen, 'acenaphthene'
 # is named 1,2-dihydroacenaphthylene, the rest are their own name
-READ_AS = {'fluorene': '9H-fluorene', 'acenaphthene': '1,2-dihydroacenaphthylene'}
+READ_AS = {'fluorene': '9H-fluorene'}
 
 
 def _same_numbering(opsin_smiles, opsin_labels, entry):
@@ -220,7 +220,7 @@ def _isomers(parent_smiles):
 @pytest.mark.roundtrip
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize('name', [
-    'fluorene', 'acenaphthene', 'acenaphthylene', 'chrysene', 'tetracene', 'triphenylene', 'tetraphene',
+    'fluorene', 'acenaphthylene', 'chrysene', 'tetracene', 'triphenylene', 'tetraphene',
     'benzo[c]phenanthrene', 'pentacene', 'picene', 'perylene', 'benzo[pqr]tetraphene',
     '9,10-dihydroanthracene', '1,2-dihydronaphthalene'])
 def test_every_chloro_isomer_gets_the_lowest_locants(namer, name):

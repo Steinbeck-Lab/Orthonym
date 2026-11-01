@@ -8,6 +8,7 @@ Assembly order:
 4. Locanted suffix (principal group)
 """
 
+import functools
 import logging
 import re
 from collections import defaultdict, deque, namedtuple
@@ -4225,6 +4226,18 @@ def _fused_core_covers_ring_system(mol, atom_to_locant) -> bool:
     return True
 
 
+def _preselected_cage_first(assemble):
+    """ (the Blue Book): the preselected name of a cage of one noncarbon element comes first."""
+    @functools.wraps(assemble)
+    def named(mol, features):
+        from ..rules.preselected_cage import is_bare_single_element_cage, preselected_cage_result
+        found = (preselected_cage_result(mol, _classify_complex_ring(mol))
+                 if is_bare_single_element_cage(mol) else None)
+        return ComplexRingResult(*found) if found is not None else assemble(mol, features)
+    return named
+
+
+@_preselected_cage_first
 def _assemble_complex_ring_name(mol, features):
     """
     Assemble IUPAC name for a complex ring system.
