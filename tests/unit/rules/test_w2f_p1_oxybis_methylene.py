@@ -131,33 +131,19 @@ class TestAsymmetricSubstitutedBenzyloxy:
         # atom 6 = benzylic CH2, atom 7 = O -> retained preferred prefix
         assert _name_aryl_methyl_ether(mol, 6, 7) == "benzyloxy"
 
-    @pytest.mark.xfail(
-        reason="w2f p1 Task 7 DEFERRAL: the producer chokepoint is fixed "
-        "(test_chokepoint_substituted_ring + name_substituent_fragment now "
-        "emit '[(4-methoxyphenyl)methoxy]methyl' correctly), but the "
-        "benzene HANDLER declines PARENT SELECTION for this molecule — two "
-        "benzene rings each bearing an O-substituent (phenol-OH + anisole-OMe) "
-        "make it split at the central ether O instead of naming the phenol "
-        "ring with the full -CH2-O-CH2-anisole substituent (traced: no ESC-CALL "
-        "n>=3; general_acyclic 'empty parent stem'). The methyl-far-ring "
-        "variant (single ring-substituent) DOES route through and names OK, "
-        "proving the residual is benzene-handler ring-disambiguation — OUT of "
-        "this plan's scope (Task 8: parent-selection edits are out of scope; "
-        "Out-of-scope #6 acceptable fail-closed residual). Stays fail-closed "
-        "(never-wrong). Gold W2F-P1-10 dropped; un-xfail + add gold when the "
-        "benzene-handler two-O-ring parent selection lands.",
-        strict=True,
-    )
     def test_asymmetric_target_braces_pin(self):
-        # strict escalation parens->brackets->braces (research)
-        assert name_compound("COc1ccc(COCc2ccc(O)cc2)cc1") == \
-            "4-{[(4-methoxyphenyl)methoxy]methyl}phenol"
-
-    def test_asymmetric_target_fails_closed_residual(self):
-        # DOCUMENTS the current never-wrong end state: the benzene-handler
-        # parent-selection residual keeps this fail-closed (unknown), NEVER a
-        # decoration-dropped wrong name. Paired with the xfail target above.
-        assert name_compound("COc1ccc(COCc2ccc(O)cc2)cc1", on_failure="label") == UNKNOWN
+        # strict escalation parens->brackets->braces (research).
+        # Lane DT5 (2026-11-01, change-asserted-value): the residual of w2f p1 Task 7 is gone. The writer for the phenol
+        # ring did not take a fragment of more than ten atoms that holds a ring, so the molecule was declined; it takes
+        # one when that ring bears the most principal groups (``ring_nitrogen_yl.ring_yl_branch_in_scope``): the
+        # phenol ring bears the only -OH, the Blue Book "The senior parent structure has the maximum
+        # number of substituents corresponding to the principal characteristic group"). OPSIN 2.9.0 and main read the
+        # name back to the full InChIKey; mutation: the size guard alone declines it again.
+        from tests.support.rt_assert import name_is_rt_exact
+        smiles = "COc1ccc(COCc2ccc(O)cc2)cc1"
+        name = name_compound(smiles)
+        assert name == "4-{[(4-methoxyphenyl)methoxy]methyl}phenol"
+        assert name_is_rt_exact(name, smiles)
 
     def test_benzyloxy_sibling_regression(self):
         # 'benzyloxy' is a concatenated (compound) prefix -- only the

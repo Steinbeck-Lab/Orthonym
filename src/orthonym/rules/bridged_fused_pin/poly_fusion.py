@@ -294,10 +294,6 @@ def _tree_readings(km, rings, comps):
     multiparent and benzo policies keep it: (b):12970 "the location that results in a name
     that does not require attached components higher than first-order")."""
     allr = frozenset(range(len(rings)))
-    # a three- or four-membered ring (an epoxide, a cyclopropane) is not built here: the engine names a
-    # saturated oxirane on a ring system by its bridge prefix or the von Baeyer name, and those names stand
-    if any(len(r) <= 4 for r in rings):
-        return None
     seniors = hf._senior(km, rings, list(comps.values()))
     if not seniors:
         return None

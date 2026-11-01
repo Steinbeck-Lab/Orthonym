@@ -6,11 +6,17 @@
 - A ketone on a saturated bridge atom needs none either (slice S1.8b,:28386):
   '1,2,3,4-tetrahydro-1,4-methanonaphthalen-9-one'.
 - Not pseudoketones of the ring system, so the builder still declines: an N-acyl group on a
-  ring nitrogen (an acyclic pseudoketone,:29370), a lactone beside an acyclic ester
+  ring nitrogen (an acyclic pseudoketone,:29370) and a lactone beside an acyclic ester
    :32112 "A lactone, as a pseudoketone, ranks lower in the seniority of classes
-  than an acid or an ester") and a lactone beside a nitrile:29628 "There is no
-  seniority order difference between ketones and pseudoketones"; nitriles are senior to
-  ketones,."""
+  than an acid or an ester").
+- A lactone beside a nitrile (change-asserted-value, lane DT5 2026-11-01): the row used to decline here
+  as "the nitrile is senior". It is: (the Blue Book) puts nitriles in class 14 and
+  "ketones..., pseudoketones..." in class 16:29628 "There is no seniority order difference
+  between ketones and pseudoketones"), so the nitrile takes the suffix and the lactone is the 'oxo' prefix,
+  as (:32120) prints for a lactone beside an acid: '8-oxo-7-oxabicyclo[4.2.0]octane-4,5-
+  dicarboxylic acid (PIN)'. Independent check: OPSIN 2.9.0 and main read the name below back to the
+  input's full InChIKey (a fresh parse outside the engine, ``PSEUDOKETONE_BESIDE_NITRILE``); mutation:
+  ``bridged_fused_pin._pseudoketone_principal`` returning None for a senior group fails the test."""
 import pytest
 from rdkit import Chem
 
@@ -27,7 +33,10 @@ DECLINE = [
     "CC(=O)N1CC2C3CCC(C3)C2C1",          # N-acetyl on a ring nitrogen
     "COC(=O)C1CC2CC1C1C(=O)OCC21",       # lactone + methyl ester: the ester is senior
     "CC(=O)OC1CC2CC1C1C(=O)OCC21",       # lactone + acetate ester: the ester is senior
-    "N#CC1CC2CC1C1C(=O)OCC21",           # lactone + nitrile: the nitrile is senior
+]
+#: a lactone beside a nitrile: the nitrile (class 14) takes the suffix, the lactone (class 16) is 'oxo'
+PSEUDOKETONE_BESIDE_NITRILE = [
+    ("N#CC1CC2CC1C1C(=O)OCC21", "3-oxooctahydro-4,7-methano-2-benzofuran-5-carbonitrile"),
 ]
 
 
@@ -49,3 +58,13 @@ def test_names_the_added_hydrogen_rule_must_keep(smiles, name, tier):
 @pytest.mark.parametrize("smiles", DECLINE)
 def test_groups_that_are_not_pseudoketones_of_the_ring_system_decline(smiles):
     assert build(Chem.MolFromSmiles(smiles)) is None
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("tier", ["pin", "best-effort"])
+@pytest.mark.parametrize("smiles,name", PSEUDOKETONE_BESIDE_NITRILE)
+def test_a_lactone_beside_a_nitrile_is_the_oxo_prefix(smiles, name, tier):
+    from tests.support.rt_assert import name_is_rt_exact
+    assert name_is_rt_exact(name, smiles)
+    row = _row(smiles, tier)
+    assert (row.get("name"), row["tier"]) == (name, "pin_verified"), (row.get("name"), row["tier"])

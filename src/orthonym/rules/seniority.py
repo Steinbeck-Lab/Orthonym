@@ -1351,6 +1351,14 @@ def _first_principal_group(
     return None, []
 
 
+#: the amidine and its amidrazone relatives, whose carbon and nitrogens are ring atoms when the ring holds the
+#: whole unit. "Amidrazone suffixes" (the Blue Book): the suffixes 'hydrazonamide' and
+#: 'carbohydrazonamide', 'imidohydrazide' and 'carboximidohydrazide' name R-C(NH2)=N-NH2 on a parent hydride;
+#: the 'carbo' form is the one for "a cyclic parent hydride", whose group carbon is outside the ring, so a
+#: -C(=N-N)-N- unit with every atom in the ring is skeletal like the amidine of
+_AMIDINE_LIKE_CLASSES = ("amidine", "hydrazonamide", "hydrazidine", "imidohydrazide")
+
+
 def without_ring_skeleton_amidine(
     functional_groups: Dict[str, List[tuple]],
     ring_atoms,
@@ -1366,10 +1374,12 @@ def without_ring_skeleton_amidine(
     1,8-diazabicyclo[5.4.0]undec-7-ene), so no '-imidamide' suffix stands on it and the ring
     system is the parent. A group of another kind that the ring carries is still seen once
     the skeletal amidine is set aside."""
-    amidines = functional_groups.get('amidine')
-    if not amidines or not all(all(i in ring_atoms for i in match) for match in amidines):
+    drop = {cls for cls in _AMIDINE_LIKE_CLASSES
+            if functional_groups.get(cls)
+            and all(all(i in ring_atoms for i in match) for match in functional_groups[cls])}
+    if not drop:
         return functional_groups
-    return {k: v for k, v in functional_groups.items() if k != 'amidine'}
+    return {k: v for k, v in functional_groups.items() if k not in drop}
 
 
 def guanidine_parent_matches(mol, matches) -> List[tuple]:

@@ -4495,8 +4495,8 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
 
-            from ..metrics.abstention import ring_system_unnameable
-            return ring_system_unnameable(logger, f"Fused ring naming failed for {ring_type} system")
+            from ..rules.ring_ladder import next_rung_or_unnameable
+            return next_rung_or_unnameable(mol, features, logger, ring_type)
 
         else:
             # Not a complex ring - shouldn't reach here

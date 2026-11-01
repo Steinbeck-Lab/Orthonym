@@ -86,8 +86,13 @@ def test_guanidine_prefix_name_is_not_the_pin(smiles, non_pin):
 # The two rows of the item: a ring amidine -NH2 (an amine, class 19) beside an acyclic guanidine.
 # Primary amines (the Blue Book; 'quinolin-4-amine (PIN)',:26199) makes the ring
 # -NH2 an amine, junior to the guanidine; 'N-[2-(2-aminoquinolin-6-yl)ethyl]guanidine' is the
-# guanidine-parent name, verified by OPSIN but not certified (the ring prefix is a breadth
-# producer's), so the best-effort tier ships it as pin_unverified and the default tier declines.
+# guanidine-parent name. Lane DT5 (2026-11-01, change-asserted-value): the row was pin_unverified at the
+# best-effort tier and declined at the default tier, because the quinolinyl prefix was a breadth producer's: the
+# fused '-yl' builder (DT4 F2b) declined it for the bare -NH2 of the ring. A ring that is itself a substituent
+# cites its -OH, -SH and -NH2 as prefixes, the Blue Book: the free valence is the 'suffix'), 'amino'
+# here, so the prefix is built and the name is certified at both tiers, as the dihydroquinolinyl row below.
+# Independent check: OPSIN 2.9.0 and main read the name back (``name_is_rt_exact``); mutation: with
+# ``bridged_fused_pin._assemble`` called without ``bare_prefixes`` the best-effort label is pin_unverified again.
 TARGET_ROWS = [
     ("Nc1ccc2cc(CCN=C(N)N)ccc2n1",
      "N-[2-(2-aminoquinolin-6-yl)ethyl]guanidine",
@@ -98,11 +103,8 @@ TARGET_ROWS = [
 @pytest.mark.parametrize("smiles,parent_name,ring_name", TARGET_ROWS)
 def test_ring_amidine_amine_beside_guanidine_names_the_guanidine(smiles, parent_name, ring_name):
     assert name_is_rt_exact(parent_name, smiles), parent_name
-    b = name_breadth(smiles)
-    assert (b.get("name"), b.get("tier")) == (parent_name, "pin_unverified"), b
-    assert b.get("producer") == "inner:guanidine", b
+    assert_pin_at_both_tiers(smiles, parent_name)
     assert_not_pin_labelled(smiles, ring_name)
-    assert_declined_at_default(smiles)
 
 
 def test_a_dihydroquinolinyl_arm_is_built_by_the_fusion_builder_and_the_guanidine_name_is_the_pin():

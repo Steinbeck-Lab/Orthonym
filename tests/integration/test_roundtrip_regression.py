@@ -41,9 +41,7 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-})
+DEFAULT_TIER_DECLINES = frozenset()      # lane DT5 (2026-11-01): the one row left, see _LARGE_POLYCYCLE_BLOCKED
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
@@ -147,11 +145,13 @@ _TIER_CONTRACT = {
 # xfail(strict) on that PIN contract, so the day Task 6a lands they XPASS and
 # must be unmarked; the best-effort name stays RT-exact
 # (test_large_polycycle_blocked_rows_best_effort_rt_exact below, not xfail).
-_LARGE_POLYCYCLE_BLOCKED = {
-    "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31":
-        "needs large-polycycle Task 6a: hydro bridged-fused PIN "
-        "(P-52.2.5.2; the von Baeyer name is not the PIN)",
-}
+#
+# Lane DT5 (2026-11-01, change-asserted-value): the one blocked row XPASSed. A three-membered ring is a
+# second-order fusion component now, the Blue Book; asks only for two rings of five
+# or more members), so the row has its bridged fused PIN, '4,4,7a,10a-tetramethyltetradecahydro-1b,10-methano
+# naphtho[2',1':3,4]cyclohepta[1,2-b]oxirene-5,6-diol' (OPSIN 2.9.0 and main read it back to the full InChIKey;
+# tests/unit/rules/test_dt5_ring_ladder.py), and the two tables below pin it.
+_LARGE_POLYCYCLE_BLOCKED = {}
 
 
 def _assert_large_polycycle_pin_contract(smiles):
@@ -302,7 +302,7 @@ ROUNDTRIP_VERIFIED = [
     ),
     (
         "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.1(1,13).0(4,9).0(14,16)]heptadecan-6,7-diol",
+        "4,4,7a,10a-tetramethyltetradecahydro-1b,10-methanonaphtho[2',1':3,4]cyclohepta[1,2-b]oxirene-5,6-diol",
     ),
     (
         "CC1(C)CCC2(C(=O)O)CCC3(C)C(=CCC4C5(C)CC(O)C(=O)C(C)(C)C5CCC43C)C2C1",
@@ -979,7 +979,7 @@ PHASE24_RT_IMPROVEMENTS = [
     # VB pentacyclo format with superscript locants
     (
         "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.1(1,13).0(4,9).0(14,16)]heptadecan-6,7-diol",
+        "4,4,7a,10a-tetramethyltetradecahydro-1b,10-methanonaphtho[2',1':3,4]cyclohepta[1,2-b]oxirene-5,6-diol",
         "vb-pentacyclo-superscript",
     ),
     # VB tricyclo format with dioxa + stereo

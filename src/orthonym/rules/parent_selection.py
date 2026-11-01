@@ -794,6 +794,35 @@ def select_parent(
     )
 
 
+def ring_system_with_most_groups(mol, ring_systems, senior, principal_group_atoms,
+                                 principal_group: Optional[str] = None):
+    """The ring system that holds more principal characteristic groups than the senior one, when
+    exactly one does, else None. ``### **** SENIORITY ORDER FOR PARENT STRUCTURES`` (the Blue Book),
+    **** (:18875): "The senior parent structure has the maximum number of substituents corresponding to
+    the principal characteristic group (suffix)" comes before the seniority of rings,. Offered only when
+    the senior system bears a group itself: a molecule whose groups all sit on other ring systems is decided
+    by the callers that exist for it. '2-(2-hydroxydecahydronaphthalen-1-yl)benzene-1,3-diol': two hydroxy
+    groups on the benzene ring, one on the decalin."""
+    # the namer hands over the matches of the principal subtype only (the secondary alcohols); the groups of its
+    # equal-seniority class (phenols, primary and tertiary alcohols) count as well, and the class union is
+    # what ``seniority.get_principal_group`` returns
+    from ..perception.functional_groups import detect_functional_groups
+    from .seniority import get_principal_group
+    pg, atoms = get_principal_group(mol, detect_functional_groups(mol))
+    if pg == principal_group and atoms:
+        principal_group_atoms = atoms
+    held = _count_pg_on_ring(mol, set(senior), principal_group_atoms, principal_group)
+    if not held:
+        return None
+    richer = [rs for rs in ring_systems if not (set(rs) & set(senior))
+              and _count_pg_on_ring(mol, set(rs), principal_group_atoms, principal_group) > held]
+    if len(richer) != 1:
+        return None
+    best = _count_pg_on_ring(mol, set(richer[0]), principal_group_atoms, principal_group)
+    return richer[0] if all(_count_pg_on_ring(mol, set(rs), principal_group_atoms, principal_group) <= best
+                            for rs in ring_systems) else None
+
+
 def _count_pg_on_ring(
     mol,
     ring_atoms: Set[int],
