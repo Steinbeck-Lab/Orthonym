@@ -13,8 +13,9 @@ The rule asks only what the key cannot: when the input draws a configured double
 InChI leaves out, and the OPSIN parse is the same constitution drawn the same way (equal canonical SMILES without
 stereo), the two canonical isomeric SMILES must be equal too. A parse drawn as another tautomer, or a molecule with
 no such bond, is never rejected by it ('n/a'), so a correct name is never lost to a drawing difference. A parse
-that carries no configuration on those bonds is an omission ('omission'), not another molecule: the name keeps the
-label it had, as for any stereodescriptor a name leaves out; only the opposite configuration ('mismatch') refuses it.
+that carries no configuration on those bonds is an omission ('omission'), not another molecule: the name ships, labelled
+below the PIN (``namer._record_key_blind_omission``,: a PIN cites each stereogenic unit); only the opposite
+configuration ('mismatch') refuses it.
 """
 from typing import Optional
 

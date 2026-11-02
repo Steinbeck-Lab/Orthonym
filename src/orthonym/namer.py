@@ -2274,8 +2274,11 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
         return "mismatch"
     # nor some other double-bond configurations (an amidine C=N): validation/key_blind_double_bonds.py
     from .validation.key_blind_double_bonds import key_blind_double_bond_verdict
-    if not ignore_stereo and key_blind_double_bond_verdict(input_smiles, opsin_smiles) == "mismatch":
+    _kb = None if ignore_stereo else key_blind_double_bond_verdict(input_smiles, opsin_smiles)
+    if _kb == "mismatch":
         return "mismatch"
+    if _kb == "omission":
+        _record_key_blind_omission(name)
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
     if ka is not None and kb is not None and ka == kb:
@@ -3138,11 +3141,25 @@ def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
             return "failed"
         # Nor some double-bond configurations (an amidine C=N): validation/key_blind_double_bonds.py.
         from .validation.key_blind_double_bonds import key_blind_double_bond_verdict
-        if key_blind_double_bond_verdict(input_smiles, opsin_smiles) == "mismatch":
+        _kb = key_blind_double_bond_verdict(input_smiles, opsin_smiles)
+        if _kb == "mismatch":
             return "failed"
+        if _kb == "omission":
+            _record_key_blind_omission(name)
     except Exception:
         return "failed"
     return "verified"
+
+
+def _record_key_blind_omission(name: str) -> None:
+    """A name that leaves out the configuration of a double bond the standard InChIKey does not see (an amidine C=N)
+    names the input, so it ships, and it is not the PIN: Stereodescriptors used in substitutive
+    nomenclature (the Blue Book) "In preferred IUPAC names, stereodescriptors, preceded by a locant, must be
+    cited to specify each stereogenic unit". Label only, as for a lone-pair centre left out."""
+    from .metrics.provenance import record_non_pin_label, record_stereo_unexpressed
+    record_stereo_unexpressed(True)
+    record_non_pin_label(name, rule="P-91.2.1.2.1",
+                         detail="the configuration of a double bond the standard InChIKey does not encode is not cited")
 
 
 def _np_exact_list_name(smiles: Optional[str]) -> Optional[str]:

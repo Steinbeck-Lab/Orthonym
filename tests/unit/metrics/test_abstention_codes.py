@@ -187,7 +187,11 @@ class TestEndToEndCodes:
     # frozen unnamed panel (benchmarks/unnamed_panel) with the same abstention code and detail under this
     # config: a bicyclo[4.1.0] ring system with a cyclopropane ring fused to a bicyclo[3.1.0] one, a skeleton no
     # ring-substituent namer has a name for.
-    _RING_FALLBACK_SMI = "C1[C@H]2[C@@H]1CC3CC3C2"   # PubChem CID 10887849
+    # Re-verified 2026-11-01: the former fixture, C1[C@H]2[C@@H]1CC3CC3C2 (PubChem CID 10887849), is named now
+    # (best-effort 'tricyclo[5.1.0.0^3,5]octane'); this one, a row of the DS non-stereo census
+    # (internal notes abstention BRANCH_UNNAMEABLE:enumerator_ring_fallback), still
+    # exhausts the ring ladder: a silanide branch on an O-acyl hydroxylamine of an aryl hydrazinium.
+    _RING_FALLBACK_SMI = "C[Si-](C)(C)CCOC(=O)ONc1cc(C(F)(F)F)ccc1N[NH3+]"
     # The same ladder exhaustion on a ring whose numbering has no tie. ``_RING_FALLBACK_SMI`` still
     # abstains with BRANCH_UNNAMEABLE (asserted above), but its phenyl ring has two equivalent
     # orientations, and the (g) tie-break of ``general_engine._orient_carbocycle`` names the
@@ -321,12 +325,13 @@ class TestConfidenceSurface:
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
 
     def test_confidence_dict_carries_abstention_on_failure_ring_witness(self):
-        # A frozen unnamed-panel row (PubChem CID 10887849) whose decline is not served from a seeded memo
-        # entry: name_with_confidence carries its BRANCH_UNNAMEABLE code.
+        # A ring-fallback witness (``TestEndToEndCodes._RING_FALLBACK_SMI``; the former one, PubChem CID 10887849, is
+        # named since 2026-11-01) whose decline is not served from a seeded memo entry: name_with_confidence carries
+        # its BRANCH_UNNAMEABLE code.
         meta = Orthonym(
             general_fallback=True, general_fallback_unverified=True,
             allow_aromatic_general=True).name_with_confidence(
-                "C1[C@H]2[C@@H]1CC3CC3C2")
+                TestEndToEndCodes._RING_FALLBACK_SMI)
         assert is_failure_name(meta["name"])
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
 

@@ -45,3 +45,24 @@ def test_a_salt_whose_name_omits_the_configuration_keeps_its_name():
     smiles = "CN/C(NCc1ccccc1)=[NH+]\\C.CN/C(NCc1ccccc1)=[NH+]\\C.O=S(=O)([O-])[O-]"
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert row["name"] == "bis(N-benzyl-N',N''-dimethylguanidinium) sulfate", row
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,name", [
+    ("C/N=C(/N)c1ccc(C(=O)O)cc1", "4-(N'-methylcarbamimidoyl)benzoic acid"),
+    ("C/C(N)=N/C", "N'-methylethanimidamide"),
+])
+def test_a_name_that_omits_the_configuration_is_not_the_pin(smiles, name):
+    """ Stereodescriptors used in substitutive nomenclature (the Blue Book): "In preferred IUPAC
+    names, stereodescriptors, preceded by a locant, must be cited to specify each stereogenic unit". The name that
+    leaves the key-blind configuration out still names the input, so it ships below the PIN; the PIN tier declines it.
+    The same drawing without a configuration keeps its PIN."""
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    best = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    assert (best["name"], best["tier"], best["is_pin"], best["stereo_unexpressed"]) == (
+        name, "systematic_verified", False, True), best
+    assert Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)["tier"] == "abstain"
+    plain = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(Chem.MolToSmiles(
+        Chem.MolFromSmiles(smiles), isomericSmiles=False))
+    assert plain["name"] == name and plain["tier"] == "pin_verified", plain
