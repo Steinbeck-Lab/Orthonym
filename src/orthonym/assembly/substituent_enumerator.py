@@ -49,6 +49,7 @@ from ..rules.seniority import get_prefix
 from ..errors import CASCADE_REFUSAL
 from .engine_prefix_ordering import engine_orders_with_mancude
 from .fused_ring_prefix import fused_ring_system_prefix
+from .ring_prefix_order import host_cited_ylidene_bonds, ring_prefix_in_pin_order
 from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
 from .n_unit_prefix import n_unit_prefix
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
@@ -2895,9 +2896,8 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 # producer, and the mononuclear-carrier branches whose descriptor
                 # is unlocanted) => byte-identical to before.
                 _carrier_pos: dict = {}
-                _ring_nm = name_ring_system_substituent(
-                    mol, sorted(frag_atoms_set), attach_idx,
-                    allow_enumerator_fallback=False,
+                _ring_nm = ring_prefix_in_pin_order(
+                    mol, frag_atoms_set, attach_idx,
                     allow_mancude=allow_mancude,
                     pos_out=_carrier_pos,
                 )
@@ -4301,7 +4301,7 @@ def _prepend_ring_substituent_stereo(mol, pos, token, frag_set=None):
             collect_stereodescriptors,
             format_stereodescriptor_string,
         )
-        descr = list(collect_stereodescriptors(mol, pos))
+        descr = list(collect_stereodescriptors(mol, pos, skip_bonds=host_cited_ylidene_bonds(mol, pos, frag_set)))
         _seen = {loc for loc, _ in descr}
         if frag_set is not None:
             for bond in bonds_of(mol):

@@ -120,11 +120,26 @@ def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
     acid'. Skipping it left the name stereo-incomplete: the round trip then
     refused every candidate of the ChEBI chloromethylidene lactams (it used to
     pass only through a misplaced-locant '(1Z)' block OPSIN happened to bind).
-    Condition (2) still keeps an endocyclic bond of another ring out.
+    Condition (2) still keeps an endocyclic bond of another ring out. Its one
+    exception is a chain atom's double bond to the ring atom of a ring '-ylidene'
+    group (``ylidene_bond_on_chain``): method (a) cites it with the chain atom's
+    locant too, '(2E)-2-[(2S)-2-methylcyclohexylidene]propanal', and the ring
+    prefix leaves it out.
     """
     if mol.GetAtomWithIdx(other_idx).IsInRing():
-        return False
+        bond = mol.GetBondBetweenAtoms(in_scope_idx, other_idx)
+        return bond is not None and ylidene_bond_on_chain(mol, bond)
     return True
+
+
+def ylidene_bond_on_chain(mol, bond) -> bool:
+    """A stereo double bond, not a ring bond, from an acyclic atom to a ring atom: the bond of a ring '-ylidene'
+    group on a chain, cited by method (a) of (1) (the Blue Book) with the chain atom's locant."""
+    if bond.GetBondType() != Chem.BondType.DOUBLE or bond.IsInRing():
+        return False
+    if not (bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z')):
+        return False
+    return bond.GetBeginAtom().IsInRing() != bond.GetEndAtom().IsInRing()
 
 
 def ring_ylidene_bonds(mol) -> List["Chem.Bond"]:

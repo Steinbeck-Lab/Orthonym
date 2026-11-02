@@ -2196,9 +2196,9 @@ def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int], host_atom: 
     Method (b) (:48277) cites it on the ylidene prefix instead. The two methods are
     alternatives: citing the unit in both scopes gives one bond two descriptors,
     e.g. '3-{(1Z)-1-[(1Z)-2-azaethan-1-ylidene]-...-3-azaprop-2-en-1-yl}', which
-    the round trip cannot read. So the branch leaves that bond to its host; when the
-    ylidene end is a ring atom the host does not cite it and the branch keeps it
-    (method (b), as before).
+    the round trip cannot read. So the branch leaves that bond to its host; when both
+    ends are ring atoms the host does not cite it and the branch keeps it (method (b),
+    as before).
 
     ``ring_ylidene`` (``ring_ylidene_stereo.RingYlidene``): also cite the ring=ring double bonds
     of this scope that it names, which neither scope cites otherwise (UN S1a)."""

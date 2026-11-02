@@ -23,9 +23,9 @@ def test_lambda_after_the_locant_is_not_part_of_the_sort_key(name, key):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("C1=CC=C2C(=C1)C=CC(=N2)/C=C\\3/C4=CC=CC=C4S(=O)(=O)N3[Al]",
-     "2-{[(9Z)-8-(1λ1-aluminamethyl)-7,7-dioxo-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-9-ylidene]methyl}quinoline"),
+     "2-{(1Z)-[8-(1λ1-aluminamethyl)-7,7-dioxo-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-9-ylidene]methyl}quinoline"),
     ("C1=CC=C2C(=C1)C=CC(=N2)/C=C\\3/C4=CC=CC=C4S(=O)(=O)N3C",
-     "2-{[(9Z)-8-methyl-7,7-dioxo-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-9-ylidene]methyl}quinoline"),
+     "2-[(1Z)-(8-methyl-7,7-dioxo-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-9-ylidene)methyl]quinoline"),
 ])
 def test_ring_sulfonyl_cites_its_bonding_number(smiles, expected):
     res = name_best_effort(smiles)

@@ -53,3 +53,34 @@ def acyl_prefix_text(mol, attach_idx: int, sub_atoms, prefix_on: Dict[int, List[
              for p in sorted(rest, key=alpha_sort_key)]
     return "".join(_joined_prefix_parts(parts)) + (
         "acetyl" if n_carbons == 2 else f"{get_chain_prefix(n_carbons)}anoyl")
+
+
+def is_acylsulfanyl(mol, sub_atoms, attach_idx) -> bool:
+    """True for a thioester group -S-CO-R attached at its sulfur, R hydrogen or a carbon-only
+    group: (the Blue Book) "an ester group is indicated by preferred prefixes
+    [...] such as 'acylsulfanyl' for the group -S-CO-R", '1-[(acetylsulfanyl)peroxy]propan-1-one
+    (PIN)' (:39499). The fragment holds the sulfur, one oxo oxygen and carbon atoms only, with no
+    charge and no radical."""
+    from rdkit import Chem
+    try:
+        sub_set = set(sub_atoms)
+        s = mol.GetAtomWithIdx(attach_idx)
+        if attach_idx not in sub_set or s.GetSymbol() != 'S' or s.GetTotalNumHs():
+            return False
+        inner = [x for x in s.GetNeighbors() if x.GetIdx() in sub_set]
+        if len(inner) != 1 or inner[0].GetSymbol() != 'C':
+            return False
+        oxo = [x for x in inner[0].GetNeighbors() if x.GetSymbol() == 'O' and x.GetDegree() == 1
+               and mol.GetBondBetweenAtoms(x.GetIdx(), inner[0].GetIdx()).GetBondType()
+               == Chem.BondType.DOUBLE]
+        if len(oxo) != 1:
+            return False
+        for idx in sub_set:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetFormalCharge() or a.GetNumRadicalElectrons():
+                return False
+            if idx not in (attach_idx, oxo[0].GetIdx()) and a.GetSymbol() != 'C':
+                return False
+        return True
+    except Exception:
+        return False

@@ -4629,16 +4629,13 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     # gate (namer.py) ships the full PIN — cf. `(1s,4s)-cyclohexane-1,4-diol`.
     _stereo_prefix = ''
     if any(mol.GetAtomWithIdx(i).HasProp('_CIPCode') for i in ring_list):
-        from .stereochemistry import (
-            collect_stereodescriptors as _collect_sd,
-        )
-        from .stereochemistry import (
-            format_stereodescriptor_string as _fmt_sd,
-        )
+        from .stereochemistry import collect_stereodescriptors as _collect_sd
+        from .stereochemistry import format_stereodescriptor_string as _fmt_sd
+        from .ylidene_stereo_label import label_ylidene_ez_in_prefix, ylidene_bonds_to_chain
         _ring_a2l = {atom_idx: loc for loc, atom_idx in order.items()}
-        _stereo_prefix = _fmt_sd(_collect_sd(mol, _ring_a2l, include_near_parent_ez=False))
-        from .ylidene_stereo_label import label_ylidene_ez_in_prefix    # method (b) of: below the PIN
-        label_ylidene_ez_in_prefix(mol, ring_list, _stereo_prefix)
+        _skip = ylidene_bonds_to_chain(mol, ring_list, attachment_atom)    # cited by a chain host, method (a)
+        _stereo_prefix = _fmt_sd(_collect_sd(mol, _ring_a2l, include_near_parent_ez=False, skip_bonds=_skip))
+        label_ylidene_ez_in_prefix(mol, ring_list, _stereo_prefix, attachment_atom)
 
     if het:
         if stem is _HW_STEM_FROM_NUMBERING:

@@ -3216,12 +3216,12 @@ def _assemble_fragments(
     # CH3-COOH is caught upstream by the exact-SMILES retained-name lookup. A stereo
     # descriptor on the 2-carbon parent can only be the alpha carbon's '(2R)-',
     # cited bare on the locant-free parent, the Blue Book; '(R)-
-    # {...}acetic acid (PIN)':45731); any other stereo string keeps the
-    # systematic form. (:7304): the second and later simple
+    # {...}acetic acid (PIN)':45731), as is an alpha E/Z (1)(a):48276);
+    # any other stereo string keeps the systematic form. (:7304): the second and later simple
     # substituents of the single-substitutable parent are enclosed, 'bromo(chloro)
     # acetic acid (PIN)' (:7312), with a multiplier left outside the marks,
     # 'hydroxydi(phenyl)acetic acid (PIN)' (:29852) -- as in the polyfunctional arm.
-    _acetic_stereo = re.fullmatch(r"\(2([RSrs])\)-", stereo) if stereo else None
+    _acetic_stereo = re.fullmatch(r"\(2([RSrsEZ])\)-", stereo) if stereo else None
     _is_substituted_retained_c2 = (
         stem == "eth" and prefix_str
         and suffix_frag and suffix_frag.text in RETAINED_C2_PARENT_BY_SUFFIX

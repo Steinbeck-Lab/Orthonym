@@ -15,6 +15,9 @@ pytestmark = pytest.mark.unit
     ("CC1=CC(=CS1)[C-]2C=CC=C2.[CH-]1C=CC=C1.[Fe+2]", "4-(ferrocen-1-yl)-2-methylthiophene"),
     ("COC1=CC=C(C=C1)C(=O)C#CC2=CC=C[CH-]2.[CH-]1C=CC=C1.[Fe+2]",
      "3-(ferrocen-1-yl)-1-(4-methoxyphenyl)prop-2-yn-1-one"),
+    ("C1CCN(CC1)C[C-]2C=CC=C2.[CH-]1C=CC=C1.[Fe+2]", "1-[(ferrocen-1-yl)methyl]piperidine"),
+    ("C1CN(CCN1CC2=C[CH-]C=C2)C3=NC=CC=N3.[CH-]1C=CC=C1.[Fe+2]",
+     "2-{4-[(ferrocen-1-yl)methyl]piperazin-1-yl}pyrimidine"),
 ])
 def test_ocenyl_names(smiles, name):
     row = name_best_effort(smiles)
@@ -27,8 +30,13 @@ def test_ocenyl_names(smiles, name):
     ("cyclopentyl pyridine-4-carboxylate", "ferrocen-1-yl pyridine-4-carboxylate"),
     # a word that sorts between 'cyclopentyl' and 'ferrocenyl' (a compound prefix with its multiplier): declined
     ("2-cyclopentyl-3-(2,6-dimethylanilino)pyridine", None),
-    ("(cyclopentylmethyl)benzene", None),                # inside marks
-    ("1-cyclopentyloxybenzene", None),                   # part of a longer prefix
+    # inside a compound prefix: the marks around it step up, the Blue Book)
+    ("(cyclopentylmethyl)benzene", "[(ferrocen-1-yl)methyl]benzene"),
+    ("2-[4-(cyclopentylmethyl)piperazin-1-yl]pyrimidine", "2-{4-[(ferrocen-1-yl)methyl]piperazin-1-yl}pyrimidine"),
+    ("1-bromo-4-(cyclopentylsulfanyl)benzene", "1-bromo-4-[(ferrocen-1-yl)sulfanyl]benzene"),
+    ("1-cyclopentyloxybenzene", None),                   # an unenclosed compound prefix
+    ("cyclopentylidenemethanol", None),                  # another free valence
+    ("{[(cyclopentylmethyl)amino]methyl}benzene", None), # the marks would need a level above { }
 ])
 def test_the_rewrite_guards(name, expected):
     assert rewrite_surrogate_prefix(name, "ferrocen") == expected

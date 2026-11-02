@@ -31,6 +31,7 @@ from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..errors import UnnameableSubstituentError, is_failure_name  # the first: a voided candidate (Task 3)
 from .amino_acids import retained_amino_acid_names_off as _aa_names_off, systematic_or_retained as _aa_offer
+from .ring_centres import _ring_system_of, ylium_as_ring_substituent  # noqa: F401 (tests read ions._ring_system_of)
 from .ring_cation_hydron import (  # noqa: F401 (also patched by tests as ions.<name>)
     _hydron_site_candidates, _hydron_sites_in, _other_ring_heteroatom_with_hydrogen, _rdkit_flags0_structures,
 )
@@ -4254,7 +4255,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
             ring_mol = work.GetMol()
             Chem.SanitizeMol(ring_mol)
         except (RuntimeError, ValueError):
-            return ''
+            return ylium_as_ring_substituent(mol, center_idx) if suffix == 'ylium' else ''
         # Fail-closed (code-review) when the neutral ring carries a
         # principal characteristic group (-ol / -al / -one / -oic acid / -amine
         # / -nitrile …): the `<ring-stem>-<locant>-<suffix>` append is only
@@ -4316,7 +4317,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
                 locants = _lowest_cation_locant_renumbering(
                     ring_mol, locants, center_idx)
         if not locants or center_idx not in locants:
-            return ''
+            return ylium_as_ring_substituent(mol, center_idx) if suffix == 'ylium' else ''
         center_locant = locants[center_idx]
         # RC-A (Task 8E) substituted ring carbenium: a ring bearing an off-ring
         # substituent CANNOT use the independent-parent path below. That names the
@@ -4585,17 +4586,6 @@ def _neutral_parent_ium_names(res, x: int, ring_system) -> List[str]:
         return []
     stem = _elide_terminal_e(parent)
     return [f"{stem}-{k}-ium" for k in range(1, len(ring_system) + 1)]
-
-
-def _ring_system_of(mol, center_idx: int):
-    from ..perception.rings import get_ring_systems
-    try:
-        for rs in get_ring_systems(mol, include_spiro=True):
-            if center_idx in rs:
-                return rs
-    except (RuntimeError, ValueError):
-        return None
-    return None
 
 
 def _ring_cation_hydron_site_name(mol, center_idx: int, demoted: str) -> str:

@@ -47,8 +47,6 @@ DECLINED_ROWS = [
     "NC(=O)CCc1ccccc1CCCC(=O)NC",              #: the N-methylamide chain is the longer one
     "NC(=O)CCc1ccc(CCC(=O)NC)cc1",             #:21604: equal chains, the N-methylamide has more prefixes
     "NC(=O)CCc1ccc(/C=C/C(=O)NC)cc1",          #:21033: the N-methylamide chain has the multiple bond
-    #:32368,:39499
-    "CCC(=O)OOSC(C)=O",
     #:35730: built as the PIN, tests/unit/rules/test_acid_halide_pseudohalide_infix.py
     #:46008
     "CO[As@](C)(=O)c1ccccc1",

@@ -103,11 +103,9 @@ def ring_ylidene_on_chain_substituent(
     (the carrier numbering, free valence 1) when the name cites a carrier locant."""
     if attach_idx not in frag_set or attach_idx in frag_ring_atoms:
         return None
-    # The prefix names the ring and the carrier; the configuration of the ylidene bond is not part of it. At
-    # the strict tiers a bond with a stereo flag is left to the other producers, which compose the descriptor
-    # onto the whole name. At the wide tiers (``allow_mancude``) no other producer builds the branch, and the
-    # name composed from it is read back to the input's full InChIKey, which a missing or a wrong descriptor
-    # cannot pass: the same bar every other name of those tiers meets.
+    # The prefix names the ring and the carrier. A bond with a stereo flag is named at the wide tiers
+    # (``allow_mancude``) only, its descriptor at the front of the carrier (below), and the name composed from it
+    # is read back to the input's full InChIKey, which a missing or a wrong descriptor cannot pass.
     ylidene = _ring_ylidene_bonds(mol, frag_set, set(frag_ring_atoms), allow_stereo=allow_mancude)
     if len(ylidene) != 1:
         return None
@@ -162,17 +160,26 @@ def ring_ylidene_on_chain_substituent(
     alkyl = get_alkyl_name(len(path))
     if not alkyl:
         return None
-    if mol.GetBondBetweenAtoms(chain_c, ring_c).GetStereo() != Chem.BondStereo.STEREONONE:
-        # "Specification by stereodescriptors 'E' and 'Z'" (the Blue Book): the descriptor of
-        # this bond cited at the front of the ylidene group, '[(4E)-...-4-ylidene]methyl', is method (b); "Method (a)
-        # generates preferred IUPAC names". Such a name is valid and is not the PIN. The group closes with a square or
-        # curly mark when it holds the descriptor, with the round one of its own enclosure when it does not.
-        from ..metrics.provenance import record_non_pin_fragment
-        record_non_pin_fragment(f"{ring_name}]")
+    # The ring producer leaves the ylidene bond out of the ylidene group (``stereochemistry.ylidene_bond_on_chain``),
+    # so the carrier cites it with the locant of its own atom, at its front ('[(1E)-(...-4-ylidene)methyl]'), as
+    # (1)(a) (the Blue Book) cites it for a parent. The Blue Book gives no placement for the
+    # descriptor of a double bond that joins the two components of one prefix,:44639, "cited at the front
+    # of the corresponding prefix", does not say which one), so the name is valid and is not the PIN.
+    bond = mol.GetBondBetweenAtoms(chain_c, ring_c)
+    from .stereochemistry import ylidene_bond_on_chain
+    k = path.index(chain_c) + 1
+    front = f"({k}{bond.GetProp('_CIPCode')})-" if ylidene_bond_on_chain(mol, bond) else ''
+    if not front and bond.GetStereo() != Chem.BondStereo.STEREONONE:
+        return None   # a stereo flag without an E/Z label: no descriptor to cite
     #: the ring-ylidene prefix is enclosed only when it is itself complex.
     inner = apply_enclosing_marks(ring_name, -1) if is_complex_substituent(ring_name) else ring_name
     if len(path) == 1:
-        return built(f'{inner}methyl', substituted=True)
-    if pos_out is not None:
-        pos_out.update({a: i for i, a in enumerate(path, start=1)})
-    return built(f'{path.index(chain_c) + 1}-{inner}{alkyl}', substituted=True)
+        prefix = f'{front}{inner}methyl'
+    else:
+        if pos_out is not None:
+            pos_out.update({a: i for i, a in enumerate(path, start=1)})
+        prefix = f'{front}{k}-{inner}{alkyl}'
+    if front:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(prefix)
+    return built(prefix, substituted=True)

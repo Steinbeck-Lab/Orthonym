@@ -34,7 +34,7 @@ from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
-from .acyl_prefix import acyl_prefix_text, is_acyl_prefix
+from .acyl_prefix import acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
@@ -9100,9 +9100,9 @@ def _name_substituent_fragment_uncached(
     # (the Blue Book) "method (1) is preferred for chains"
     # (:32928), 'amino' and 'oxo' on the terminal atom -- '5-(2-amino-2-oxoethyl)
     # furan-2-carboxylic acid (PIN)' (:32940); the recursive path below writes the
-    # method (2) form '(carbamoylmethyl)' (:32941).
-    _fg_pin = (not _fg_best_effort and attach_idx is not None
-               and _is_chain_carboxamide(mol, sub_atoms, attach_idx))
+    # method (2) form '(carbamoylmethyl)' (:32941); and the 'acylsulfanyl' prefix.
+    _fg_pin = (not _fg_best_effort and attach_idx is not None and (_is_chain_carboxamide(
+        mol, sub_atoms, attach_idx) or is_acylsulfanyl(mol, sub_atoms, attach_idx)))
     if (_fg_best_effort or _fg_pin) and attach_idx is not None and attach_idx in set(sub_atoms):
         _fg_name = None
         _fg_located = None

@@ -438,7 +438,7 @@ def test_pass_gives_no_pass_inside_the_pass(monkeypatch):
 # ``ring_ylidene_carrier._ring_ylidene_bonds(..., allow_stereo=True)``) the tree gives the old name again
 # (``test_without_the_stereo_ylidene_prefix_the_old_name_returns``).
 CYANINE_ETHANE = "CN\\1C2=CC=CC=C2S/C1=C\\C3=CC=[N+](C)C4=CC=CC=C34.CC"
-CYANINE_ETHANE_NAME = ("1-methyl-4-{[(2Z)-3-methyl-2,3-dihydro-1,3-benzothiazol-2-ylidene]methyl}quinolin-1-ium"
+CYANINE_ETHANE_NAME = ("1-methyl-4-[(1Z)-(3-methyl-2,3-dihydro-1,3-benzothiazol-2-ylidene)methyl]quinolin-1-ium"
                        f"{EM}ethane (1/1)")
 CYANINE_ETHANE_OLD_NAME = ("3-methyl-2-[(1-methyl-1,4-dihydroquinolin-4-ylidene)methyl]-1,3-benzothiazol-3-ium"
                            f"{EM}ethane (1/1)")

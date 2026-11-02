@@ -274,12 +274,12 @@ def test_pseudoketone_with_the_book_names(smiles, expected):
 def test_pseudoketone_is_named_on_the_longer_acyl_chain():
     # (the Blue Book) names a diacyl chalcogen chain as a pseudoketone; each acyl group is a candidate
     # parent and the senior chain is the parent, SENIORITY OF ACYCLIC CHAINS (:20916) "(b) has the greater number of
-    # skeletal atoms": '1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499, under. The best-effort tier
-    # gives the book name; the PIN tier still declines it (its strict namer does not build the peroxy prefix).
+    # skeletal atoms": '1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499, under. Both tiers give the book
+    # name as the PIN: the strict namer builds the 'acylsulfanyl' prefix, (:32007).
     smiles, name = "CCC(=O)OOSC(C)=O", "1-[(acetylsulfanyl)peroxy]propan-1-one"
-    assert name_row(smiles, tier="pin")["tier"] != "pin_verified"
-    row = name_row(smiles, tier="best-effort")
-    assert row["name"] == name and row["tier"] != "pin_verified", row
+    for tier in ("pin", "best-effort"):
+        row = name_row(smiles, tier=tier)
+        assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert round_trips(smiles, name)
 
 

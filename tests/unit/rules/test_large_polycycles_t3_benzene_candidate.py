@@ -86,11 +86,11 @@ def test_fused_hydrocarbon_controls(smiles, expected):
 # ('PG instance not on parent chain'): the ring became the parent and the -ol a prefix.
 SUFFIX_ROWS = {
     "ol": ("Cc1cc2c(c(C)c1CCO)C[C@@](C)(CO)C2",
-           "2-[(S)-2-(hydroxymethyl)-2,4,6-trimethyl-2,3-dihydro-1H-inden-5-yl]ethan-1-ol"),
+           "2-[(2S)-2-(hydroxymethyl)-2,4,6-trimethyl-2,3-dihydro-1H-inden-5-yl]ethan-1-ol"),
     "ol_flat": ("Cc1cc2c(c(C)c1CCO)CC(C)(CO)C2",
                 "2-[2-(hydroxymethyl)-2,4,6-trimethyl-2,3-dihydro-1H-inden-5-yl]ethan-1-ol"),
     "acid": ("Cc1cc2c(c(C)c1CC(=O)O)C[C@@](C)(CO)C2",
-             "[(S)-2-(hydroxymethyl)-2,4,6-trimethyl-2,3-dihydro-1H-inden-5-yl]acetic acid"),
+             "[(2S)-2-(hydroxymethyl)-2,4,6-trimethyl-2,3-dihydro-1H-inden-5-yl]acetic acid"),
 }
 
 

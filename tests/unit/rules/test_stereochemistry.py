@@ -158,18 +158,27 @@ class TestCollectStereodescriptorsEZ:
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
         assert descriptors == [(2, 'E')]  # the in-scope atom's locant
 
-    def test_double_bond_to_an_endocyclic_atom_of_another_ring_excluded(self):
-        """The out-of-scope end of a one-sided double bond must be acyclic: an
-        endocyclic bond of another ring stays out (condition (2) of
-        ``_is_true_exocyclic``, kept by 49a0e838f); the descriptor then belongs to the
-        substituent."""
+    def test_double_bond_to_a_ring_ylidene_atom_is_cited_by_the_chain(self):
+        """A chain atom's double bond to the ring atom of a ring '-ylidene' group is cited by the chain
+        scope with the chain locant: (1) (the Blue Book), method (a), "the
+        stereodescriptor is placed at the front of the substitutive name, preceded by the locant indicating
+        its point of attachment to the parent structure"; "Method (a) generates preferred IUPAC names"
+        (:48279). The ring prefix leaves it out."""
         mol = Chem.MolFromSmiles('C/C=C1\\CCCCC1C')
         rdCIPLabeler.AssignCIPLabels(mol)
 
         # chain atoms 0,1 in scope; the ring atom 2 carrying the double bond is not
-        assert collect_stereodescriptors(mol, {0: 1, 1: 2}) == []
+        assert collect_stereodescriptors(mol, {0: 1, 1: 2}) == [(2, 'E')]
         # control: the same bond is cited once both ends are in scope
         assert collect_stereodescriptors(mol, {0: 1, 1: 2, 2: 3}) == [(2, 'E')]
+
+    def test_double_bond_inside_another_ring_excluded(self):
+        """An endocyclic double bond of another ring stays out (condition (2) of ``_is_true_exocyclic``,
+        kept by 49a0e838f): its descriptor belongs to that ring's prefix."""
+        mol = Chem.MolFromSmiles('CC/C1=C/CCCCCCCC1')
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert any(b.HasProp('_CIPCode') for b in mol.GetBonds())
+        assert collect_stereodescriptors(mol, {0: 1, 1: 2, 2: 3}) == []
 
     def test_double_bond_both_atoms_missing_excluded(self):
         """Double bond excluded if both atoms not in mapping."""

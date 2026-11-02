@@ -12,8 +12,8 @@ with a check of everything the rewrite can change:
 
 * Alphanumerical order and the numbering it decides (g)): declined when any other word of the name
   sorts between 'cyclopentyl' and the ocenyl name.
-* Enclosing marks: only a 'cyclopentyl' outside every mark, a whole prefix (not 'cyclopentyloxy', not
-  'dicyclopentyl'), is rewritten; the ocenyl prefix has a locant, so it is enclosed.
+* Enclosing marks: only a whole prefix (not 'cyclopentyloxy', not 'dicyclopentyl') is rewritten; the ocenyl prefix
+  has a locant, so it is enclosed, and every mark around it steps up as nests them.
 * The structure: the name ships only when OPSIN reads it to the input's full standard InChIKey.
 
 Scope (fail closed, None otherwise): three fragments, a metal of the ocene table with charge 2+, a bare
@@ -110,20 +110,55 @@ def rewrite_surrogate_prefix(name: str, stem: str) -> Optional[str]:
         return None
     i, j = hits[0].start(), hits[0].end()
     before, after = name[:i], name[j:]
-    if (before[-1:].isalpha() and not before.endswith('-')) or after[:1].isalpha():
-        return None                     # 'dicyclopentyl', 'cyclopentyloxy', 'cyclopentylidene'
+    if (before[-1:].isalpha() and not before.endswith('-')) or re.match(r'(?:id|ium)', after):
+        return None                     # 'dicyclopentyl', 'cyclopentylidene', 'cyclopentylium'; the group of a
+                                        # compound prefix ('cyclopentylmethyl', 'cyclopentyloxy') is rewritten
     depth = sum(1 if c in '([{' else -1 if c in ')]}' else 0 for c in before)
-    if depth:
-        return None                     # inside a compound prefix: the marks would step up
     target = stem + 'yl'
     low, high = sorted((_SURROGATE, target))
     for w in re.findall(r'[a-z]+', before + ' ' + after):
         # a compound prefix sorts with its multiplier ('dimethylanilino'), a simple one without it: either decides
         if low < w < high or low < re.sub('^' + _MULTIPLIER, '', w) < high:
             return None                 #: another prefix would change places with it
-    if (not before or before.endswith(' ')) and (not after or after.startswith(' ')):
+    if not depth and after[:1].isalpha():
+        return None                     # an unenclosed compound prefix ('1-cyclopentyloxybenzene')
+    if not depth and (not before or before.endswith(' ')) and (not after or after.startswith(' ')):
         return f"{before}{stem}-1-yl{after}"   # a word of its own (an ester's organyl group) takes no marks
-    return f"{before}({stem}-1-yl){after}"
+    if not depth:
+        return f"{before}({stem}-1-yl){after}"
+    return _raise_enclosing_marks(f"{before}({stem}-1-yl){after}", len(before))
+
+
+_LEVEL = {'(': 1, '[': 2, '{': 3}
+_OPEN = {1: '(', 2: '[', 3: '{'}
+_CLOSE = {'(': ')', '[': ']', '{': '}'}
+
+
+def _raise_enclosing_marks(name: str, start: int) -> Optional[str]:
+    """``name`` with every pair of marks that encloses the new '(...)' at ``start`` raised, inner to outer, to one
+    level above the highest pair inside it: (the Blue Book) nests , , { } in that order
+    ('1-[(ferrocen-1-yl)methyl]piperidine'). None when a pair would need a level above { }."""
+    pairs, stack = {}, []
+    for i, c in enumerate(name):
+        if c in '([{':
+            stack.append(i)
+        elif c in ')]}':
+            if not stack:
+                return None
+            pairs[stack.pop()] = i
+    if stack:
+        return None
+    chars = list(name)
+    chain = sorted((o for o, cl in pairs.items() if o < start and cl > start), reverse=True)   # inner to outer
+    for o in chain:
+        cl = pairs[o]
+        inner = max((_LEVEL[chars[x]] for x, y in pairs.items() if o < x and y < cl), default=0)
+        need = max(_LEVEL[chars[o]], inner + 1)
+        if need > 3:
+            return None
+        if need != _LEVEL[chars[o]]:
+            chars[o], chars[cl] = _OPEN[need], _CLOSE[_OPEN[need]]
+    return ''.join(chars)
 
 
 def ocene_drawing_row(namer, smiles: str) -> Optional[dict]:

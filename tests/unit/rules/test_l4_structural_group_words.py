@@ -89,10 +89,10 @@ ROWS = [
      "2-(hydroxymethyl)phenyl β-D-glucopyranoside"),
     ("OC[C@H]1O[C@@H](Oc2ccc(CO)cc2)[C@H](O)[C@@H](O)[C@@H]1O",
      "4-(hydroxymethyl)phenyl β-D-glucopyranoside"),
-    # a polyol aglycone whose group the substituent namer cannot spell with the locant of its
-    # stereocentre ('(S)-6-hydroxy-...-8-yl') is not offered; the general name stands
+    # a polyol aglycone whose group the substituent namer spells with the locant of its
+    # stereocentre ('(3S)-6-hydroxy-...-8-yl', the fusion prefix) is offered as the glycoside
     ("CCCCC[C@H]1Cc2c(C)c(O)c(C)c(O[C@@H]3O[C@@H](C)[C@H](O)[C@@H](O)[C@H]3O)c2CO1",
-     "(3S)-5,7-dimethyl-3-pentyl-8-(α-L-rhamnopyranosyloxy)-3,4-dihydro-1H-2-benzopyran-6-ol"),
+     "(3S)-6-hydroxy-5,7-dimethyl-3-pentyl-3,4-dihydro-1H-2-benzopyran-8-yl α-L-rhamnopyranoside"),
     # --- aryl ether whose aryl holds a ketone / lactone / pyranone: recognised groups, named
     ("CC(C)=CCc1cc2ccc(=O)oc2c(O)c1OC1OC(C(=O)O)C(O)C(O)C1O",
      "3,4,5-trihydroxy-6-{[8-hydroxy-6-(3-methylbut-2-en-1-yl)-2-oxo-2H-1-benzopyran-7-yl]oxy}"

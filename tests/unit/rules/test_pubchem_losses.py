@@ -125,9 +125,11 @@ def test_double_cited_form_is_unreadable():
     assert _independent_parse(name) is None
 
 
-def test_ring_ylidene_branch_keeps_its_own_block():
-    """The branch keeps the bond when its ylidene end is a ring atom (the host
-    then does not cite it, _is_true_exocyclic): method (b), unchanged."""
+def test_ring_ylidene_branch_leaves_the_bond_to_its_chain_host():
+    """A ring branch whose ylidene bond goes to a chain atom of the host leaves the bond to the host, which cites it
+    with its own locant: (1) method (a) (the Blue Book), "Method (a) generates preferred IUPAC
+    names" (:48279). One bond, one descriptor."""
+    from orthonym.rules.stereochemistry import collect_stereodescriptors
     from orthonym.assembly.universal_substituent import _branch_stereo_block
     # 2-(2-methylcyclohexylidene)ethanol analogue: host C of the chain, the
     # ylidene end in the ring
@@ -136,8 +138,9 @@ def test_ring_ylidene_branch_keeps_its_own_block():
     assign_stereochemistry(mol)
     ring_c = 3  # the ring atom doubly bonded to chain atom 2
     ring_map = {3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 8: 6}
-    with_bond = _branch_stereo_block(mol, ring_map, host_atom=2, root=ring_c)
-    assert with_bond.startswith("(1"), with_bond
+    assert _branch_stereo_block(mol, ring_map, host_atom=2, root=ring_c) == ""
+    assert [d for _, d in collect_stereodescriptors(mol, {0: 2, 1: 1, 2: 2})] == ["E"] or \
+        [d for _, d in collect_stereodescriptors(mol, {0: 2, 1: 1, 2: 2})] == ["Z"]
 
 
 # --------------------------------------------------------------------------
