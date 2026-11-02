@@ -60,7 +60,7 @@ RELATIVE_STEREO = [
 ]
 
 # The zinc rows of the metal lane (ZN). The producers it added sit under the seams of the outer classes:
-# the class METAL_ATOM (the atom, an ion), the organometallic and salt classes (the drawing as written, and
+# the class ELEMENT_ATOM (the atom, an ion), the organometallic and salt classes (the drawing as written, and
 # the other drawing that ``assembly/metal_offer.py`` offers: the ionic drawing of a bonded one, the bonded
 # drawing of an organometallic cation beside its anion, the drawing of a dative one without its dative
 # bonds), the isotope step (a labelled atom) and the multi-component recovery (an ammine). Each id was
@@ -72,8 +72,8 @@ ZINC = [
     ("CC[Zn]CC", "best-effort", "outer:organometallic"),
     ("[Cl-].[Zn+]c1ccccc1", "best-effort", "outer:organometallic"),  # the bonded drawing of a cation beside its anion
     ("[CH3-].[CH3-].[Zn+2]", "best-effort", "outer:salt"),           # a carbanion salt
-    ("[Zn]", "best-effort", "outer:metal_atom"),
-    ("[Zn+2]", "best-effort", "outer:metal_atom"),
+    ("[Zn]", "best-effort", "outer:element_atom"),
+    ("[Zn+2]", "best-effort", "outer:element_atom"),
     ("[65Zn]", "best-effort", "isotope"),
     ("C1=CC2=NC1=Cc1ccc3[n]1[Zn][n]1c(ccc1=CC1=NC(=C3)C=C1)=C2", "best-effort", "outer:salt"),  # dative porphyrin
     ("[Zn+2].N.N.N.N", "best-effort", "multifragment"),               # the ammine

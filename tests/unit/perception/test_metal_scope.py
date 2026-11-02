@@ -35,8 +35,9 @@ GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 METALLOIDS = ("B", "Al", "Ga", "In", "Tl", "Si", "Ge", "Sn", "Pb", "As", "Sb", "Bi", "Te", "Po")
 #: the metals admitted to every mechanism since 2026-10-30 (lanes B1 and B2)
 BONDED_METALS = bonded_metal_symbols()
-#: true metals that the table does not admit to any mechanism after lane B2: the guards of "the others are not moved"
-#: use them (the actinides without an entry; the superheavy elements are the rest of ``_TRUE_METAL_SYMBOLS_FOR_VETO``)
+#: true metals that the table admits to no salt, complex or bonded mechanism: the guards of "the others are not moved"
+#: use them. Since lane LONE (2026-11-01) every metal is admitted to ``ELEMENT`` (its lone atom, ion or isotope gets an
+#: element name), so these are the metals of ``ELEMENT_ONLY_METALS``, admitted to that one alone
 NOT_ADMITTED = ("Tc", "Th", "Pu")
 
 
@@ -171,7 +172,8 @@ def test_zinc_has_its_mechanisms():
     assert has_mechanism("Zn", AMMINE) is True
     assert all(has_mechanism(s, AMMINE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", ELEMENT) is True
-    assert all(has_mechanism(s, ELEMENT) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
+    # lane LONE (2026-11-01): every metal is admitted to ELEMENT, so a lone atom, ion or isotope of any metal is named
+    assert all(has_mechanism(s, ELEMENT) is True for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", BONDED_NAMES) is True
     assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", DISCONNECT) is True
@@ -201,7 +203,9 @@ def test_mechanism_lookup():
     assert has_mechanism("Na", "no_such_mechanism") is False
     for symbol in GROUP_1 + GROUP_2:
         extra = frozenset({MACROCYCLE, DISCONNECT}) if symbol == "Mg" else frozenset()
-        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}) | extra, symbol
+        # ELEMENT since lane LONE (2026-11-01): the atom and the ion alone ('sodium(1+)')
+        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT}) | extra, \
+            symbol
         assert is_named_metal(symbol) is True, symbol
     assert is_named_metal("Xx") is False
 
@@ -237,57 +241,67 @@ def test_the_function_follows_the_table(monkeypatch):
 
 def test_the_metals_of_the_two_bonded_lanes_have_every_mechanism_of_zinc():
     """The 46 metals of ``BONDED_METAL_VALENCES`` and ``MORE_BONDED_METAL_VALENCES`` (lanes B1, B2 and
-    uranium) are admitted to every mechanism of zinc with the charges listed, and none is complete; the metals
-    whose ions have a retained name ('copper(II)', 'iron(III)') are not admitted to ``ELEMENT``, so that the
-    retained name keeps its label."""
+    uranium) are admitted to every mechanism of zinc with the charges listed, and none is complete. Since lane LONE
+    (2026-11-01) that includes the metals whose ions have a retained name ('copper(II)', 'iron(III)'): they are
+    admitted to ``ELEMENT`` for the atom and the ions without such a name ('copper', 'iron(6+)'), and the ion of a
+    retained name keeps it (``rules.metal_atoms.lone_atom_name``)."""
     from orthonym.data.metal_scope import ALL_MECHANISMS, RETAINED_ION_METALS
     assert len(BONDED_METALS) == 46 and not set(BONDED_METAL_VALENCES) & set(MORE_BONDED_METAL_VALENCES)
     assert sorted(RETAINED_ION_METALS) == ["Ag", "Au", "Co", "Cr", "Cu", "Fe", "Mn", "Ni"]
     assert RETAINED_ION_METALS <= set(MORE_BONDED_METAL_VALENCES)
     for symbol in BONDED_METALS:
         valences = {**BONDED_METAL_VALENCES, **MORE_BONDED_METAL_VALENCES}[symbol]
-        expected = ALL_MECHANISMS - ({ELEMENT} if symbol in RETAINED_ION_METALS else frozenset())
-        assert METAL_SCOPE[symbol] == MetalScope(expected, frozenset(valences)), symbol
+        assert METAL_SCOPE[symbol] == MetalScope(ALL_MECHANISMS, frozenset(valences)), symbol
         assert is_named_metal(symbol) is True, symbol
     assert has_valence("Cu", 1) is True and has_valence("Cu", 2) is True and has_valence("Cu", 3) is False
-    assert has_mechanism("Cu", ELEMENT) is False and has_mechanism("Hf", ELEMENT) is True
+    assert has_mechanism("Cu", ELEMENT) is True and has_mechanism("Hf", ELEMENT) is True    # lane LONE
 
 
 def test_tin_and_lead_are_admitted_to_the_parent_hydride_cation_the_connection_and_the_atom_beside_ions():
     """Tin and lead are named on their parent hydrides, 'stannane' and 'plumbane': the cation 'stannylium'
      Cationic centers in parent hydrides, the Blue Book), the bonded drawing of an organotin cation
-    beside its anion (``CONNECT_ANION``), and the neutral atom beside ions (``ZERO_VALENT``); never ``DISCONNECT``,
+    beside its anion (``CONNECT_ANION``), the neutral atom beside ions (``ZERO_VALENT``) and, since lane LONE
+    (2026-11-01), the atom and the ion alone ('tin', '(119Sn)tin': ``ELEMENT``); never ``DISCONNECT``,
     ``BONDED_NAMES`` or any other coordination mechanism."""
     for symbol in ("Sn", "Pb"):
-        assert METAL_SCOPE[symbol] == MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT}),
+        assert METAL_SCOPE[symbol] == MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT}),
                                                  frozenset({4})), symbol
         assert is_named_metal(symbol) is True and metal_scope.is_complete_metal(symbol) is False
         assert has_mechanism(symbol, DISCONNECT) is False and has_mechanism(symbol, BONDED_NAMES) is False
-        assert has_mechanism(symbol, ION_SALTS) is False and has_mechanism(symbol, ELEMENT) is False
+        assert has_mechanism(symbol, ION_SALTS) is False and has_mechanism(symbol, ELEMENT) is True     # lane LONE
     assert not any(has_mechanism(s, PARENT_HYDRIDE_IONS) for s in set(METAL_SCOPE) - {"Sn", "Pb"})
 
 
-def test_the_true_metals_that_no_mechanism_admits():
-    """After lane B2 the elements of the veto set without an entry are the actinides without one (Th, Pa, Np, Pu, Am,
-    Cm, Bk, Cf, Es, Md, No, Lr), technetium, promethium and the superheavy elements: the witnesses of the guards that
-    say 'a metal that the table does not admit is not moved' are drawn from them."""
+def test_the_true_metals_that_only_the_element_name_admits():
+    """After lane B2 the elements of the veto set without an entry were the actinides without one (Th, Pa, Np, Pu, Am,
+    Cm, Bk, Cf, Es, Md, No, Lr), technetium, promethium and the superheavy elements. Lane LONE (2026-11-01) admits every
+    metal to ``ELEMENT``, so each of them now has an entry admitting it to ``ELEMENT`` alone (``ELEMENT_ONLY_METALS``):
+    no salt, complex or bonded mechanism, so ``is_named_metal`` stays False and the witnesses of the guards that say
+    'a metal that the table does not admit is not moved' are still drawn from them."""
+    from orthonym.data.metal_scope import ELEMENT_ONLY_METALS
     from orthonym.perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
-    outside = sorted(set(_TRUE_METAL_SYMBOLS_FOR_VETO) - set(METAL_SCOPE))
-    assert outside == ["Am", "Bh", "Bk", "Cf", "Cm", "Cn", "Db", "Ds", "Es", "Hs", "Lr", "Md", "Mt", "No", "Np", "Pa",
-                       "Pm", "Pu", "Rg", "Sg", "Tc", "Th"]
-    assert set(NOT_ADMITTED) <= set(outside)
+    assert sorted(set(_TRUE_METAL_SYMBOLS_FOR_VETO) - set(METAL_SCOPE)) == []          # every metal has an entry
+    element_only = sorted(s for s in _TRUE_METAL_SYMBOLS_FOR_VETO if METAL_SCOPE[s].mechanisms == frozenset({ELEMENT}))
+    assert element_only == ["Am", "Bh", "Bk", "Cf", "Cm", "Cn", "Db", "Ds", "Es", "Hs", "Lr", "Md", "Mt", "No", "Np",
+                            "Pa", "Pm", "Pu", "Rg", "Sg", "Tc", "Th"]
+    assert element_only == sorted(ELEMENT_ONLY_METALS)
+    assert all(METAL_SCOPE[s] == MetalScope(frozenset({ELEMENT}), frozenset()) for s in element_only)
+    assert all(is_named_metal(s) is False for s in element_only)
+    assert set(NOT_ADMITTED) <= set(element_only)
 
 
-def test_zero_valent_metals_are_admitted_to_that_alone():
-    """The metals of the 2026-10-30 panel are admitted to ``ZERO_VALENT`` only: they cite a neutral atom beside
-    ions as 'metal(0)' and nothing else; their failures keep the label UNSUPPORTED_ELEMENT (``is_named_metal``). The
-    bonded metals (every mechanism since lanes B1 and B2) and tin and lead (``PARENT_HYDRIDE_IONS``) have more."""
+def test_zero_valent_metals_are_admitted_to_that_and_the_element_name_alone():
+    """The metals of the 2026-10-30 panel are admitted to ``ZERO_VALENT`` and, since lane LONE (2026-11-01, every metal
+    is admitted to the element name), ``ELEMENT``: they cite a neutral atom beside ions as 'metal(0)' and name the lone
+    atom, ion or isotope, and nothing else; the failures of their assemblies keep the label UNSUPPORTED_ELEMENT
+    (``is_named_metal``). The bonded metals (every mechanism since lanes B1 and B2) and tin and lead
+    (``PARENT_HYDRIDE_IONS``) have more."""
     alone = []
     for symbol in ZERO_VALENT_METALS:
         if symbol in BONDED_METALS or symbol in ("Sn", "Pb"):
             assert ZERO_VALENT in METAL_SCOPE[symbol].mechanisms, symbol
             continue
-        assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT}), frozenset()), symbol
+        assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()), symbol
         assert is_named_metal(symbol) is False, symbol
         alone.append(symbol)
     assert alone == ["Rf", "Ac", "Fm"], alone               # no other lane admitted these

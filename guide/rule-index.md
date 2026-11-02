@@ -312,6 +312,7 @@ A class handler is a short shim in `routing/dispatch_table.py` that calls the co
 | 49.8 | `CYCLIC_POLYESTER` | Lactides and other cyclic di- or polyesters (glycolide) | `rules/lactones.py` |
 | 50 | `ORGANOMETALLIC` | Metal-carbon compounds and sandwich complexes | `assembly/handlers/organometallic.py` |
 | 100 | `SALT` | Salts of several components | `rules/salts.py` |
+| 150 | `ELEMENT_ATOM` | Lone atoms, monoatomic ions and isotopes of every element (zinc(2+), neon, chloranyl, (65Zn)zinc) | `rules/metal_atoms.py` |
 | 200 | `RADICAL` | Radicals | `data/`, `rules/charged_router.py`, `rules/radicals.py` |
 | 250 | `LIPID` | Lipids built on glycerol, phosphoglycerol or a sphingoid base | `rules/lipids.py` |
 | 300 | `ZWITTERION` | Zwitterions with net charge zero | `rules/salts.py` |
@@ -319,7 +320,6 @@ A class handler is a short shim in `routing/dispatch_table.py` that calls the co
 | 302 | `MIXED_SIGN_ZWITTERION` | Net-charged ions with both cation and anion sites | `rules/charged_router.py`, `rules/ions.py` |
 | 400 | `ANION_RETAINED` | Anions with a retained name (acetate, benzoate) | `rules/ions.py` |
 | 480 | `CATION_QUATERNARY` | Quaternary ammonium cations | `rules/charged_router.py` |
-| 490 | `METAL_ATOM` | Atoms, ions and isotopes of a metal the scope table admits (zinc, zinc(2+), (65Zn)zinc) | `rules/metal_atoms.py` |
 | 500 | `CATION_RETAINED` | Cations with a retained name | `rules/ions.py` |
 | 600 | `ANION_SMALL` | Single anions of up to 25 heavy atoms | `rules/acid_ester_anion.py`, `rules/ions.py`, `rules/charged_router.py`, `perception/ions.py` |
 | 700 | `POLY_ANION` | Anions with two or more anionic sites | `rules/acid_ester_anion.py`, `rules/charged_router.py`, `rules/ions.py`, `perception/ions.py` |

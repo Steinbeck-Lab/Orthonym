@@ -884,6 +884,12 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         _charged = Chem.GetFormalCharge(fm) != 0
         if _charged and not _charged_ok:
             return None
+        if fm.GetNumAtoms() == 1 and fm.GetAtomWithIdx(0).GetSymbol() == 'H' and smi not in _hydrogens:
+            # a hydrogen atom or ion is a component only through ``_hydrogen_components``: a hydride beside a metal the
+            # table does not admit to CARBANION_SALTS makes the assembly organometallic for that metal
+            # INTRODUCTION), and a stray hydrogen atom is no component of a adduct, although each has a name
+            # alone ('hydride', 'hydrogen': rules.metal_atoms.lone_atom_name)
+            return None
         if _charged and _out_of_scope_metal:
             _widened = True
         if (fm.GetNumHeavyAtoms() == 1

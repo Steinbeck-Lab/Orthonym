@@ -196,8 +196,10 @@ def test_a_failing_connection_ships_nothing_and_the_drawing_as_written_keeps_its
     as_written = _row(smiles, "best-effort")
     assert as_written["name"] == "phenylzinc(1+)—chloride (1/1)" and as_written["tier"] == "systematic_verified"
     assert_full_rt(as_written["name"], smiles)
+    # a string no tier names (Cl[Tc]Cl; the lone ion [Th+4] was the stand-in until lane LONE, 2026-11-01, named it
+    # 'thorium(4+)')
     monkeypatch.setattr(metal_offer, "metal_connected_spelling_and_order",
-                        lambda s: ("[Th+4]", (0,)) if s == smiles else None)
+                        lambda s: ("Cl[Tc]Cl", (0,)) if s == smiles else None)
     row = _row(smiles, "best-effort")
     assert row["name"] == as_written["name"] and row["tier"] == as_written["tier"] and row["is_pin"] is False
 

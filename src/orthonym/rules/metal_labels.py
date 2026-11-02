@@ -7,7 +7,7 @@ from typing import Optional
 
 from rdkit import Chem
 
-from ..data.metal_scope import BONDED_NAMES, ELEMENT, has_mechanism
+from ..data.metal_scope import BONDED_NAMES, has_mechanism
 
 
 def is_carbanion_salt_of_group_3_12_metal(smiles: str, name: Optional[str]) -> bool:
@@ -105,26 +105,27 @@ def is_bonded_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
         return False
 
 
-def is_metal_atom_or_ion_name_without_pin(smiles: str, name: Optional[str]) -> bool:
-    """True iff ``name`` names a drawing that is one atom of a metal admitted to ``ELEMENT``
-    (``data/metal_scope.py``): the atom, an ion or an isotope ('zinc', 'zinc(2+)', '(65Zn)zinc'),
-    whose names the Blue Book gives without PIN status.
+def is_lone_atom_name_without_pin(smiles: str, name: Optional[str]) -> bool:
+    """True iff ``smiles`` is one atom without hydrogen that ``rules.metal_atoms.lone_atom_name`` names by its element
+    name or a hydrogen name ('zinc(2+)', 'sodium(1+)', 'neon', 'selenium(6+)', '(65Zn)zinc', 'hydride'), whose names
+    the Blue Book gives without PIN status.
 
-     PREFERRED IUPAC NAMES (the Blue Book): "the label 'PIN' is added to the names of
-    compounds whose parent hydride contains at least one of the following elements: B, Si, Ge, Sn,
-    Pb, N, P, As, Sb, Bi, O, S, Se, Te, Po, F, Cl, Br, I, At, and that also contain at least one
-    carbon atom in their structure": zinc is none of those elements and the drawing has no carbon;
-    the project keeps the path label of a carbon-free SALT (user decision 2026-09-30), and a lone
-    atom or ion is no salt. The structure alone decides: the name is the one the producer of
-    ``rules/metal_atoms.py`` built.
+     PREFERRED IUPAC NAMES (the Blue Book): "the label 'PIN' is added to the names of compounds whose
+    parent hydride contains at least one of the following elements: B, Si, Ge, Sn, Pb, N, P, As, Sb, Bi, O, S, Se,
+    Te, Po, F, Cl, Br, I, At, and that also contain at least one carbon atom in their structure": an element name
+    has no parent hydride, and the drawing has no carbon. A name built on a parent hydride ('azanylidyne',
+    '(32P)phosphanetriide') keeps the label of its naming path, as every carbon-free name does (user decision
+    2026-09-30, paper conformance: 'azanidyl' pin_verified); an ion the producer leaves to the retained tables
+    ('iron(II)', 'chloride') is not covered. So an isotopologue takes the label of its parent. The structure alone
+    decides.
 
     Label only: the name is unchanged."""
     if not smiles or not name:
         return False
     try:
-        mol = Chem.MolFromSmiles(smiles)
-        return (mol is not None and mol.GetNumAtoms() == 1
-                and has_mechanism(mol.GetAtomWithIdx(0).GetSymbol(), ELEMENT))
+        from .metal_atoms import lone_atom_name_and_basis
+        built, on_hydride = lone_atom_name_and_basis(Chem.MolFromSmiles(smiles))
+        return built is not None and not on_hydride
     except Exception:
         return False
 
@@ -165,11 +166,11 @@ def is_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
     """True iff ``name`` is a name of a compound of a Group 3-12 metal that the Blue Book gives no
     PIN: the compositional name of a salt of a carbanion (``is_carbanion_salt_of_group_3_12_metal``),
     a name of a bonded drawing that lists its ligands (``is_bonded_metal_name_without_pin``), the
-    name of an atom, an ion or an isotope (``is_metal_atom_or_ion_name_without_pin``) or the name of
+    name of an atom, an ion or an isotope (``is_lone_atom_name_without_pin``) or the name of
     a salt of a metal with a macrocyclic ligand (``is_macrocycle_complex_name_without_pin``).
     The tier row of ``Orthonym._tier_row_and_pin_form`` reads this one predicate. Label only."""
     return (is_carbanion_salt_of_group_3_12_metal(smiles, name)
             or is_beta_diketonate_salt_of_group_3_12_metal(smiles, name)
             or is_bonded_metal_name_without_pin(smiles, name)
-            or is_metal_atom_or_ion_name_without_pin(smiles, name)
+            or is_lone_atom_name_without_pin(smiles, name)
             or is_macrocycle_complex_name_without_pin(smiles, name))

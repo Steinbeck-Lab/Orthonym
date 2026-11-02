@@ -23,6 +23,23 @@ from .isotope_compare import tautomer_passes
 from .isotope_induced import decorate_induced, induced_centres
 
 
+def lone_atom_isotope_name(original: Chem.Mol) -> Optional[str]:
+    """The name of a labelled lone atom or monoatomic ion that reads back, or None.
+
+    A lone atom names its nuclide inside its own name ('(36Cl)chloranide', ``rules.metal_atoms.lone_atom_name``);
+    the skeleton name of the stripped atom is the name of another ion form ('chloride'), which OPSIN does not read
+    with a nuclide in front. The same read-back as every candidate of the decorator decides."""
+    from .metal_atoms import lone_atom_name
+    name = lone_atom_name(original)
+    if name is None:
+        return None
+    token = _iso._RADICAL_READING.set(original.GetAtomWithIdx(0).GetNumRadicalElectrons() > 0)
+    try:
+        return name if _iso._isotope_round_trips(name, original) else None
+    finally:
+        _iso._RADICAL_READING.reset(token)
+
+
 def decorate_passes(smiles: str, style: str, namer, original: Chem.Mol, stripped: Chem.Mol,
                     label_map) -> Optional[str]:
     """The name of ``original`` (``stripped`` and ``label_map`` as ``rules.isotopes.strip_isotopes``

@@ -4210,8 +4210,8 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     if not label_map:
         return None
     from .isotope_alternative import alternative_skeleton, alternative_skeleton_active, has_alternative
-    from .isotope_passes import decorate_passes
-    name = decorate_passes(smiles, style, namer, original, stripped, label_map)
+    from .isotope_passes import decorate_passes, lone_atom_isotope_name
+    name = lone_atom_isotope_name(original) or decorate_passes(smiles, style, namer, original, stripped, label_map)
     if name is None and not alternative_skeleton_active() and has_alternative(stripped):
         with alternative_skeleton():
             name = decorate_passes(smiles, style, namer, original, stripped, label_map)

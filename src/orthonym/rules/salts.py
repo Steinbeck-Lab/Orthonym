@@ -677,6 +677,12 @@ def _reattach_protons_to_acids(mol):
 # true metal co-present with a carbanion/hydride is organometallic. The
 # census OUT predicate (internal notes _review_census5.py) — the 1b
 # widening is scoped to exactly the in-scope set.
+#: the elements whose one-atom ion the best-effort ion namer below does not name (hydrogen, carbon and the elements of
+#: the mononuclear parent hydrides of ``rules.metal_atoms.RADICAL_PARENT_HYDRIDES``)
+_ONE_ATOM_NON_METAL_IONS = frozenset({'H', 'C', 'B', 'Si', 'Ge', 'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te', 'Po',
+                                      'F', 'Cl', 'Br', 'I', 'At'})
+
+
 def _name_organic_ion_best_effort(ion_smiles: str, *,
                                   style: str = 'general',
                                   general_fallback: bool = False,
@@ -698,6 +704,13 @@ def _name_organic_ion_best_effort(ion_smiles: str, *,
     """
     if not (general_fallback or general_fallback_unverified
             or allow_aromatic_general):
+        return ''
+    _ion = Chem.MolFromSmiles(ion_smiles)
+    if _ion is not None and _ion.GetNumAtoms() == 1 and _ion.GetAtomWithIdx(0).GetSymbol() in _ONE_ATOM_NON_METAL_IONS:
+        # A one-atom ion of hydrogen, carbon or a p-block element is no organic ion: its salt word is the table's
+        # (``rules.metal_atoms.inorganic_anion_word``), and the free-ion name of ``rules.metal_atoms.lone_atom_name``
+        # ('hydride', 'boranetriylium') would compose what the table leaves out (a hydride beside a metal not admitted
+        # to CARBANION_SALTS, INTRODUCTION; a covalent hydride drawn as ions)
         return ''
     try:
         from orthonym.assembly.budget_rescue import name_after_budget_trip

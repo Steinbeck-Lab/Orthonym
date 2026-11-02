@@ -29,8 +29,9 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     the compound that is isotopically substituted",:43718). The Blue Book gives such a
     name no PIN: PREFERRED IUPAC NAMES (:2056) labels "the names of compounds whose parent
     hydride contains at least one of the following elements: B, Si,... At, and that also contain at
-    least one carbon atom in their structure". The producer is ``rules.metal_atoms``; the class of
-    the dispatch table is ``METAL_ATOM``.
+    least one carbon atom in their structure". The producer is ``rules.metal_atoms.lone_atom_name``, which
+    names the lone atoms of the other elements too; the class of the dispatch table is ``ELEMENT_ATOM``. Every
+    metal of the table is admitted (lane LONE, 2026-11-01).
 ``DISCONNECT``
     a drawing in which the metal is joined to non-carbon atoms by single bonds is named through
     its ionic drawing, the one a charge-conserving heterolytic disconnection of those bonds gives
@@ -154,7 +155,8 @@ cation that a metal with its bonds would give if every one of them were broken i
 charge plus its number of bonds). The Group 1 elements carry +1 and the Group 2 elements +2; zinc
 carries +2. The metals of ``BONDED_METAL_VALENCES`` (Al, Hg, Pd, Pt, Ru, Ti, V, W) and of
 ``MORE_BONDED_METAL_VALENCES`` (38 more) are admitted to every mechanism zinc has, with the charges listed there,
-and are not complete; those of ``RETAINED_ION_METALS`` not to ``ELEMENT``.
+and are not complete; the ions of ``RETAINED_ION_METALS`` that have a retained name keep it. The metals of
+``ELEMENT_ONLY_METALS`` are admitted to ``ELEMENT`` alone.
 """
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, Iterable
@@ -212,24 +214,34 @@ MORE_BONDED_METAL_VALENCES = {"Zr": (4,), "Hf": (4,), "Fe": (2, 3), "Co": (2, 3)
                               "Pr": (3,), "Ho": (3,), "Tm": (3,), "U": (3, 4, 5, 6)}
 
 #: metals whose ions have a retained name of their own ('copper(II)', 'iron(III)': ``data.ion_retained_names``,
-#: INORGANIC_CATIONS) are not admitted to ``ELEMENT``: its 'copper(2+)' would replace the retained name and its label
+#: INORGANIC_CATIONS). They are admitted to ``ELEMENT`` for the atom and for the ions without such a name
+#: ('copper', 'iron(6+)'); the ion of a retained name keeps it (``rules.metal_atoms.lone_atom_name``)
 RETAINED_ION_METALS = frozenset({"Ag", "Au", "Co", "Cr", "Cu", "Fe", "Mn", "Ni"})
+
+#: the metals no other mechanism admits: the f-block elements, technetium and the superheavy metals. Lane LONE
+#: (2026-11-01) admits them to ``ELEMENT`` alone, measured on the 1,326 lone-atom compounds of PubChem
+#: (`internal notes`) with no wrong name
+ELEMENT_ONLY_METALS = ("Tc", "Pm", "Th", "Pa", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Md", "No", "Lr",
+                       "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn")
 
 METAL_SCOPE: Dict[str, MetalScope] = {
     # the hydride of a Group 1 or 2 salt (``[Na+].[H-]``), its carbanions and the neutral atom beside ions
-    # ('potassium(0)'): the lane of 2026-10-30
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({1})) for symbol in GROUP_1},
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({2})) for symbol in GROUP_2},
+    # ('potassium(0)'): the lane of 2026-10-30; the atom and the ion alone ('sodium(1+)'): lane LONE
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT}), frozenset({1}))
+       for symbol in GROUP_1},
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT}), frozenset({2}))
+       for symbol in GROUP_2},
     # magnesium porphyrins (the chlorophyll core) are named on the porphyrin dianion like zinc's
-    "Mg": MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, MACROCYCLE, DISCONNECT}), frozenset({2})),
-    **{symbol: MetalScope(frozenset({ZERO_VALENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
+    "Mg": MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, MACROCYCLE, DISCONNECT, ELEMENT}),
+                     frozenset({2})),
+    **{symbol: MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
+    **{symbol: MetalScope(frozenset({ELEMENT}), frozenset()) for symbol in ELEMENT_ONLY_METALS},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in BONDED_METAL_VALENCES.items()},
-    **{symbol: MetalScope(ALL_MECHANISMS - ({ELEMENT} if symbol in RETAINED_ION_METALS else frozenset()),
-                          frozenset(valences))
-       for symbol, valences in MORE_BONDED_METAL_VALENCES.items()},
+    **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in MORE_BONDED_METAL_VALENCES.items()},
     "Zn": MetalScope(ALL_MECHANISMS, frozenset({2}), complete=True),
-    # Group 14 metals named on their parent hydrides: the lane of 2026-10-30
-    **{symbol: MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT}), frozenset({4}))
+    # Group 14 metals named on their parent hydrides: the lane of 2026-10-30; the atom and the ion alone
+    # ('tin', '(119Sn)tin'): lane LONE
+    **{symbol: MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT}), frozenset({4}))
        for symbol in ("Sn", "Pb")},
 }
 
@@ -247,11 +259,11 @@ def has_valence(symbol: str, charge: int) -> bool:
 
 
 def is_named_metal(symbol: str) -> bool:
-    """True when the metal ``symbol`` is admitted to at least one mechanism other than ``ZERO_VALENT`` (a
-    metal admitted to that one alone has no name for its ions, atoms or complexes: its failures keep the
-    label ``UNSUPPORTED_ELEMENT``)."""
+    """True when the metal ``symbol`` is admitted to at least one mechanism other than ``ZERO_VALENT`` and
+    ``ELEMENT`` (a metal admitted to those alone has no name for its complexes or its salts: the failures of
+    its assemblies keep the label ``UNSUPPORTED_ELEMENT``)."""
     scope = METAL_SCOPE.get(symbol)
-    return scope is not None and bool(scope.mechanisms - {ZERO_VALENT})
+    return scope is not None and bool(scope.mechanisms - {ZERO_VALENT, ELEMENT})
 
 
 def is_complete_metal(symbol: str) -> bool:

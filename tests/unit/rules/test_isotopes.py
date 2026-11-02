@@ -174,9 +174,13 @@ class TestDecorateEndToEnd:
         from orthonym.rules.isotopes import decorate_isotopic_name
         from orthonym.namer import Orthonym
         n = Orthonym(style="systematic")
-        # Deliberately exotic: a labeled atom with no OPSIN-expressible locus.
+        # Was the exotic example of a label with no OPSIN-expressible locus. Lane LONE (2026-11-01) names the bare
+        # atom as the radical of its parent hydride with the nuclide in front: (the Blue Book)
+        # "named by adding the suffix 'yl' to the name of the parent hydride, eliding the final letter 'e'", and
+        # (:43718) the nuclide symbol "enclosed in parentheses... before the part of the compound that is
+        # isotopically substituted". The name ships only when it reads back to the labelled atom.
         out = decorate_isotopic_name("[36Cl]", "systematic", n)
-        assert out is None or "36Cl" not in out or "chlorane" in out  # never a wrong labeled PIN
+        assert out == "(36Cl)chloranyl"
 
 
 class TestNuclideTieBreaks:

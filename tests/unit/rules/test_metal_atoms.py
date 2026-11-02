@@ -1,10 +1,11 @@
-"""The atom, the ions and the isotopes of zinc, and the hydride ion beside zinc (``ELEMENT`` of
-``data/metal_scope.py``, ``rules/metal_atoms.py``, the dispatch class ``METAL_ATOM``).
+"""The atom, the ions and the isotopes of zinc and of every other element, and the hydride ion beside zinc
+(``ELEMENT`` of ``data/metal_scope.py``, ``rules/metal_atoms.py``, the dispatch class ``ELEMENT_ATOM``, which was
+``METAL_ATOM`` until lane LONE).
 
 ``[Zn]``, ``[Zn+2]`` and ``[65Zn]`` were named at no tier although OPSIN reads ``zinc``, ``zinc(2+)``
 and ``(65Zn)zinc``. The retained table of cation words gave ``[Zn+2]`` the word 'zinc' (the cation word
 of a salt, ``zinc dichloride``), which is no name of the free ion: OPSIN reads 'zinc' as the neutral
-atom, so the namer's gate refused it. The class ``METAL_ATOM`` sits above ``CATION_RETAINED`` and names
+atom, so the namer's gate refused it. The class (now ``ELEMENT_ATOM``) sits above ``CATION_RETAINED`` and names
 the atom, the ion and the isotope by the element name, the charge number and the nuclide symbol.
 
 Blue Book: Compounds with at least one metal-carbon single bond (the Blue Book)
@@ -16,6 +17,12 @@ of a zinc atom, ion or isotope are verified systematic names and no PIN. The hyd
 'hydride' in the salt of zinc,:43590, "binary names formed by citing the name of the cation
 followed by that of the anion"); a carbon-free salt keeps the label of its path (user decision
 2026-09-30, answer 3 of 2026-10-13).
+
+Lane LONE (2026-11-01) names the lone atom of every element: the bare atom of a mononuclear parent hydride is its
+radical, RADICALS DERIVED FROM PARENT HYDRIDES, (:40426) "named by adding the suffix 'yl' to the
+name of the parent hydride" ('chloranyl'); an isotopic halide anion takes the preselected anion name of its parent
+hydride, (2) (:40924) ('(36Cl)chloranide'); hydrogen takes Table 8.1 of NAMES FOR HYDROGEN ATOMS
+AND IONS (:43659) ('deuteride').
 
 Every name is read back by a fresh OPSIN call that does not go through the engine, to the full
 standard InChIKey of the input.
@@ -31,8 +38,9 @@ from orthonym.data.metal_scope import CARBANION_SALTS, ELEMENT, MetalScope
 from orthonym.perception.ions import parse_salt_fragments
 from orthonym.routing.dispatch_table import DISPATCH_TABLE, StoutClass
 from orthonym.routing.dispatcher import ClassFirstRouter
+from tests.support.opsin_marks import release_opsin_in_use
 from orthonym.rules import adducts, metal_atoms, metal_labels
-from orthonym.rules.metal_atoms import admitted_metal_atom_name, inorganic_anion_word, metal_atom_name
+from orthonym.rules.metal_atoms import admitted_metal_atom_name, inorganic_anion_word, lone_atom_name, metal_atom_name
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -58,7 +66,7 @@ def _assert_named_without_a_pin(smiles, name, tiers=("best-effort", "valid")):
         assert row["name"] == name, (tier, row)
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
         assert_full_rt(row["name"], smiles)
-    declined = _row(smiles, "pin")                    # the default tier declines it, with a reason
+    declined = _row(smiles, "pin")                    # the PIN tier declines it, with a reason
     assert declined["tier"] == "abstain" and declined["limit_code"] == "NO_VERIFIED_PIN", declined
     assert declined["is_pin"] is False
 
@@ -103,21 +111,22 @@ def test_the_isotope_and_the_charge_are_in_the_name():
     assert _row("[66Zn+2]", "best-effort")["name"] == "(66Zn)zinc(2+)"
 
 
-def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_word():
-    assert _class_of("[Zn]") == StoutClass.METAL_ATOM
-    assert _class_of("[Zn+2]") == StoutClass.METAL_ATOM         # not CATION_RETAINED, whose word is 'zinc'
-    assert _class_of("[Cu+2]") == StoutClass.CATION_RETAINED    # admitted, but not to ELEMENT: the retained name stands
-    assert _class_of("[Tc+2]") != StoutClass.METAL_ATOM         # a metal that is not admitted
-    assert _class_of("[Na+]") == StoutClass.CATION_RETAINED
-    assert _class_of("[Tc]") != StoutClass.METAL_ATOM          # a metal that is not admitted
-    assert _class_of("[Hg]") == StoutClass.METAL_ATOM          # admitted to ELEMENT since 2026-10-30
-    assert _class_of("[Cd]") == StoutClass.METAL_ATOM          # and since lane B2
-    assert _class_of("[Hf+4]") == StoutClass.METAL_ATOM
-    assert _class_of("[Zn-]") != StoutClass.METAL_ATOM
-    assert _class_of("[ZnH]") != StoutClass.METAL_ATOM
+def test_the_class_of_the_dispatch_table_names_a_lone_atom_before_the_radical_and_retained_classes():
+    assert _class_of("[Zn]") == StoutClass.ELEMENT_ATOM
+    assert _class_of("[Zn+2]") == StoutClass.ELEMENT_ATOM         # not CATION_RETAINED, whose word is 'zinc'
+    assert _class_of("[Cu+2]") == StoutClass.CATION_RETAINED      # the retained name with its oxidation number stands
+    assert _class_of("[Tc+2]") == StoutClass.ELEMENT_ATOM         # admitted to ELEMENT alone (lane LONE)
+    assert _class_of("[Na+]") == StoutClass.ELEMENT_ATOM          # 'sodium' is the word of a salt, no name of the ion
+    assert _class_of("[Tl]") == StoutClass.ELEMENT_ATOM           # RDKit gives the bare atom a radical electron
+    assert _class_of("[Cl]") == StoutClass.ELEMENT_ATOM
+    assert _class_of("[Ne]") == StoutClass.ELEMENT_ATOM
+    assert _class_of("[Hg]") == StoutClass.ELEMENT_ATOM
+    assert _class_of("[Hf+4]") == StoutClass.ELEMENT_ATOM
+    assert _class_of("[Cl-]") != StoutClass.ELEMENT_ATOM          # the retained anion name stands
+    assert _class_of("[ZnH]") != StoutClass.ELEMENT_ATOM
+    assert _class_of("[CH3]") != StoutClass.ELEMENT_ATOM
     priorities = {c: e.priority for c, e in DISPATCH_TABLE.items()}
-    assert priorities[StoutClass.CATION_QUATERNARY] < priorities[StoutClass.METAL_ATOM] < priorities[
-        StoutClass.CATION_RETAINED]
+    assert priorities[StoutClass.SALT] < priorities[StoutClass.ELEMENT_ATOM] < priorities[StoutClass.RADICAL]
 
 
 # ---- the producer (pure: no JVM)
@@ -128,42 +137,91 @@ def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_w
     ("[Zn+]", "zinc(1+)"),
     ("[65Zn]", "(65Zn)zinc"),
     ("[66Zn+2]", "(66Zn)zinc(2+)"),
-    ("[Zn-]", None),                  # an '-ide' of a metal is not built
-    ("[Zn-2]", None),
+    ("[Zn-]", "zinc(1-)"),            # any other anion: the element name with the charge number
     ("[ZnH]", None),                  # a hydrogen on the metal: a hydride, named by its ligands (BONDED_NAMES)
     ("[ZnH+]", None),
     ("[Zn]=[Zn]", None),              # two atoms
     ("Cl[Zn]Cl", None),
     ("[Zn+2].[Cl-].[Cl-]", None),     # a salt, named by the salt route
-    ("[Cu]", None),                   # a metal that the table does not admit to ELEMENT
-    ("[Cu+2]", None),
-    ("[Na+]", None),
-    ("[Tc+2]", None),                 # a metal that no mechanism admits
-    ("[Hg+2]", "mercury(2+)"),       # admitted to ELEMENT since 2026-10-30 (BONDED_METAL_VALENCES)
-    ("[Cd+2]", "cadmium(2+)"),       # and since lane B2 (MORE_BONDED_METAL_VALENCES), but not the metals of
-    ("[Hf+4]", "hafnium(4+)"),       # RETAINED_ION_METALS (Ag, Au, Co, Cr, Cu, Fe, Mn, Ni): their ion words are retained
-    ("[U]", "uranium"),               # admitted since 2026-10-31 (MORE_BONDED_METAL_VALENCES)
-    ("[U+4]", "uranium(4+)"),
-    ("[Pu]", None),                   # plutonium: no mechanism admits it
+    ("[Cu]", "copper"),               # RETAINED_ION_METALS: the atom and the ions without a retained name
+    ("[Fe+6]", "iron(6+)"),
+    ("[Cu+2]", None),                 # 'copper(II)': CATION_RETAINED names it
     ("[Fe+2]", None),
     ("[Ni+2]", None),
+    ("[Ag+]", "silver(1+)"),          # the table word 'silver' carries no oxidation number: a salt word only
+    ("[Na+]", "sodium(1+)"),
+    ("[Tc+2]", "technetium(2+)"),     # ELEMENT_ONLY_METALS
+    ("[Pu]", "plutonium"),
+    ("[Hg+2]", "mercury(2+)"),
+    ("[U+4]", "uranium(4+)"),
+    ("[Sn]", "tin"),
+    ("[Sn+4]", None),                 # 'tin(IV)'
+    ("[Tl]", "thallium"),
+    ("[Si]", "silicon"),              # a metalloid outside RADICAL_PARENT_HYDRIDES: the element name
+    ("[C]", "carbon"),
+    ("[13C]", "(13C)carbon"),
+    ("[Ne]", "neon"),
+    ("[Kr+]", "krypton(1+)"),
+    ("[222Rn]", "(222Rn)radon"),
+    ("[At]", "astatine"),             # OPSIN reads no 'astanyl'
+    #: the bare atom of a mononuclear parent hydride is its radical
+    ("[Cl]", "chloranyl"),
+    ("[36Cl]", "(36Cl)chloranyl"),
+    ("[O]", "oxidanylidene"),
+    ("[N]", "azanylidyne"),
+    ("[B]", "boranylidyne"),
+    ("[Bi]", "bismuthanylidyne"),
+    ("[Po]", "polanylidene"),
+    ("[Cl+]", "chloraniumylidene"),   # +: a hydron added, every hydrogen atom taken away
+    ("[P-3]", None),                  # a closed-shell anion: the anion classes name it ('phosphanetriide')
+    ("[N-]", "azanidylidene"),
+    ("[O-]", "oxidanidyl"),
+    ("[Si+]", "silyliumylidyne"),
+    ("[Si+4]", "silanetetraylium"),
+    ("[Se+6]", "selenium(6+)"),     # no hydride form accounts for the charge: the element name
+    ("[18O-2]", "(18O)oxidanediide"),
+    ("[59Fe+3]", None),               # the isotope decorator gives "(59Fe)iron(III)"
+    # anions: the retained anion names stand; an isotope takes the parent-hydride anion of (2)
     ("[Cl-]", None),
-    ("[Si]", None),                   # a metalloid is named substitutively, not by this mechanism
+    ("[S-2]", None),
+    ("[36Cl-]", "(36Cl)chloranide"),
+    ("[125I-]", "(125I)iodanide"),
+    ("[B-]", "boron(1-)"),
+    #
+    ("[H]", "hydrogen"),
+    ("[H-]", "hydride"),
+    ("[2H-]", "deuteride"),
+    ("[3H+]", "triton"),
+    ("[2H]", "deuterium"),
     ("C", None),
+    ("[NH4+]", None),
 ])
-def test_the_producer_names_an_admitted_atom_and_nothing_else(smiles, expected):
-    assert admitted_metal_atom_name(Chem.MolFromSmiles(smiles)) == expected
+def test_the_producer_names_a_lone_atom_and_nothing_else(smiles, expected):
+    assert lone_atom_name(Chem.MolFromSmiles(smiles)) == expected
 
 
 def test_the_producer_follows_the_scope_table(monkeypatch):
     """Admitting a metal to ELEMENT is an edit of the table; the element name is the one the adduct
     components use."""
-    assert admitted_metal_atom_name(Chem.MolFromSmiles("[Cu+2]")) is None
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu", MetalScope(frozenset({ELEMENT}), frozenset({2})))
-    assert admitted_metal_atom_name(Chem.MolFromSmiles("[Cu+2]")) == "copper(2+)"
-    assert admitted_metal_atom_name(Chem.MolFromSmiles("[63Cu]")) == "(63Cu)copper"
+    assert lone_atom_name(Chem.MolFromSmiles("[Tc+2]")) == "technetium(2+)"
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Tc", MetalScope(frozenset({CARBANION_SALTS}), frozenset({2})))
+    assert lone_atom_name(Chem.MolFromSmiles("[Tc+2]")) is None
+    assert admitted_metal_atom_name(Chem.MolFromSmiles("[Tc+2]")) is None
     monkeypatch.setitem(metal_scope.METAL_SCOPE, "Zn", MetalScope(frozenset({CARBANION_SALTS}), frozenset({2})))
-    assert admitted_metal_atom_name(Chem.MolFromSmiles("[Zn+2]")) is None
+    assert lone_atom_name(Chem.MolFromSmiles("[Zn+2]")) is None
+
+
+def test_every_true_metal_is_in_the_scope_table():
+    """The table decides for every metal: a metal outside it would be named without an admission."""
+    from orthonym.perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
+    assert not [s for s in _TRUE_METAL_SYMBOLS_FOR_VETO if s not in metal_scope.METAL_SCOPE]
+    assert all(metal_scope.has_mechanism(s, ELEMENT) for s in _TRUE_METAL_SYMBOLS_FOR_VETO)
+
+
+def test_an_element_mechanism_alone_does_not_name_complexes():
+    """The failure label of an assembly reads ``is_named_metal``: ELEMENT names no complex or salt."""
+    assert not metal_scope.is_named_metal("Tc") and not metal_scope.is_named_metal("Fm")
+    assert metal_scope.is_named_metal("Na") and metal_scope.is_named_metal("Zn")
 
 
 def test_the_element_names_have_one_home():
@@ -180,10 +238,12 @@ def test_the_element_names_have_one_home():
 # ---- the label: no PIN, set by a predicate that the tier row reads
 
 def test_the_label_predicate():
-    f = metal_labels.is_metal_atom_or_ion_name_without_pin
+    f = metal_labels.is_lone_atom_name_without_pin
     assert f("[Zn]", "zinc") and f("[Zn+2]", "zinc(2+)") and f("[65Zn]", "(65Zn)zinc")
+    assert f("[Ne]", "neon") and f("[Na+]", "sodium(1+)") and f("[Se+6]", "selenium(6+)") and f("[H-]", "hydride")
+    assert not f("[N]", "azanylidyne") and not f("[36Cl-]", "(36Cl)chloranide")   # on a parent hydride: path label
     assert not f("[Cu+2]", "copper(II)")                                   # the retained name keeps its label
-    assert not f("[Na+]", "sodium")
+    assert not f("[Cl-]", "chloride")
     assert not f("[Zn+2].[Cl-].[Cl-]", "zinc dichloride")                  # a carbon-free salt keeps its label
     assert not f("[H-].[H-].[Zn+2]", "zinc dihydride")
     assert not f("CC[Zn]CC", "diethylzinc")
@@ -194,7 +254,7 @@ def test_the_label_predicate():
 def test_the_predicate_is_what_lowers_the_label(monkeypatch):
     """Switched off, the name of the ion would be a path label (pin_verified): the predicate is on
     the path of the tier row, and it is the only thing that sets the label."""
-    monkeypatch.setattr(metal_labels, "is_metal_atom_or_ion_name_without_pin", lambda smiles, name: False)
+    monkeypatch.setattr(metal_labels, "is_lone_atom_name_without_pin", lambda smiles, name: False)
     row = _row("[Zn+2]", "valid")
     assert row["name"] == "zinc(2+)" and row["tier"] == "pin_verified", row
 
@@ -259,9 +319,6 @@ def test_a_neutral_atom_beside_anions_is_cited_with_zero():
 
 #: (default tier, best-effort tier) identity views at the start commit of the zinc work
 START_ROWS = {
-    "[Cu]": (
-        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Cu+2]": (
         ('copper(II)', 'pin_verified', True, None),
         ('copper(II)', 'pin_verified', True, None)),
@@ -271,30 +328,9 @@ START_ROWS = {
     "[Fe+2]": (
         ('iron(II)', 'pin_verified', True, None),
         ('iron(II)', 'pin_verified', True, None)),
-    "[Na+]": (
-        ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Na]": (
-        ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Li+]": (
-        ('lithium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Mg+2]": (
-        ('magnesium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Ca+2]": (
-        ('calcium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Tc+2]": (
-        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Sn+4]": (
         ('tin(IV)', 'pin_verified', True, None),
         ('tin(IV)', 'pin_verified', True, None)),
-    "[Ag+]": (
-        ('silver compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Tc+2].[H-].[H-]": (
         ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
@@ -367,6 +403,83 @@ def test_zinc_assemblies_no_producer_names_are_unnameable(smiles):
     assert _view(_row(smiles, "pin")) == default_view, smiles
     assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
 
+
+
+#: the rows of the start commit that lane LONE (2026-11-01) moves: every metal is admitted to ``ELEMENT``, and a bare
+#: atom that RDKit gives radical electrons reaches the class ELEMENT_ATOM before RADICAL. The PIN tier declines
+#: each name (no PIN,: no carbon); the best-effort tier gives it, read back to the full key
+LONE_ROWS = {
+    "[Cu]": "copper", "[Na+]": "sodium(1+)", "[Na]": "sodium", "[Li+]": "lithium(1+)", "[Mg+2]": "magnesium(2+)",
+    "[Ca+2]": "calcium(2+)", "[Tc+2]": "technetium(2+)", "[Ag+]": "silver(1+)", "[Tl]": "thallium", "[Ne]": "neon",
+    "[Kr+]": "krypton(1+)", "[199Tl]": "(199Tl)thallium", "[Cl]": "chloranyl", "[O]": "oxidanylidene",
+    "[Bi]": "bismuthanylidyne", "[36Cl-]": "(36Cl)chloranide", "[125I-]": "(125I)iodanide", "[2H-]": "deuteride",
+    "[H-]": "hydride", "[C]": "carbon", "[At]": "astatine", "[Sn+]": "tin(1+)",
+}
+
+
+#: the names built on a parent hydride: a carbon-free name keeps the label of its naming path (user decision
+#: 2026-09-30, the label of 'azanidyl'), so only the name and its read-back are pinned here
+LONE_HYDRIDE_ROWS = {"[Cl]", "[O]", "[Bi]", "[36Cl-]", "[125I-]"}
+
+
+@pytest.mark.parametrize("smiles", sorted(LONE_ROWS))
+def test_the_rows_that_lane_lone_moves(smiles):
+    if smiles in LONE_HYDRIDE_ROWS:
+        row = _row(smiles, "best-effort")
+        assert row["name"] == LONE_ROWS[smiles], row
+        assert_full_rt(row["name"], smiles)
+        return
+    _assert_named_without_a_pin(smiles, LONE_ROWS[smiles], tiers=("best-effort",))
+
+
+def test_a_hydride_stays_out_of_an_assembly_of_a_metal_the_table_does_not_admit():
+    """The hydride ion has a name of its own now; beside technetium (no CARBANION_SALTS) the assembly is still
+    organometallic for the metal INTRODUCTION) and gets no adduct name."""
+    assert _row("[Tc+2].[H-].[H-]", "best-effort")["name"] is None
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("[B+3].[H-].[H-].[H-]", "boron(3+)—hydride (1/3)"),      # not 'boranetriylium trihydride' through the salt route
+    ("[Si+4].[O-2].[O-2]", "oxidanediide—silicon(4+) (2/1)"),
+])
+def test_the_salt_route_does_not_cite_a_one_atom_non_metal_ion_by_its_free_ion_name(smiles, name):
+    """``rules.salts._name_organic_ion_best_effort`` names organic ions; a one-atom ion of hydrogen, carbon or a
+    p-block element keeps the adduct name of its drawing (systematic_verified,."""
+    row = _row(smiles, "best-effort")
+    if smiles.startswith("[B+3]") and release_opsin_in_use():
+        # OPSIN 2.9.0 reads no 'boron(3+)—hydride (1/3)' (OPSIN's main branch does): the row then has no name, and
+        # never the free-ion name of its hydride
+        assert (row["name"], row["tier"]) == (None, "abstain"), row
+        return
+    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
+    assert_full_rt(name, smiles)
+
+
+@pytest.mark.parametrize("smiles", ["CCO.[H]", "[Na+].[H]"])
+def test_a_stray_hydrogen_atom_is_no_adduct_component(smiles):
+    assert _row(smiles, "best-effort")["name"] is None
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("[C-4]", "methanetetraide"), ("[14C-4]", "(14C)methanetetraide"), ("[C+4]", "methane-1,1,1,1-tetrakis(ylium)"),
+])
+def test_carbon_ions_keep_their_names_on_methane(smiles, name):
+    """'H3C– methanide (PIN)', the Blue Book): a carbon ion is named on methane and keeps the
+    PIN label of (it contains carbon); ``lone_atom_name`` leaves it to the ion classes."""
+    assert lone_atom_name(Chem.MolFromSmiles(smiles)) is None
+    row = _row(smiles, "best-effort")
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+
+
+@pytest.mark.parametrize("plain,labelled", [
+    ("[P-3]", "[32P-3]"), ("[O-2]", "[18O-2]"), ("[Fe+2]", "[59Fe+2]"), ("[Cl-]", "[36Cl-]"), ("[Zn+2]", "[65Zn+2]"),
+])
+def test_an_isotopologue_takes_the_label_of_its_parent(plain, labelled):
+    """The label of a lone atom is a function of the structure: an element name has no PIN, a name on a
+    parent hydride keeps its path label; the nuclide changes neither ('(13C)methane (PIN)' and 'methane (PIN)',
+    :7354)."""
+    a, b = _row(plain, "best-effort"), _row(labelled, "best-effort")
+    assert a["tier"] == b["tier"] and a["is_pin"] == b["is_pin"], (a, b)
 
 
 @pytest.mark.parametrize("smiles", sorted(START_ROWS))

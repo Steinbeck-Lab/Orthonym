@@ -411,9 +411,12 @@ def test_the_scope_function_reads_the_table(monkeypatch):
     assert _code("Cl[Bi]Cl") == "UNNAMEABLE"                      # a later phase completes a metal by its entry
 
 
-@pytest.mark.parametrize("smiles, message", [("[Zn-]", "zinc compound (not supported)"),
+# Lane LONE (2026-11-01) names every lone atom and monoatomic ion ('zinc(1-)', and the salt 'sodium zinc(1-)' at the
+# best-effort tier), so [Zn-] and [Zn-].[Na+] are no longer failures: two zinc anions with no cation, alone and beside
+# sodium, are the zinc inputs that no producer names at any tier
+@pytest.mark.parametrize("smiles, message", [("[Zn-].[Zn-]", "zinc compound (not supported)"),
                                              ("[Zn]=[Zn]", "zinc compound (not supported)"),
-                                             ("[Zn-].[Na+]", "sodium compound (not supported)")])
+                                             ("[Zn-].[Zn-].[Na+]", "sodium compound (not supported)")])
 def test_the_named_rows_of_a_zinc_failure_carry_the_label_at_every_tier(smiles, message):
     """name_tiered, the call that asks for the label (``on_failure="label"``), ``raise_on_limit`` and
     ``classify_limit`` agree: UNNAMEABLE at the default and at the best-effort tier; the call returns the
@@ -431,9 +434,9 @@ def test_the_named_rows_of_a_zinc_failure_carry_the_label_at_every_tier(smiles, 
 
 
 @pytest.mark.parametrize("smiles, code, label", [
-    ("[Zn-]", "UNNAMEABLE", "zinc compound (not supported)"),
+    ("[Zn-].[Zn-]", "UNNAMEABLE", "zinc compound (not supported)"),       # [Zn-] is 'zinc(1-)' since lane LONE
     ("[Zn]=[Zn]", "UNNAMEABLE", "zinc compound (not supported)"),
-    ("[Zn-].[Na+]", "UNNAMEABLE", "sodium compound (not supported)"),
+    ("[Zn-].[Zn-].[Na+]", "UNNAMEABLE", "sodium compound (not supported)"),  # [Zn-].[Na+] is named since lane LONE
     ("Cl[Zn]Cl", "NO_VERIFIED_PIN", "unknown organic compound"),     # a name was built and is no PIN
     ("Cl[Cu]Cl", "UNSUPPORTED_ELEMENT", "copper compound (not supported)"),
 ])

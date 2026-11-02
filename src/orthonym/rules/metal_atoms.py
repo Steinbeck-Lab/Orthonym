@@ -1,4 +1,4 @@
-"""Names of the atom, the ions and the isotopes of a metal, and of the hydride ion beside a metal.
+"""Names of the lone atom, the monoatomic ions and the isotopes of every element, and of the hydride ion beside a metal.
 
 One home for the element names of the metals. A metal atom takes its element name; a metal cation
 adds its charge number in parentheses, the notation of 'pentaammine(ethanido)osmium(1+) chloride'
@@ -9,12 +9,13 @@ parentheses... before the part of the compound that is isotopically substituted"
 * the adduct of ``rules/adducts.py``, which cites a one-atom metal component by them at the
   best-effort tier (``metal_atom_name``): "preferred IUPAC names cannot be assigned to mixed adducts"
   (:4667), so such a name is never a PIN;
-* the class ``METAL_ATOM`` of the dispatch table, for a molecule that is one atom of a metal
-  admitted to the mechanism ``ELEMENT`` of ``data/metal_scope.py`` (``admitted_metal_atom_name``).
+* the class ``ELEMENT_ATOM`` of the dispatch table, for a molecule that is one atom without hydrogen
+  of any element (``lone_atom_name``): a metal admitted to the mechanism ``ELEMENT`` of
+  ``data/metal_scope.py``, a metalloid, a non-metal or a noble gas, as an atom, an ion or an isotope.
   The name is a verified systematic name and no PIN: PREFERRED IUPAC NAMES (:2056) labels
   "the names of compounds whose parent hydride contains at least one of the following elements: B,
-  Si,... At, and that also contain at least one carbon atom in their structure", and zinc is none
-  of them (``rules/metal_labels.is_metal_atom_or_ion_name_without_pin`` sets the label).
+  Si,... At, and that also contain at least one carbon atom in their structure", and a lone atom
+  holds no such pair (``rules/metal_labels.is_lone_atom_name_without_pin`` sets the label).
 
 ``inorganic_anion_word`` gives the word of a one-atom or oxo anion in a salt: the table of retained
 inorganic anions, and 'hydride' for the hydride ion beside metals admitted to ``CARBANION_SALTS``.
@@ -23,8 +24,8 @@ to ``AMMINE``.
 """
 from typing import Dict, Optional
 
-from ..data.ion_retained_names import INORGANIC_ANIONS
-from ..data.metal_scope import AMMINE, CARBANION_SALTS, ELEMENT, has_mechanism
+from ..data.ion_retained_names import INORGANIC_ANIONS, INORGANIC_CATIONS
+from ..data.metal_scope import AMMINE, CARBANION_SALTS, ELEMENT, METAL_SCOPE, has_mechanism
 
 # The monoatomic metal components of a disconnected depiction -- 'CC(N)C(=O)O.CC(N)C(=O)O.[Ni]', six
 # '[C-]#N' with '[Fe+2]'. "Mixed organic - inorganic adducts" (the Blue Book):
@@ -64,6 +65,78 @@ METAL_ELEMENT_NAMES: Dict[str, str] = {
     'Zn': 'zinc', 'Zr': 'zirconium',
 }
 
+#: the elements that are not in ``METAL_ELEMENT_NAMES``: hydrogen, carbon, the non-metals of Groups 15-17, the
+#: noble gases and the superheavy elements. A lone atom of one of them takes its element name, as a metal does,
+#: unless it is the radical of a mononuclear parent hydride (``RADICAL_PARENT_HYDRIDES``).
+NONMETAL_ELEMENT_NAMES: Dict[str, str] = {
+    'H': 'hydrogen', 'He': 'helium', 'C': 'carbon', 'N': 'nitrogen', 'O': 'oxygen', 'F': 'fluorine',
+    'Ne': 'neon', 'P': 'phosphorus', 'S': 'sulfur', 'Cl': 'chlorine', 'Ar': 'argon', 'Se': 'selenium',
+    'Br': 'bromine', 'Kr': 'krypton', 'I': 'iodine', 'Xe': 'xenon', 'At': 'astatine', 'Rn': 'radon',
+    'Nh': 'nihonium', 'Fl': 'flerovium', 'Mc': 'moscovium', 'Lv': 'livermorium', 'Ts': 'tennessine',
+    'Og': 'oganesson',
+}
+
+#: the mononuclear parent hydrides of Table 2.1, the Blue Book-7932) on which a bare atom or a bare
+#: monoatomic ion of the element is named, with the standard bonding number of the element. The neutral atom is
+#: the radical, (:40426) "named by adding the suffix 'yl' to the name of the parent hydride, eliding
+#: the final letter 'e'", 'ylidene' and 'ylidyne' for two and three hydrogen atoms (:40448): 'chloranyl',
+#: 'oxidanylidene', 'azanylidyne'; an ion combines the cumulative suffixes 'ide', 'ium', 'ylium' and 'yl'
+#: Suffixes,:4777: "Cumulative suffixes are used to designate radicals, ions, radical ions... They can be combined
+#: with each other"): 'phosphanetriide', 'azanidylidene', 'tellaniumylidyne', 'silyliumylidyne'. Silicon and germanium
+#: are here for their ions only (a neutral atom with four radical electrons takes the element name). Astatine is
+#: not here: OPSIN 2.9.0 reads no 'astanyl', so the atom takes the element name 'astatine'. The metals of Groups
+#: 13 and 14 (alumane... plumbane) take the element name of the coordination nomenclature.
+RADICAL_PARENT_HYDRIDES: Dict[str, tuple] = {
+    'B': ('borane', 3), 'Si': ('silane', 4), 'Ge': ('germane', 4), 'N': ('azane', 3), 'P': ('phosphane', 3),
+    'As': ('arsane', 3), 'Sb': ('stibane', 3), 'Bi': ('bismuthane', 3), 'O': ('oxidane', 2), 'S': ('sulfane', 2),
+    'Se': ('selane', 2), 'Te': ('tellane', 2), 'Po': ('polane', 2), 'F': ('fluorane', 1), 'Cl': ('chlorane', 1),
+    'Br': ('bromane', 1), 'I': ('iodane', 1),
+}
+#: the Group 14 hydrides whose single 'yl' replaces the ending 'ane',:40414: 'silyl', not 'silanyl')
+_GROUP_14_HYDRIDES = frozenset({'silane', 'germane'})
+_RADICAL_SUFFIX = {0: '', 1: 'yl', 2: 'ylidene', 3: 'ylidyne', 4: 'tetrayl'}
+_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+
+
+def _suffixed(hydride: str, suffix: str) -> str:
+    """The hydride name with a suffix: its final 'e' is elided before a vowel or 'y' ('chloranyl', 'oxidanide')
+    and kept before a consonant ('oxidanediide')."""
+    return hydride[:-1] + suffix if suffix[:1] in tuple('aeiouy') else hydride + suffix
+
+
+def _hydride_ion_name(hydride: str, bonding: int, charge: int, radicals: int) -> Optional[str]:
+    """The name of a bare monoatomic ion on its parent hydride (all its hydrogen atoms taken away), or None when
+    the charge and the radical electrons do not account for them.
+
+    An anion loses ``-charge`` hydrons ('ide') and the rest of its hydrogen atoms as radicals: 'phosphanetriide',
+    'azanidylidene', 'oxidanidyl',:40900). A cation adds hydrons ('ium',, and then loses
+    every hydrogen atom as radicals: 'tellaniumylidyne') or loses hydride ions ('ylium',,:41553,
+    and then the rest as radicals: 'silyliumylidyne', 'silanetetraylium'); the radical electrons decide which."""
+    if radicals not in _RADICAL_SUFFIX:
+        return None
+    tail = _RADICAL_SUFFIX[radicals]
+    if charge < 0:
+        k = -charge
+        if k not in _MULTIPLIER or k + radicals != bonding:
+            return None
+        return _suffixed(hydride, _MULTIPLIER[k] + 'id' + (tail or 'e'))
+    if charge == 1 and radicals == bonding + 1:
+        return _suffixed(hydride, 'ium' + tail)
+    if charge in _MULTIPLIER and radicals == bonding - charge:
+        if charge == 1 and hydride in _GROUP_14_HYDRIDES:
+            return hydride[:-3] + 'yl' + 'ium' + tail
+        return _suffixed(hydride, _MULTIPLIER[charge] + 'ylium' + tail)
+    return None
+
+
+#: Table 8.1 Names of the hydrogen atoms and ions, the Blue Book), by (mass number, charge); the
+#: mass number 0 is the natural composition
+HYDROGEN_NAMES: Dict[tuple, str] = {
+    (0, 0): 'hydrogen', (1, 0): 'protium', (2, 0): 'deuterium', (3, 0): 'tritium',
+    (0, -1): 'hydride', (1, -1): 'protide', (2, -1): 'deuteride', (3, -1): 'tritide',
+    (0, 1): 'hydron', (1, 1): 'proton', (2, 1): 'deuteron', (3, 1): 'triton',
+}
+
 #: the canonical SMILES of the hydride ion, the fragment ``inorganic_anion_word`` cites as 'hydride'
 HYDRIDE_ION = '[H-]'
 
@@ -100,16 +173,83 @@ def metal_atom_name(frag_mol) -> Optional[str]:
 
 def admitted_metal_atom_name(mol) -> Optional[str]:
     """The name of ``mol`` when it is one atom of a metal admitted to ``ELEMENT`` in
-    ``data/metal_scope.py`` ('zinc', 'zinc(2+)', '(65Zn)zinc'), else None.
-
-    A pure function of the structure: the predicate and the handler of the dispatch class
-    ``METAL_ATOM`` both call it. The name is read back by OPSIN 2.9.0 to the standard InChIKey of
-    the atom or ion (the gate of the namer); this function builds it only."""
+    ``data/metal_scope.py`` ('zinc', 'zinc(2+)', '(65Zn)zinc'), else None (the metal case of
+    ``lone_atom_name``)."""
     if mol is None or mol.GetNumAtoms() != 1:
         return None
     if not has_mechanism(mol.GetAtomWithIdx(0).GetSymbol(), ELEMENT):
         return None
     return metal_atom_name(mol)
+
+
+def _charge_number(charge: int) -> str:
+    return f"({abs(charge)}{'+' if charge > 0 else '-'})"
+
+
+def lone_atom_name(mol) -> Optional[str]:
+    """The name of a lone atom, ion or isotope (``lone_atom_name_and_basis``), else None."""
+    return lone_atom_name_and_basis(mol)[0]
+
+
+def lone_atom_name_and_basis(mol) -> tuple:
+    """``(name, on_parent_hydride)``: the name of ``mol`` when it is one atom without hydrogen (an atom, a monoatomic
+    ion or an isotope of either), else ``(None, False)``; ``on_parent_hydride`` is True when the name is built on the
+    mononuclear parent hydride of the element ('chloranyl', 'phosphanetriide') and False for an element name or a
+    hydrogen name ('neon', 'sodium(1+)', 'hydride').
+
+    * a neutral atom of an element of ``RADICAL_PARENT_HYDRIDES`` whose radical electrons are the bonding number
+      of the element: the radical of its parent hydride: 'chloranyl', 'oxidanylidene';
+    * hydrogen: Table 8.1: 'hydrogen', 'deuteride', 'hydron';
+    * any other neutral atom: the element name ('neon', 'thallium', 'carbon');
+    * an ion of an element of ``RADICAL_PARENT_HYDRIDES``: its name on the parent hydride when the charge and the
+      radical electrons account for every hydrogen atom of the hydride (``_hydride_ion_name``): 'phosphanetriide',
+      'oxidanidyl', 'chloraniumylidene', 'silanetetraylium', '(36Cl)chloranide';
+    * any other ion: the element name with the charge number ('sodium(1+)', 'selenium(6+)'), the notation of
+      'pentaammine(ethyl)osmium(1+)', the Blue Book).
+
+    None for an ion of the table of retained cations whose name carries an oxidation number ('iron(II)': the class
+    CATION_RETAINED, and the isotope decorator for '(59Fe)iron(II)'); a bare cation word of that table ('sodium',
+    'silver') is the word of a salt and names no free ion. None for a closed-shell anion of the table of retained
+    anions or of a parent hydride ('chloride', 'phosphanetriide'), which the anion classes name; its isotope
+    ('(36Cl)chloranide') and its radical forms ('oxidanidyl') are named here.
+
+    An element of ``data/metal_scope.py`` (every true metal is there) takes a name only when the table admits it
+    to ``ELEMENT``; the metalloids and the non-metals are not in that table. The nuclide symbol goes in
+    parentheses in front of the name, the Blue Book). The name is never a PIN: PREFERRED
+    IUPAC NAMES (:2056) gives the label to names "that also contain at least one carbon atom", and a lone atom is
+    no salt (``rules/metal_labels.is_lone_atom_name_without_pin``). A pure function of the structure: the predicate
+    and the handler of the dispatch class ``ELEMENT_ATOM`` both call it; the namer's gate reads the name back."""
+    if mol is None or mol.GetNumAtoms() != 1:
+        return None, False
+    atom = mol.GetAtomWithIdx(0)
+    if atom.GetTotalNumHs() != 0:
+        return None, False
+    symbol, charge, isotope = atom.GetSymbol(), atom.GetFormalCharge(), atom.GetIsotope()
+    if symbol == 'H':
+        return HYDROGEN_NAMES.get((isotope, charge)), False
+    if symbol == 'C' and charge:
+        return None, False          # 'methanide', 'methylium' (PINs,: the ion classes and the isotope decorator
+    if symbol in METAL_SCOPE and not has_mechanism(symbol, ELEMENT):
+        return None, False
+    element = METAL_ELEMENT_NAMES.get(symbol) or NONMETAL_ELEMENT_NAMES.get(symbol)
+    if element is None:
+        return None, False
+    plain = f"[{symbol}{'+' if charge > 0 else '-' if charge < 0 else ''}{abs(charge) if abs(charge) > 1 else ''}]"
+    radicals = atom.GetNumRadicalElectrons()
+    hydride = RADICAL_PARENT_HYDRIDES.get(symbol)
+    if charge > 0 and '(' in (INORGANIC_CATIONS.get(plain) or ''):
+        return None, False          # 'iron(II)': CATION_RETAINED (and the isotope decorator for '(59Fe)iron(II)')
+    if charge < 0 and not isotope and not radicals and (plain in INORGANIC_ANIONS or hydride):
+        return None, False          # 'chloride', 'phosphanetriide': the anion classes name a closed-shell anion
+    if charge == 0:
+        name = (_suffixed(hydride[0], _RADICAL_SUFFIX[radicals])
+                if hydride and radicals == hydride[1] and radicals <= 3 else None)
+    else:
+        name = hydride and _hydride_ion_name(hydride[0], hydride[1], charge, radicals)
+    on_hydride = name is not None
+    if name is None:
+        name = element + (_charge_number(charge) if charge else '')
+    return (f"({isotope}{symbol}){name}" if isotope else name), on_hydride
 
 
 def inorganic_anion_word(smiles: str, cation_frags) -> Optional[str]:

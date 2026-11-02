@@ -74,7 +74,6 @@ def test_tin_and_lead_cations_are_named_on_their_parent_hydrides(smiles, expecte
 @pytest.mark.parametrize("smiles", [
     "C[Sn+]C",            # +1 and two bonds: not the cation of the mononuclear hydride (3 bonds at +1)
     "C[Sn+2]C",
-    "[Sn+]",              # no bond at all
     "C1CC[Sn+]C1",        # a ring atom is a skeletal atom of a ring parent hydride, not of this one
 ])
 def test_a_tin_cation_that_is_not_the_ylium_of_the_parent_hydride_is_declined(smiles):

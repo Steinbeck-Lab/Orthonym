@@ -98,7 +98,7 @@ class StoutClass(_StrEnumBase):
     ANION_RETAINED = "anion_retained"         # row 4; namer.py:861-871;
     CATION_RETAINED = "cation_retained"       # row 5; namer.py:872-875;
     CATION_QUATERNARY = "cation_quaternary"   # a phase.1 quaternary aminium; priority 480, tier 1 — below ZWITTERION@300/LIPID@250, above CATION_RETAINED@500)
-    METAL_ATOM = "metal_atom"                 # ZN7 (the atom, ion or isotope of a metal admitted to ELEMENT in data/metal_scope.py: 'zinc', 'zinc(2+)', '(65Zn)zinc'; priority 490, tier 1 -- above CATION_RETAINED@500, whose table word 'zinc' is the cation word of a salt and no name of the free ion [Zn+2]; below CATION_QUATERNARY@480). Predicate-IS-handler: rules.metal_atoms.admitted_metal_atom_name.
+    ELEMENT_ATOM = "element_atom"             # lane LONE (was METAL_ATOM, ZN7): one atom without hydrogen of any element -- an atom, a monoatomic ion or an isotope: the element name ('thallium', 'neon', 'sodium(1+)', '(65Zn)zinc'), the radical of a mononuclear parent hydride ('chloranyl', or the hydrogen names of; priority 150, tier 1 -- after SALT@100, before RADICAL@200, which claims a bare atom that RDKit gives radical electrons. Predicate-IS-handler: rules.metal_atoms.lone_atom_name.
     ESTER_ANION_ZWITTERION = "ester_anion_zwitterion"  # a phase B1 choline-family acid-ester-anion zwitterion; priority 301, tier 1 — right after ZWITTERION@300). A mono-ester P-oxoacid DIANION whose owner arm carries a quaternary cation (e.g. R-O-PO3^2-) has NET CHARGE != 0, so `detect_species_type` returns 'ion' (not 'zwitterion') and ZWITTERION@300's predicate never sees it, even though `charged_router`'s OWN internal zwitterion test (site presence, not net charge) already names it correctly once reached. This entry is the missing dispatch-level door for that net-charged variant; predicate-IS-handler pattern (mirrors ANION_RETAINED@400).
     MIXED_SIGN_ZWITTERION = "mixed_sign_zwitterion"  # charged Slice B azaniumyl PIN; priority 302, tier 1 — right after ESTER_ANION_ZWITTERION@301). The GENERAL net-charged door for a single-fragment, metal-free MIXED-SIGN organic (>=1 cation site AND >=1 anion site) that `detect_species_type` buckets as 'ion' (net charge != 0), e.g. a protonated diamino-acid `[NH3+]CCCC([NH3+])C(=O)[O-]` (net +1) -> `2,5-bis(azaniumyl)pentanoate`. `charged_router.route_charged` routes such a fragment to `_route_zwitterion` (its zwitterion test is site-presence, not net charge), which builds the RT-gated azaniumyl PIN; predicate-IS-handler (mirrors ESTER_ANION_ZWITTERION@301). Net-zero mixed-sign is already ZWITTERION@300's; this is strictly the net-charged variant.
     ANION_SMALL = "anion_small"               # row 6; namer.py:877-914;
@@ -421,12 +421,11 @@ def _is_cation_quaternary(mol, smiles, canonical_smiles, features=None, **kwargs
     return classify_cation(mol, sites['cations'][0]) == 'quaternary'
 
 
-def _is_metal_atom(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """Tier-1; ZN7 (rules/metal_atoms.py): the molecule is one atom of a metal admitted to the
-    mechanism ``ELEMENT`` of ``data/metal_scope.py``, with a name (a non-negative charge, no
-    hydrogen). Predicate-IS-handler, pure : the name is a function of the structure."""
-    from orthonym.rules.metal_atoms import admitted_metal_atom_name
-    return admitted_metal_atom_name(mol) is not None
+def _is_element_atom(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Tier-1; lane LONE (rules/metal_atoms.py): the molecule is one atom without hydrogen with a name
+    (``lone_atom_name``). Predicate-IS-handler, pure : the name is a function of the structure."""
+    from orthonym.rules.metal_atoms import lone_atom_name
+    return lone_atom_name(mol) is not None
 
 
 def _is_anion_small(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -941,13 +940,13 @@ def _handle_cation_retained(mol, smiles, canonical_smiles, features=None, *,
     return name_cation(mol, style=style, retained_only=True)
 
 
-def _handle_metal_atom(mol, smiles, canonical_smiles, features=None, *,
-                       style: str = "pin", **kwargs) -> Optional[str]:
-    """ZN7: the element name of the atom, with the charge number of an ion and the nuclide symbol of
-    an isotope ('zinc', 'zinc(2+)', '(65Zn)zinc'); the namer's gates read it back to the standard
-    InChIKey of the atom or ion, and the tier row labels it (no PIN:."""
-    from orthonym.rules.metal_atoms import admitted_metal_atom_name
-    return admitted_metal_atom_name(mol)
+def _handle_element_atom(mol, smiles, canonical_smiles, features=None, *,
+                         style: str = "pin", **kwargs) -> Optional[str]:
+    """Lane LONE: the name of a lone atom, ion or isotope ('zinc(2+)', 'neon', 'chloranyl', '(36Cl)chloranide');
+    the namer's gates read it back to the standard InChIKey of the atom or ion, and the tier row labels it (no
+    PIN:."""
+    from orthonym.rules.metal_atoms import lone_atom_name
+    return lone_atom_name(mol)
 
 
 def _handle_cation_quaternary(mol, smiles, canonical_smiles, features=None, *,
@@ -3062,10 +3061,10 @@ _register_dispatch(
     side_effect_inventory=(),
 )
 _register_dispatch(
-    class_id=StoutClass.METAL_ATOM, priority=490, tier=1,
-    predicate=_is_metal_atom, handler=_handle_metal_atom,
-    iupac_section="element name with the charge number (P-69.2.3) and the nuclide symbol (P-82.2.1); no PIN (P-12.1)",
-    description="One atom of a metal admitted to ELEMENT (zinc): the atom, an ion or an isotope; routes to rules.metal_atoms.admitted_metal_atom_name",
+    class_id=StoutClass.ELEMENT_ATOM, priority=150, tier=1,
+    predicate=_is_element_atom, handler=_handle_element_atom,
+    iupac_section="element name with the charge number (P-69.2.3) and the nuclide symbol (P-82.2.1); parent-hydride radical (P-71.2.1.2) and anion (P-72.2.2.2); hydrogen names (P-81.3); no PIN (P-12.1)",
+    description="One atom without hydrogen of any element: the atom, a monoatomic ion or an isotope; routes to rules.metal_atoms.lone_atom_name",
     side_effect_inventory=(),
 )
 _register_dispatch(
