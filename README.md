@@ -65,6 +65,7 @@ name_compound("C[C@H](O)CC")                  # '(2S)-butan-2-ol'
 orthonym "CCO"                                # ethanol
 orthonym "CC(=O)Oc1ccccc1C(=O)O" --provenance # the name plus its tier and how it was checked, as JSON
 orthonym --batch molecules.smi -o names.txt   # one SMILES per line
+orthonym --batch molecules.smi -j 8 -o names.txt   # the same, in 8 processes at once
 ```
 
 These commands use the default, the `best-effort` tier: the verified Preferred IUPAC Name (PIN) when the

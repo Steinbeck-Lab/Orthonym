@@ -15,15 +15,26 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 
-# ``requests`` is only needed for the optional PubChem network lookup below; it
-# is NOT required for core naming. Import it lazily so that ``import orthonym``
-# succeeds on a minimal install that omits it -- the lookup degrades to "no
-# result" rather than making the whole package unimportable.
-try:
-    import requests
-    import requests.utils
-except ModuleNotFoundError:  # pragma: no cover - exercised on minimal installs
-    requests = None
+
+def _requests():
+    """``requests``, or None when it is not installed.
+
+    It is only needed for the optional PubChem network lookup below, NOT for core naming, so it is imported on the
+    first lookup: ``import orthonym`` neither needs it (a minimal install that omits it degrades to "no result") nor
+    pays its import (0.12 s)."""
+    try:
+        import requests
+        import requests.utils
+    except ModuleNotFoundError:  # pragma: no cover - exercised on minimal installs
+        return None
+    return requests
+
+
+def __getattr__(name):
+    # ``pubchem_validator.requests`` (PEP 562), so a test can patch ``requests.get`` through this module
+    if name == "requests":
+        return _requests()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # Default cache location: project_root/data/pubchem_cache.json
@@ -114,6 +125,7 @@ def lookup_name_pubchem(
         return None
 
     # No network library available -> behave like offline mode.
+    requests = _requests()
     if requests is None:
         return None
 

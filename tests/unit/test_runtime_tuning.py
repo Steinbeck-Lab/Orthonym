@@ -43,3 +43,13 @@ def test_env_path_only_when_on(rt, monkeypatch):
     monkeypatch.setenv("ORTHONYM_GC_TUNE", "on")
     assert rt.maybe_tune_from_env() is True
     assert gc.get_threshold() == rt.DEFAULT_THRESHOLD
+
+
+def test_batch_tunes_gc(rt, monkeypatch, tmp_path):
+    """``--batch`` names many structures in one process: it applies the batch tuning (speed baseline: -3.4% CPU)."""
+    from orthonym import cli
+    monkeypatch.delenv("ORTHONYM_GC_TUNE", raising=False)
+    src = tmp_path / "blank.smi"
+    src.write_text("\n")
+    assert cli._process_batch(str(src), None, "pin", False) == 0
+    assert rt.is_tuned() is True

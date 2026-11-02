@@ -13,9 +13,12 @@ Two knobs, both invisible to the names and tiers the engine emits:
   threshold) so a 16,000-molecule shard cannot accumulate cyclic garbage unbounded.
 
 * **BLAS/OpenMP thread pools.** numpy's bundled OpenBLAS spawns one thread per CPU
-  (59 idle threads per worker on this 60-vCPU host, 2,400 across a 41-worker run). They
-  use no CPU but cost memory and scheduler noise; one thread is the right size for a
-  process that never calls BLAS in parallel.
+  (59 threads per worker on this 60-vCPU host, 2,400 across a 41-worker run). They are
+  not idle: they spin when they start, so ``orthonym CCO`` used 10.8 s of user CPU for
+  2.2 s of wall time, and 3.2 s with one thread (2026-11-02). One thread is the right
+  size for a process that never calls BLAS in parallel. The variables work only when
+  set before numpy loads: ``import orthonym`` does not load numpy, and the CLI calls
+  :func:`limit_blas_threads` first (a library user's environment is left alone).
 
 Opt-in. The repo's batch runners (eval/harness.py, scripts/perf/name_sample.py) call
 :func:`tune_batch_process` explicitly; any other runner sets ``ORTHONYM_GC_TUNE=on`` and
@@ -57,6 +60,12 @@ def tune_batch_process(threshold: Tuple[int, int, int] = DEFAULT_THRESHOLD, *,
     gc.set_threshold(*threshold)
     _state["tuned"] = True
     return True
+
+
+def limit_blas_threads() -> None:
+    """One BLAS/OpenMP thread for this process unless the user set the variables; call before numpy loads."""
+    for var in _THREAD_VARS:
+        os.environ.setdefault(var, "1")
 
 
 def maybe_tune_from_env() -> bool:

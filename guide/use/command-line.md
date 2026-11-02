@@ -58,6 +58,9 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 `--output FILE`, `-o FILE`
 : With `--batch`, write the lines to this file instead of the screen.
 
+`--jobs N`, `-j N`
+: With `--batch`, name the lines in N processes at once (default 1). The output and the error stream are the same, line for line and in the same order (with `--time-limit`, a line that needs about as long as the limit can run out of time in one run and not in another); each process starts its own Java machine. See [Many processes at once](batch.md#many-processes-at-once).
+
 `--time-limit SECONDS`
 : Give each structure at most this many seconds: one SMILES, or each line of `--batch`. A structure that is not named in time has no name, as any structure that gets none (`--on-failure`), with the reason code `TIME_LIMIT`; with `--provenance` its row has the tier `abstain` and `limit_code` `TIME_LIMIT`. A batch goes on with the next line, which is named as in a run without the limit, and `--verbose` counts the lines that ran out of time. Off by default. A call into the JVM that is already running finishes before the limit stops the naming (for one SMILES, a call still running 5 s after the limit ends the run with the same output), and where no alarm can be set (Windows, a thread other than the main one) the run says so once and has no limit: see [A time limit for each structure](batch.md#a-time-limit-for-each-structure).
 

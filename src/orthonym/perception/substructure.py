@@ -8,10 +8,12 @@ query renumbered into its canonical SMILES order, which walks the molecule from 
 matches in 0.08 s with the same matches. ``ordered_matches`` searches that renumbered query and returns each match
 indexed by the query's own atoms, so callers read it as before.
 """
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
-import numpy as np
 from rdkit import Chem
+
+if TYPE_CHECKING:  # numpy loads only when a match is searched: ``import orthonym`` starts no BLAS threads
+    import numpy as np
 
 
 def ordered_matches(target: Chem.Mol, query: Chem.Mol, *, use_chirality: bool = False, uniquify: bool = True,
@@ -22,7 +24,7 @@ def ordered_matches(target: Chem.Mol, query: Chem.Mol, *, use_chirality: bool = 
 
 
 def ordered_match_array(target: Chem.Mol, query: Chem.Mol, *, use_chirality: bool = False, uniquify: bool = True,
-                        max_matches: int = 1000) -> np.ndarray:
+                        max_matches: int = 1000) -> "np.ndarray":
     """``target.GetSubstructMatches(query,...)`` searched in the canonical atom order of ``query``.
 
     One row per match, indexed by the atoms of ``query`` (as RDKit returns a match); an array, because a caller
@@ -32,6 +34,8 @@ def ordered_match_array(target: Chem.Mol, query: Chem.Mol, *, use_chirality: boo
     same; with ``uniquify=True`` the representative of a set of atoms can differ, and under ``max_matches`` the
     subset can.
     """
+    import numpy as np
+
     work = Chem.Mol(query)
     try:
         Chem.MolToSmiles(work)

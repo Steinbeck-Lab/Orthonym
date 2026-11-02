@@ -270,7 +270,7 @@ def test_the_start_up_is_paid_before_the_first_limit_begins(monkeypatch, capsys,
     events = []
     real_prepare, real_timed = cli_time_limit.prepare, cli_time_limit.timed
     monkeypatch.setattr(cli_time_limit, "prepare",
-                        lambda *a: events.append("prepare") or real_prepare(*a))
+                        lambda *a, **k: events.append("prepare") or real_prepare(*a, **k))
     monkeypatch.setattr(cli_time_limit, "timed",
                         lambda *a, **k: events.append("timed") or real_timed(*a, **k))
     status, out, _ = _batch(capsys, tmp_path, [NAMED], "--time-limit", "600")

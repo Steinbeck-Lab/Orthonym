@@ -8,11 +8,12 @@ Usage:
 """
 
 import argparse
+import contextlib
 import functools
 import logging
 import os
 import sys
-from typing import List, Optional, Tuple
+from typing import List, NamedTuple, Optional, Tuple
 
 from . import __version__, name_compound
 from . import cli_time_limit as _tl
@@ -177,6 +178,25 @@ def _unnamed_line(smiles: str, code: str, label: str) -> str:
 _UNREADABLE = ("INVALID_SMILES", "RDKit cannot read this SMILES")
 
 
+def _add_jobs_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--jobs", "-j",
+        type=_positive_int,
+        default=1,
+        help=("With --batch: name the lines in this many processes at once (default 1). The output is the "
+              "same, line for line and in the same order (with --time-limit, a line that needs about as long "
+              "as the limit can run out of time in one run and not in another); each process starts its own "
+              "JVM.")
+    )
+
+
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or more, not {value}")
+    return number
+
+
 def _readable(smiles: str) -> bool:
     """Whether RDKit reads the user's SMILES. When it does not, RDKit says why on the error
     stream (the one RDKit message the command line shows: it is about the user's input) and
@@ -216,6 +236,9 @@ def _reports_unnamed(fn):
     only the user's own input is checked with the errors on (:func:`_readable`)."""
     @functools.wraps(fn)
     def _wrapper(*args, **kwargs):
+        # Before numpy can load (jpype loads it at JVM start): its OpenBLAS starts one spinning thread per CPU
+        from orthonym.runtime_tuning import limit_blas_threads
+        limit_blas_threads()
         reporter = _UnnamedReporter()
         logger = logging.getLogger("orthonym")
         logger.addFilter(reporter)
@@ -455,6 +478,8 @@ def main(args: List[str] = None) -> int:
         help="With --batch: write the lines to this file instead of the screen."
     )
 
+    _add_jobs_option(parser)
+
     parser.add_argument(
         "--confidence",
         action="store_true",
@@ -674,7 +699,7 @@ def main(args: List[str] = None) -> int:
     # the tier: the one asked for, else the default (best-effort when OPSIN reads the names back)
     emit_tier_given = parsed.emit_tier is not None
     parsed.emit_tier = parsed.emit_tier or default_tier(parsed.style)
-    parsed.time_limit = _tl.prepare(parsed.time_limit, parsed.style, parsed.emit_tier)
+    parsed.time_limit = _tl.prepare(parsed.time_limit, parsed.style, parsed.emit_tier, warm_up=parsed.jobs == 1)
 
     # Batch processing mode
     if parsed.batch:
@@ -688,7 +713,7 @@ def main(args: List[str] = None) -> int:
                               provenance=parsed.provenance,
                               enable_triviality_controller=getattr(
                                   parsed, 'enable_triviality_controller', False),
-                              time_limit=parsed.time_limit)
+                              time_limit=parsed.time_limit, jobs=parsed.jobs)
 
     # Single SMILES mode (parsed.smiles is set: without it and without --batch the help check
     # above returned)
@@ -890,6 +915,156 @@ def _print_confidence(result: dict) -> None:
             print(f"  {k}: {v:.4f}" if isinstance(v, (int, float)) else f"  {k}: {v}")
 
 
+class _BatchOutcome(NamedTuple):
+    """One output line of ``--batch`` and what it adds to the counts and to the note at the end of the run."""
+    line: str
+    unnamed: int = 0
+    error: int = 0
+    timed_out: int = 0
+    below_pin: bool = False
+    stderr: str = ""        # what a --jobs worker printed on the error stream for this line
+
+
+class _BatchLines:
+    """The naming of the lines of ``--batch``: one per call of:meth:`outcome`, which prints the reasons on the error
+    stream as the line is named. Used by the serial loop and, one per process, by the ``--jobs`` workers."""
+
+    def __init__(self, style, emit_tier, emit_tier_given, provenance, confidence, on_failure, time_limit, *,
+                 trivial_fallback=False, binding_proof="off", enable_triviality_controller=False):
+        self.style, self.emit_tier, self.emit_tier_given = style, emit_tier, emit_tier_given
+        self.provenance, self.confidence, self.on_failure, self.time_limit = (provenance, confidence, on_failure,
+                                                                               time_limit)
+        self.kwargs = dict(enable_triviality_controller=enable_triviality_controller,
+                           trivial_fallback=trivial_fallback, binding_proof=binding_proof)
+        self.tiered = _wants_tier_row(emit_tier, provenance) and not confidence
+        self.namer = None           # built on the first line: the parent of --jobs workers names none
+
+    def _new_namer(self):
+        return _tiered_namer(self.style, self.emit_tier, **self.kwargs) if self.tiered else None
+
+    def outcome(self, smiles: str) -> _BatchOutcome:
+        if not smiles:
+            return _BatchOutcome("")
+        _readable(smiles)       # RDKit's reason and the reason line; the ERROR row follows
+        time_limit, on_failure = self.time_limit, self.on_failure
+        if self.tiered and self.namer is None:
+            self.namer = self._new_namer()
+        try:
+            if self.tiered:
+                row = _tl.timed(time_limit, self.namer.name_tiered, smiles)
+                if self.provenance:
+                    text = _provenance_json(row)
+                else:
+                    text, reason = _tiered_name_text(row, smiles, on_failure, not self.emit_tier_given)
+                    if reason is not None:
+                        print(reason, file=sys.stderr)
+                return _BatchOutcome(f"{smiles}\t{text}", unnamed=int(not _tiered_row_is_named(row)),
+                                     below_pin=_is_below_pin(row.get("tier")))
+            if self.confidence:
+                result = _tl.timed(time_limit, name_compound, smiles, style=self.style, include_confidence=True,
+                                   emit_tier=self.emit_tier, on_failure=on_failure, **self.kwargs)
+                # C4-D: None means UNMEASURED, not zero — emit the token
+                # 'unverified' rather than formatting None or implying 0.0000.
+                _conf = result.get('confidence')
+                _conf_col = 'unverified' if _conf is None else f"{_conf:.4f}"
+                return _BatchOutcome(f"{smiles}\t{result['name']}\t{_conf_col}\t{result['handler']}",
+                                     unnamed=int(is_failure_name(result['name'])),
+                                     below_pin=_is_below_pin(result.get('tier')))
+            nm = _tl.timed(time_limit, name_compound, smiles, style=self.style, emit_tier=self.emit_tier,
+                           on_failure=on_failure, **self.kwargs)
+            return _BatchOutcome(f"{smiles}\t{nm}", unnamed=int(is_failure_name(nm)))
+        except WallClockTimeout:
+            clear_leaked_naming_state()
+            self.namer = self._new_namer()
+            try:
+                text, reason = _timeout_text(smiles, time_limit, on_failure, self.provenance)
+            except OrthonymLimitError as e:     # --on-failure raise: the ERROR row of any other limit
+                return _BatchOutcome(f"{smiles}\tERROR: {e}", error=1, timed_out=1)
+            if reason is not None:
+                print(reason, file=sys.stderr)
+            # --confidence has three more columns: the score of a name that was not built is unverified
+            line = f"{smiles}\t{text}\tunverified\t{_tl.CODE}" if self.confidence else f"{smiles}\t{text}"
+            return _BatchOutcome(line, unnamed=1, timed_out=1)
+        except Exception as e:
+            return _BatchOutcome(f"{smiles}\tERROR: {e}", error=1)
+
+
+def _batch_outcomes(input_lines: List[str], jobs: int, lines: "_BatchLines"):
+    """The outcome of every input line, in input order: named here one by one (``jobs`` 1), or in ``jobs`` spawn
+    workers (``orthonym.batch_pool``), each with its own:class:`_BatchLines` built from the same settings. A worker
+    prints nothing itself: it returns what it wrote on the error stream for a line, and the reasons are printed here
+    in input order. Like the serial run, the workers reserve no JVM slot (``orthonym.jvm_budget``, the budget of
+    this repository's own tools): a reservation waited for a busy budget and wrote its own warning."""
+    if jobs <= 1:
+        yield from (lines.outcome(smiles) for smiles in input_lines)
+        return
+    from .batch_pool import run_ordered
+    settings = (lines.style, lines.emit_tier, lines.emit_tier_given, lines.provenance, lines.confidence,
+                lines.on_failure, lines.time_limit, lines.kwargs)
+    for out in run_ordered(input_lines, jobs, _worker_outcome, functools.partial(_worker_init, settings),
+                           error_row=_worker_crash):
+        if out.stderr:
+            sys.stderr.write(out.stderr)
+            sys.stderr.flush()
+        yield out
+
+
+_WORKER: dict = {}
+
+
+def _worker_init(settings) -> None:
+    """The start of a ``--jobs`` worker: what:func:`main` sets up before naming (one BLAS thread, the reason line
+    of each unnamed structure, RDKit's own messages off, the warm-up of a time limit), then the namer of its lines."""
+    import faulthandler
+
+    from .runtime_tuning import limit_blas_threads, tune_batch_process
+    limit_blas_threads()
+    tune_batch_process()
+    # the stack of a crash goes to the run's error stream, not into the capture of the line that crashed
+    # (``orthonym.diagnostics``; before the JVM starts)
+    _WORKER["crash_stream"] = os.fdopen(os.dup(2), "w")
+    faulthandler.enable(file=_WORKER["crash_stream"], all_threads=True)
+    style, emit_tier, emit_tier_given, provenance, confidence, on_failure, time_limit, kwargs = settings
+    logging.getLogger("orthonym").addFilter(_UnnamedReporter())
+    _WORKER["logs"] = rdkit_logs_off("rdApp.warning", "rdApp.error")
+    _WORKER["logs"].__enter__()
+    with _stderr_captured():        # the warm-up's own messages are no line's
+        time_limit = _tl.prepare(time_limit, style, emit_tier)
+        _WORKER["lines"] = _BatchLines(style, emit_tier, emit_tier_given, provenance, confidence, on_failure,
+                                       time_limit, **kwargs)
+
+
+def _worker_outcome(smiles: str) -> _BatchOutcome:
+    with _stderr_captured() as captured:
+        out = _WORKER["lines"].outcome(smiles)
+    return out._replace(stderr=captured())
+
+
+def _worker_crash(smiles: str) -> _BatchOutcome:
+    """The line of an input whose naming ended its worker process (a crash in RDKit or the JVM), run alone."""
+    return _BatchOutcome(f"{smiles}\tERROR: the naming process ended unexpectedly", error=1)
+
+
+@contextlib.contextmanager
+def _stderr_captured():
+    """Everything written on the error stream inside the block (file descriptor 2, so RDKit's and the JVM's
+    messages too), as the text the block returns."""
+    import tempfile
+    text = {"value": ""}
+    sys.stderr.flush()
+    saved = os.dup(2)
+    with tempfile.TemporaryFile(mode="w+b") as tmp:
+        os.dup2(tmp.fileno(), 2)
+        try:
+            yield lambda: text["value"]
+        finally:
+            sys.stderr.flush()
+            os.dup2(saved, 2)
+            os.close(saved)
+            tmp.seek(0)
+            text["value"] = tmp.read().decode("utf-8", "replace")
+
+
 def _process_batch(input_file: str, output_file: str, style: str,
                     verbose: bool, confidence: bool = False,
                     trivial_fallback: bool = False,
@@ -899,7 +1074,8 @@ def _process_batch(input_file: str, output_file: str, style: str,
                     provenance: bool = False,
                     enable_triviality_controller: bool = False,
                     emit_tier_given: bool = True,
-                    time_limit: Optional[float] = None) -> int:
+                    time_limit: Optional[float] = None,
+                    jobs: int = 1) -> int:
     """Process multiple SMILES from a file.
 
     ``binding_proof`` is honoured here exactly as on the single-SMILES path:
@@ -930,12 +1106,16 @@ def _process_batch(input_file: str, output_file: str, style: str,
     wall-clock limit of each line. A line that runs out of it is a line with no name, with the code
     ``TIME_LIMIT`` (:func:`_timeout_text`), and the next line is named as in a fresh process: the limit
     puts the process-global naming state back, and the namer of the run is built anew.
+
+    ``jobs`` above 1 names the lines in that many worker processes (:func:`_batch_outcomes`); the output and the
+    error stream are those of ``jobs`` 1, line for line.
     """
     from .namer import validate_binding_proof
     validate_binding_proof(binding_proof)
-    tiered = _wants_tier_row(emit_tier, provenance) and not confidence
     if confidence and provenance:
         raise ValueError(_CONFIDENCE_NEEDS_PIN)
+    from .runtime_tuning import tune_batch_process
+    tune_batch_process()        # the collector of a many-structure run (runtime_tuning); names do not change
     below_pin = False
     try:
         with open(input_file, 'r') as f:
@@ -947,83 +1127,18 @@ def _process_batch(input_file: str, output_file: str, style: str,
         print(f"Error reading input file: {e}", file=sys.stderr)
         return 1
 
-    def _new_namer():
-        return _tiered_namer(style, emit_tier,
-                             enable_triviality_controller=enable_triviality_controller,
-                             trivial_fallback=trivial_fallback, binding_proof=binding_proof)
-
-    namer = _new_namer() if tiered else None
-
+    lines = _BatchLines(style, emit_tier, emit_tier_given, provenance, confidence, on_failure, time_limit,
+                        trivial_fallback=trivial_fallback, binding_proof=binding_proof,
+                        enable_triviality_controller=enable_triviality_controller)
     results = []
-    errors = 0
-    named = 0
-    unnamed = 0
-    timed_out = 0
-
-    for smiles in input_lines:
-        if not smiles:
-            results.append("")
-            continue
-        named += 1
-        _readable(smiles)       # RDKit's reason and the reason line; the ERROR row follows
-        try:
-            if tiered:
-                row = _tl.timed(time_limit, namer.name_tiered, smiles)
-                if provenance:
-                    text = _provenance_json(row)
-                else:
-                    text, reason = _tiered_name_text(row, smiles, on_failure, not emit_tier_given)
-                    if reason is not None:
-                        print(reason, file=sys.stderr)
-                unnamed += not _tiered_row_is_named(row)
-                below_pin = below_pin or _is_below_pin(row.get("tier"))
-                results.append(f"{smiles}\t{text}")
-            elif confidence:
-                result = _tl.timed(time_limit, name_compound, smiles, style=style,
-                                   include_confidence=True,
-                                   enable_triviality_controller=enable_triviality_controller,
-                                   trivial_fallback=trivial_fallback,
-                                   emit_tier=emit_tier,
-                                   binding_proof=binding_proof,
-                                   on_failure=on_failure)
-                unnamed += is_failure_name(result['name'])
-                below_pin = below_pin or _is_below_pin(result.get('tier'))
-                # C4-D: None means UNMEASURED, not zero — emit the token
-                # 'unverified' rather than formatting None or implying 0.0000.
-                _conf = result.get('confidence')
-                _conf_col = ('unverified' if _conf is None
-                             else f"{_conf:.4f}")
-                results.append(
-                    f"{smiles}\t{result['name']}\t"
-                    f"{_conf_col}\t{result['handler']}"
-                )
-            else:
-                nm = _tl.timed(time_limit, name_compound, smiles, style=style,
-                               enable_triviality_controller=enable_triviality_controller,
-                               trivial_fallback=trivial_fallback,
-                               emit_tier=emit_tier,
-                               binding_proof=binding_proof,
-                               on_failure=on_failure)
-                unnamed += is_failure_name(nm)
-                results.append(f"{smiles}\t{nm}")
-        except WallClockTimeout:
-            timed_out += 1
-            clear_leaked_naming_state()
-            namer = _new_namer() if tiered else None
-            try:
-                text, reason = _timeout_text(smiles, time_limit, on_failure, provenance)
-            except OrthonymLimitError as e:     # --on-failure raise: the ERROR row of any other limit
-                results.append(f"{smiles}\tERROR: {e}")
-                errors += 1
-            else:
-                if reason is not None:
-                    print(reason, file=sys.stderr)
-                unnamed += 1
-                # --confidence has three more columns: the score of a name that was not built is unverified
-                results.append(f"{smiles}\t{text}\tunverified\t{_tl.CODE}" if confidence else f"{smiles}\t{text}")
-        except Exception as e:
-            results.append(f"{smiles}\tERROR: {e}")
-            errors += 1
+    errors = unnamed = timed_out = 0
+    named = sum(1 for smiles in input_lines if smiles)
+    for out in _batch_outcomes(input_lines, jobs, lines):
+        results.append(out.line)
+        unnamed += out.unnamed
+        errors += out.error
+        timed_out += out.timed_out
+        below_pin = below_pin or out.below_pin
 
     output_text = "".join(line + "\n" for line in results)
     counts = f"Processed {named} SMILES, {errors} errors, {unnamed} unnamed"

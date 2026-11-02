@@ -109,10 +109,11 @@ def add_option(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def prepare(seconds: Optional[float], style: str, emit_tier: str) -> Optional[float]:
+def prepare(seconds: Optional[float], style: str, emit_tier: str, warm_up: bool = True) -> Optional[float]:
     """The limit this run can enforce: ``seconds``, or None for no limit (not asked for, or no alarm can
     be set here, which is said once on the error stream). When there is a limit, the start-up costs of
-    naming are paid first (see:data:`WARM_UP_SMILES`), outside any limit.
+    naming are paid first (see:data:`WARM_UP_SMILES`), outside any limit; not with ``warm_up`` False (the parent
+    of ``--jobs`` workers, which names nothing: each worker warms itself up).
 
     A timeout while the JVM is starting is not harmless: the first structure would be charged the start-up
     (about a second), and the structure that follows would depend on where in the start-up the alarm
@@ -123,6 +124,8 @@ def prepare(seconds: Optional[float], style: str, emit_tier: str) -> Optional[fl
         print("orthonym: note: --time-limit needs SIGALRM on the main thread, which is not available "
               "here; no time limit is applied", file=sys.stderr)
         return None
+    if not warm_up:
+        return seconds
     from .namer import Orthonym
     from .tiers import emit_tier_flags
     try:
