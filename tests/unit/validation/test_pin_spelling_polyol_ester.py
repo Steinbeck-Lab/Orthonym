@@ -71,8 +71,11 @@ def test_where_the_esters_sit():
     assert single_polyol_ester(Chem.MolFromSmiles("CCOC(=O)C(C)OC(C)=O"))[0] == "none"          # one per alcohol
     assert single_polyol_ester(Chem.MolFromSmiles("COC(=O)CCC(=O)OCCOC(C)=O"))[0] == "other"
     assert single_polyol_ester(Chem.MolFromSmiles("CCO"))[0] == "none"
-    assert single_polyol_ester(Chem.MolFromSmiles("O=C1CCCCO1"))[0] == "ring"                  # a lactone: not read
-    assert single_polyol_ester(Chem.MolFromSmiles("O=C1OCCOC(=O)CCCC1"))[0] == "ring"
+    # a lactone is a heterocycle, not an ester of the class,:18182 "lactones and other cyclic esters
+    # are named as heterocycles"): its ring ester is left out, and the open-chain esters beside it are read
+    assert single_polyol_ester(Chem.MolFromSmiles("O=C1CCCCO1"))[0] == "none"
+    assert single_polyol_ester(Chem.MolFromSmiles("O=C1OCCOC(=O)CCCC1"))[0] == "none"
+    assert single_polyol_ester(Chem.MolFromSmiles("CC(=O)OCC(OC(C)=O)C1CCC(=O)O1")) == ("single", 2)
 
 
 def test_a_molecule_with_a_group_senior_to_the_esters_is_not_decided():
@@ -86,3 +89,16 @@ def test_a_name_of_the_p_10_classes_and_a_name_without_an_ester_word_abstain():
     assert _verdict(GLYCERIDE, "1,2-di-O-acetyl-3-O-hexadecanoyl-sn-glycerol glycerate") == ABSTAIN
     assert _verdict("CC(=O)OCC(OC(C)=O)COC(C)=O", "glycerol triacetate trimer") == ABSTAIN
     assert _verdict("CC(=O)OCC(OC(C)=O)COC(C)=O", "2,3-bis(acetyloxy)propyl") == ABSTAIN
+
+
+def test_the_esters_beside_a_lactone_are_read():
+    """A macrolactone with two acetates on its ring: the lactone is a heterocycle,:18182), the two
+    acetates are esters of one polyol (the ring), and a name that cites one of them as an acyloxy prefix is not the
+    PIN,:31819: identical anions take the multiplicative '...-9,13-diyl diacetate'). Before the
+    lactone was left out, the check abstained on the molecule and the name shipped as pin_verified."""
+    smiles = ("CC(=O)O[C@H]1[C@@H](C)[C@H](C)OC(=O)[C@H](Cc2ccccc2)N(C)C(=O)/C=C\\[C@@H](C)[C@H](OC(C)=O)"
+              "/C(C)=C\\[C@@H]1C")
+    name = ("(3S,6Z,8R,9S,10Z,12S,13R,14S,15S)-13-(acetyloxy)-3-benzyl-4,8,10,12,14,15-hexamethyl-2,5-dioxo-"
+            "1-oxa-4-azacyclopentadeca-6,10-dien-9-yl acetate")
+    assert single_polyol_ester(Chem.MolFromSmiles(smiles)) == ("single", 2)
+    assert getattr(_verdict(smiles, name), "rule", None) == "P-65.6.3.3.3"

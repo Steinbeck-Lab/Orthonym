@@ -104,16 +104,19 @@ def single_polyol_ester(mol):
     ``"none"`` -- no ester group, or each alcoholic fragment holds one (monoesters, nothing to decide);
     ``"single"`` -- one alcoholic component of one parent carries every ester group (``count`` >= 2);
     ``"other"`` -- an alcoholic fragment holds two or more ester groups and the molecule is not that case
-    (several alcoholic components, a polyol of more than one parent): the rule of the polyester is another one;
-    ``"ring"`` -- an ester linkage lies in a ring (a lactone): not read."""
+    (several alcoholic components, a polyol of more than one parent): the rule of the polyester is another one.
+    An ester linkage in a ring (a lactone) is left out: SENIORITY ORDER FOR CLASSES, Table 4.1 (:18182), "9
+    Esters (functional class names are given to noncyclic esters; lactones and other cyclic esters are named as
+    heterocycles; see 16 below)"; the open-chain esters beside it are read as in any other molecule."""
     matches = mol.GetSubstructMatches(_ESTER)
     if not matches:
         return "none", 0
     bonds = []
     for acyl, _o_dbl, o_ester, alcohol in matches:
-        if mol.GetBondBetweenAtoms(acyl, o_ester).IsInRing():
-            return "ring", 0
-        bonds.append((acyl, o_ester, alcohol))
+        if not mol.GetBondBetweenAtoms(acyl, o_ester).IsInRing():
+            bonds.append((acyl, o_ester, alcohol))
+    if not bonds:
+        return "none", 0
     rw = Chem.RWMol(mol)
     for acyl, o_ester, _alcohol in bonds:
         rw.RemoveBond(acyl, o_ester)
