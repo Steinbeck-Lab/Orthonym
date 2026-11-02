@@ -24,15 +24,14 @@
 
 </div>
 
-## How it works, visualized as a machine
+<a href="https://github.com/Steinbeck-Lab/Orthonym/discussions/49"><picture>
+  <source media="(max-width: 700px)" srcset="assets/readme-pubchem-narrow.svg">
+  <img src="assets/readme-pubchem.svg" alt="All of PubChem, named and read back: 124,717,116 compounds, no filtering. 124,145,767 of them (99.54 %) are named, each name read back by OPSIN to the exact input structure; 571,349 (0.46 %) have no exact name yet; 0 wrong structures. Drawn as 10,000 dots, each about 12,472 compounds: 9,954 filled and 46 hollow at the end of the last row, shown under a loupe. November 2026." width="100%">
+</picture></a>
 
-<p align="right"><a href="#quick-start"><b>Go straight to the Quick start ↓</b></a></p>
+## What it names
 
-<picture>
-  <img src="assets/readme-anatomy.svg" alt="An animated isometric drawing of a typesetting bench that shows, in six numbered and coloured steps, how Orthonym names a molecule. Step 1, blue: RDKit reads the SMILES and the structure is perceived on a plate under four dial gauges. Step 2, amber: a cabinet of type drawers sets the name, one block per part, while the name grows in the readout. Step 3, violet: a separate machine, OPSIN, reads only the name back and draws the structure it reads. Step 4, green: a lock of 25 pins compares the InChIKey of what OPSIN read with the input's, letter by letter; for caffeine, 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione, all 25 match. Step 5, teal: the name lands in the PIN tray as pin_verified. Step 6, red: for cis-decalin the name (4as,8as)-decahydronaphthalene matches only 17 of 25 pins and is withdrawn into the reject bin, and cis-decahydronaphthalene lands in the best-effort tray." width="100%">
-</picture>
-
-<sub>Orthonym as a machine: RDKit reads the structure (1), the IUPAC 2013 rules set the name (2), and OPSIN, which never sees the input, reads it back (3). A name ships only when the InChIKey of what OPSIN read matches the input's in every letter (4); it then lands on its tier (5), or is withdrawn or declined (6). More in <a href="guide/how-it-works.md">How it works</a>.</sub>
+How a name is made and checked, step by step: [How it works](guide/how-it-works.md).
 
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-gallery-narrow.svg">
