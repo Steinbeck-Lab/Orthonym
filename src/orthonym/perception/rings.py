@@ -248,10 +248,12 @@ def _get_spiro_atoms_impl(mol) -> Set[int]:
     Returns:
         Set of atom indices that are spiro centers
     """
-    ri = mol.GetRingInfo()
+    # read once: RDKit builds a new tuple of tuples on every AtomRings call (re-read per atom below, it was
+    # 7 of the 42 s that AtomRings took on the typical speed panel)
+    rings = mol.GetRingInfo().AtomRings()
     atom_ring_count = {}
 
-    for ring in ri.AtomRings():
+    for ring in rings:
         for atom_idx in ring:
             atom_ring_count[atom_idx] = atom_ring_count.get(atom_idx, 0) + 1
 
@@ -260,7 +262,7 @@ def _get_spiro_atoms_impl(mol) -> Set[int]:
     for atom_idx, count in atom_ring_count.items():
         if count == 2:
             # Check if this is the only shared atom between two rings
-            rings_containing = [ring for ring in ri.AtomRings() if atom_idx in ring]
+            rings_containing = [ring for ring in rings if atom_idx in ring]
             if len(rings_containing) == 2:
                 shared = set(rings_containing[0]) & set(rings_containing[1])
                 if shared == {atom_idx}:
