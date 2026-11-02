@@ -407,6 +407,24 @@ def _check_flag_combinations(parser: argparse.ArgumentParser, parsed: argparse.N
                      "(for one SMILES, not for a file of them)")
 
 
+def _leaves_jvm_archive(fn):
+    """Run ``fn`` (``main``); a run that started the JVM then leaves the class-data archive of that JVM for the
+    next run (``orthonym.jvm_cds``), after its output is out."""
+    @functools.wraps(fn)
+    def _wrapper(*args, **kwargs):
+        status = fn(*args, **kwargs)
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:  # noqa: BLE001 - a closed output is the caller's business
+            pass
+        from .jvm_cds import build_if_missing
+        build_if_missing()
+        return status
+    return _wrapper
+
+
+@_leaves_jvm_archive
 @_reports_unnamed
 def main(args: List[str] = None) -> int:
     """Main entry point for CLI."""

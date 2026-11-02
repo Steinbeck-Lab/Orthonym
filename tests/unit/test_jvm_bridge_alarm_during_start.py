@@ -81,8 +81,9 @@ def test_a_failed_start_is_recorded_before_the_held_alarm_is_raised(opsin_availa
     pytest.importorskip("jpype")
     if not opsin_available:
         pytest.skip("no JVM or OPSIN jar")
+    # without the class-data archive (jvm_cds), whose two extra rungs would make it six attempts
     done = subprocess.run([sys.executable, "-c", FAILING_SCRIPT], capture_output=True, text=True, timeout=300,
-                          env={**os.environ, "ORTHONYM_JVM_BUDGET": "off"})
+                          env={**os.environ, "ORTHONYM_JVM_BUDGET": "off", "ORTHONYM_JVM_CDS": "off"})
     assert done.stdout.split("\n")[-2] == "timeout False False 4 4", done.stdout + done.stderr
 
 

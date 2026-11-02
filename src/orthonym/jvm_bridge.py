@@ -276,10 +276,17 @@ def _start(pid: int) -> bool:
         # would emit it, so silence it where supported. The flag is UNKNOWN to
         # JDK < 24 and would abort start-up there, hence the retry without it --
         # a cosmetic flag must never be the reason the JVM fails to come up.
+        # The class-data archive (jvm_cds): tried first, and the rungs without it stay, so that an archive
+        # option can never be the reason the JVM fails to come up.
+        from .jvm_cds import start_options as _cds_options
+        cds = _cds_options(classpath)
+        ladder = [[*base, "--enable-native-access=ALL-UNNAMED"], base,
+                  [*base_core, "--enable-native-access=ALL-UNNAMED"], base_core]
+        if cds:
+            ladder = [[*base, *cds, "--enable-native-access=ALL-UNNAMED"], [*base, *cds], *ladder]
         started = False
         with _alarm_held():
-            for opts in ([*base, "--enable-native-access=ALL-UNNAMED"], base,
-                         [*base_core, "--enable-native-access=ALL-UNNAMED"], base_core):
+            for opts in ladder:
                 try:
                     jpype.startJVM(*opts, classpath=classpath)
                     started = True

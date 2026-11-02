@@ -81,6 +81,16 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
         return
 
 
+def _carries_no_stereo(mol) -> bool:
+    """True when no atom has a chiral tag and no bond has a stereo flag (``STEREOANY`` included) or a direction.
+    A molecule the engine builds without parsing a SMILES can carry bond directions alone."""
+    unspecified = Chem.ChiralType.CHI_UNSPECIFIED
+    if any(a.GetChiralTag() != unspecified for a in atoms_of(mol)):
+        return False
+    none_stereo, none_dir = Chem.BondStereo.STEREONONE, Chem.BondDir.NONE
+    return all(b.GetStereo() == none_stereo and b.GetBondDir() == none_dir for b in bonds_of(mol))
+
+
 def assign_stereochemistry(mol) -> None:
     """
     Assign CIP stereochemistry labels to a molecule (idempotent guard).
@@ -108,6 +118,14 @@ def assign_stereochemistry(mol) -> None:
     # unavailable (jar/Java absent), this branch is skipped and the path below
     # is byte-identical to HEAD -- a missing JVM never hard-fails a name.
     if _USE_CENTRES_CIP:
+        if _carries_no_stereo(mol):
+            # centres reads the stereo marks of the SMILES it is given, and this molecule writes none: it would
+            # label nothing. The rest of the centres branch runs as it would after an empty label map; only the
+            # JVM call (and, in a new process, the start of the centres classes) is not made.
+            _fill_missing_bond_cip_from_rdkit(mol)
+            _clear_nonexpressible_amine_n_cip(mol)
+            mol.SetProp(_CIP_ASSIGNED_PROP, '1')
+            return
         try:
             from .centres_bridge import centres_label_mol
             if centres_label_mol(mol):
