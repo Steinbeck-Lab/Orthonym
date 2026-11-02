@@ -94,11 +94,14 @@ def test_t1_the_name_does_not_depend_on_the_input_atom_order(rid, smiles, expect
         assert _row(_shuffled(smiles, seed))["name"] == expected, (seed, _shuffled(smiles, seed))
 
 
-@pytest.mark.parametrize("rid,smiles,expected", [T1_ROWS[5], T1_ROWS[12], T1_ROWS[16]],
-                         ids=["d1280", "d1259", "d713"])
+@pytest.mark.parametrize("rid,smiles,expected", [T1_ROWS[1], T1_ROWS[12], T1_ROWS[16]],
+                         ids=["d452", "d1259", "d713"])
 def test_t1_mutation_without_the_producer_the_row_is_declined(monkeypatch, rid, smiles, expected):
     # the assertions above depend on the producer: with it removed the re-run's breadth name is
-    # labelled below the PIN again and the default tier declines (NO_VERIFIED_PIN)
+    # labelled below the PIN again and the default tier declines (NO_VERIFIED_PIN). d1280 stood here
+    # until the re-run certificate (``assembly.pin_rerun.rerun_name_certified``, 9cabb2aa9) kept the PIN
+    # label of a breadth name whose every part the evidence decides: without the producer, d1280, d1758
+    # and d860 ship the same name as a certified PIN, so they cannot show that the producer is needed
     monkeypatch.setattr(strict_ring_prefix, "_KINDS", frozenset())
     row = _row(smiles)
     assert row["tier"] == "abstain" and row["limit_code"] == "NO_VERIFIED_PIN", row

@@ -413,21 +413,23 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         # retained PAH parent, Table 2.7 entry (1) (OCR'd as a figure before '(2) pyranthrene (PIN)',
         # the Blue Book; named in the seniority list,:14776; 10 rings, 32 atoms). Numbering: OPSIN
         # `ovalene -o extendedsmi` ($_AV: 1;2;2a;3;4;4a;5;6;6a;7;7a;8;9;9a;10;11;11a;12;13;13a;14;14a..14k), in the atom
-        # order of this SMILES (the OPSIN SMILES written without canonical reordering).
-        'canonical_smiles': 'c1cc2ccc3ccc4cc5ccc6ccc7ccc8cc1c1c2c3c4c2c5c6c7c8c12',
-        'smarts': 'c1cc2ccc3ccc4cc5ccc6ccc7ccc8cc1c1c2c3c4c2c5c6c7c8c12',
+        # order of the RDKit canonical SMILES below, mapped from OPSIN's atom order by a substructure match (the reverse
+        # lookup ``_SMILES_TO_NAME`` reads the canonical form, as for pleiadene).
+        'canonical_smiles': 'c1cc2ccc3cc4ccc5ccc6ccc7cc8ccc1c1c2c3c2c4c5c6c7c2c81',
+        'smarts': 'c1cc2ccc3cc4ccc5ccc6ccc7cc8ccc1c1c2c3c2c4c5c6c7c2c81',
         'num_atoms': 32,
-        'iupac_numbering': {0: 1, 1: 2, 2: '2a', 3: 3, 4: 4, 5: '4a', 6: 5, 7: 6, 8: '6a', 9: 7, 10: '7a', 11: 8, 12: 9, 13: '9a', 14: 10, 15: 11, 16: '11a', 17: 12, 18: 13, 19: '13a', 20: 14, 21: '14a', 22: '14b', 23: '14c', 24: '14d', 25: '14e', 26: '14f', 27: '14g', 28: '14h', 29: '14i', 30: '14j', 31: '14k'},
+        'iupac_numbering': {0: 4, 1: 3, 2: '2a', 3: 2, 4: 1, 5: '14a', 6: 14, 7: '13a', 8: 13, 9: 12, 10: '11a', 11: 11, 12: 10, 13: '9a', 14: 9, 15: 8, 16: '7a', 17: 7, 18: '6a', 19: 6, 20: 5, 21: '4a', 22: '14d', 23: '14c', 24: '14b', 25: '14k', 26: '14j', 27: '14i', 28: '14h', 29: '14g', 30: '14f', 31: '14e'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         'num_rings': 10,
     },
     'rubicene': {
         # retained PAH parent ('(4) rubicene (PIN)', Table 2.7, the Blue Book). Numbering: OPSIN `rubicene -o extendedsmi` ($_AV), in the
-        # atom order of this SMILES (the OPSIN SMILES written without canonical reordering).
-        'canonical_smiles': 'c1ccc2c3ccccc3c3c4cccc5c6ccccc6c(c1c23)c45',
-        'smarts': 'c1ccc2c3ccccc3c3c4cccc5c6ccccc6c(c1c23)c45',
+        # atom order of the RDKit canonical SMILES below, mapped from OPSIN's atom order by a substructure match (the
+        # reverse lookup ``_SMILES_TO_NAME`` reads the canonical form, as for pleiadene).
+        'canonical_smiles': 'c1ccc2c(c1)c1cccc3c4c5ccccc5c5cccc(c2c13)c54',
+        'smarts': 'c1ccc2c(c1)c1cccc3c4c5ccccc5c5cccc(c2c13)c54',
         'num_atoms': 26,
-        'iupac_numbering': {0: 1, 1: 2, 2: 3, 3: '3a', 4: '3b', 5: 4, 6: 5, 7: 6, 8: 7, 9: '7a', 10: '7b', 11: '7c', 12: 8, 13: 9, 14: 10, 15: '10a', 16: '10b', 17: 11, 18: 12, 19: 13, 20: 14, 21: '14a', 22: '14b', 23: '14c', 24: '14d', 25: '14e'},
+        'iupac_numbering': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3b', 5: 4, 6: '3a', 7: 3, 8: 2, 9: 1, 10: '14c', 11: '14b', 12: '14a', 13: 14, 14: 13, 15: 12, 16: 11, 17: '10b', 18: '10a', 19: 10, 20: 9, 21: 8, 22: '7c', 23: '7b', 24: '14d', 25: '14e'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         'num_rings': 7,
     },

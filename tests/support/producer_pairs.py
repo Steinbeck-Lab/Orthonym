@@ -145,8 +145,11 @@ PAIRS = [
     # no organic positive: the list of metal-complex names, taken by name at its exit
     (COB_I, "pin", "table:coordination"),
     (COB_II, "pin", "table:coordination"),
-    # T4: the handoff of the late recovery, the rescue, and the floor offer
-    ("O=[N+]([O-])c1ccc(/C=C/c2ccc([N+](=O)[O-])cc2S(=O)(=O)O)c(S(=O)(=O)O)c1", "best-effort", "engine:t4"),
+    # T4: the handoff of the late recovery, the rescue, and the floor offer. The handoff row is a dev2000 row (not in
+    # a holdout split by full InChIKey or connectivity), read from a trace of ``_try_general_engine_recovery_impl``; it was a
+    # stilbenedisulfonic acid until the ring with the most principal groups became the parent, since when
+    # the benzene writer names that one ('inner:tier_a_ring')
+    ("NC(=NO)NCCC[C@H]([NH3+])C(=O)[O-]", "best-effort", "engine:t4"),
     ("COC(=O)c1ccc(OC(CO)C(O)c2ccc(O)c(OC)c2)c(OC)c1", "best-effort", "engine:t4"),
     ("C[C@@H]1CCC2C(C)(C)[C@H](O)CC[C@]2(C)[C@@]12Cc1c(O)cc3c(c1O2)CNC3=O", "best-effort", "engine:t4"),
     # the stereo of the input composed onto the string of a producer

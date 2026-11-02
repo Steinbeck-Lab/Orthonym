@@ -108,6 +108,17 @@ class TestLookupFunctions:
         assert result['name'] == 'coronene'
         assert result['num_atoms'] == 24
 
+    @pytest.mark.parametrize("name,opsin_smiles,num_atoms", [
+        ("ovalene", "C1=CC2=CC=C3C=CC4=CC5=CC=C6C=CC7=CC=C8C=C1C1=C2C3=C4C4=C5C6=C7C8=C14", 32),
+        ("rubicene", "C1=CC=C2C3=CC=CC=C3C=3C4=CC=CC=5C6=CC=CC=C6C(=C1C23)C45", 26),
+    ])
+    def test_get_polycyclic_by_smiles_opsin_parents(self, name, opsin_smiles, num_atoms):
+        """Ovalene and rubicene are found by the RDKit canonical SMILES of OPSIN's structure (the entries were
+        first written in OPSIN's atom order, which the canonical lookup never matched)."""
+        result = get_polycyclic_by_smiles(Chem.MolToSmiles(Chem.MolFromSmiles(opsin_smiles)))
+        assert result is not None and result['name'] == name
+        assert result['num_atoms'] == num_atoms
+
     def test_get_polycyclic_by_smiles_not_found(self):
         """Non-PAH SMILES should return None."""
         result = get_polycyclic_by_smiles('c1ccccc1')  # benzene

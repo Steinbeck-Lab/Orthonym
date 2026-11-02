@@ -304,7 +304,11 @@ CI_BENCHMARK = [
     ),
     pytest.param(
         "NC(=O)[C@H](CCC/N=C(/N)CF)NC(=O)c1ccccc1",
-        _ships("(2S)-5-[(1-amino-2-fluoroethylidene)amino]-2-benzamidopentanamide"),
+        # The name leaves out the E/Z of the amidine C=N, which the InChIKey cannot see, so it is no PIN since
+        # d900357be (stereo_unexpressed). "Stereodescriptors used in substitutive nomenclature"
+        # (the Blue Book,:44624): "In preferred IUPAC names, stereodescriptors, preceded by a locant,
+        # must be cited to specify each stereogenic unit". The strict path and best-effort build the same name.
+        _declined_at_default("(2S)-5-[(1-amino-2-fluoroethylidene)amino]-2-benzamidopentanamide"),
         marks=_GATE,
     ),
     pytest.param(

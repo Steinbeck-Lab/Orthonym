@@ -24,12 +24,12 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "COc1ccc(C=Cc2cc(O)cc(O)c2)cc1O",
+    "Clc1ccc(C(c2ccc(Cl)cc2)C(Cl)(Cl)Cl)cc1",
     "O=c1[nH]c(=O)c2ncn([C@@H]3O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]3O)c2[nH]1",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    "COc1ccc(C=Cc2cc(O)cc(O)c2)cc1O",
+    "Clc1ccc(C(c2ccc(Cl)cc2)C(Cl)(Cl)Cl)cc1",
 })
 
 
@@ -64,6 +64,12 @@ def _tiered(smiles):
     # the Blue Book '1,1'-[(1E)-1-(4-chlorophenyl)ethene-1,2-diyl]dibenzene (PIN)'):
     # two identical phenol parents on 'hex-3-ene-3,4-diyl'
     ("CC/C(=C(/CC)c1ccc(O)cc1)c1ccc(O)cc1", "4,4'-[(3E)-hex-3-ene-3,4-diyl]diphenol"),
+    # was 'rhapontigenin', the trivial last resort, until the ring with the most principal groups became the
+    # parent. SENIORITY ORDER FOR PARENT STRUCTURES, (the Blue Book): "The
+    # senior parent structure has the maximum number of substituents corresponding to the principal
+    # characteristic group (suffix)": the ring with two OH is the parent, the ring with one is in the prefix;
+    # the double bond has no configuration in the input, so the name cites none
+    ("COc1ccc(C=Cc2cc(O)cc(O)c2)cc1O", "5-[2-(3-hydroxy-4-methoxyphenyl)ethenyl]benzene-1,3-diol"),
 ])
 def test_systematic_pin_replaces_the_trivial_name(smiles, pin):
     from tests.support.rt_assert import name_is_rt_exact
@@ -74,10 +80,10 @@ def test_systematic_pin_replaces_the_trivial_name(smiles, pin):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,trivial", [
-    # 'rhapontigenin' has no Blue Book hit and the systematic pipeline builds no PIN for it;
-    # 'bisphenol a' was this row until batch 2 named it (above), 'diethylstilbestrol' until its
-    # (3E) multiplicative name was built
-    ("COc1ccc(C=Cc2cc(O)cc(O)c2)cc1O", "rhapontigenin"),
+    # 'dichlorodiphenyltrichloroethane' has no Blue Book hit and the systematic pipeline builds no PIN for
+    # it; 'bisphenol a' was this row until batch 2 named it (above), 'diethylstilbestrol' until its
+    # (3E) multiplicative name was built, 'rhapontigenin' until its parent was chosen by (above)
+    ("Clc1ccc(C(c2ccc(Cl)cc2)C(Cl)(Cl)Cl)cc1", "dichlorodiphenyltrichloroethane"),
 ])
 def test_trivial_name_is_the_last_resort_labelled_non_pin(smiles, trivial):
     r = _tiered(smiles)

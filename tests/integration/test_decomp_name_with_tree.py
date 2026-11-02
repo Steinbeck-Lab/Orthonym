@@ -163,26 +163,27 @@ def test_name_with_tree_tree_population_status(namer):
     assert result.tree.class_id == "coarse_fallback"
 
 
-@pytest.mark.parametrize("smi", ["[He]", "[Ne]", "[Ar]", "[Kr]", "[Xe]", "[Rn]"])
-def test_simple_molecule_emits_tree_round_trip(smi, namer):
-    """Plan-10 DECOMP-02 OBSERVABLE CLOSURE: simple_molecule is the FIRST
-    tree-emitting handler. For each in-scope SMILES, the handler returns
-    a NameTreeNode whose serialization round-trips byte-identically to
-    result.name.
+@pytest.mark.parametrize("smi,element", [
+    ("[He]", "helium"), ("[Ne]", "neon"), ("[Ar]", "argon"),
+    ("[Kr]", "krypton"), ("[Xe]", "xenon"), ("[Rn]", "radon"),
+])
+def test_noble_gas_emits_tree_round_trip(smi, element, namer):
+    """Plan-10 DECOMP-02 OBSERVABLE CLOSURE, as lane LONE left it.
+
+    The noble gases were the probes of ``simple_molecule``, the first tree-emitting
+    handler; the name it shipped for them was the sentinel 'unknown'
+    (``composer._name_simple_molecule``). Since lane LONE the class ELEMENT_ATOM names
+    a lone atom by its element name before dispatch_inner (``rules.metal_atoms.
+    lone_atom_name``), so the tree is the coarse node of that name and still
+    round-trips byte-identically. The structured-tree closure is held by the
+    structured probes of ``test_handler_tree_contract.py`` .
     """
     result = namer.name_with_tree(smi)
     assert isinstance(result, NamingResult)
+    assert result.name == element, result.name
     assert result.tree is not None, (
-        f"simple_molecule must emit a non-None tree for {smi!r}; "
-        f"DECOMP-02 closure depends on at least ONE handler proving "
-        f"the IR substrate works end-to-end"
+        f"name_with_tree must emit a non-None tree for {smi!r}"
     )
-    assert result.tree.parent_stem == result.name, (
-        f"NameTreeNode.parent_stem must equal NamingResult.name for "
-        f"simple_molecule; got {result.tree.parent_stem!r} vs {result.name!r}"
-    )
-    assert result.tree.class_id == "simple_molecule"
-    assert result.tree.iupac_section_cite == "P-14"
     assert name_tree_to_string(result.tree) == result.name, (
         f"name_tree_to_string round-trip must equal result.name for {smi!r}"
     )

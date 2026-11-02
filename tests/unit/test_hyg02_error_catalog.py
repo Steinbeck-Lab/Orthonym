@@ -31,10 +31,19 @@ def test_wildcard_raises_named_limit():
     assert err.code in LIMIT_CATALOG
 
 
+# Lane LONE names every lone atom, monoatomic ion and isotope ('gold', 'carbon',
+# 'hydrogen', ``rules/metal_atoms.lone_atom_name``), so the witnesses below are compounds the
+# engine still cannot name: methylgold (no producer names it, and gold is not a metal of complete
+# scope in ``data/metal_scope.py``, so ``errors.classify_failure_limit`` gives UNSUPPORTED_ELEMENT
+# rather than UNNAMEABLE), the carbon(1+) ion (``lone_atom_name`` leaves a charged carbon atom to
+# the ion classes, which name none with three radical electrons) and tetraphosphorus.
+METAL_WITNESS = "C[Au]"
+
+
 def test_metal_raises_unsupported_element():
     n = Orthonym()
     with pytest.raises(OrthonymLimitError) as ei:
-        n.name("[Au]", raise_on_limit=True)
+        n.name(METAL_WITNESS, raise_on_limit=True)
     assert ei.value.code == "UNSUPPORTED_ELEMENT"
 
 
@@ -42,13 +51,13 @@ def test_isolated_atom_raises():
     n = Orthonym()
     # A carbon-bearing single heavy atom the engine cannot name is the ISOLATED_ATOM case.
     with pytest.raises(OrthonymLimitError) as ei:
-        n.name("[C]", raise_on_limit=True)
+        n.name("[C+]", raise_on_limit=True)
     assert ei.value.code == "ISOLATED_ATOM"
-    # [H] holds no carbon at all: since 4c33b3271 ("honest inorganic abstain -- carbon-free
+    # P4 holds no carbon at all: since 4c33b3271 ("honest inorganic abstain -- carbon-free
     # structural check") classify_failure_limit calls any carbon-free input UNSUPPORTED_ELEMENT
     # ('inorganic compound (not supported)') before the isolated-atom branch is reached.
     with pytest.raises(OrthonymLimitError) as ei:
-        n.name("[H]", raise_on_limit=True)
+        n.name("P12P3P1P23", raise_on_limit=True)
     assert ei.value.code == "UNSUPPORTED_ELEMENT"
 
 
@@ -60,10 +69,10 @@ def test_default_path_no_raise_and_legacy_strings():
     out = n.name("CC*", on_failure="label")  # must not raise
     assert isinstance(out, str)
     # name_compound with on_failure="label": metal -> exact legacy descriptive string.
-    assert name_compound("[Au]", on_failure="label") == "gold compound (not supported)"
+    assert name_compound(METAL_WITNESS, on_failure="label") == "gold compound (not supported)"
     assert name_compound("CCO", on_failure="label") == "ethanol"  # in-scope unchanged
     # the default of the public call is no name at all (tests/unit/test_on_failure.py)
-    assert n.name("CC*") == "" and name_compound("[Au]") == ""
+    assert n.name("CC*") == "" and name_compound(METAL_WITNESS) == ""
     assert name_compound("CCO") == "ethanol"
 
 
