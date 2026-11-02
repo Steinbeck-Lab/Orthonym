@@ -33,6 +33,7 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 from rdkit import Chem
 
+from ...data.locant_text import render_locants
 from ...perception.stereo import assign_stereochemistry, detect_axial_chirality
 from .skeleton import PhaneSkeleton, SkeletonKind
 
@@ -133,7 +134,7 @@ def block(skel: PhaneSkeleton, pos, chosen, units: Sequence[Unit]) -> str:
     if not units:
         return ""
     from .numbering import render_locant
-    return "(" + ",".join(f"{render_locant(loc)}{code}" for loc, code in descriptors(skel, pos, chosen, units)) + ")-"
+    return "(" + render_locants(f"{render_locant(loc)}{code}" for loc, code in descriptors(skel, pos, chosen, units)) + ")-"
 
 
 def stereo_atoms(units: Sequence[Unit]) -> Dict[int, None]:

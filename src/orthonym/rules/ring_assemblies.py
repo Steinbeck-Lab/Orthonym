@@ -26,6 +26,7 @@ from rdkit import Chem
 from rdkit.Chem import rdchem
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import bonds_of
+from ..data.locant_text import render_locants
 
 
 # a phase.B: detect indicated-H prefix in a ring stem name like
@@ -745,7 +746,7 @@ def _name_replacement_ring_assembly(mol, assembly_info: Dict) -> Optional[str]:
         mult = _MULT.get(len(entries))
         if mult is None:
             return None
-        locant_str = ",".join(
+        locant_str = render_locants(
             f"{loc}{chr(39) if primed else ''}" for loc, primed in entries)
         cited.append(
             (_RA_REPL_ORDER.index(sym),
@@ -3551,7 +3552,7 @@ def name_ring_assembly(
             for sys_idx, locs in enumerate(per_ring_ih_locants)
             for loc in locs
         )
-        ih_prefix = (",".join(f"{loc}{_format_prime(sys_idx)}H"
+        ih_prefix = (render_locants(f"{loc}{_format_prime(sys_idx)}H"
                               for loc, sys_idx in ih_tokens) + "-"
                      ) if ih_tokens else ""
         return ih_prefix + _multiplied_assembly(connection_str, multiplier,
@@ -3639,7 +3640,7 @@ def name_ring_assembly(
                  for loc in locs),
             )
             if ih_tokens:
-                ih_prefix = ",".join(
+                ih_prefix = render_locants(
                     f"{loc}{_format_prime(sys_idx)}H"
                     for loc, sys_idx in ih_tokens
                 ) + "-"
@@ -3708,7 +3709,7 @@ def name_ring_assembly(
                 if sorted(_swapped) < sorted(suffix_pairs):
                     suffix_pairs = _swapped
         suffix_locants = sorted(suffix_pairs)
-        locant_str = ",".join(
+        locant_str = render_locants(
             f"{loc}{_format_prime(sys_idx)}" for loc, sys_idx in suffix_locants
         )
         n = len(suffix_locants)
@@ -3814,7 +3815,7 @@ def name_ring_assembly(
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
         keys = sorted(sub_groups[name])
         n = len(keys)
-        locant_str = ",".join(
+        locant_str = render_locants(
             f"{loc}{_format_prime(sys_idx)}" for loc, sys_idx in keys)
         if n > 1:
             from ..assembly.naming_utils import multiplied_component as _mc
@@ -3877,7 +3878,7 @@ def name_ring_assembly_polyvalent_prefix(
         assembly_base, junction_key, free_valences = parts
         located = sorted((_locant_key(loc), system, loc) for loc, system in free_valences)
         key = (junction_key, tuple((number, system) for number, system, _loc in located))
-        locants = ",".join(f"{loc}{_format_prime(system)}" for _number, system, loc in located)
+        locants = render_locants(f"{loc}{_format_prime(system)}" for _number, system, loc in located)
         if best is None or key < best[1]:
             best = (f"[{assembly_base}]-{locants}-{word}", key)
     return best[0] if best is not None else None

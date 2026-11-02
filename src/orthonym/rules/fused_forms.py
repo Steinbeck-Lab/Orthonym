@@ -48,6 +48,7 @@ from typing import Dict, Iterable, Optional, Sequence, Tuple
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 
 logger = logging.getLogger(__name__)
@@ -383,7 +384,7 @@ def fused_system_ketone_form(mol, ring_atoms: Iterable[int], suffix_atoms: Itera
             key = (ih_key, suffix_key, added_key, hydro_key, prefix_key, stem, tie)
             if best is None or key < best[0]:
                 glue = "-" if pre and not pre.endswith("-") and stem[:1].isdigit() else ""
-                locs = ",".join(str(a2l[a]) for a in sorted(suffix, key=lambda x: locant_key(a2l[x])))
+                locs = render_locants(str(a2l[a]) for a in sorted(suffix, key=lambda x: locant_key(a2l[x])))
                 added = rh_rule.added_text(rh, a2l)
                 if added:
                     locs += f"({added})"

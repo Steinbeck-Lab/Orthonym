@@ -24,6 +24,7 @@ from ..assembly.naming_utils import (
     get_multiplier_prefix,
     is_complex_substituent,
 )
+from ..data.locant_text import render_locants
 from ..errors import is_refusal_sentinel
 
 # Pattern matching a leading positional locant (digit(s)) in a substituent
@@ -1070,7 +1071,7 @@ def name_chain_diamide(
             display_name = _wrap_n_substituent(name) if '(' in name else f"({name})"
         else:
             display_name = _wrap_n_substituent(name)
-        n_locant_str = ",".join(f"N{loc}" for loc in locants)
+        n_locant_str = render_locants(f"N{loc}" for loc in locants)
         if len(locants) == 1:
             prefix = f"{n_locant_str}-{display_name}"
         else:

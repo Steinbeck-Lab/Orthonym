@@ -31,6 +31,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 
 # Phosphate H-count -> word /.2). The "<n>hydrogen" multiplier counts
@@ -226,7 +227,7 @@ def _assemble_base_substituents(stem: str, sugar: str,
         return None  # mixed substituent words -> alphanumeric ordering not built yet
     word = next(iter(words))
     locs = sorted(subs, key=lambda t: (len(t[0]), t[0]))
-    loc_str = ",".join(l for l, _ in locs)
+    loc_str = render_locants(l for l, _ in locs)
     mult = "" if len(subs) == 1 else _PRIME_MULT.get(len(subs))
     if mult is None:
         return None

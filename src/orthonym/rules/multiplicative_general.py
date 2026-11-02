@@ -77,6 +77,8 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
+
 logger = logging.getLogger(__name__)
 
 _ALLOWED_Z = frozenset({1, 5, 6, 7, 8, 9, 14, 15, 16, 17, 32, 33, 34, 35, 50, 51,
@@ -1364,7 +1366,7 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
                     marks.append((min(num[order[i]], num[order[j]]), lab))
             if len(marks) != len(stereo):
                 return None
-            body = "(" + ",".join(f"{loc}{lab}" for loc, lab in sorted(marks)) + ")-" + body
+            body = "(" + render_locants(f"{loc}{lab}" for loc, lab in sorted(marks)) + ")-" + body
         names.add(body)
     if len(names) != 1:
         return None
@@ -1885,7 +1887,7 @@ def _unit_stereo(mol, units, numberings, primes_order, unit_atoms) -> Optional[s
     if len(sets) != 1 or len(per_unit) != len(units):
         return None
     labels.sort(key=lambda t: (t[0], t[1]))
-    return "(" + ",".join(f"{loc}{chr(39) * p}{lab}" for loc, p, lab in labels) + ")-"
+    return "(" + render_locants(f"{loc}{chr(39) * p}{lab}" for loc, p, lab in labels) + ")-"
 
 
 def _unit_token(unit_name: str, count: int, substituted: bool, kind: str, n_chain: int) -> str:
@@ -2039,7 +2041,7 @@ def _try_unit_set(mol, units: List[_Kernel], rings, same_key) -> Optional[str]:
         gtok = f"({group})"
     else:
         gtok = group
-    loc_block = "" if loc is None else ",".join(f"{loc}{chr(39) * p}" for p in range(count)) + "-"
+    loc_block = "" if loc is None else render_locants(f"{loc}{chr(39) * p}" for p in range(count)) + "-"
     utok = _unit_token(unit_name, count, substituted, units[0].kind, len(units[0].order))
     body = f"{loc_block}{gtok}{utok}"
     if units[0].pg == "ester":

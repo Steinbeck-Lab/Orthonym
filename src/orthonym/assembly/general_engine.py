@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..data.chain_names import multiplying_prefix
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from ..errors import is_refusal_sentinel
 from ..perception.molcache import atoms_of
@@ -1299,7 +1300,7 @@ def _suffix_block(style: str, core: str, locants: List[int]) -> Optional[str]:
     mult = '' if n == 1 else _MULT_SIMPLE.get(n)
     if n > 1 and mult is None:
         return None
-    return '-' + ','.join(map(str, sorted(locants))) + '-' + _multiplied_core(mult, core)
+    return '-' + render_locants(sorted(locants)) + '-' + _multiplied_core(mult, core)
 
 
 def _multiplied_core(mult: Optional[str], core: str) -> str:
@@ -1365,7 +1366,7 @@ def _assemble(mol, features, chain, part,
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        prefix_parts.append(text if omit_2c else ','.join(locs) + '-' + text)
+        prefix_parts.append(text if omit_2c else render_locants(locs) + '-' + text)
     if omit_2c and len(prefix_parts) >= 2:
         from .composition_primitives import apply_mononuclear_enclosing
         prefix_parts = apply_mononuclear_enclosing(prefix_parts, is_mononuclear=True)
@@ -2341,7 +2342,7 @@ def _ring_suffix_text(core: str, locants: List[int]) -> Optional[str]:
     mult = '' if n == 1 else _MULT_SIMPLE.get(n)
     if n > 1 and mult is None:
         return None
-    return '-' + ','.join(map(str, sorted(locants))) + '-' + _multiplied_core(mult, core)
+    return '-' + render_locants(sorted(locants)) + '-' + _multiplied_core(mult, core)
 
 
 def _bond_ring_locant(la: int, lb: int, n: int) -> int:

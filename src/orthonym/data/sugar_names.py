@@ -31,6 +31,7 @@ from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 from ..perception.molcache import atoms_of, bonds_of, canon_smiles
 from .multipliers import multiplier_table
+from .locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -4429,7 +4430,7 @@ def name_sugar_o_methyl(mol, canonical_smiles: str) -> Optional[str]:
     mult = _OMETHYL_MULT.get(len(methyl_locants))
     if mult is None:
         return None  # >6 O-methyls -> out of scope
-    locs = ",".join(str(x) for x in sorted(methyl_locants))
+    locs = render_locants(sorted(methyl_locants))
     prefix = f"{locs}-{mult}-O-methyl" if mult else f"{locs}-O-methyl"
     candidate = f"{prefix}-{sugar_name}"
     if not _mono_name_rt_ok(mol, candidate):

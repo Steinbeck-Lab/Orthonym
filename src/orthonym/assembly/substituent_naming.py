@@ -44,6 +44,7 @@ from .prefix_derivation import retained_benzyl
 from .fragment_naming import name_fragment_recursively
 from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, alpha_sort_key_rs, get_alkyl_name, has_structural_hyphen, multiplied_component, simple_multiplier_word
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..data.locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -548,8 +549,8 @@ def _located_stereo_block(mol, locant_of: Dict[int, int]) -> str:
         # a ONE-carbon chain cites no locant, and its descriptor none: "Sphere I."
         # (the Blue Book), '[(R)-germyl(methoxy)(methylsulfanyl)methyl]silane (PIN) (the locant '1'
         # is related to the digraph; it is not required in the name)' (:45031)
-        return '(' + ','.join(code for _loc, code in terms) + ')-'
-    return '(' + ','.join(f'{loc}{code}' for loc, code in terms) + ')-'
+        return '(' + render_locants(code for _loc, code in terms) + ')-'
+    return '(' + render_locants(f'{loc}{code}' for loc, code in terms) + ')-'
 
 
 def _build_alkenyl_name(

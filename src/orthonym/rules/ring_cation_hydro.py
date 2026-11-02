@@ -43,6 +43,8 @@ import re
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
+
 
 def hydro_ring_cation_name(mol, ring_mol, ring_system, center_idx: int) -> str:
     """The name of the ring cation of ``mol`` centred on ``center_idx``, in one numbering, or ''
@@ -284,13 +286,13 @@ def _stem_is_in_numbering(stem: str, sel) -> bool:
     by the namer of the neutral hydro ring (its retained parent 'pyrimidine' or 'imidazole',
     , the numbering by the selection that namer's hydro locants follow."""
     loc, ih = sel['loc'], sel['ih']
-    hydro = ','.join(str(loc[p]) for p in sorted(sel['sp3_pos'] - ih, key=lambda q: loc[q]))
+    hydro = render_locants(str(loc[p]) for p in sorted(sel['sp3_pos'] - ih, key=lambda q: loc[q]))
     lead = f"{hydro}-{sel['prefix']}"
     if not stem.startswith(lead):
         return False
     rest = stem[len(lead):]
     if ih:
-        cited = ','.join(f"{loc[p]}H" for p in sorted(ih, key=lambda q: loc[q]))
+        cited = render_locants(f"{loc[p]}H" for p in sorted(ih, key=lambda q: loc[q]))
         return rest.startswith(f"-{cited}-")
     return not re.match(r'-?\d+H', rest)
 

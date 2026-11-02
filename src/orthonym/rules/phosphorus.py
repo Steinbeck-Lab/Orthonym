@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .lambda_convention import LAMBDA, nonstandard_bonding_number
@@ -2072,7 +2073,7 @@ def name_phosphoxane_oxy_substituent(
     def _locant_prefix(locants, word):
         if not locants:
             return None
-        locs = ','.join(str(x) for x in sorted(locants))
+        locs = render_locants(sorted(locants))
         from ..assembly.naming_utils import multiplied_component as _mc
         return f"{locs}-{_mc(len(locants), word, word)}"
 
@@ -2096,7 +2097,7 @@ def name_phosphoxane_oxy_substituent(
     pieces = detach_sorted[:]
     if op:
         pieces.append(op)                                # oxo last (after hydroxy)
-    lam = ','.join(f"{x}{LAMBDA}5" for x in sorted(lam_loc))
+    lam = render_locants(f"{x}{LAMBDA}5" for x in sorted(lam_loc))
     # Elide the terminal 'e' of the parent before the '-1-yl' ending
     # (diphosphoxane -> diphosphoxan-1-yl), per / standard '-yl' elision.
     stem = parent[:-1] if parent.endswith('e') else parent

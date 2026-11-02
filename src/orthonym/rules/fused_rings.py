@@ -55,6 +55,7 @@ from .stereochemistry import (
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from .fused_interior import interior_pin_name as _interior_pin_name
 from .lambda_convention import fused_lambda_prefix
+from ..data.locant_text import render_locants
 
 # Simple multiplicative prefixes for substituent naming
 SIMPLE_MULTIPLIERS = multiplier_table(10)
@@ -1077,7 +1078,7 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
     hydro_prefix = f"{','.join(str(l) for l in hydro_locs)}-{mult}hydro"
     cited_ih = set() if from_catalogue else (set(ih_set) | arom_ih)
     if cited_ih:
-        ih_prefix = ','.join(
+        ih_prefix = render_locants(
             f"{cand[a]}H"
             for a in sorted(cited_ih, key=lambda a: _fused_locant_num(cand[a]))
         )
@@ -1352,7 +1353,7 @@ def _certified_fusion_name(mol, ring_atom_set: Set[int],
     name = certified.name
     cited = sorted((atom_to_locant[a] for a in indicated), key=_fused_locant_num)
     if cited:
-        name = ','.join(f"{loc}H" for loc in cited) + '-' + name
+        name = render_locants(f"{loc}H" for loc in cited) + '-' + name
     if has_substituents:
         name = _assemble_fused_heterocycle_name(mol, name, subs, atom_to_locant)
         if not name:
@@ -1601,7 +1602,7 @@ def _try_algorithmic_fusion_name(mol, require_certified: bool = False) -> Option
         return None
 
     if indicated_h:
-        h_parts = ','.join(str(loc) + 'H' for loc in indicated_h)
+        h_parts = render_locants(str(loc) + 'H' for loc in indicated_h)
         name = f"{h_parts}-{lam_prefix}{name}"
         # (the Blue Book): indicated hydrogen tells apart the
         # isomers of the MANCUDE parent; (:17026): the degree of
@@ -4866,7 +4867,7 @@ def _assemble_fused_heterocycle_name(
             if suf_name == chosen_suffix:
                 continue
             prefix_name = _SUFFIX_TO_PREFIX.get(suf_name, suf_name)
-            loc_str = ",".join(str(loc) for loc in sorted(suf_locants))
+            loc_str = render_locants(sorted(suf_locants))
             n = len(suf_locants)
             if n == 1:
                 extra_prefix = f"{loc_str}-{prefix_name}-"
@@ -5126,7 +5127,7 @@ def _format_suffix(suffix_base: str, locants: List, added_hydrogen=()) -> str:
     count = len(locants)
     locant_str = ','.join(str(loc) for loc in locants)
     if added_hydrogen:
-        locant_str += '(' + ','.join(f"{loc}H" for loc in added_hydrogen) + ')'
+        locant_str += '(' + render_locants(f"{loc}H" for loc in added_hydrogen) + ')'
 
     if count == 1:
         return f"-{locant_str}-{suffix_base}"

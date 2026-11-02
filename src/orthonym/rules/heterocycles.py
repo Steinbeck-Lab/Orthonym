@@ -26,6 +26,7 @@ import re
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
+from ..data.locant_text import render_locants
 from .azole_numbering import indicated_locants, numbering_starts, pyrrole_type_atoms
 from .pyrrole_type import is_pyrrole_type
 from .ring_numbering_ties import ring_numbering_tie_key as _ring_tie_key
@@ -1820,12 +1821,12 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
 
     # (:3721): in a PIN the locant and the symbol 'H' must be cited.
     if ih:
-        stem = ','.join(f"{loc[p]}H" for p in sorted(ih, key=lambda q: loc[q])) + '-' + stem
+        stem = render_locants(f"{loc[p]}H" for p in sorted(ih, key=lambda q: loc[q])) + '-' + stem
     # (:16879): "the 'hydro' prefixes precede them" -> hydro locants,
     # then the indicated-hydrogen term, then the stem. A hyphen is needed only
     # when what follows starts with a digit (2,3-dihydrofuran vs
     # 5,6-dihydro-4H-1,3-oxazine).
-    hydro_locants = ','.join(
+    hydro_locants = render_locants(
         str(loc[p]) for p in sorted(sp3_pos - set(ih), key=lambda q: loc[q])
     )
     sep = '-' if stem[:1].isdigit() else ''
@@ -2855,7 +2856,7 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info, substituent_ho
                        default=None)
         if best_set is None:
             return ""
-        return ",".join(f"{loc}H" for loc in best_set) + "-"
+        return render_locants(f"{loc}H" for loc in best_set) + "-"
     if len(sp3h) != 1:
         return ""
     target = sp3h[0]
@@ -5555,7 +5556,7 @@ def _suffix_nitrogen_prefix_tokens(entries):
         marked = enclose_if_compound(name)
         n = len(locs[name])
         text = marked if n == 1 else multiplied_component(n, name, marked)
-        out.append((f"{','.join(locs[name])}-{text}", name))
+        out.append((f"{render_locants(locs[name])}-{text}", name))
     return out
 
 

@@ -21,6 +21,7 @@ from ..assembly.naming_utils import (
     is_complex_substituent,
     multiplied_component,
 )
+from ..data.locant_text import render_locants
 from ..errors import is_refusal_sentinel
 
 
@@ -39,7 +40,7 @@ def locanted_prefix_block(pieces: "List[Tuple[str, str]]") -> Optional[str]:
         else:
             display = _wrap_n_substituent(name)
         token = display if len(locs) == 1 else multiplied_component(len(locs), name, display)
-        parts.append(f"{','.join(locs)}-{token}")
+        parts.append(f"{render_locants(locs)}-{token}")
     return "-".join(parts)
 
 

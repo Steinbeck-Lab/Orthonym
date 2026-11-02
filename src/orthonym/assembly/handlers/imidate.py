@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from ...data.locant_text import render_locants
 from ..name_tree import NameTreeNode, NamingResult
 
 
@@ -222,7 +223,7 @@ def _name_carbamimidate(mol: Any, match: "tuple[int, ...]",
     prefix_parts = []
     for nm in sorted(by_name, key=alpha_sort_key):
         locs = sorted(by_name[nm])   # 'N' sorts before "N'"
-        loc_str = ','.join(locs)
+        loc_str = render_locants(locs)
         disp = apply_enclosing_marks(nm, -1) if needs_brackets(nm) else nm
         if len(locs) == 1:
             prefix_parts.append(f"{loc_str}-{disp}")

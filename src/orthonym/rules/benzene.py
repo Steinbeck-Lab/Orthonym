@@ -47,6 +47,7 @@ from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_
 from .ring_nitrogen_yl import n_in_substituent_ring, ring_yl_branch_in_scope, ring_yl_in_scope
 from ..perception.molcache import atoms_of, inchikey_of
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..data.locant_text import render_locants
 
 # Mapping from substituent atom symbol/pattern to prefix name
 # Key: (symbol, hybridization/bond_info) or simple symbol
@@ -4512,7 +4513,7 @@ def _assemble_benzene_with_suffix(
             # the multiplier-final 'a' before '-ol' (hexa+ol → hexol).
             from ..assembly.naming_utils import _join_multiplied_suffix
             mult = multiplying_prefix(len(ol_locants))
-            loc_str = ','.join(str(l) for l in sorted(ol_locants))
+            loc_str = render_locants(sorted(ol_locants))
             multiplied = _join_multiplied_suffix(mult, 'ol')
             # (the Blue Book): when every substitutable ring position bears the
             # SAME decoration the locants are omitted -- 'benzenehexol' (PIN) the Blue Book.
@@ -4993,7 +4994,7 @@ def _name_substituted_benzenediamine(
     n_prefix_entries: List[Tuple[str, str]] = []
     for nm, locs in n_locs_by_name.items():
         locs = sorted(locs)
-        tags = ",".join(f"N{loc}" for loc in locs)
+        tags = render_locants(f"N{loc}" for loc in locs)
         body = _wrap_n_substituent(enclose_if_compound(nm))
         from ..assembly.naming_utils import multiplied_component as _mc
         n_prefix_entries.append((alpha_sort_key(nm), f"{tags}-{_mc(len(locs), nm, body)}"))

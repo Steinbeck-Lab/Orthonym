@@ -41,6 +41,7 @@ from .ion_locants import cites_a_locant, name_neutral_ring_for_ion
 from .ring_cation_hydro import (hydro_ring_cation_name, hydro_ring_zwitterion_name, neutralized_cation,
                                 ring_cation_locants, ring_numbering_tie_key, ring_stereo_prefix)
 from .uide_lambda import (UIDE_STD_VALENCE, double_bonded_ligand, doubled_ligand_not_pin, lambda_uide_name, uide_bonding_number, uide_lambda)
+from ..data.locant_text import render_locants
 
 # F- (DD3,: skeletal heteroatom-hydride anions named with the
 # -anide ending on the parent hydride. element -> the neutral parent-hydride
@@ -4769,7 +4770,7 @@ def emit_ring_poly_cation_ium(mol, centers) -> str:
         mult = get_suffix_multiplier_prefix(len(centers), 'ium')
     except ValueError:
         return ''
-    locs = ','.join(str(locants[c]) for c in sorted(
+    locs = render_locants(str(locants[c]) for c in sorted(
         centers, key=lambda c: _ring_locant_order_key(locants[c])))
     return f"{_join_prefix_stem(prefix, stem)}-{locs}-{mult}ium"
 
@@ -7072,7 +7073,7 @@ def emit_uronium(mol, sites) -> str:
         count = len(locs)
         wrapped = enclose_if_compound(s)
         from ..assembly.naming_utils import multiplied_component as _mc
-        parts.append(",".join(locs) + '-' + _mc(count, s, wrapped))
+        parts.append(render_locants(locs) + '-' + _mc(count, s, wrapped))
     prefix = "-".join(parts)
     parent = 'uronium' if chalcogen.GetSymbol() == 'O' else 'thiouronium'
     return prefix + parent

@@ -78,11 +78,13 @@ jobs:
       - name: Source size budget
         # No function over 200 lines and no file over 5,000 lines in src/orthonym,
         # except those already listed in tests/support/size_budget_baseline.py,
-        # which may not grow (and the list may only shrink). Pure ast: no JVM, no
-        # jars, a few seconds. Runs even when the smoke test failed, so one run
-        # reports both (but not when the install itself failed).
+        # which may not grow (and the list may only shrink). No new hand-written
+        # comma join of locants (tests/support/locant_rendering_baseline.py, which
+        # may only shrink too). Pure ast: no JVM, no jars, a few seconds. Runs even
+        # when the smoke test failed, so one run reports both (but not when the
+        # install itself failed).
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: python -m pytest tests/unit/test_size_budget.py -q -o addopts=""
+        run: python -m pytest tests/unit/test_size_budget.py tests/unit/test_locant_rendering.py -q -o addopts=""
 
   tests:
     name: Test suite

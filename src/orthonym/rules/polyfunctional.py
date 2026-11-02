@@ -13,6 +13,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from ..data.locant_text import render_locants
+
 logger = logging.getLogger(__name__)
 
 from ..assembly.composition_primitives import RETAINED_C2_ACYL_BY_SUFFIX, RETAINED_C2_PARENT_BY_SUFFIX
@@ -67,7 +69,7 @@ def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
     out = stem + ('a' if has_mult else '')
     if ene_locants:
         m = multiplying_prefix(len(ene_locants)) if len(ene_locants) > 1 else ''
-        out += '-' + ','.join(ene_locants) + '-' + m + 'en'
+        out += '-' + render_locants(ene_locants) + '-' + m + 'en'
     if yne_locants:
         m = multiplying_prefix(len(yne_locants)) if len(yne_locants) > 1 else ''
         out += '-' + ','.join(yne_locants) + '-' + m + 'yn'
@@ -486,7 +488,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         return prefix_form
 
     # Format locants
-    locant_str = ",".join(str(loc) for loc in sorted(locants))
+    locant_str = render_locants(sorted(locants))
 
     # Check if prefix is a compound substituent needing parentheses.
     # A prefix that already carries inner enclosing marks but is not itself

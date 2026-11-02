@@ -44,6 +44,7 @@ from .functional_replacement import (
     build_p_frn_acid_name,
     build_polyacid_name,
 )
+from ..data.locant_text import render_locants
 
 # Single-bonded halogen -> class-infix combining form (1)).
 _HALIDO_INFIX = {"Cl": "chlorido", "F": "fluorido", "Br": "bromido", "I": "iodido"}
@@ -2185,7 +2186,7 @@ def _name_polycarbonic_diamide(mol) -> Optional[str]:
         locs = sorted(by_name[nm])
         if len(locs) not in _CARB_MULT or len(locs) > 4:
             return None
-        loc_str = ",".join(f"N{x}" for x in locs)
+        loc_str = render_locants(f"N{x}" for x in locs)
         parts.append(f"{loc_str}-"
                      f"{multiplied_component(len(locs), nm, enclose_if_compound(nm))}")
     prefix = "-".join(parts)
@@ -2338,7 +2339,7 @@ def _hzc_assemble_prefix(subs):
         # '2-propan-2-ylidene'.
         rendered = enclose_if_compound(tok)
         items.append((alpha_sort_key(tok),
-                      f"{','.join(locs_sorted)}-{mult}{rendered}"))
+                      f"{render_locants(locs_sorted)}-{mult}{rendered}"))
     items.sort(key=lambda x: x[0])
     return '-'.join(r for _, r in items)
 

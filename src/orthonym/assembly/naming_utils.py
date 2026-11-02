@@ -1040,6 +1040,7 @@ def get_alkyl_name(carbon_count: int) -> str:
 # module with no orthonym imports. These names are the same dict objects, so every importer of
 # ``naming_utils.SIMPLE_MULTIPLIERS`` / ``COMPLEX_MULTIPLIERS`` is unchanged.
 from ..data.chain_names import multiplying_prefix  # noqa: E402
+from ..data.locant_text import render_locants  # noqa: E402
 from ..data.multipliers import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS  # noqa: E402,F401 (re-exported)
 
 
@@ -3562,7 +3563,7 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         '4,7-bis(1-methylethyl)'
     """
     # Format locants as comma-separated string
-    locant_str = ",".join(str(loc) for loc in locants)
+    locant_str = render_locants(locants)
 
     # Get the multiplier prefix
     multiplier = get_multiplier_prefix(count, name)
@@ -4920,7 +4921,7 @@ def format_suffix_with_locants(
 
     if suffix_locants:
         # Format locants as comma-separated
-        locant_str = ",".join(str(loc) for loc in suffix_locants)
+        locant_str = render_locants(suffix_locants)
 
         # Build the suffix part: multiplier + suffix (e.g., 'diol', 'tetrol').
         # elides multiplier-final 'a' before '-ol' (tetra+ol → tetrol).

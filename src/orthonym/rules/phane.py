@@ -44,6 +44,7 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..data.chain_names import multiplying_prefix
+from ..data.locant_text import render_locants
 
 # ---------------------------------------------------------------------------
 # Sub-class enum
@@ -1277,7 +1278,7 @@ def build_phane_pin(mol: Optional[Chem.Mol]) -> Optional[str]:
         skeletal_name = _unsaturated_phane_name(skeletal_name, doubles, triples)
         if skeletal_name is None:
             return None
-    cited = ",".join(f"{loc}{descriptors[loc]}" for loc in sorted(descriptors))
+    cited = render_locants(f"{loc}{descriptors[loc]}" for loc in sorted(descriptors))
 
     superatom_locants = sorted(sup for sup, _ in per_amp)
     superatom_str = ",".join(str(x) for x in superatom_locants)

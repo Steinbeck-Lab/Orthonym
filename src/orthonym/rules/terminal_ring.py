@@ -76,6 +76,8 @@ from typing import Dict, Optional, Sequence, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
+
 logger = logging.getLogger(__name__)
 
 #: Shared with the von Baeyer sibling so the two halves of the terminal namer
@@ -274,7 +276,7 @@ def _unsaturation_block(double_locs: Sequence[str], triple_locs: Sequence[str],
     head_a = 'a' if terms[0][1] else ''
     out = head_a
     for locs, mult, ending in terms:
-        out += f"-{','.join(locs)}-{mult}{ending}"
+        out += f"-{render_locants(locs)}-{mult}{ending}"
     return out
 
 

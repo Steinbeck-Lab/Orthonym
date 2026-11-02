@@ -1550,7 +1550,7 @@ def _build_hetero_prefix(
     if totality.unexpressed or (pin and totality.preselected_only):
         return None
 
-    from ..assembly.naming_utils import get_multiplier_prefix
+    from ..assembly.naming_utils import get_multiplier_prefix, render_locants
 
     heteroatom_info = []
     for atom_idx in ring_atoms:
@@ -1609,7 +1609,7 @@ def _build_hetero_prefix(
             (f"{loc}{_LAMBDA}{lam}" if lam is not None else str(loc))
             for loc, lam, _idx in entries
         ]
-        locant_str = ','.join(locant_tokens)
+        locant_str = render_locants(locant_tokens)
         prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
         # One entry per HETEROATOM (not per distinct morpheme): a multiplied
         # morpheme -- ``dioxa`` -- is written once but spells ``oxa`` once per

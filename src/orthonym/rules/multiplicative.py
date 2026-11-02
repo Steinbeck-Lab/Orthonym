@@ -34,6 +34,7 @@ from .bridge_arms import arm_sizes_differ
 from .multiplicative_general import name_general_multiplicative
 from .multiplied_class_word_units import ACYL_UNIT_SUFFIXES, multiply_class_word_unit
 from .multiplicative_arms import find_arm_pcg
+from ..data.locant_text import render_locants
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -392,7 +393,7 @@ def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
     if attach_locant is None:
         locant_prefix = ""
     else:
-        locant_prefix = ",".join(
+        locant_prefix = render_locants(
             f"{attach_locant}{chr(39) * i}" for i in range(n)
         ) + "-"
     if any(ch.isdigit() for ch in parent_name) or parent_name.startswith("dec"):

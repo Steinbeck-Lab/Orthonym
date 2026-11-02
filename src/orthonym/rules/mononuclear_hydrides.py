@@ -63,6 +63,7 @@ from typing import List, Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from ..metrics.provenance import best_effort_ctx
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
@@ -1593,7 +1594,7 @@ def name_lambda5_phosphanimine(mol) -> Optional[str]:
         mult = _PHOSPHANIMINE_MULT.get(count)
         if mult is None:
             return None
-        loc_str = ','.join(locants)
+        loc_str = render_locants(locants)
         # `enclose_if_compound` replaces the raw `f"({name})"`: it ESCALATES over
         # an inner pair and carries the carve-out, so
         # `tert-butyl` is cited bare and keeps its hyphen under a multiplier.
@@ -1832,7 +1833,7 @@ def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
             mult = _IO_PREFIX_MULT.get(len(locs))
             if mult is None:
                 return None
-            parts.append(f"{','.join(locs_sorted)}-{mult}{nm}")
+            parts.append(f"{render_locants(locs_sorted)}-{mult}{nm}")
         prefix_block = '-'.join(parts)
         return _assemble(prefix_block, lam, stem_suffix)
 

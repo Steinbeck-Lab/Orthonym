@@ -43,6 +43,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from rdkit import Chem
 
+from ...data.locant_text import render_locants
 from ...data.multipliers import multiplier_table
 
 #: (:8284) citation order of the 'a' prefixes, also the order of
@@ -429,7 +430,7 @@ def benzo_name(km, benzene: FrozenSet[int], hetero: FrozenSet[int],
            if km.GetAtomWithIdx(a).GetAtomicNum() != 6]
     locs = [str(loc) for el in HW_ORDER for loc, e in sorted(het) if e == el]
     benz = "benz" if stem[0] in "aeiou" else "benzo"
-    return ",".join(locs) + "-" + benz + stem
+    return render_locants(locs) + "-" + benz + stem
 
 
 # --------------------------------------------------------------------------------------

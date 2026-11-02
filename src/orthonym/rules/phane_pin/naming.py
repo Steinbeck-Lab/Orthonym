@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Sequence, Tuple
 
+from ...data.locant_text import render_locants
 from .amplificants import hydro_split
 from .numbering import (
     Numbered,
@@ -51,7 +52,7 @@ def amplification_block(placed: Tuple[Placed, ...]) -> Optional[str]:
         groups = {}
         for p in items:
             groups.setdefault(p.cited, []).append(p.locant)
-        text = ",".join(",".join(map(str, sorted(locs))) + "(" + ",".join(_loc(x) for x in cited) + ")"
+        text = render_locants(render_locants(sorted(locs)) + "(" + ",".join(_loc(x) for x in cited) + ")"
                         for cited, locs in sorted(groups.items(), key=lambda kv: min(kv[1])))
         multiplied = _multiplied_amplificant(items[0].amp.hydride.prefix, len(items))
         if multiplied is None:
@@ -135,7 +136,7 @@ def prefix_block(plan: Plan, numbered: Numbered, skel: PhaneSkeleton) -> Optiona
         text = _mult_prefix(len(groups[name]), name)
         if text is None:
             return None
-        parts.append(",".join(render_locant(loc) for loc in sorted(groups[name])) + "-" + text)
+        parts.append(render_locants(render_locant(loc) for loc in sorted(groups[name])) + "-" + text)
     return "-".join(parts)
 
 
@@ -154,9 +155,9 @@ def hydro_block(skel: PhaneSkeleton, numbered: Numbered) -> Optional[str]:
         multiplier = "" if len(hydro) == 1 else SIMPLE_MULTIPLIERS.get(len(hydro))
         if multiplier is None:
             return None
-        text += ",".join(render_locant(loc) for loc in sorted(hydro)) + f"-{multiplier}hydro-"
+        text += render_locants(render_locant(loc) for loc in sorted(hydro)) + f"-{multiplier}hydro-"
     if indicated:
-        text += ",".join(f"{render_locant(loc)}H" for loc in sorted(indicated)) + "-"
+        text += render_locants(f"{render_locant(loc)}H" for loc in sorted(indicated)) + "-"
     return text
 
 

@@ -16,24 +16,25 @@ Where each naming rule lives in the code, which rules are written in more than o
 
 Blue Book: <!-- rule-index:begin bb:P-14.3,P-16.2 -->P-14.3 Locants; P-16.2 Punctuation.<!-- rule-index:end bb:P-14.3,P-16.2 -->
 
-The helpers join a list of locants and attach it to a prefix or a suffix, with the multiplier and the enclosing marks. Most code that needs this does not use them.
+`render_locants` writes a list of locants with commas between them. The other helpers attach a list of locants to a prefix or a suffix, with the multiplier and the enclosing marks. Most code that needs this does not use them.
 
 <!-- rule-index:begin locant-render -->
 
 | Helper | Module | Used outside its module |
 |:--|:--|:--|
-| `format_substituent_prefix` | `assembly/naming_utils.py` | 33 calls in 13 other files |
-| `format_suffix_with_locants` | `assembly/naming_utils.py` | 6 calls in 4 other files |
-| `multiplied_component` | `assembly/naming_utils.py` | 467 calls in 44 other files |
+| `render_locants` | `data/locant_text.py` | 63 calls in 31 other files |
+| `format_substituent_prefix` | `assembly/naming_utils.py` | 38 calls in 17 other files |
+| `format_suffix_with_locants` | `assembly/naming_utils.py` | 8 calls in 6 other files |
+| `multiplied_component` | `assembly/naming_utils.py` | 396 calls in 55 other files |
 
-Code that writes a locant into a name by hand: **560 places** in **243 functions** of **70 files** (a locant joined with commas or hyphens: 253; an f-string `{locant}-...`: 365; a locant plus `"-"`: 31; a line can match more than one pattern). 209 of those functions call none of the helpers above. The files with most places: `rules/ions.py` (63), `assembly/composer.py` (54), `rules/natural_products.py` (52), `rules/ring_substituents.py` (30), `rules/heterocycles.py` (28). 20 of the comma joins sort the locants inside the join; the others write them in the order they are given.
+Code that writes a locant into a name by hand: **547 places** in **263 functions** of **85 files** (a locant joined with commas or hyphens: 210; an f-string `{locant}-...`: 379; a locant plus `"-"`: 35; a line can match more than one pattern). 184 of those functions call none of the helpers above. The files with most places: `rules/ions.py` (56), `assembly/composer.py` (52), `rules/natural_products.py` (52), `rules/heterocycles.py` (24), `rules/ring_substituents.py` (24). 5 of the comma joins sort the locants inside the join; the others write them in the order they are given. 63 places write a list of locants with `render_locants`.
 
 <!-- rule-index:end locant-render -->
 
 When you change it:
 
 - Look at each place that writes a locant by hand and decide whether your change should reach it. Do not assume that fixing the helper fixes the name.
-- Most comma joins write the locants in the order the caller gives. A helper that sorts would turn `2,1` into `1,2` for a caller that cites locants in citation order, as some multiplicative names do. Do not add a sort without reading the callers.
+- `render_locants` writes the locants in the order it is given and never sorts. A caller that needs ascending order sorts first, at the call (`render_locants(sorted(locants))`). Some callers cite locants in citation order, as some multiplicative names do, so a sort inside the function would turn `2,1` into `1,2` for them.
 - Not every locant is an integer. `4a`, primed locants, Greek letters, `N1`, `1H` and the lambda tokens sort and compare differently. They have renderers of their own (`format_lambda_token` in `rules/lambda_convention.py`, `_render_primed_locant` in `assembly/composer.py`).
 
 ### Citing and omitting locants

@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from . import isotope_oxoacid as _oxoacid
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
@@ -2919,7 +2920,7 @@ def _decorate_distinct_multi_locant(
         # hyphenation falls back to the bare splice that already round-tripped.
         before_digit = off < len(skeleton) and skeleton[off:off + 1].isdigit()
         for locs in candidate_sets:
-            loc_part = ",".join(locs)
+            loc_part = render_locants(locs)
             # count-bearing subscript first, bare form as a parseability fallback.
             for desc in (f"({loc_part}-{sym}{count})", f"({loc_part}-{sym})"):
                 joins = ["-", ""] if before_digit else [""]

@@ -115,7 +115,9 @@ a listed producer or step is not wrapped, so add the function of a new one to it
    name. The rule index lists the canonical helper of a
    rule and the places that decide the same question beside it. If the rule is written in
    several places, fix the shared helper first, and say in the pull request which other places
-   you did not change.
+   you did not change. A list of locants in a name is written with `render_locants`
+   (`orthonym.data.locant_text`); a new hand-written comma join of locants fails
+   `tests/unit/test_locant_rendering.py`.
 4. **Fix the cause, not the name.** Fix the rule or the data table that produced the defect.
    Do not add a case for one molecule, and do not rewrite the finished name by string
    surgery. When a preferred name cannot be built with confidence, degrade to a correct

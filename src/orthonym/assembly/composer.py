@@ -15,6 +15,8 @@ from collections import defaultdict, deque, namedtuple
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from ..data.locant_text import render_locants
+
 logger = logging.getLogger(__name__)
 
 # Structured result from complex ring sub-handlers.
@@ -3476,7 +3478,7 @@ def _build_n_substituted_name(
             else sorted(sub_locants.keys()):
         locants = sub_locants[name]
         count = len(locants)
-        locant_str = ",".join(locants)
+        locant_str = render_locants(locants)
         #; BB 33336 'N-[1-cyano-3-(methylsulfanyl)propyl]
         # -N'-methylurea (PIN)'): a COMPOUND N-substituent (its own locants /
         # hyphens) is enclosed so a numeral never abuts the next N-locant; simple
@@ -6308,7 +6310,7 @@ def _format_hydrazide_nn_prefix(inner_subs, term_subs):
     for nm, locs in by_name.items():
         locs.sort(key=lambda l: (l.count("'"), l))  # N before N'
         wrapped = _wrap_n_substituent(nm)
-        loc_str = ",".join(locs)
+        loc_str = render_locants(locs)
         if len(locs) == 1:
             parts.append((alpha_sort_key(nm), f"{loc_str}-{wrapped}"))
         else:

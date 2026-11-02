@@ -32,6 +32,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ...data.locant_text import render_locants
 from ...perception.mancude import max_matching_size
 from .numbering import loc_key, locant_tuple
 from .selection import Split
@@ -253,4 +254,4 @@ def hydro_text(state: HydroState, hydro_atoms, atom_to_locant: Dict[int, Any],
 def ih_text(ih_atoms, atom_to_locant: Dict[int, Any]) -> str:
     """'' or '1H' or '2H,7H'; also the 'added indicated hydrogen' list ('2H', '1H,5H')."""
     locs = sorted((atom_to_locant[a] for a in ih_atoms), key=loc_key)
-    return ",".join(f"{x}H" for x in locs)
+    return render_locants(f"{x}H" for x in locs)

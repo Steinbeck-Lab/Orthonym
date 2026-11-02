@@ -31,6 +31,7 @@ from rdkit import Chem
 
 from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..data.locant_text import render_locants
 
 # Saturation prefix mapping based on number of added hydrogens
 # Each sp3 carbon in ring adds 2 hydrogens vs aromatic parent
@@ -2507,7 +2508,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol,
         return None
     if added_ih:
         ih_sorted = sorted(added_ih, key=lambda a: _locant_key(loc[a]))
-        ih_str = '(' + ','.join(f"{_locant_display(loc[a])}H" for a in ih_sorted) + ')'
+        ih_str = '(' + render_locants(f"{_locant_display(loc[a])}H" for a in ih_sorted) + ')'
     else:
         ih_str = ''
     # (a): elide terminal 'e' only before a vowel-initial suffix. For the
@@ -2550,7 +2551,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol,
         for nm in sorted(by_name, key=alpha_sort_key):
             nlocs = sorted(by_name[nm], key=lambda s: _locant_key(s[1:]))
             from ..assembly.naming_utils import multiplied_component as _mc
-            parts.append(','.join(nlocs) + '-' + _mc(len(nlocs), nm, nm))
+            parts.append(render_locants(nlocs) + '-' + _mc(len(nlocs), nm, nm))
         # (a) (the Blue Book): a hyphen separates the prefix from a
         # DIGIT-initial parent ('N-methyl' + '1H-inden-1-imine' ->
         # 'N-methyl-1H-inden-1-imine'); no hyphen before a letter-initial parent
@@ -2679,7 +2680,7 @@ def oxo_prefix_parent_numberings(mol: Chem.Mol, ring_atoms) -> List[tuple]:
                 prefix = SATURATION_PREFIXES.get(len(hydro))
                 if prefix is None:
                     continue
-                hy = ','.join(_locant_display(loc[a]) for a in
+                hy = render_locants(_locant_display(loc[a]) for a in
                               sorted(hydro, key=lambda a: _locant_key(loc[a])))
                 sep = '-' if name[:1].isdigit() else ''
                 name = f"{hy}-{prefix}{sep}{name}"
