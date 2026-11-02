@@ -74,8 +74,16 @@ def _declined_pin_row(smiles):
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
 
+def _carbon_free(smiles):
+    from rdkit import Chem
+    return not any(a.GetAtomicNum() == 6 for a in Chem.MolFromSmiles(smiles).GetAtoms())
+
+
 def _row(smiles, tier):
-    if tier == "pin" and smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+    # a carbon-free compound has a preselected name at most (user decision 2026-11-02; PREFERRED IUPAC NAMES,
+    # the Blue Book,:2058): the default tier declines it, so the strict path's row is asserted
+    if (tier == "pin" and (smiles in DEFAULT_TIER_DECLINES or _carbon_free(smiles))
+            and default_tier_rule_applies()):
         return _declined_pin_row(smiles)
     if tier == "pin":
         return Orthonym(style="pin").name_tiered(smiles)
@@ -475,22 +483,23 @@ def test_d_the_shared_acid_parent_predicate():
 # nomenclature writes 'hydrogen' directly in front of the anion;
 # (:43566) '*N*,*N*-diethylethanaminium hydrogen sulfate (PIN)';:7150
 # "hydrogensulfate is an inorganic name for HSO4-". (2) A wholly inorganic
-# metal compound (a metal atom, no carbon) takes the label of its naming path,
-# as in the paper's measured run (user decision 2026-09-30, which replaces the
-# 2026-09-28 label systematic_verified: 'sodium chloride' pin_verified). Label
-# only; names unchanged.
+# compound (no carbon) has a preselected name at most, never a PIN: changed
+# asserted labels (user decision 2026-11-02, "decide what the Blue Book says",
+# which replaces the paper-run label pin_verified of 2026-09-30).
+# PREFERRED IUPAC NAMES (:2056) "... and that also contain at least one carbon
+# atom in their structure";:2058 "... the label 'preselected name' is added to
+# appropriate names". Label only; names unchanged.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected,tier", [
     ("CC[NH+](CC)CC.OS(=O)(=O)[O-]", "N,N-diethylethanaminium hydrogen sulfate",
      "pin_verified"),
     ("c1cc[nH+]cc1.OS(=O)(=O)[O-]", "pyridin-1-ium hydrogen sulfate", "pin_verified"),
-    # carbon-free salts: the label of the naming path, as in the paper's measured
-    # run (user decision 2026-09-30, 'sodium chloride' pin_verified)
-    ("[K+].OS(=O)(=O)[O-]", "potassium hydrogen sulfate", "pin_verified"),
+    # carbon-free salts: a preselected name at most (2026-11-02, see above)
+    ("[K+].OS(=O)(=O)[O-]", "potassium hydrogen sulfate", "systematic_verified"),
     ("[Ba+2].OS(=O)(=O)[O-].OS(=O)(=O)[O-]", "barium bis(hydrogen sulfate)",
-     "pin_verified"),
-    ("[Na+].OS(=O)[O-]", "sodium hydrogen sulfite", "pin_verified"),
+     "systematic_verified"),
+    ("[Na+].OS(=O)[O-]", "sodium hydrogen sulfite", "systematic_verified"),
 ])
 def test_e_hydrogen_sulfate_is_two_words(smiles, expected, tier):
     row = _row(smiles, "pin")
@@ -508,15 +517,13 @@ def test_e_hydrogen_sulfate_is_two_words(smiles, expected, tier):
     ("[Hg+2].[Cl-].[Cl-]", "mercury(II) chloride"),
     ("[Na+].[Cl-]", "sodium chloride"),
 ])
-def test_e_a_wholly_inorganic_metal_compound_keeps_the_label_of_its_naming_path(
-        smiles, expected):
-    # Paper conformance (user decision 2026-09-30): a carbon-free compound takes
-    # the label of the paper's measured run, 'sodium chloride' pin_verified (the
-    # strict PIN path built and verified it). Names unchanged.
+def test_e_a_wholly_inorganic_metal_compound_is_below_the_pin(smiles, expected):
+    # A carbon-free compound has a preselected name at most (2026-11-02, see above; changed asserted labels, were
+    # pin_verified at every tier): systematic_verified, the PIN tier declines it ("pin" reads the strict path's row).
     for tier in ("pin", "valid", "best-effort"):
         row = _row(smiles, tier)
         assert row["name"] == expected, (tier, row)
-        assert row["tier"] == "pin_verified" and row["is_pin"], (tier, row)
+        assert row["tier"] == "systematic_verified" and not row["is_pin"], (tier, row)
     assert_full_rt(expected, smiles)
 
 

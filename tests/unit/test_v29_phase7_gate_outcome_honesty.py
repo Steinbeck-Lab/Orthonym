@@ -47,6 +47,33 @@ from orthonym.metrics import provenance as pv
 # (the verbatim Blue Book PIN, "Achiral cyclic compounds",
 # the Blue Book 'cis-cyclohexane-1,4-diol'; OPSIN has no r/s grammar)
 # C[C@H]1CC[C@@H](C)CC1 -> '(1s,4s)-1,4-dimethylcyclohexane', the same exit
+# Since 2026-11-02 the polyacid witness is declined at the default tier (a carbon-free name is a preselected name,
+# never a PIN: PREFERRED IUPAC NAMES, the Blue Book,:2058; user decision "decide what the Blue Book
+# says"), so its gate outcome is read with the default tier's emission rule switched off (``_strict``): the gate
+# runs and records exactly as before, only the emission is withheld.
+CARBON_FREE_WITNESS = "NP(=O)(O)OP(N)(=O)O"
+
+
+import contextlib
+
+
+@contextlib.contextmanager
+def _strict():
+    import orthonym.namer as namer
+    token = namer._DEFAULT_TIER_POLICY_OFF.set(True)
+    try:
+        yield
+    finally:
+        namer._DEFAULT_TIER_POLICY_OFF.reset(token)
+
+
+def _tiered(nm, smiles):
+    if smiles == CARBON_FREE_WITNESS:
+        with _strict():
+            return nm.name_tiered(smiles)
+    return nm.name_tiered(smiles)
+
+
 T1_LEAKS = {
     "NP(=O)(O)OP(N)(=O)O": "carveout:polyacid_prefix_derivative",
     "O[C@H]1CC[C@@H](O)CC1": "self_consistency_constitution_only",
@@ -82,7 +109,7 @@ def test_t1_leaks_do_not_claim_bare_self01():
     assert len(T1_LEAKS) == 3, "the measured T1 leak set must not be empty"
     checked = 0
     for smiles, expected_outcome in T1_LEAKS.items():
-        row = Orthonym().name_tiered(smiles)
+        row = _tiered(Orthonym(), smiles)
         assert row["name"], f"{smiles} must still EMIT (Task 1 changes no name)"
         assert row["gate_outcome"] == expected_outcome, (
             f"{smiles}: expected gate outcome {expected_outcome!r}, "
@@ -116,7 +143,7 @@ def test_carveout_reports_its_slug():
     '1,3-diamidodiphosphoric acid' with both amido groups on one P atom, so the name ships on its
     construction with the carve-out label, never a bare. (The former probe `C=C.C=C.[Ni]` no longer
     ships its eta name at the PIN tier, user decision 2026-11-01:, the Blue Book.)"""
-    row = Orthonym().name_tiered("NP(=O)(O)OP(N)(=O)O")
+    row = _tiered(Orthonym(), CARBON_FREE_WITNESS)
     assert row["name"] == "1,3-diamidodiphosphoric acid"
     assert row["gate_outcome"] == "carveout:polyacid_prefix_derivative"
     assert row["gate_outcome"].startswith("carveout:")
@@ -172,14 +199,14 @@ def test_consecutive_molecules_each_report_their_own_gate_branch():
     """
     nm = Orthonym()
 
-    first = nm.name_tiered("NP(=O)(O)OP(N)(=O)O")      # carve-out
+    first = _tiered(nm, CARBON_FREE_WITNESS)            # carve-out
     second = nm.name_tiered("CCO")                     # genuinely verified
     assert first["gate_outcome"] == "carveout:polyacid_prefix_derivative"
     assert second["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert "self_consistency" in second["gates_passed"]
 
     third = nm.name_tiered("CCO")
-    fourth = nm.name_tiered("NP(=O)(O)OP(N)(=O)O")
+    fourth = _tiered(nm, CARBON_FREE_WITNESS)
     assert third["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert fourth["gate_outcome"] == "carveout:polyacid_prefix_derivative"
     assert "self_consistency" not in fourth["gates_passed"]

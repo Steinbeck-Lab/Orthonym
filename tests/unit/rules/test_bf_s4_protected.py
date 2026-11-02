@@ -90,8 +90,12 @@ def test_an_exact_match_list_name_is_kept_at_both_tiers_below_the_pin(smiles, na
 
 @pytest.mark.opsin_gate
 def test_an_exact_match_list_parent_the_builder_does_not_name_keeps_its_name():
-    """'hetisan': no PIN either,:50943); the name is kept at the default tier, labelled systematic_verified."""
-    row = _row(HETISAN, "pin")
+    """'hetisan': no PIN either,:50943 "Preferred IUPAC names (PINs) are not identified for the compounds in
+    this Chapter"); labelled systematic_verified. Since 2026-11-02 (user decision "decide what the Blue Book says")
+    the PIN tier declines it (it was kept there as an exception); the strict path still builds it, unchanged."""
+    from tests.support.default_tier import strict_path_row
+    assert (_row(HETISAN, "pin")["tier"], _row(HETISAN, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
+    row = strict_path_row(HETISAN)
     assert (row.get("name"), row["tier"]) == ("hetisan", "systematic_verified"), (row.get("name"), row["tier"])
     assert row["verified"] == "identity" and row["is_pin"] is False, row
 

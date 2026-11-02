@@ -228,16 +228,19 @@ def test_the_label_predicate_covers_bonded_zinc_names_with_or_without_a_metal_ca
     assert f("O=[Zn]", "oxozinc") and f("[ZnH2]", "dihydridozinc")     # no carbon:
     assert f("CC[Zn]O", "ethyl(hydroxy)zinc") and f("C[Zn-](C)C", "trimethylzinc(1-)")
     assert f("[O-2].[Zn+2]", "zinc oxide") is False                    # an ionic drawing: no bond, no hydrogen
-    assert f("[Cl-].[Cl-].[Zn+2]", "zinc dichloride") is False         # the carbon-free salt keeps its label
+    assert f("[Cl-].[Cl-].[Zn+2]", "zinc dichloride") is False         # no bond (the carbon-free rule of the namer)
     assert f("O=[Cd]", "oxocadmium") is True and f("O=[Cu]", "oxocopper") is True     # admitted since 2026-10-30
     assert f("O=[Tc]", "oxotechnetium") is False and f("O=[Pu]", "oxoplutonium") is False   # not admitted
     assert f("", "oxozinc") is False and f("O=[Zn]", None) is False and f("not a smiles", "x") is False
 
 
-def test_a_name_of_the_exact_structure_list_keeps_the_label_of_its_path(monkeypatch):
+def test_a_name_of_the_exact_structure_list_is_no_exception(monkeypatch):
+    # changed asserted value (2026-11-02, user decision "decide what the Blue Book says", replacing the path label
+    # of 2026-09-30; was False): a list name is no PIN either INTRODUCTION, the Blue Book, "Preferred
+    # IUPAC names (PINs) are not identified for the compounds in this Chapter"), so the predicate does not read it
     import orthonym.namer as namer
     monkeypatch.setattr(namer, "_coordination_list_name", lambda smiles, name: True)
-    assert metal_labels.is_bonded_metal_name_without_pin("O=[Zn]", "oxozinc") is False
+    assert metal_labels.is_bonded_metal_name_without_pin("O=[Zn]", "oxozinc") is True
 
 
 def test_the_combined_predicate_keeps_the_carbanion_salts_and_adds_the_bonded_names():
@@ -250,8 +253,11 @@ def test_the_combined_predicate_keeps_the_carbanion_salts_and_adds_the_bonded_na
 
 def test_the_predicate_is_what_lowers_the_label(monkeypatch):
     """Without the predicate the strict path's label would stand: 'oxozinc' is a name that the strict
-    path builds and verifies, so the demotion is the only thing that keeps it from the label of a PIN."""
+    path builds and verifies, so the demotion (with the namer's carbon-free demotion, which holds 'oxozinc' too
+    since 2026-11-02) is the only thing that keeps it from the label of a PIN."""
+    import orthonym.namer as namer
     monkeypatch.setattr(metal_labels, "is_bonded_metal_name_without_pin", lambda smiles, name: False)
+    monkeypatch.setattr(namer, "_is_carbon_free_compound", lambda smiles: False)
     row = _row("O=[Zn]", "valid")
     assert row["name"] == "oxozinc" and row["tier"] == "pin_verified", row
 

@@ -166,7 +166,11 @@ def test_carveout_stereoparent_is_labelled_by_its_list_identity():
     # decision of 2026-09-30 (c) labelled it pin_verified; the lead decided on 2026-10-17 (the user
     # delegating it to the Blue Book) that this class is systematic_verified. The name is unchanged
     # (OPSIN reads none, below); mutation: the tier assertion fails on the commit before.
-    row = _row("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1")
+    # Since 2026-11-02 (user decision "decide what the Blue Book says") the PIN tier declines the list name (it is
+    # no PIN, the sentence above), so the row is the strict path's (the emission rule switched off).
+    from tests.support.default_tier import assert_default_tier_declines, strict_path_row
+    assert_default_tier_declines("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1")
+    row = strict_path_row("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1")
     assert row["name"] == "germacrane"
     assert row["opsin"] == "unverified"
     assert row["tier"] == "systematic_verified" and row["verified"] == "identity", row

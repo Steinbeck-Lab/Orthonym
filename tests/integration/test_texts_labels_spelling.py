@@ -10,12 +10,12 @@ A. Carbon-free compounds carry a preselected name at most, never a PIN.
    appropriate names"; PRESELECTED NAMES (:2062); '(HO)3PO phosphoric acid
    (preselected name)' (:2076), 'sulfuric acid (preselected name)' (:35449),
    'tetrachlorosilane (preselected name)' (:35758). The Blue Book labels no
-   carbon-free structure '(PIN)'. The tier label, however, follows the paper's
-   measured run (user decision 2026-09-30, replacing the 2026-09-29 label
-   systematic_verified): the label of the naming path, 'sodium chloride'
-   pin_verified -- the paper, Methods, "Tiers": "The tier labels describe how the
-   engine built a name". The name is unchanged. A carbon-containing compound keeps
-   its label.
+   carbon-free structure '(PIN)'; the online errata (iupac.qmul.ac.uk/bibliog/BBerrors.html)
+   read "For phosphane (PIN) read phosphane (preselected name)". User decision
+   2026-11-02 ("decide what the Blue Book says", which replaces the paper-run label
+   pin_verified of 2026-09-30): changed asserted labels, a carbon-free name is
+   systematic_verified with is_pin False, and the PIN tier declines it. The name is
+   unchanged. A carbon-containing compound keeps its label.
 
 B. A multiplied organic cation in a salt takes 'bis', 'tris',... when it carries a
    cumulative cationic suffix or is a substituted parent cation, and every
@@ -74,7 +74,7 @@ def _row(smiles, tier):
 
 
 # ---------------------------------------------------------------------------
-# A. Carbon-free compounds: preselected names; the label of the naming path
+# A. Carbon-free compounds: preselected names, below the PIN
 # ---------------------------------------------------------------------------
 
 CARBON_FREE = [
@@ -91,11 +91,15 @@ CARBON_FREE = [
 
 @pytest.mark.parametrize("smiles,expected", CARBON_FREE)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
-def test_a_carbon_free_compound_keeps_the_label_of_its_naming_path(smiles, expected,
-                                                                   tier):
+def test_a_carbon_free_compound_is_a_preselected_name_below_the_pin(smiles, expected,
+                                                                    tier):
     row = _row(smiles, tier)
+    if tier == "pin":
+        assert (row["tier"], row["limit_code"], row["is_pin"]) == ("abstain", "NO_VERIFIED_PIN", False), row
+        assert_full_rt(expected, smiles)
+        return
     assert row["name"] == expected, row
-    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert row["verified"] == "opsin", row
     assert_full_rt(expected, smiles)
 

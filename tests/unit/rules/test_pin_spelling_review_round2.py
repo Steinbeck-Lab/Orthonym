@@ -345,9 +345,10 @@ def test_delocalized_charge_is_one_species(smiles, expected):
 def test_sodium_nitrate_18o_is_named():
     name, tier = _pin_verified_name("[Na+].[O-][N+](=O)[18O-]")
     assert name == "sodium (18O)nitrate", name
-    # carbon-free: no PIN; the label is the one of its naming path, as in
-    # the paper's measured run (user decision 2026-09-30)
-    assert tier == "pin_verified", tier
+    # carbon-free: no PIN. Changed asserted label (2026-11-02, user decision "decide what the Blue Book says";
+    # was pin_verified, the paper-run label of 2026-09-30): PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to names of compounds "that also contain at least one carbon atom in their structure";
+    #:2058 "... the label 'preselected name' is added to appropriate names"
+    assert tier == "systematic_verified", tier
 
 
 @pytest.mark.parametrize("a,b,same", [
@@ -668,22 +669,24 @@ def test_oxoacid_ester_prefixes_come_from_the_prefix_table():
 # compounds,:4667;,:2056-2058).
 # --------------------------------------------------------------------------
 
-# Labels: a carbon-free salt takes the label of its naming path, as in the paper's
-# measured run (user decision 2026-09-30, 'sodium chloride' pin_verified); an
+# Labels: a carbon-free salt has a preselected name at most, never a PIN (changed asserted labels 2026-11-02,
+# user decision "decide what the Blue Book says"; were pin_verified, the paper-run labels of 2026-09-30):
+# PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to names of compounds "that also contain at least one carbon atom in their structure";
+#:2058 "... the label 'preselected name' is added to appropriate names"; an
 # aluminium compound keeps the no-PIN-status label (the Blue Book,:2062) and the
 # metal carbide the / one.
 @pytest.mark.parametrize("smiles,expected,tier", [
     ("[Al+3].[N-3]", "aluminium azanetriide", "systematic_verified"),
     ("[Mg+2].[Mg+2].[Mg+2].[P-3].[P-3]", "trimagnesium bis(phosphanetriide)",
-     "pin_verified"),
+     "systematic_verified"),
     ("[Ca+2].[Ca+2].[Ca+2].[P-3].[P-3]", "tricalcium bis(phosphanetriide)",
-     "pin_verified"),
-    ("[Fe+3].[N-3]", "iron(III) azanetriide", "pin_verified"),
+     "systematic_verified"),
+    ("[Fe+3].[N-3]", "iron(III) azanetriide", "systematic_verified"),
     ("[Mg+2].[Mg+2].[C-4]", "dimagnesium methanetetraide", "systematic_verified"),
     # table names OPSIN reads stay
-    ("[Li+].[Li+].[Li+].[N-3]", "lithium nitride", "pin_verified"),
-    ("[Na+].[Na+].[S-2]", "disodium sulfide", "pin_verified"),
-    ("[Na+].[Cl-]", "sodium chloride", "pin_verified"),
+    ("[Li+].[Li+].[Li+].[N-3]", "lithium nitride", "systematic_verified"),
+    ("[Na+].[Na+].[S-2]", "disodium sulfide", "systematic_verified"),
+    ("[Na+].[Cl-]", "sodium chloride", "systematic_verified"),
 ])
 def test_binary_salt_of_element_ions(smiles, expected, tier):
     res = name_best_effort(smiles)

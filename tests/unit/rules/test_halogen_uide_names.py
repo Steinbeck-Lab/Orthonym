@@ -37,6 +37,7 @@ import contextlib
 import re
 
 import pytest
+from tests.support.pin_tiers import is_carbon_free
 from rdkit import Chem
 
 from tests.support.default_tier import default_tier_row
@@ -226,6 +227,16 @@ def test_a_ligand_without_a_name_declines_the_emitter(monkeypatch):
 
 @pytest.mark.parametrize("smiles,name", OTHER_STEMS_SAME + OTHER_STEMS_RESPELLED + OTHER_STEMS_NEWLY_NAMED)
 def test_other_uide_stems_are_named_and_read_by_opsin(smiles, name):
+    if is_carbon_free(smiles):
+        # 'tetrafluoroboranuide': a preselected name, no PIN. Changed asserted label 2026-11-02 (user decision "decide
+        # what the Blue Book says"; was pin_verified at both tiers): ``pin_tiers.CARBON_FREE_RULE``,
+        # the Blue Book,:2058). The default tier declines it; best-effort gives it, read back by OPSIN.
+        assert default_tier_row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
+        row = name_best_effort(smiles)
+        assert row["name"] == name and row["tier"] == "systematic_verified", row
+        assert row["verified"] == "opsin" and row["spelling_failures"] == [], row
+        assert _canon(_independent_parse(name, smiles)) == _canon(smiles)
+        return
     for row in (default_tier_row(smiles), name_best_effort(smiles)):
         assert row["name"] == name and row["tier"] == "pin_verified", row
         assert row["verified"] == "opsin" and row["spelling_failures"] == [], row

@@ -42,6 +42,11 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "O=[N+]([O-])NCN[N+](=O)[O-]",
     "OCC(O[N+](=O)[O-])CO[N+](=O)[O-]",
+    # Carbon-free (user decision 2026-11-02, "decide what the Blue Book says"): a preselected name at most, never a
+    # PIN, so the default tier declines it. PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to
+    # names of compounds "that also contain at least one carbon atom in their structure";:2058 "... the label
+    # 'preselected name' is added to appropriate names". The strict path's name is asserted unchanged.
+    "O=[N+]([O-])[O-]", "O=S([O-])[O-]", "[O-][Cl+][O-]", "[O-]N=O", "O=S([O-])O", "O=[PH]([O-])[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()

@@ -87,8 +87,12 @@ def test_an_exact_match_list_parent_keeps_its_name_and_is_no_pin():
     # names, namer.py _default_tier_emits) and is no PIN. INTRODUCTION (the Blue Book; the sentence at:50943): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." The label of a list name is systematic_verified (verified 'identity'), never pin_verified (lead decision 2026-10-17, delegated by the user to the Blue Book: it supersedes the decision of 2026-09-30 (c) for this class); the name and its emission are unchanged.
     # Independent check: the name is the list entry of the exact structure; mutation: this test
     # fails on the commit before (it read pin_verified).
+    # Since 2026-11-02 (user decision "decide what the Blue Book says") the PIN tier declines the list name (the
+    # sentence above; the exception of ``_default_tier_emits`` is gone); the strict path still builds it.
     smiles = "c1ccc2c(c1)CC[C@@]13CCCC[C@@]21CCN3"
     assert has_bridged_fused_reading(Chem.MolFromSmiles(smiles))
-    row = _row(smiles, "pin")
+    from tests.support.default_tier import strict_path_row
+    assert _row(smiles, "pin")["limit_code"] == "NO_VERIFIED_PIN"
+    row = strict_path_row(smiles)
     assert (row.get("name"), row["tier"]) == ("hasubanan", "systematic_verified"), row
     assert row["is_pin"] is False and row["verified"] == "identity", row

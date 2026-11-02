@@ -20,6 +20,7 @@ from orthonym import Orthonym
 from orthonym.rules.preselected_cage import preselected_cage_name
 from orthonym.validation.preselected_cage_twin import preselected_cage_twin
 from orthonym.validation.twin_spellings import twin_of
+from tests.support.default_tier import assert_default_tier_declines, strict_path_row
 
 # the SMILES are the structures OPSIN 2.9.0 reads from the 'a' names of the book's own examples
 SI9_BICYCLO_421 = "[SiH2]1[SiH2][SiH2][SiH]2[SiH2][SiH2][SiH]([SiH2]1)[SiH2]2"
@@ -50,28 +51,38 @@ PREFERRED = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,preselected", PREFERRED)
 def test_pin_tier_gives_the_preselected_name(smiles, preselected):
-    row = Orthonym(style="pin").name_tiered(smiles)
+    """Changed asserted label (2026-11-02, user decision "decide what the Blue Book says"; was pin_verified and
+    shipped at the PIN tier): a preselected name is no PIN. PREFERRED IUPAC NAMES (the Blue Book):
+    the label 'PIN' goes to names of compounds "that also contain at least one carbon atom in their structure";
+    :2058 "... the label 'preselected name' is added to appropriate names". The PIN tier declines it; the strict
+    path still builds exactly that name (the emission rule switched off), labelled systematic_verified."""
+    assert_default_tier_declines(smiles)
+    row = strict_path_row(smiles)
     assert row["name"] == preselected, row
-    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
 
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", [SI9_BICYCLO_421, SI12_TRICYCLO])
 def test_the_book_examples_are_read_back_through_their_twin(smiles):
-    """OPSIN 2.9.0 has no grammar for the preselected name: the gate outcome is the twin's."""
-    row = Orthonym(style="pin").name_tiered(smiles)
+    """OPSIN 2.9.0 has no grammar for the preselected name: the gate outcome is the twin's (the strict path's
+    row, since the PIN tier declines a carbon-free name)."""
+    row = strict_path_row(smiles)
     assert row["gate_outcome"] == "twin_verified:preselected_cage", row
     assert row["verified"] == "opsin_twin", row
 
 
 @pytest.mark.opsin_gate
-def test_the_wider_tier_gives_the_a_name_below_the_pin():
-    """: the 'a' name is the alternative 'for use in general nomenclature', never the PIN."""
+def test_the_wider_tier_gives_the_preselected_name_below_the_pin():
+    """ (:23614): the preselected name is the selected one, the 'a' name only the alternative 'for use in
+    general nomenclature'. A compound without carbon has no PIN, the Blue Book), so the wider tier gives
+    the preselected name as systematic_verified, read back through its 'a' twin."""
+    from orthonym.validation.preselected_cage_twin import preselected_cage_twin
     from tests.support.rt_assert import assert_full_rt, name_best_effort
     be = name_best_effort(SI9_BICYCLO_421)
-    assert be["name"] == "1,2,3,4,5,6,7,8,9-nonasilabicyclo[4.2.1]nonane", be
+    assert be["name"] == "bicyclo[4.2.1]nonasilane", be
     assert be["tier"] == "systematic_verified" and be["is_pin"] is False, be
-    assert_full_rt(be["name"], SI9_BICYCLO_421, what="best-effort: ")
+    assert_full_rt(preselected_cage_twin(be["name"]), SI9_BICYCLO_421, what="best-effort twin: ")
 
 
 # a group on the cage, a nonstandard bonding number (a lambda5 spiro atom), boron,:7992, 'other than

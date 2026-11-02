@@ -388,17 +388,21 @@ def test_analyze_cage_universal_names_multiplicity_past_twenty():
 @pytest.mark.parametrize("smiles,preselected", [
     (SILA22, "bicyclo[10.9.1]docosasilane"), (SILA21, "bicyclo[10.8.1]henicosasilane")], ids=["22Si", "21Si"])
 def test_same_kind_noncarbon_cage_past_twenty_is_named_by_its_preselected_name(smiles, preselected):
-    """ (:23614): the PIN tier gives the preselected name, the best-effort tier gives the 'a' name
-    ('alternative names for use in general nomenclature are formed by skeletal replacement') below the PIN,
-    with a full read-back."""
-    from tests.support.default_tier import default_tier_row
+    """ (:23614): the strict path and the best-effort tier give the preselected name (the 'a' name is
+    only the alternative 'for use in general nomenclature'), below the PIN, read back through its 'a' twin. Since 2026-11-02 (user decision "decide what the Blue Book says") the PIN tier declines
+    the preselected name: it is no PIN PREFERRED IUPAC NAMES, the Blue Book, "... and that also
+    contain at least one carbon atom in their structure";:2058 "... the label 'preselected name' is added to
+    appropriate names"); the name is asserted on the strict path, unchanged."""
+    from tests.support.default_tier import assert_default_tier_declines, strict_path_row
     from tests.support.rt_assert import assert_full_rt, name_best_effort
-    row = default_tier_row(smiles)
+    assert_default_tier_declines(smiles)
+    row = strict_path_row(smiles)
     assert row["name"] == preselected, row
+    from orthonym.validation.preselected_cage_twin import preselected_cage_twin
     be = name_best_effort(smiles)
     assert be["tier"] != "pin_verified" and not be.get("is_pin"), be
-    assert_full_rt(be["name"], smiles, what="best-effort: ")
-    assert "silabicyclo[" in be["name"] and "1,2,3" in be["name"]
+    assert be["name"] == preselected, be
+    assert_full_rt(preselected_cage_twin(be["name"]), smiles, what="best-effort twin: ")
 
 
 def test_docosasila_name_read_back():

@@ -29,7 +29,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.catenated_hydrides import name_catenated_hydride
-from tests.support.pin_tiers import assert_pin_at_both_tiers, name_default
+from tests.support.pin_tiers import assert_pin_at_both_tiers, assert_preselected_at_both_tiers, name_default
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -86,8 +86,11 @@ def test_a_molecule_outside_the_class_is_not_named_by_the_chain_with_groups(smil
 
 
 def test_the_bare_names_do_not_move():
-    for smiles, name in (("[SiH3]O[SiH3]", "disiloxane"), ("[SiH3]O[SiH2]O[SiH3]", "trisiloxane"),
-                         ("C[Si](C)(C)C", "tetramethylsilane"),
+    for smiles, name in (("C[Si](C)(C)C", "tetramethylsilane"),
                          ("C[Si](C)(C)[Si](C)(C)C", "hexamethyldisilane")):
         row = name_default(smiles)
         assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+    # the carbon-free siloxanes keep their names below the PIN: changed asserted labels 2026-11-02 (user decision
+    # "decide what the Blue Book says"; were pin_verified), ``pin_tiers.CARBON_FREE_RULE``,:2056,:2058)
+    for smiles, name in (("[SiH3]O[SiH3]", "disiloxane"), ("[SiH3]O[SiH2]O[SiH3]", "trisiloxane")):
+        assert_preselected_at_both_tiers(smiles, name)

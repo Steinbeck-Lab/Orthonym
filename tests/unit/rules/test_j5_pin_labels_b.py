@@ -20,6 +20,7 @@ Blue Book basis per group:
 import pytest
 
 from orthonym.namer import Orthonym
+from tests.support.pin_tiers import assert_preselected_at_both_tiers
 from tests.support.rt_assert import name_is_rt_exact
 
 pytestmark = pytest.mark.opsin_gate
@@ -72,34 +73,28 @@ def test_pin_name(smiles, expected):
     assert name_is_rt_exact(expected, smiles), expected
 
 
-def test_the_sodium_salt_of_a_p72_3_anion_keeps_the_label_of_its_naming_path():
-    # Paper conformance (user decision 2026-09-30, replacing the 2026-09-28/29 label
-    # systematic_verified): a carbon-free compound takes the label of the paper's
-    # measured run, the label of its naming path ('sodium chloride' pin_verified);
-    # the name is unchanged. For its PIN status see PRESELECTED
+def test_the_sodium_salt_of_a_p72_3_anion_is_a_preselected_name():
+    # Changed asserted label (2026-11-02, user decision "decide what the Blue Book says",
+    # replacing the paper-run label pin_verified of 2026-09-30): a carbon-free compound
+    # has a preselected name at most, never a PIN PREFERRED IUPAC NAMES,
+    # the Blue Book: the label 'PIN' goes to compounds "that also contain at least
+    # one carbon atom in their structure";:2058); the default tier declines it and the
+    # best-effort tier gives the name unchanged. See also PRESELECTED
     # NAMES (the Blue Book): "Preselected names are names for structures or
     # structural components chosen among two or more names for noncarboncontaining
     # (inorganic) parents to be used as the basis for preferred IUPAC names for
     # organic derivatives"; (:4667) "preferred IUPAC names have not yet been
     # determined for inorganic components". (The PIN examples of carry
     # carbon: 'sodium trimethylboranuide (PIN)',:41116.)
-    smiles = "[Na+].[B-](F)(F)(F)F"
-    r = Orthonym().name_tiered(smiles)
-    assert r["name"] == "sodium tetrafluoroboranuide", r
-    assert r["tier"] == "pin_verified" and r["is_pin"] is True, r
-    assert name_is_rt_exact(r["name"], smiles), r
+    assert_preselected_at_both_tiers("[Na+].[B-](F)(F)(F)F", "sodium tetrafluoroboranuide")
 
 
-def test_the_p72_3_anion_itself_keeps_the_label_of_its_naming_path():
+def test_the_p72_3_anion_itself_is_a_preselected_name():
     # Texts, labels and spelling (2026-09-29): a carbon-free compound has a
-    # preselected name at most; its tier label follows the paper's measured run (user
-    # decision 2026-09-30): the label of its naming path. PREFERRED IUPAC NAMES
+    # preselected name at most. Changed asserted label (2026-11-02, user decision
+    # "decide what the Blue Book says"; was pin_verified, the path label of 2026-09-30). PREFERRED IUPAC NAMES
     # (the Blue Book) adds the label 'PIN' to compounds "that also contain at
     # least one carbon atom in their structure";:2058 the PIN rules for compounds
     # "that do not contain carbon... will be discussed in a further publication";
     # 'F6I- hexafluoro-λ5-iodanuide (preselected name)' (:41112). Name unchanged.
-    smiles = "F[P-](F)(F)(F)(F)F"
-    r = Orthonym().name_tiered(smiles)
-    assert r["name"] == "hexafluoro-λ5-phosphanuide", r
-    assert r["tier"] == "pin_verified" and r["is_pin"] is True, r
-    assert name_is_rt_exact(r["name"], smiles), r
+    assert_preselected_at_both_tiers("F[P-](F)(F)(F)(F)F", "hexafluoro-λ5-phosphanuide")

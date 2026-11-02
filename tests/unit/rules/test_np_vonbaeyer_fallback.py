@@ -22,6 +22,7 @@ to the abstention sentinel respectively), which is what the two keep-retained
 tests below pin.
 """
 import pytest
+from tests.support.default_tier import assert_default_tier_declines, strict_path_name
 from rdkit import Chem
 
 from orthonym import Orthonym
@@ -72,9 +73,14 @@ BRIDGED_FUSED_PINS = {"gibbane": "(7S,9aR,10aS)-dodecahydro-1H-7,9a-methanobenzo
 
 @pytest.mark.parametrize("retained", [n for n in CONVERTS + KEEPS if n not in BRIDGED_FUSED_PINS])
 def test_default_path_still_emits_the_retained_pin(retained):
-    """The PIN/default path is byte-identical -- Engine 3 is best-effort-only."""
+    """The PIN/default path is byte-identical -- Engine 3 is best-effort-only. Since 2026-11-02 (user decision
+    "decide what the Blue Book says") the PIN tier declines an exact-match list name, which is no PIN:
+     INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the
+    compounds in this Chapter". The strict path (the emission rule switched off) still builds the
+    list name, unchanged."""
     smiles = _BY_NAME[retained]
-    assert _pin_namer().name(smiles) == retained
+    assert_default_tier_declines(smiles)
+    assert strict_path_name(smiles) == retained
 
 
 @pytest.mark.parametrize("retained", sorted(BRIDGED_FUSED_PINS))

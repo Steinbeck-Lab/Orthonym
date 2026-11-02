@@ -2185,7 +2185,9 @@ def _is_carbon_free_compound(smiles: str) -> bool:
     "preferred IUPAC names have not yet been determined for inorganic components"
     and (:4712). A carbon-containing salt keeps its PIN status ('sodium
     hydrogen carbonate (PIN)',:31623; 'N,N-diethylethanaminium hydrogen sulfate
-    (PIN)',:43566). Label only: the name is unchanged."""
+    (PIN)',:43566). Errata (iupac.qmul.ac.uk/bibliog/BBerrors.html): "For phosphane (PIN) read
+    phosphane (preselected name)". User decision 2026-11-02: ``Orthonym._tier_row_and_pin_form``
+    labels every carbon-free name below the PIN; the default tier declines it. The name is unchanged."""
     if not smiles:
         return False
     try:
@@ -3223,12 +3225,8 @@ def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
     decision 2026-09-30; the submitted text, Methods). True for:
 
     * a pin_verified name ("the strict PIN path built the name and verified it");
-    * an exact-match list name, natural-product parent or metal complex ("The only
-      deliberate exceptions are names derived from the natural-product and
-      metal-complex lists... emitted based solely on their exact structural
-      match");
-    * a name of the formats OPSIN has no grammar for, shipped on their construction
-      (gate outcome ``carveout:<class>``; "At the default tier, ten further name
+    * a strict-path name in PIN form (``pin_form``) of the formats OPSIN has no grammar
+      for, shipped on their construction (gate outcome ``carveout:<class>``; "At the default tier, ten further name
       formats absent from OPSIN's grammar... are emitted without parse-back
       validation because their construction rules are exact");
     * a strict-path PIN whose stereodescriptors OPSIN cannot read, verified by the
@@ -3242,7 +3240,9 @@ def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
     spelling rule of the PIN (``row["spelling_failures"]``, also for the grammar
     carve-outs), a name only a breadth producer built, a general-engine or
     retained-table name, a name of a class without PIN status -- is declined
-    (NO_VERIFIED_PIN)."""
+    (NO_VERIFIED_PIN). So is an exact-match list name (``_is_exact_match_list_name``), whatever
+    its gate outcome: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are
+    not identified for the compounds in this Chapter" (user decision 2026-11-02)."""
     from .metrics import provenance as _pv
     name = row.get("name")
     if not name or is_failure_name(name) or row.get("tier") == ABSTAIN:
@@ -3250,13 +3250,13 @@ def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
     if row.get("tier") == PIN_VERIFIED:
         return True
     if _is_exact_match_list_name(smiles, name):
-        return True
+        return False
     # a name that breaks a spelling rule of the PIN (``spelling_failures``,
     # validation/pin_spelling.py) is not the PIN, whatever its OPSIN grammar class
     if row.get("spelling_failures"):
         return False
     gate = row.get("gate_outcome") or ""
-    if gate.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX):
+    if gate.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX) and pin_form:
         return True
     if gate == _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY and pin_form:
         return True
@@ -5651,9 +5651,9 @@ class Orthonym:
                 back, but whose preferred status is not certified: a producer outside
                 the strict path built it or a part of it),
                 ``systematic_verified`` (a checked systematic name that is not the
-                preferred name, for example from the general engine, a table of
-                retained names, or the strict path when the name contains a part
-                the engine records as not the preferred form), ``best_effort`` (the last-resort
+                preferred name: from the general engine, a table of retained names or an
+                exact-match list, a name of a compound without carbon (a preselected name at
+                most), or a strict-path name with a part the engine records as not the PIN), ``best_effort`` (the last-resort
                 producers, or a name whose own string no round trip confirmed) or
                 ``abstain`` (no name).
             ``is_pin``
@@ -5899,18 +5899,17 @@ class Orthonym:
         # reads the records; a different offer winner supplies its own labels.
         _label_rule_failures = []
         # A name of the exact-match metal-complex list (D1 table, the input's
-        # exact InChIKey) is a ChEBI name taken verbatim: labelled by the path that
-        # returned it, as in the paper's measured run (user decision 2026-09-30),
-        # so the name-scoped non-PIN records, which read the spelling of names the
-        # engine builds, are not read for it ('kappa4' is no non-PIN token); the
-        # whole-call records are.
+        # exact InChIKey) is a ChEBI name taken verbatim, so the name-scoped non-PIN
+        # records, which read the spelling of names the engine builds, are not read
+        # for it ('kappa4' is no non-PIN token). It is no PIN: it is labelled
+        # systematic_verified below, and the default tier declines it.
         _is_coord_list = bool(name) and not is_failure_name(name) and \
             _coordination_list_name(smiles, name)
         _non_pin_scope = None if _is_coord_list else name
         # A name of the exact-match natural-product parent list (NAME_EXACT_NP_PARENTS,
-        # the input's exact canonical SMILES; 'germacrane') likewise: the paper's
-        # label is systematic_verified: no PINs in that chapter; lead decision 2026-10-17
-        # replaced 2026-09-30 (c) for it). No non-PIN record applies to a verbatim list name, the
+        # the input's exact canonical SMILES; 'germacrane') likewise: its label is
+        # systematic_verified: no PINs in that chapter; lead decision 2026-10-17), and the
+        # default tier declines it (user decision 2026-11-02). No non-PIN record applies to a verbatim list name, the
         # whole-call ones neither (they describe the candidates of the call, e.g. the
         # systematic name the general tiers tried first).
         _is_np_list = bool(name) and not is_failure_name(name) and \
@@ -6158,10 +6157,9 @@ class Orthonym:
         # 'methylmagnesium bromide', 'diethylzinc' shipped pin_verified), nor for a salt of a
         # carbanion with a Group 3-12 metal,:40173), nor for a bonded zinc complex named by
         # its ligands,:39753; both in rules/metal_labels.py). Same demotion; the name is
-        # unchanged. Not for a name of the exact-match metal-complex list (heme, chlorophyll,
-        # cobalamin, siroheme, coenzyme F430): its label is the path's (user decision 2026-09-30).
+        # unchanged. (A name of the exact-match metal-complex list takes its own label below.)
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
-                and (_is_p69_organometallic_without_pin(smiles, name) and not _is_coord_list
+                and (_is_p69_organometallic_without_pin(smiles, name)
                      or _is_metal_name_without_pin(smiles, name))):
             tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
@@ -6171,21 +6169,29 @@ class Orthonym:
                 and _is_metal_adduct_without_pin(smiles, name)):
             tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
-        # A carbon-free compound ('sodium chloride', 'sulfuric acid', 'ammonia')
-        # keeps the label its naming path gives it (user decision 2026-09-30: the
-        # labels of the paper's measured run, 'sodium chloride' pin_verified); the
-        # elements above keep their own demotion.
+        # A carbon-free compound ('sodium chloride', 'sulfuric acid', 'chloranyl') has a
+        # preselected name at most, never a PIN,: the quotes are in
+        # ``_is_carbon_free_compound``; user decision 2026-11-02). Same demotion.
+        if tier in (PIN_VERIFIED, PIN_UNVERIFIED) and _is_carbon_free_compound(smiles):
+            tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
+            is_pin = False
         # Review fixes (a performance pass): a salt of element ions with a metal cation and a
         # carbon anion ('dimagnesium methanetetraide', a metal carbide):
         # (the Blue Book) "preferred IUPAC names have not yet been
         # determined for inorganic components"; (:39735) gives no PIN for
         # the compounds of the Group 1-12 metals. Same demotion; the name is
-        # unchanged. A carbon-free salt of element ions keeps its label as above.
+        # unchanged.
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
-                and _is_one_atom_ion_salt(smiles) and _has_metal_atom(smiles)
-                and not _is_carbon_free_compound(smiles)):
+                and _is_one_atom_ion_salt(smiles) and _has_metal_atom(smiles)):
             tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
+        # A name of the exact-match coordination list (D1: heme, chlorophyll, cobalamin,
+        # siroheme, coenzyme F430) is no PIN: INTRODUCTION (the Blue Book) "Preferred
+        # IUPAC names (PINs) are not identified for the compounds in this Chapter" (porphyrin, corrin);
+        # (:39735). systematic_verified ('identity'), whatever the path derived above (user
+        # decision 2026-11-02); the default tier declines it. Label only.
+        if _is_coord_list and tier != ABSTAIN:
+            tier, is_pin = SYSTEMATIC_VERIFIED, False
         gates = []
         if source == "general_engine":
             gates.append("atom_coverage")
@@ -6238,7 +6244,7 @@ class Orthonym:
         # that is not the PIN: the label is lowered as for the name-scoped non-PIN records
         # above (systematic_verified, best_effort without a verified round trip, is_pin
         # False); the name is unchanged, and the row records the failures. The exact-match
-        # list names keep the label of their path (user decision 2026-09-30) and are not
+        # list names are below the PIN already, labelled above) and are not
         # read; the routes are read as ``_pin_spelling_rows`` says. A name lowered by a
         # label-only record that names its rule starts with that rule
         # (``_label_rule_failures``); the checks below never read such a name.
@@ -6265,11 +6271,6 @@ class Orthonym:
                 from .validation.zwitterion_drawing import named_as_neutral
                 tier = SYSTEMATIC_VERIFIED if named_as_neutral(smiles, name) else PIN_UNVERIFIED
                 is_pin = False
-        # A name from the exact-match coordination list (D1: heme, chlorophyll,
-        # cobalamin, siroheme, coenzyme F430; checked by exact InChIKey identity,
-        # 'identity') keeps the label its naming path gives it (user decision
-        # 2026-09-30, the paper's measured labels: 35 pin_verified and 3
-        # best_effort on ChEBI).
         # (a strict-path name lowered only for lack of OPSIN, the opt-in reduced mode, is in PIN form)
         _pin_form = tier == PIN_VERIFIED or (tier == PIN_UNVERIFIED and _unavailable_demoted)
         # R63 / R68 (claims conformance, 2026-09-27): a tier whose name says

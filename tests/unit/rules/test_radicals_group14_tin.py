@@ -31,7 +31,8 @@ from rdkit import Chem
 
 import orthonym.rules.charged_router as cr
 from orthonym.assembly import fragment_naming as fn
-from tests.support.pin_tiers import assert_pin_at_both_tiers, name_breadth, name_default
+from tests.support.pin_tiers import (assert_pin_at_both_tiers, assert_preselected_at_both_tiers, is_carbon_free,
+                                     name_breadth, name_default)
 from tests.support.rt_assert import name_is_rt_exact
 
 # (SMILES, PIN) -- every PIN below is read back by OPSIN to the input's full key and radicals.
@@ -56,6 +57,11 @@ PINS = [
 @pytest.mark.parametrize("smiles,pin", PINS, ids=[s for s, _ in PINS])
 def test_the_group14_radical_is_named_on_its_parent_hydride(smiles, pin):
     """The default tier and the breadth tier both give the name, labelled PIN."""
+    # a carbon-free row (Cl[Sn]Cl, [SnH2], Cl[Ge]Cl) has a preselected name, no PIN: changed asserted labels
+    # 2026-11-02 (user decision "decide what the Blue Book says"; were pin_verified), ``pin_tiers.CARBON_FREE_RULE``
+    if is_carbon_free(smiles):
+        assert_preselected_at_both_tiers(smiles, pin)
+        return
     assert_pin_at_both_tiers(smiles, pin)
 
 

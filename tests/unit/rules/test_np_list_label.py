@@ -5,8 +5,9 @@ for the compounds in this Chapter." The list names are the semisystematic parent
 names of recommended parent structures are listed in Table 10.1",:51375), so they are no PINs. The user delegated
 the decision to the Blue Book (2026-10-17) and the lead decided: the label is systematic_verified (verified
 'identity': the exact structure match, since OPSIN reads none of these names), which supersedes the decision of
-2026-09-30 (c), "paper-run labels", for this class only. The name and its emission at every tier are unchanged:
-the default tier emits an exact-match list name as one of its exceptions whatever its label.
+2026-09-30 (c), "paper-run labels", for this class only. Since 2026-11-02 (user decision "decide what the Blue
+Book says", R1-NP) the default tier declines it (the exception of ``namer._default_tier_emits`` is gone); the wider
+tiers keep it as their last resort.
 
 The checks are independent of the label code: the expected name is the entry of the list table for the canonical
 SMILES of the input (``data.natural_products.NATURAL_PRODUCT_DERIVATIVES``), OPSIN is asked for the name and
@@ -18,6 +19,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data.natural_products import NAME_EXACT_NP_PARENTS, NATURAL_PRODUCT_DERIVATIVES
+from tests.support.default_tier import strict_path_row
 from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import _independent_parse
 
@@ -48,10 +50,16 @@ def test_the_name_is_the_list_entry_of_the_exact_structure(smiles):
 # NPL 2026-11-01: the route offers the systematic name of the whole molecule before a list name INTRODUCTION,
 # the Blue Book,:50943), so germacrane and hopane take their systematic names at the default tier. The label
 # of a list name is the subject of the test below, so it names with that offer off: the list name is the fallback.
+# Since 2026-11-02 (user decision "decide what the Blue Book says", R1-NP) the default tier declines a list name
+# instead of emitting it as an exception: it is no PIN INTRODUCTION, the Blue Book, "Preferred IUPAC
+# names (PINs) are not identified for the compounds in this Chapter";,:2050). The label and the name of the
+# list name are those of the strict path (the emission rule switched off), unchanged.
 @pytest.mark.usefixtures("np_producer_only")
 @pytest.mark.parametrize("smiles", LIST_ROWS)
-def test_the_default_tier_emits_the_list_name_labelled_below_the_pin(smiles):
-    row = Orthonym().name_tiered(smiles)
+def test_the_default_tier_declines_the_list_name_labelled_below_the_pin(smiles):
+    declined = Orthonym().name_tiered(smiles)
+    assert (declined["tier"], declined["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), declined
+    row = strict_path_row(smiles)
     assert row["name"] == _expected(smiles), row
     assert row["gate_outcome"] == "carveout:np_stereoparent", row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row

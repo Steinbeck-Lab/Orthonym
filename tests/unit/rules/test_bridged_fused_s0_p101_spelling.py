@@ -112,7 +112,11 @@ def test_name_exact_hetisan_is_spelled_as_the_parent_table():
     """'hetisan' (:51392,:57087) is a name-exact list parent: OPSIN reads neither spelling, the
     name is shipped on the exact canonical SMILES. It is no PIN: INTRODUCTION (the Blue Book;
     :50943) "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." (lead
-    decision 2026-10-17): label systematic_verified, verified 'identity'. The name is unchanged."""
-    row = _row("C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6", "pin")
+    decision 2026-10-17): label systematic_verified, verified 'identity'. The name is unchanged. Since 2026-11-02
+    (user decision "decide what the Blue Book says") the PIN tier declines it; the strict path still builds it."""
+    from tests.support.default_tier import strict_path_row
+    smiles = "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6"
+    assert _row(smiles, "pin")["limit_code"] == "NO_VERIFIED_PIN"
+    row = strict_path_row(smiles)
     assert row.get("name") == "hetisan" and row["tier"] == "systematic_verified", (row.get("name"), row["tier"])
     assert row["verified"] == "identity" and row["is_pin"] is False, row

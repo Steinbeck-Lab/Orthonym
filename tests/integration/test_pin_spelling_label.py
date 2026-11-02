@@ -15,6 +15,7 @@ the molecule, and passes for every name below although none is the PIN.
   spelling is '2-[(pentyloxy)carbonyl]benzoic acid'.
 """
 import pytest
+from tests.support.default_tier import strict_path_row
 from rdkit import Chem
 
 from orthonym import Orthonym
@@ -147,9 +148,10 @@ def test_the_q1_name_is_pin_verified_only_with_its_indicated_hydrogen():
     assert (best["tier"], best["is_pin"]) == ("systematic_verified", False), best
 
 
-#: 'hopane' (gate gold P14C-) is a name of the exact-match natural-product list; it keeps the
-#: label of its path (user decision 2026-09-30), so the checks do not read it (the indicated-
-#: hydrogen count misreads a saturated stereoparent name)
+#: 'hopane' (gate gold P14C-) is a name of the exact-match natural-product list; it is below the
+#: PIN already, so the checks do not read it (the indicated-hydrogen count misreads a saturated
+#: stereoparent name). Since 2026-11-02 (user decision R1-NP) the PIN tier declines a list name, so the
+#: rows below are the strict path's (the emission rule switched off)
 HOPANE = ("CC(C)[C@H]1CC[C@]2(C)[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]4(C)[C@]3(C)"
           "CC[C@@H]12")
 
@@ -160,7 +162,7 @@ HOPANE = ("CC(C)[C@H]1CC[C@]2(C)[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]
 @pytest.mark.usefixtures("np_producer_only")
 def test_a_name_of_the_exact_match_list_is_not_read():
     assert check_pin_spelling(Chem.MolFromSmiles(HOPANE), "hopane", strict=True)   # it would fail
-    row = Orthonym().name_tiered(HOPANE)
+    row = strict_path_row(HOPANE)
     # INTRODUCTION (the Blue Book, sentence:50943): "Preferred IUPAC names (PINs) are not identified fo
     # r the compounds in this Chapter." Lead decision 2026-10-17 (the user delegated it to the Blue Book) replaced the 2026-09-30 (c) label for the exact-match list: systematic_verified, verified 'identity'.
     assert (row["name"], row["tier"]) == ("hopane", "systematic_verified"), row
@@ -171,10 +173,10 @@ def test_a_name_of_the_exact_match_list_is_not_read():
 def test_a_name_of_the_exact_match_list_is_not_read_on_a_route_outside_p10(monkeypatch):
     """'hopane' reaches the label site through the NATURAL_PRODUCT route, so the class
     skip alone keeps its label; with that skip turned off, the list-name clause must still keep
-    the checks from reading a name of the exact-match list (user decision 2026-09-30)."""
+    the checks from reading a name of the exact-match list."""
     from orthonym.validation.spelling import route_scope
     monkeypatch.setattr(route_scope, "_SPELLING_CHECK_SKIPPED_CLASSES", ())
-    row = Orthonym().name_tiered(HOPANE)
+    row = strict_path_row(HOPANE)
     # INTRODUCTION (the Blue Book, sentence:50943): "Preferred IUPAC names (PINs) are not identified fo
     # r the compounds in this Chapter." Lead decision 2026-10-17 (the user delegated it to the Blue Book) replaced the 2026-09-30 (c) label for the exact-match list: systematic_verified, verified 'identity'.
     assert (row["name"], row["tier"]) == ("hopane", "systematic_verified"), row

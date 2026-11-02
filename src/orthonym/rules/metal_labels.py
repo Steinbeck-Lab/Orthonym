@@ -25,8 +25,6 @@ def is_carbanion_salt_of_group_3_12_metal(smiles: str, name: Optional[str]) -> b
     carbon beside the metal (``perception.metals.holds_carbanion_salt_of_group_3_12_metal``; a
     cyanide anion, the anion of an acid, is none). A name is outside the rule when
 
-    * it is a name of the exact-structure list (``namer._coordination_list_name``): the label of
-      its path (user decision 2026-09-30);
     * it is a retained metallocene name or an ocene name (``RETAINED_METALLOCENES``,
       ``namer._OCENE_STEMS``): "except for 'ocene' compounds" and "Ocenes"
       (:40129), whose examples carry "(PIN)" (:40133);
@@ -37,12 +35,10 @@ def is_carbanion_salt_of_group_3_12_metal(smiles: str, name: Optional[str]) -> b
     if not smiles or not name:
         return False
     try:
-        from ..namer import _OCENE_STEMS, _ORGANOMETALLIC_ADDITIVE_PIN_RE, _coordination_list_name
+        from ..namer import _OCENE_STEMS, _ORGANOMETALLIC_ADDITIVE_PIN_RE
         from ..perception.metals import holds_carbanion_salt_of_group_3_12_metal
         mol = Chem.MolFromSmiles(smiles)
         if not holds_carbanion_salt_of_group_3_12_metal(mol):
-            return False
-        if _coordination_list_name(smiles, name):
             return False
         from ..data.organometallics import RETAINED_METALLOCENES
         if name in RETAINED_METALLOCENES.values() or any(stem in name for stem in _OCENE_STEMS):
@@ -87,8 +83,7 @@ def is_bonded_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
     gives the label "PIN" to "the names of compounds whose parent hydride contains at least one
     of the following elements: B, Si, Ge, Sn, Pb, N, P, As, Sb, Bi, O, S, Se, Te, Po, F, Cl, Br, I,
     At, and that also contain at least one carbon atom in their structure": zinc is none of them,
-    and 'oxozinc' has no carbon. A name of the exact-structure list (``namer._coordination_list_name``)
-    keeps the label of its path (user decision 2026-09-30).
+    and 'oxozinc' has no carbon.
 
     Label only: the name is unchanged."""
     if not smiles or not name:
@@ -99,33 +94,34 @@ def is_bonded_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
                 has_mechanism(a.GetSymbol(), BONDED_NAMES) and (a.GetDegree() > 0 or a.GetTotalNumHs() > 0)
                 for a in mol.GetAtoms()):
             return False
-        from ..namer import _coordination_list_name
-        return not _coordination_list_name(smiles, name)
+        return True
     except Exception:
         return False
 
 
 def is_lone_atom_name_without_pin(smiles: str, name: Optional[str]) -> bool:
-    """True iff ``smiles`` is one atom without hydrogen that ``rules.metal_atoms.lone_atom_name`` names by its element
-    name or a hydrogen name ('zinc(2+)', 'sodium(1+)', 'neon', 'selenium(6+)', '(65Zn)zinc', 'hydride'), whose names
-    the Blue Book gives without PIN status.
+    """True iff ``smiles`` is one atom without hydrogen that ``rules.metal_atoms.lone_atom_name`` names, by its element
+    name, a hydrogen name or a name on its parent hydride ('zinc(2+)', 'sodium(1+)', 'neon', '(65Zn)zinc', 'hydride',
+    'chloranyl', '(36Cl)chloranide'), whose names the Blue Book gives without PIN status.
 
      PREFERRED IUPAC NAMES (the Blue Book): "the label 'PIN' is added to the names of compounds whose
     parent hydride contains at least one of the following elements: B, Si, Ge, Sn, Pb, N, P, As, Sb, Bi, O, S, Se,
     Te, Po, F, Cl, Br, I, At, and that also contain at least one carbon atom in their structure": an element name
-    has no parent hydride, and the drawing has no carbon. A name built on a parent hydride ('azanylidyne',
-    '(32P)phosphanetriide') keeps the label of its naming path, as every carbon-free name does (user decision
-    2026-09-30, paper conformance: 'azanidyl' pin_verified); an ion the producer leaves to the retained tables
-    ('iron(II)', 'chloride') is not covered. So an isotopologue takes the label of its parent. The structure alone
-    decides.
+    has no parent hydride, and a name built on a parent hydride ('azanylidyne', '(32P)phosphanetriide') names a
+    drawing without carbon, which has a preselected name at most (:2058 "... the label 'preselected name' is added
+    to appropriate names"; user decision 2026-11-02, which replaces the path labels of 2026-09-30; the namer's
+    carbon-free demotion, ``namer._is_carbon_free_compound``, holds these too). The lone carbon atom ('carbon',
+    '(13C)carbon') has an element name; the carbon ions ('methanide', 'methylium') are no names of this producer and
+    keep their label. An ion the producer leaves to the retained tables ('iron(II)', 'chloride') is not covered
+    here (the carbon-free demotion covers it). The structure alone decides.
 
     Label only: the name is unchanged."""
     if not smiles or not name:
         return False
     try:
         from .metal_atoms import lone_atom_name_and_basis
-        built, on_hydride = lone_atom_name_and_basis(Chem.MolFromSmiles(smiles))
-        return built is not None and not on_hydride
+        built, _on_hydride = lone_atom_name_and_basis(Chem.MolFromSmiles(smiles))
+        return built is not None
     except Exception:
         return False
 
@@ -142,7 +138,7 @@ def is_macrocycle_complex_name_without_pin(smiles: str, name: Optional[str]) -> 
     name that cites the ligand and the metal as the words of a salt is no preferred name;
     INTRODUCTION (:50943): "Preferred IUPAC names (PINs) are not identified for the compounds in this
     Chapter", the chapter of the porphyrin parent. A name of the exact-structure list
-    (``namer._coordination_list_name``) keeps the label of its path (user decision 2026-09-30).
+    (``namer._coordination_list_name``) is below the PIN by the same sentence (the namer labels it).
 
     The structure decides (``metal_macrocycles.macrocycle_ion_fragments``), not the producer of the
     ligand name: that producer names a fused-ring substituent of the ion in the best-effort call only,
@@ -154,10 +150,7 @@ def is_macrocycle_complex_name_without_pin(smiles: str, name: Optional[str]) -> 
         if mol is None:
             return False
         from .metal_macrocycles import macrocycle_ion_fragments
-        if not macrocycle_ion_fragments(mol):
-            return False
-        from ..namer import _coordination_list_name
-        return not _coordination_list_name(smiles, name)
+        return bool(macrocycle_ion_fragments(mol))
     except Exception:
         return False
 

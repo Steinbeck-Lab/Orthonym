@@ -20,6 +20,7 @@ import pytest
 
 from orthonym import Orthonym
 from orthonym.errors import is_failure_name
+from tests.support.default_tier import declined_pin_row
 
 
 @pytest.fixture(scope="module")
@@ -246,6 +247,10 @@ def test_h_plus_protonation_site_choice_is_spelling_deterministic(namer):
     ("[O-][Cl+][O-]", "chlorite"),
 ])
 def test_poly_anion_name_anion_fallback_rt_gate_regression(namer, smi, expected):
-    out = namer.name(smi)
+    # Carbon-free (user decision 2026-11-02, "decide what the Blue Book says"): a preselected name at most, never a
+    # PIN, so the default tier declines it. PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to
+    # names of compounds "that also contain at least one carbon atom in their structure";:2058 "... the label
+    # 'preselected name' is added to appropriate names". The strict path's name is asserted unchanged.
+    out = declined_pin_row(smi)["name"]
     assert out == expected, f"{smi} -> {out!r}"
     assert _rt_full(smi, out), f"round-trip failed: {out!r}"

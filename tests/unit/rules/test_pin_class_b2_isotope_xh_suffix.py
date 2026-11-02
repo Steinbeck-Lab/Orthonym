@@ -69,6 +69,8 @@ from orthonym.rules.isotopes import (
 )
 from tests.support.pin_tiers import (
     assert_not_pin_labelled,
+    assert_preselected_at_both_tiers,
+    is_carbon_free,
     assert_pin_at_both_tiers,
 )
 
@@ -145,6 +147,11 @@ SLOT_ROWS = [
 
 @pytest.mark.parametrize("smiles,pin", PIN_ROWS)
 def test_pin(smiles, pin):
+    if is_carbon_free(smiles):
+        # a preselected name, no PIN: changed asserted label 2026-11-02 (user decision "decide what the Blue Book
+        # says"; was pin_verified), ``pin_tiers.CARBON_FREE_RULE``, the Blue Book,:2058)
+        assert_preselected_at_both_tiers(smiles, pin)
+        return
     assert_pin_at_both_tiers(smiles, pin)
 
 

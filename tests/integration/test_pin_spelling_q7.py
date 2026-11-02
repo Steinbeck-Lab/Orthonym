@@ -32,11 +32,21 @@ RIGHT = [
     ("CC(=O)O", "acetic acid"),
     ("NNC(=O)N", "hydrazinecarboxamide"),
     ("[AsH]1cccc1", "1H-arsole"),
-    ("Cl[As](Cl)Cl", "trichloroarsane"),
     ("O=C(O)CCOC(=O)c1cccnc1", "3-[(pyridine-3-carbonyl)oxy]propanoic acid"),
     ("S=C(n1ccnc1)n1ccnc1", "di(1H-imidazol-1-yl)methanethione"),
     ("OC(=O)Cn1ccnc1", "(1H-imidazol-1-yl)acetic acid"),
 ]
+
+
+def test_a_carbon_free_right_name_is_a_preselected_name():
+    # 'trichloroarsane' left RIGHT on 2026-11-02 (changed asserted label, was pin_verified; user decision "decide what
+    # the Blue Book says"): a carbon-free name is a preselected name, never a PIN PREFERRED IUPAC NAMES,
+    # the Blue Book, "... and that also contain at least one carbon atom in their structure";:2058). Its
+    # spelling is still right: no spelling rule fails on the strict path, and best-effort gives it.
+    from tests.support.default_tier import strict_path_row
+    from tests.support.pin_tiers import assert_preselected_at_both_tiers
+    assert_preselected_at_both_tiers("Cl[As](Cl)Cl", "trichloroarsane")
+    assert not strict_path_row("Cl[As](Cl)Cl").get("spelling_failures")
 
 
 @pytest.mark.parametrize("smiles,name", RIGHT)

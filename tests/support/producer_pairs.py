@@ -67,7 +67,9 @@ RELATIVE_STEREO = [
 # read from a trace of the panel ``tests/fixtures/zinc/panel_pairs.tsv`` with the gate on; a name that the
 # offer finds is the name of a string that the producer of that class built, so the id is the class's.
 ZINC = [
-    ("[Cl-].[Cl-].[Zn+2]", "pin", "outer:salt"),                    # the strict path names the ions
+    # the strict path names the ions; a carbon-free name is no PIN since 2026-11-02, the Blue Book,
+    #:2058), so the PIN tier declines it and the producer is read at best-effort
+    ("[Cl-].[Cl-].[Zn+2]", "best-effort", "outer:salt"),
     ("Cl[Zn]Cl", "best-effort", "outer:salt"),                       # the ionic drawing of a bonded one
     ("CC[Zn]CC", "best-effort", "outer:organometallic"),
     ("[Cl-].[Zn+]c1ccccc1", "best-effort", "outer:organometallic"),  # the bonded drawing of a cation beside its anion
@@ -143,8 +145,10 @@ PAIRS = [
     # producer of any list parent; the last resort itself is pinned by test_table_np_parent_exact_list_name
     ("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1", "best-effort", "outer:natural_product"),
     # no organic positive: the list of metal-complex names, taken by name at its exit
-    (COB_I, "pin", "table:coordination"),
-    (COB_II, "pin", "table:coordination"),
+    # a list name is no PIN since 2026-11-02 INTRODUCTION, the Blue Book), so the PIN tier declines it
+    # and the producer is read at best-effort
+    (COB_I, "best-effort", "table:coordination"),
+    (COB_II, "best-effort", "table:coordination"),
     # T4: the handoff of the late recovery, the rescue, and the floor offer. The handoff row is a dev2000 row (not in
     # a holdout split by full InChIKey or connectivity), read from a trace of ``_try_general_engine_recovery_impl``; it was a
     # stilbenedisulfonic acid until the ring with the most principal groups became the parent, since when

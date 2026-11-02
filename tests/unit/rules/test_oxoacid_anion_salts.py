@@ -17,6 +17,7 @@ from orthonym import Orthonym
 from orthonym.jvm_budget import jvm_slots
 from orthonym.jvm_bridge import opsin_stdout
 from orthonym.rules.ions import name_anion
+from tests.support.default_tier import assert_default_tier_declines, strict_path_name
 from tests.support.jars import jar_or_skip
 
 
@@ -46,8 +47,13 @@ SALTS = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", SALTS)
 def test_oxoacid_salt_named(smiles, expected):
+    # Carbon-free (user decision 2026-11-02, "decide what the Blue Book says"): a preselected name at most, never a
+    # PIN, so the default tier declines it. PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to
+    # names of compounds "that also contain at least one carbon atom in their structure";:2058 "... the label
+    # 'preselected name' is added to appropriate names". The strict path's name is asserted unchanged.
     with jvm_slots(1, purpose="test-oxoacid-salt"):
-        name = Orthonym(style="pin").name(smiles)
+        assert_default_tier_declines(smiles)
+        name = strict_path_name(smiles)
     assert name == expected
     assert _strict_rt(expected, smiles)
 

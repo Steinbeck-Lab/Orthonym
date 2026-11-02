@@ -40,7 +40,8 @@ from rdkit import Chem
 import orthonym.rules.radicals as rad
 from orthonym.perception.ions import get_radical_sites
 from orthonym.validation.pin_spelling import check_pin_spelling
-from tests.support.pin_tiers import (assert_not_pin_labelled, assert_pin_at_both_tiers, name_breadth,
+from tests.support.pin_tiers import (assert_not_pin_labelled, assert_pin_at_both_tiers, assert_preselected_at_both_tiers,
+                                     is_carbon_free, name_breadth,
                                      name_default)
 from tests.support.rt_assert import name_is_rt_exact
 
@@ -108,8 +109,10 @@ def test_a_ligand_that_states_a_descriptor_is_named_but_not_labelled_a_pin(smile
 
 @pytest.mark.opsin_gate
 def test_the_trisilanyl_pin_is_kept():
-    """'trisilan-2-yl (preselected prefix)' (:16005): the mononuclear construction would say 'disilylsilyl'."""
-    assert_pin_at_both_tiers("[SiH3][SiH]([SiH3])", "trisilan-2-yl")
+    """'trisilan-2-yl (preselected prefix)' (:16005): the mononuclear construction would say 'disilylsilyl'.
+    Changed asserted label (2026-11-02, user decision "decide what the Blue Book says"; was pin_verified): a
+    carbon-free name is a preselected name, no PIN (``pin_tiers.CARBON_FREE_RULE``;:2056,:2058)."""
+    assert_preselected_at_both_tiers("[SiH3][SiH]([SiH3])", "trisilan-2-yl")
 
 
 @pytest.mark.opsin_gate
@@ -209,6 +212,9 @@ def test_ligand_descriptor_test_sees_every_form_of_a_stereodescriptor(text, foun
     ("[SiH2]c1ccccc1", "phenylsilyl"),
 ])
 def test_a_centre_whose_neutral_parent_is_the_centre_keeps_its_name(smiles, name):
+    if is_carbon_free(smiles):     # '[B](F)F': no PIN since 2026-11-02 (changed asserted label; CARBON_FREE_RULE)
+        assert_preselected_at_both_tiers(smiles, name)
+        return
     assert_pin_at_both_tiers(smiles, name)
 
 

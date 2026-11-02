@@ -219,7 +219,11 @@ def test_rs_component_is_refused_and_the_salt_name_is_readable_or_absent():
 
 @pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the list name is the fallback behind the systematic offer, the Blue Book)
 def test_component_list_name_exception():
-    """An exact-match list name OPSIN rejects is still accepted as a component."""
+    """An exact-match list name OPSIN rejects is still accepted as a component. Since 2026-11-02 (user decision
+    R1-NP; INTRODUCTION, the Blue Book, "Preferred IUPAC names (PINs) are not identified for the
+    compounds in this Chapter") the PIN-tier component namer declines a list name, so the exception is read at
+    the component namer's wider tier."""
     from orthonym.rules.adducts import _name_component
     assert _jar_full_key("germacrane") == ""
-    assert _name_component(GERMACRANE, "pin") == "germacrane"
+    assert _name_component(GERMACRANE, "pin") is None
+    assert _name_component(GERMACRANE, "pin", general_fallback=True, allow_aromatic_general=True) == "germacrane"

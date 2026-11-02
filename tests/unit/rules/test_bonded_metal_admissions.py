@@ -329,15 +329,23 @@ def test_the_metals_of_lane_b2_are_named_below_the_pin_and_read_back(smiles, exp
     _best_effort_row_checks(smiles, expected)
 
 
-#: the PIN-labelled rows that the admission must keep: a salt of an acid, an alcohol or a thiol and a carbon-free salt
-#: keep ``pin_verified`` by decision of the maintainers (the contributor guide "Scope"), and the ion of a metal whose ions have a
-#: retained name keeps that name (``RETAINED_ION_METALS`` are not admitted to ELEMENT): none of them is lowered
+#: the PIN-labelled rows that the admission must keep: a salt of an acid, an alcohol or a thiol keeps ``pin_verified``
+#: by decision of the maintainers (the contributor guide "Scope"): none of them is lowered
 PIN_KEPT_ROWS = [
     ("CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].[La+3]", "lanthanum triacetate"),
     ("CC(=O)[O-].CC(=O)[O-].[Cd+2]", "cadmium diacetate"),
     ("CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].[Gd+3]", "gadolinium triacetate"),
     ("CC(=O)[O-].CC(=O)[O-].[Co+2]", "cobalt diacetate"),
     ("CC(=O)[O-].[Ag+]", "silver acetate"),
+]
+
+#: the carbon-free rows: the admission keeps their names, and the ion of a metal whose ions have a retained name keeps
+#: that name (``RETAINED_ION_METALS`` are not admitted to ELEMENT). Changed asserted labels (2026-11-02, user decision
+#: "decide what the Blue Book says"; were pin_verified at both tiers): a carbon-free name is a preselected name at
+#: most, never a PIN. PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to names of compounds
+#: "that also contain at least one carbon atom in their structure";:2058 "... the label 'preselected name' is added
+#: to appropriate names". The PIN tier declines them; best-effort gives the name, systematic_verified.
+PRESELECTED_KEPT_ROWS = [
     ("[Cl-].[Cl-].[Cd+2]", "cadmium dichloride"),
     ("[Cl-].[Ag+]", "silver chloride"),
     ("[Mo+5].[Cl-].[Cl-].[Cl-].[Cl-].[Cl-]", "molybdenum(V) chloride"),
@@ -354,6 +362,15 @@ def test_the_admission_lowers_no_pin_label(smiles, expected):
     assert name_is_rt_exact(expected, smiles)
 
 
+@pytest.mark.parametrize("smiles,expected", PRESELECTED_KEPT_ROWS)
+def test_the_admission_keeps_the_carbon_free_names(smiles, expected):
+    res = name_best_effort(smiles)
+    assert (res["name"], res["tier"], res["is_pin"]) == (expected, "systematic_verified", False), res
+    pin = _tiered_namer("pin", "pin").name_tiered(smiles)
+    assert (pin["tier"], pin["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), pin
+    assert name_is_rt_exact(expected, smiles)
+
+
 def test_a_carbonyl_drawn_with_double_bonds_is_carbonyl():
     """ Definitions of terms (the Blue Book): "Exceptionally, the molecules H2O, NH3, CO, and NO are
     named 'aqua', 'ammine', 'carbonyl', and 'nitrosyl' when used as ligands" -- never the prefix 'formylidene'."""
@@ -364,9 +381,10 @@ def test_a_carbonyl_drawn_with_double_bonds_is_carbonyl():
 
 
 def test_caesium_is_spelled_as_the_book_asks():
-    """ SPELLING (the Blue Book): "caesium not cesium"; a carbon-free salt keeps its label."""
+    """ SPELLING (the Blue Book): "caesium not cesium". Changed asserted label (2026-11-02; was
+    pin_verified): a carbon-free salt has a preselected name at most, the Blue Book,:2058)."""
     res = name_best_effort("[Cs+].[Cl-]")
-    assert (res["name"], res["tier"]) == ("caesium chloride", "pin_verified"), res
+    assert (res["name"], res["tier"]) == ("caesium chloride", "systematic_verified"), res
     assert name_is_rt_exact(res["name"], "[Cs+].[Cl-]"), res
 
 

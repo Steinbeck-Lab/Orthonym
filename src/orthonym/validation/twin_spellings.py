@@ -265,9 +265,12 @@ def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[s
     thioperoxol name has one, the name by prefixes that OPSIN reads ('(hydroxysulfanyl)methane'): it ships through
     its twin only inside ``thioperoxol_twin.last_resort_scope``, for a molecule that has no other name. The rule
     id, or None. A name with a count word above 50 has no other spelling either, and OPSIN has no numerical term
-    for it: the reconstructor reads it (``validation.long_count_read_back``)."""
+    for it: the reconstructor reads it (``validation.long_count_read_back``). The preselected name of a cage of one
+    noncarbon element ('bicyclo[2.2.1]heptasilane', ``validation.preselected_cage_twin``) ships here too: it has no
+    PIN, the Blue Book, a compound without carbon), it is the name (:23614) selects, the 'a'
+    name being only "for use in general nomenclature", and no OPSIN grammar reads it."""
     found = twin_of(name)
-    if found is not None and found[1] == ("halido_o",):
+    if found is not None and found[1] in (("halido_o",), ("preselected_cage",)):
         return twin_round_trip(name, smiles)
     return (uide_twin_round_trip(name, smiles) or long_count_round_trip(name, smiles)
             or (thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None))

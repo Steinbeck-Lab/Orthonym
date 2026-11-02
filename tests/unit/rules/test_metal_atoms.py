@@ -15,8 +15,10 @@ isotopically substituted"; PREFERRED IUPAC NAMES (:2056): the label "PIN" belong
 of the listed elements "that also contain at least one carbon atom in their structure", so the names
 of a zinc atom, ion or isotope are verified systematic names and no PIN. The hydride ion is cited as
 'hydride' in the salt of zinc,:43590, "binary names formed by citing the name of the cation
-followed by that of the anion"); a carbon-free salt keeps the label of its path (user decision
-2026-09-30, answer 3 of 2026-10-13).
+followed by that of the anion"). Since 2026-11-02 (user decision "decide what the Blue Book says", which
+replaces the path labels of 2026-09-30) every carbon-free name is a preselected name at most and no PIN
+ :2056,:2058 "... the label 'preselected name' is added to appropriate names"): the salts, the
+retained ion names and the names on a parent hydride included; the PIN tier declines them.
 
 Lane LONE (2026-11-01) names the lone atom of every element: the bare atom of a mononuclear parent hydride is its
 radical, RADICALS DERIVED FROM PARENT HYDRIDES, (:40426) "named by adding the suffix 'yl' to the
@@ -241,10 +243,12 @@ def test_the_label_predicate():
     f = metal_labels.is_lone_atom_name_without_pin
     assert f("[Zn]", "zinc") and f("[Zn+2]", "zinc(2+)") and f("[65Zn]", "(65Zn)zinc")
     assert f("[Ne]", "neon") and f("[Na+]", "sodium(1+)") and f("[Se+6]", "selenium(6+)") and f("[H-]", "hydride")
-    assert not f("[N]", "azanylidyne") and not f("[36Cl-]", "(36Cl)chloranide")   # on a parent hydride: path label
+    # on a parent hydride: no PIN either, the drawing has no carbon (changed asserted value 2026-11-02, was False:
+    #:2056 "... and that also contain at least one carbon atom in their structure";:2058 preselected name)
+    assert f("[N]", "azanylidyne") and f("[36Cl-]", "(36Cl)chloranide")
     assert not f("[Cu+2]", "copper(II)")                                   # the retained name keeps its label
     assert not f("[Cl-]", "chloride")
-    assert not f("[Zn+2].[Cl-].[Cl-]", "zinc dichloride")                  # a carbon-free salt keeps its label
+    assert not f("[Zn+2].[Cl-].[Cl-]", "zinc dichloride")                  # no lone atom (the carbon-free rule of the namer)
     assert not f("[H-].[H-].[Zn+2]", "zinc dihydride")
     assert not f("CC[Zn]CC", "diethylzinc")
     assert not f("[Zn+2]", "") and not f("", "zinc(2+)") and not f("[Zn+2]", None)
@@ -252,9 +256,12 @@ def test_the_label_predicate():
 
 
 def test_the_predicate_is_what_lowers_the_label(monkeypatch):
-    """Switched off, the name of the ion would be a path label (pin_verified): the predicate is on
-    the path of the tier row, and it is the only thing that sets the label."""
+    """Switched off, together with the namer's carbon-free demotion (which holds every lone-atom name since
+    2026-11-02), the name of the ion would be a path label (pin_verified): the predicate is on the path of the
+    tier row."""
+    import orthonym.namer as namer
     monkeypatch.setattr(metal_labels, "is_lone_atom_name_without_pin", lambda smiles, name: False)
+    monkeypatch.setattr(namer, "_is_carbon_free_compound", lambda smiles: False)
     row = _row("[Zn+2]", "valid")
     assert row["name"] == "zinc(2+)" and row["tier"] == "pin_verified", row
 
@@ -262,15 +269,13 @@ def test_the_predicate_is_what_lowers_the_label(monkeypatch):
 # ---- the hydride ion beside zinc (panel B9 ionic)
 
 def test_zinc_dihydride_is_named_and_read_back():
-    """``[H-].[H-].[Zn+2]``: the salt route cites 'hydride' for the ion beside zinc. A carbon-free salt
-    keeps the label of its path (the named exception of the label policy: 'zinc dichloride' alike)."""
+    """``[H-].[H-].[Zn+2]``: the salt route cites 'hydride' for the ion beside zinc. Changed asserted labels
+    (2026-11-02; was pin_verified at every tier): a carbon-free salt has a preselected name at most, never a PIN
+     PREFERRED IUPAC NAMES, the Blue Book, "... and that also contain at least one carbon atom in
+    their structure";:2058), so the PIN tier declines it, as 'zinc dichloride'."""
     smiles = "[H-].[H-].[Zn+2]"
-    for tier in ("pin", "valid", "best-effort"):
-        row = _row(smiles, tier)
-        assert row["name"] == "zinc dihydride", (tier, row)
-        assert row["tier"] == "pin_verified" and row["is_pin"] is True, (tier, row)
-        assert_full_rt(row["name"], smiles)
-    assert _row("[Zn+2].[Cl-].[Cl-]", "pin")["tier"] == "pin_verified"   # the same label as zinc dichloride
+    _assert_named_without_a_pin(smiles, "zinc dihydride")
+    assert _row("[Zn+2].[Cl-].[Cl-]", "pin")["limit_code"] == "NO_VERIFIED_PIN"   # as zinc dichloride
     assert _row("[Zn+2].[Zn+2].[H-].[H-].[H-].[H-]", "best-effort")["name"] == "dizinc tetrahydride"
     assert_full_rt("dizinc tetrahydride", "[Zn+2].[Zn+2].[H-].[H-].[H-].[H-]")
 
@@ -317,20 +322,22 @@ def test_a_neutral_atom_beside_anions_is_cited_with_zero():
 
 # ---- the other metals and the other assemblies are not moved (START literals, computed on the start tree)
 
-#: (default tier, best-effort tier) identity views at the start commit of the zinc work
+#: (default tier, best-effort tier) identity views at the start commit of the zinc work; the retained ion names are
+#: carbon-free, so no PIN since 2026-11-02 (changed asserted labels, were pin_verified at both tiers::2056
+#: "... and that also contain at least one carbon atom in their structure";:2058 preselected name)
 START_ROWS = {
     "[Cu+2]": (
-        ('copper(II)', 'pin_verified', True, None),
-        ('copper(II)', 'pin_verified', True, None)),
+        ('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
+        ('copper(II)', 'systematic_verified', False, None)),
     "[Fe+3]": (
-        ('iron(III)', 'pin_verified', True, None),
-        ('iron(III)', 'pin_verified', True, None)),
+        ('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
+        ('iron(III)', 'systematic_verified', False, None)),
     "[Fe+2]": (
-        ('iron(II)', 'pin_verified', True, None),
-        ('iron(II)', 'pin_verified', True, None)),
+        ('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
+        ('iron(II)', 'systematic_verified', False, None)),
     "[Sn+4]": (
-        ('tin(IV)', 'pin_verified', True, None),
-        ('tin(IV)', 'pin_verified', True, None)),
+        ('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
+        ('tin(IV)', 'systematic_verified', False, None)),
     "[Tc+2].[H-].[H-]": (
         ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
@@ -371,7 +378,8 @@ def test_the_rows_that_lane_b2_moves(smiles):
 #: (zinc is a complete metal and every metal of the assembly is admitted to the table); the text of the plain
 #: call is the descriptive fallback of the metal of lowest atomic number
 #: the hydride salts of Groups 1-2 and of zinc: User decision 2026-10-30 (breadth lane, levers B and C) admits Groups 1-2 to ``CARBANION_SALTS``,
-#: so these are binary salts, carbon-free: kept pin_verified by the maintainers' decision)
+#: so these are binary salts; carbon-free, so no PIN (changed asserted labels 2026-11-02, were pin_verified at both
+#: tiers::2056 "... and that also contain at least one carbon atom in their structure";:2058 preselected name)
 ADMITTED_HYDRIDE_ROWS = {
     "[Na+].[H-]": "sodium hydride",
     "[Li+].[H-]": "lithium hydride",
@@ -385,8 +393,7 @@ ADMITTED_HYDRIDE_ROWS = {
 
 @pytest.mark.parametrize("smiles", sorted(ADMITTED_HYDRIDE_ROWS))
 def test_admitted_hydride_salts(smiles):
-    for tier in ("pin", "best-effort"):
-        assert _view(_row(smiles, tier)) == (ADMITTED_HYDRIDE_ROWS[smiles], "pin_verified", True, None), (smiles, tier)
+    _assert_named_without_a_pin(smiles, ADMITTED_HYDRIDE_ROWS[smiles], tiers=("best-effort",))
 
 
 UNNAMED_ZINC_ASSEMBLIES = {
@@ -417,18 +424,10 @@ LONE_ROWS = {
 }
 
 
-#: the names built on a parent hydride: a carbon-free name keeps the label of its naming path (user decision
-#: 2026-09-30, the label of 'azanidyl'), so only the name and its read-back are pinned here
-LONE_HYDRIDE_ROWS = {"[Cl]", "[O]", "[Bi]", "[36Cl-]", "[125I-]"}
-
-
 @pytest.mark.parametrize("smiles", sorted(LONE_ROWS))
 def test_the_rows_that_lane_lone_moves(smiles):
-    if smiles in LONE_HYDRIDE_ROWS:
-        row = _row(smiles, "best-effort")
-        assert row["name"] == LONE_ROWS[smiles], row
-        assert_full_rt(row["name"], smiles)
-        return
+    # the names built on a parent hydride ('chloranyl', '(36Cl)chloranide') are carbon-free too: no PIN since
+    # 2026-11-02 (user decision;:2056,:2058), so every row is asserted the same way
     _assert_named_without_a_pin(smiles, LONE_ROWS[smiles], tiers=("best-effort",))
 
 
@@ -475,8 +474,8 @@ def test_carbon_ions_keep_their_names_on_methane(smiles, name):
     ("[P-3]", "[32P-3]"), ("[O-2]", "[18O-2]"), ("[Fe+2]", "[59Fe+2]"), ("[Cl-]", "[36Cl-]"), ("[Zn+2]", "[65Zn+2]"),
 ])
 def test_an_isotopologue_takes_the_label_of_its_parent(plain, labelled):
-    """The label of a lone atom is a function of the structure: an element name has no PIN, a name on a
-    parent hydride keeps its path label; the nuclide changes neither ('(13C)methane (PIN)' and 'methane (PIN)',
+    """The label of a lone atom is a function of the structure: a carbon-free name has no PIN, an element
+    name or a name on a parent hydride alike; the nuclide changes neither ('(13C)methane (PIN)' and 'methane (PIN)',
     :7354)."""
     a, b = _row(plain, "best-effort"), _row(labelled, "best-effort")
     assert a["tier"] == b["tier"] and a["is_pin"] == b["is_pin"], (a, b)

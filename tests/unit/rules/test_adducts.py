@@ -237,8 +237,11 @@ class TestAdductDispatch:
         assert row["name"] == "ethanol—hydrogen chloride—water (1/1/1)"
 
     def test_salt_routing_protected(self):
-        # charged multi-fragment stays with the ions/salt router
-        assert self._nc("[Na+].[Cl-]") == "sodium chloride"
+        # charged multi-fragment stays with the ions/salt router; a carbon-free salt is declined at the PIN tier
+        # since 2026-11-02 (a preselected name at most, the Blue Book,:2058), so the name is asserted
+        # on the strict path
+        from tests.support.default_tier import strict_path_name
+        assert strict_path_name("[Na+].[Cl-]") == "sodium chloride"
 
     def test_organometallic_not_swallowed(self):
         # (item 4, a review -P1 review I3): the ORGANOMETALLIC handler used to

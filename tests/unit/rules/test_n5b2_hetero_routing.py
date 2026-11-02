@@ -8,7 +8,8 @@ The older hetero producers (``name_fused_heterocycle`` and the retained names) s
 and so does the natural-product route: every name they gave stays byte-identical."""
 import pytest
 
-from tests.support.default_tier import default_tier_row
+from orthonym.data.natural_products import NAME_EXACT_NP_PARENTS
+from tests.support.default_tier import assert_default_tier_declines, default_tier_row, strict_path_row
 from tests.support.rt_assert import assert_full_rt, name_best_effort
 from tests.support.np_producer import np_producer_only  # noqa: F401
 
@@ -67,7 +68,7 @@ def test_names_that_were_right_stay_byte_identical(smiles, expected):
 
 
 # the natural-product route parents,:50943 "Preferred IUPAC names (PINs) are not
-# identified for the compounds in this Chapter") keeps these names at the default tier
+# identified for the compounds in this Chapter") builds these names (the PIN tier declines the list names)
 NATURAL_PRODUCT_PARENTS = [
     ("CC[C@H]1C[C@H]2c3[nH]c4ccccc4c3CCN2C[C@@H]1CC", "corynan"),
     ("c1ccc2c3c([nH]c2c1)[C@@H]1C[C@@H]2CCCC[C@H]2CN1CC3", "yohimban"),
@@ -85,6 +86,13 @@ NATURAL_PRODUCT_PARENTS = [
 
 @pytest.mark.parametrize("smiles,expected", NATURAL_PRODUCT_PARENTS)
 def test_natural_product_parents_keep_winning(smiles, expected):
+    if expected in NAME_EXACT_NP_PARENTS:
+        # an exact-match list name is no PIN, so the PIN tier declines it since 2026-11-02 (user decision "decide
+        # what the Blue Book says"; INTRODUCTION, the Blue Book, "Preferred IUPAC names (PINs) are not
+        # identified for the compounds in this Chapter"): the strict path still builds it, the name unchanged
+        assert_default_tier_declines(smiles)
+        assert strict_path_row(smiles)["name"] == expected
+        return
     assert default_tier_row(smiles)["name"] == expected
 
 

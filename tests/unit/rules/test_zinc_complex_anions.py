@@ -183,14 +183,17 @@ def test_a_zincate_is_named_and_read_back(smiles, name):
     assert _row(smiles, "pin")["tier"] == "abstain"
 
 
-def test_an_ionic_zincate_keeps_the_label_of_a_carbon_free_salt():
-    """The named exception of the label policy (user answer 3 of 2026-10-13): a carbon-free salt
-    keeps the label of its path, as 'sodium chloride' does."""
+def test_an_ionic_zincate_takes_the_label_of_a_carbon_free_salt():
+    """Changed asserted labels (2026-11-02, user decision "decide what the Blue Book says", replacing user answer
+    3 of 2026-10-13; were pin_verified at both tiers): a carbon-free salt has a preselected name at most, never a
+    PIN, as 'sodium chloride'. PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to
+    names of compounds "that also contain at least one carbon atom in their structure";:2058 "... the label
+    'preselected name' is added to appropriate names". The PIN tier declines it; the best-effort tier gives the name."""
     smiles = "[Na+].[Na+].[Cl-].[Cl-].[Cl-].[Cl-].[Zn+2]"
-    for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
-        assert row["name"] == "disodium zinc tetrachloride", (tier, row)
-        assert row["tier"] == "pin_verified" and row["is_pin"] is True, (tier, row)
+    assert (_row(smiles, "pin")["tier"], _row(smiles, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
+    row = _row(smiles, "best-effort")
+    assert row["name"] == "disodium zinc tetrachloride", row
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert_full_rt("disodium zinc tetrachloride", smiles)
 
 
@@ -209,9 +212,11 @@ START_ROWS = {
     "N.N.O": (
         ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
+    # carbon-free: no PIN since 2026-11-02 (changed asserted labels, were pin_verified at both tiers;
+    # the Blue Book "... and that also contain at least one carbon atom in their structure";:2058)
     "[NH4+].[Cl-]": (
-        ('ammonium chloride', 'pin_verified', True, None),
-        ('ammonium chloride', 'pin_verified', True, None)),
+        ('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
+        ('ammonium chloride', 'systematic_verified', False, None)),
     "[Na+].[Cl-].N": (
         ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),

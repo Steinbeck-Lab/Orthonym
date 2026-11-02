@@ -121,12 +121,17 @@ def test_the_atoms_of_the_group_in_each_drawing():
 
 def test_hydrazoic_acid_keeps_its_zwitterionic_name():
     """HN3 has no host for the prefix 'azido': 'triaz-1,2-dien-2-ium-1-ide' is the only name it has
-    method (3) names the group of an azide, method (1) needs a parent hydride to carry it), so it keeps its label."""
+    method (3) names the group of an azide, method (1) needs a parent hydride to carry it), so it keeps its name.
+    Changed asserted label (2026-11-02, user decision "decide what the Blue Book says"; was pin_verified at the PIN
+    tier): HN3 has no carbon, so its name is a preselected name, never a PIN PREFERRED IUPAC NAMES,
+    the Blue Book, "... and that also contain at least one carbon atom in their structure";:2058)."""
     from orthonym import Orthonym
+    from tests.support.default_tier import strict_path_row
     jar_or_skip()
     for smiles in ("N=[N+]=[N-]", "[N-]=[N+]=N"):
-        res = Orthonym(style="pin").name_tiered(smiles)
-        assert (res["name"], res["tier"]) == ("triaz-1,2-dien-2-ium-1-ide", "pin_verified"), res
+        assert Orthonym(style="pin").name_tiered(smiles)["limit_code"] == "NO_VERIFIED_PIN"
+        res = strict_path_row(smiles)
+        assert (res["name"], res["tier"]) == ("triaz-1,2-dien-2-ium-1-ide", "systematic_verified"), res
 
 
 def test_an_input_drawn_with_the_plus_on_the_amine_is_named_as_drawn():

@@ -256,18 +256,19 @@ def test_round_tripping_pin_keeps_pin_verified():
     assert _independent_full_key(row["name"]) == _key("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O")
 
 
-def test_identity_table_name_keeps_the_label_of_its_naming_path():
-    # Paper conformance (user decision 2026-09-30, replacing the 2026-09-28 label
-    # systematic_verified): the exact-match coordination list name keeps its name,
-    # its 'identity' check and the label of the path that returned it, as in the
-    # paper's measured run (35 pin_verified, 3 best_effort on ChEBI); heme b at the
-    # default tier is pin_verified (tests/integration/test_p2_labels_public_claims.py
-    # covers the whole list).
+def test_identity_table_name_is_below_the_pin():
+    # Changed asserted label (2026-11-02, user decision "decide what the Blue Book says", R1-NP, which replaces the
+    # paper-run label pin_verified of 2026-09-30): the exact-match coordination list name keeps its name and its
+    # 'identity' check, and is no PIN: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are
+    # not identified for the compounds in this Chapter". The PIN tier declines heme b; the strict path's row is
+    # read (tests/integration/test_p2_labels_public_claims.py covers the whole list).
+    from tests.support.default_tier import assert_default_tier_declines, strict_path_row
     from tests.unit.rules.test_d1_coordination_v36 import FIXTURES
     heme = next(r["smiles"] for r in FIXTURES
                 if r["name"] == "(protoporphyrinato)iron(II)")
-    row = _pin_row(heme)
+    assert_default_tier_declines(heme)
+    row = strict_path_row(heme)
     assert row["name"] == "(protoporphyrinato)iron(II)", row
     assert row["verified"] == "identity", row
-    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert _independent_full_key(row["name"]) == ""  # OPSIN cannot read it

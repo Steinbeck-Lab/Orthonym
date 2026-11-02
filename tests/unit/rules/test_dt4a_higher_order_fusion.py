@@ -177,11 +177,14 @@ def test_the_direction_of_a_higher_order_pair_is_chosen_by_the_lowest_set():
 def test_a_descriptor_with_a_fusion_atom_locant_is_declined():
     # conanine: the reading 'naphtho[2',1':4,5]indeno[1,7a-c]pyrrole' fuses the pyrrole at the indene bond 1-7a; the book
     # prints no higher-order descriptor with a component's own fusion-atom locant, so the builder declines it and the list
-    # name stays INTRODUCTION, the Blue Book; the exact-match list parent keeps its label)
+    # name stays INTRODUCTION, the Blue Book; the exact-match list parent keeps its label). Since 2026-11-02
+    # (user decision "decide what the Blue Book says") the PIN tier declines a list name, so the strict path is read.
     from orthonym import Orthonym
     from orthonym.rules.bridged_fused_pin.poly_fusion import _FUSION_ATOM_LOCANT
     assert _FUSION_ATOM_LOCANT.search("naphtho[2',1':4,5]indeno[1,7a-c]pyrrole")
     assert not _FUSION_ATOM_LOCANT.search("pyrazino[1',2':1,6]pyrido[3,4-b]indole")
     conanine = "C[C@H]1[C@H]2CC[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]23CN1C"   # the gold row P7A-CONANINE
-    row = Orthonym().name_tiered(conanine)
+    from tests.support.default_tier import strict_path_row
+    assert Orthonym().name_tiered(conanine)["limit_code"] == "NO_VERIFIED_PIN"
+    row = strict_path_row(conanine)
     assert (row["name"], row["tier"]) == ("conanine", "systematic_verified"), row

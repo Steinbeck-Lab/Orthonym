@@ -170,7 +170,13 @@ def test_carveout_baseline_ships_expected_pin(namer, case):
         #:50943 (relabel 2026-10-31): the PIN tier declines an inositol; the carve-out ships it at best-effort
         from orthonym.cli import _emit_tier_flags
         namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    result = namer.name_tiered(case["bare_smiles"])
+    if case["carveout"] == "np_stereoparent":
+        #:50943 (user decision 2026-11-02): the PIN tier declines an exact-match list name; the carve-out
+        # ships it on the strict path (the emission rule switched off), unchanged
+        from tests.support.default_tier import strict_path_row
+        result = strict_path_row(case["bare_smiles"])
+    else:
+        result = namer.name_tiered(case["bare_smiles"])
     assert result["name"] == case["bare_name"], (
         f"{case['carveout']}: baseline SMILES {case['bare_smiles']!r} no longer "
         f"ships the expected carve-out PIN. Got {result['name']!r}."

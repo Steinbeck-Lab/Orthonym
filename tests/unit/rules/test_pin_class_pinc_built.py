@@ -50,7 +50,8 @@ the Blue Book), else the name its rule gives, read back to the input's full InCh
 """
 import pytest
 
-from tests.support.pin_tiers import assert_declined_at_default, assert_pin_at_both_tiers
+from tests.support.pin_tiers import (assert_declined_at_default, assert_pin_at_both_tiers,
+                                     assert_preselected_at_both_tiers, is_carbon_free)
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -120,12 +121,17 @@ PIN_ROWS = [
     # the classes that keep their name
     ("CC(=O)[O-].CC(=O)[O-].[Zn+2]", "zinc diacetate"),
     ("CC(=O)[O-].CC(=O)[O-].[Ca+2]", "calcium diacetate"),                #:31571
-    ("[Cl-].[Cl-].[Cl-].[Fe+3]", "iron(III) chloride"),                   # carbon-free: the project's convention
+    ("[Cl-].[Cl-].[Cl-].[Fe+3]", "iron(III) chloride"),                   # carbon-free: a preselected name (below)
 ]
 
 
 @pytest.mark.parametrize("smiles,pin", PIN_ROWS)
 def test_pin_at_both_tiers(smiles, pin):
+    if is_carbon_free(smiles):
+        # a preselected name, no PIN: changed asserted label 2026-11-02 (user decision "decide what the Blue Book
+        # says"; was pin_verified), ``pin_tiers.CARBON_FREE_RULE``, the Blue Book,:2058)
+        assert_preselected_at_both_tiers(smiles, pin)
+        return
     assert_pin_at_both_tiers(smiles, pin)
 
 

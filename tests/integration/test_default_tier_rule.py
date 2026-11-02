@@ -10,8 +10,14 @@ grammar (e.g., phanes after a structure check; inositols at best-effort only) ar
 validation"; checks (L74): "At the default tier, it compares only the constitutional
 part of the key".
 
+User decision 2026-11-02 ("decide what the Blue Book says", R1-NP) removes the list-name
+exception: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not
+identified for the compounds in this Chapter", so a natural-product or metal-complex list
+name is declined at ``--emit-tier pin`` like every name that is not a PIN, and so is every
+name of a compound without carbon (a preselected name at most,:2056,:2058).
+
 So at ``--emit-tier pin`` a name is emitted only when it is pin_verified or one of
-those exceptions; every other name is declined with the reason code NO_VERIFIED_PIN,
+the remaining exceptions; every other name is declined with the reason code NO_VERIFIED_PIN,
 on every public entry point, and the wider tiers keep it. Every emitted or kept name
 here is read back by a fresh OPSIN call that does not go through the engine
 (``tests.support.rt_assert``), by full InChIKey, except the list and grammar-gap
@@ -118,7 +124,7 @@ def test_an_inositol_is_declined_at_the_default_tier_and_ships_at_best_effort():
 @pytest.mark.parametrize("smiles,expected", [
     # a carve-out only while the active OPSIN reads no phane name; an OPSIN that does ships it through its read-back
     pytest.param("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane", marks=release_opsin_only),
-    ("CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO", "(4E)-sphing-4-enine"),  # NP list
+    # '(4E)-sphing-4-enine' (NP list) left this list on 2026-11-02: see the list-name test below
 ])
 @pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the list name is the fallback behind the systematic offer
 def test_the_exact_construction_exceptions_are_emitted(smiles, expected):
@@ -136,10 +142,30 @@ def test_the_exact_construction_exceptions_are_emitted(smiles, expected):
         assert row["tier"] != "pin_verified", row
 
 
-def test_the_metal_complex_list_name_is_emitted():
-    row = Orthonym().name_tiered(HEME_B["smiles"])
+@pytest.mark.usefixtures("np_producer_only")
+def test_a_natural_product_list_name_built_on_its_exact_construction_is_declined():
+    # changed asserted value (2026-11-02, user decision R1-NP; it was emitted here as an exception): a list name is
+    # no PIN, INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the compounds
+    # in this Chapter"; (:2050) "Preferred IUPAC names (PINs) for the natural products in Chapter are not
+    # identified". The strict path still builds it, labelled below the PIN.
+    smi = "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO"
+    assert_default_tier_declines(smi)
+    row = strict_path_row(smi)
+    assert (row["name"], row["gate_outcome"]) == ("(4E)-sphing-4-enine", "carveout:np_stereoparent"), row
+    assert row["tier"] == "systematic_verified" and row["verified"] == "identity", row
+
+
+def test_the_metal_complex_list_name_is_declined_and_shipped_below_the_pin():
+    # changed asserted label (2026-11-02, user decision R1-NP, which replaces the paper-run label pin_verified of
+    # 2026-09-30): heme is named on a parent (porphyrin) and is no PIN, INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the compounds
+    # in this Chapter"; (:2050) "Preferred IUPAC names (PINs) for the natural products in Chapter are not
+    # identified". The PIN tier declines it; the wider tiers give it, systematic_verified, by its
+    # exact-structure identity.
+    assert_default_tier_declines(HEME_B["smiles"])
+    from orthonym.cli import _emit_tier_flags
+    row = Orthonym(**_emit_tier_flags("valid")).name_tiered(HEME_B["smiles"])
     assert row["name"] == HEME_B["name"] and row["verified"] == "identity", row
-    assert row["tier"] == "pin_verified", row
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
 
 
 def test_a_strict_path_pin_verified_by_its_constitution_is_emitted():
@@ -212,14 +238,16 @@ EMIT_TIER_HELP = (
     'so once on the error stream, and --provenance shows the tier of each name), and the pin tier for '
     '--style general and cas and when no OPSIN reads the names back. pin: a name only when the pipeline '
     'can build the preferred IUPAC name (PIN), that is when the strict PIN path built the name and '
-    'verified it (tier pin_verified); this was the default up to release 1.0.x. The exceptions are names '
-    "from the natural-product and metal-complex lists, the name formats absent from OPSIN's grammar "
+    'verified it (tier pin_verified); this was the default up to release 1.0.x. The exceptions are the '
+    "name formats absent from OPSIN's grammar "
     '(phanes, checked by building their structure), PIN spellings that OPSIN reads back '
     'through a twin spelling of the same structure (ethan(2H)ol, diphenyliodanuide, '
     'methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose stereodescriptors OPSIN '
     'cannot read, for which the PIN-only tier compares the constitution, and, with --trivial, a retained '
     'trivial name. Otherwise it declines, with the reason code NO_VERIFIED_PIN when it built a name that '
-    'is not a verified PIN. The rule applies to --style pin. valid: also names from the general engine. '
+    'is not a verified PIN, such as the name of a compound without carbon (a preselected name at most) or '
+    'a name from the natural-product and metal-complex lists. '
+    'The rule applies to --style pin. valid: also names from the general engine. '
     'complete: also general names for aromatic and heterocyclic ring systems. best-effort: also the '
     'last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and '
     '15 rings (the other tiers build them up to 40 atoms and 8 rings), and adducts with a one-atom ion, '
@@ -352,9 +380,12 @@ def test_a_natural_product_list_name_is_emitted_and_labelled_below_the_pin():
     # user delegating it to the Blue Book: it supersedes the decision of 2026-09-30 (c) for this class).
     # The name and its emission are unchanged (independent check: OPSIN reads no germacrane below;
     # mutation: the label assertion fails on the commit before).
+    # Since 2026-11-02 (user decision R1-NP) the PIN tier declines it (the exception is gone, same sentence);
+    # the strict path still builds it, and the wider tiers emit it as before.
+    assert_default_tier_declines(GERMACRANE)
     for tier in ("pin", "valid", "best-effort"):
-        n = Orthonym() if tier == "pin" else Orthonym(**_emit_tier_flags(tier))
-        row = n.name_tiered(GERMACRANE)
+        n = Orthonym(**_emit_tier_flags(tier)) if tier != "pin" else None
+        row = strict_path_row(GERMACRANE) if tier == "pin" else n.name_tiered(GERMACRANE)
         assert row["name"] == "germacrane", (tier, row)
         assert row["tier"] == "systematic_verified" and row["verified"] == "identity", (tier, row)
         assert row["is_pin"] is False, (tier, row)
@@ -368,9 +399,14 @@ def test_a_natural_product_list_name_is_emitted_and_labelled_below_the_pin():
 
 
 def test_a_polyacid_carve_out_does_not_pre_empt_a_verifying_round_trip():
+    # changed asserted label (2026-11-02, user decision "decide what the Blue Book says"; was pin_verified at the PIN
+    # tier): a carbon-free name is a preselected name, never a PIN PREFERRED IUPAC NAMES, the Blue Book,
+    # "... and that also contain at least one carbon atom in their structure";:2058), so the PIN tier declines it;
+    # the round trip still decides the gate outcome of the name the strict path builds
     smi = "OS(=O)(=O)SS(=O)(=O)O"
-    row = Orthonym().name_tiered(smi)
+    assert_default_tier_declines(smi)
+    row = strict_path_row(smi)
     assert row["name"] == "2-thiodisulfuric acid", row
     assert row["gate_outcome"] == "self_consistency_verified", row
-    assert row["tier"] == "pin_verified" and row["verified"] == "opsin", row
+    assert row["tier"] == "systematic_verified" and row["verified"] == "opsin", row
     assert_full_rt(row["name"], smi)

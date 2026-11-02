@@ -15,13 +15,15 @@ not Preferred IUPAC Names:
   elements (including the Group 3 elements) and Groups 1 and 2 elements, except for
   'ocene' compounds, are noted."
 
-Paper conformance (user decision 2026-09-30, which replaces the 2026-09-28 label
-``systematic_verified``): such a name takes the label of the path that returned it, as
-in the paper's measured run (35 ``pin_verified`` and 3 ``best_effort`` on ChEBI at the
-best-effort tier; Supplementary Table 3). At the default tier every listed complex is
-``pin_verified``; the demotion of organometallic compounds and the name-scoped
-non-PIN records are not read for a list name. The name, the source, 'identity' and the
-gate outcome are unchanged.
+* INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not
+  identified for the compounds in this Chapter" (the porphyrin, corrin and phorbine parents
+  of these names are parents).
+
+User decision 2026-11-02 ("decide what the Blue Book says", R1-NP), which replaces the
+paper-run labels of 2026-09-30 (35 ``pin_verified`` and 3 ``best_effort`` on ChEBI):
+changed asserted labels, every list name is ``systematic_verified`` with ``is_pin`` False
+at the wider tiers, and the PIN tier declines it (NO_VERIFIED_PIN). The name, the source,
+'identity' and the gate outcome are unchanged.
 
 Every row is also checked independently of the engine: the input's InChIKey is the
 table key of that exact name, and a FRESH OPSIN call (``tests.support.rt_assert.
@@ -64,9 +66,13 @@ def _assert_identity_label(fx, row):
     assert row["name"] == fx["name"], row                  # name unchanged
     assert COORDINATION_RETAINED.get(_key(fx["smiles"])) == fx["name"]  # identity holds
     assert row["verified"] == "identity", row
-    assert row["tier"] == "pin_verified", row
-    assert row["is_pin"] is True, row
+    assert row["tier"] == "systematic_verified", row
+    assert row["is_pin"] is False, row
     assert _independent_parse(row["name"]) is None, row["name"]  # OPSIN reads nothing
+
+
+def _assert_declined(row):
+    assert (row["tier"], row["limit_code"], row["is_pin"]) == ("abstain", "NO_VERIFIED_PIN", False), row
 
 
 # The PIN and best-effort tiers run in the PR run; the 'valid' and 'complete' tiers (30 s
@@ -79,15 +85,18 @@ _NIGHTLY_TIERS = {"valid", "complete"}
     [pytest.param(t, marks=pytest.mark.slow) if t in _NIGHTLY_TIERS else t for t in TIERS])
 @pytest.mark.parametrize("fx", [HEME_B, CHLOROPHYLL_A, CYANOCOBALAMIN],
                          ids=["heme_b", "chlorophyll_a", "cyanocobalamin"])
-def test_coordination_list_name_keeps_the_label_of_its_naming_path(fx, tier):
-    # heme b, chlorophyll a and cyanocobalamin (a Co-C bond, not read by the
-    # demotion for a list name) are pin_verified at every tier, as in the paper run.
+def test_coordination_list_name_is_below_the_pin_at_every_tier(fx, tier):
+    # heme b, chlorophyll a and cyanocobalamin: declined at the PIN tier, systematic_verified at the others
+    if tier == "pin":
+        _assert_declined(_row(fx["smiles"], tier))
+        return
     _assert_identity_label(fx, _row(fx["smiles"], tier))
 
 
 @pytest.mark.parametrize("fx", FIXTURES, ids=[f["chebi"] for f in FIXTURES])
-def test_every_listed_complex_is_labelled_pin_verified_at_the_default_tier(fx):
-    _assert_identity_label(fx, _row(fx["smiles"], "pin"))
+def test_every_listed_complex_is_declined_at_the_default_tier_and_named_at_best_effort(fx):
+    _assert_declined(_row(fx["smiles"], "pin"))
+    _assert_identity_label(fx, _row(fx["smiles"], "best-effort"))
 
 
 def test_a_certified_pin_keeps_pin_verified():

@@ -7,8 +7,8 @@ appropriate numerical prefix, such as 'mono','di', 'tri', etc." Mixed organic - 
 (:4667): "preferred IUPAC names cannot be assigned to mixed adducts because preferred IUPAC names have not yet
 been determined for inorganic components". ``rules.adducts._label_mixed_adduct`` records the adduct form
 ('acetic acid—water (1/1)') below the PIN; the salt route cites the water as the word and now records the name
-too. A carbon-free hydrate is labelled the same way (user decision 2026-11-01, which narrows the 2026-09-30
-one: a carbon-free salt keeps the label of its naming path, its hydrate does not); (:37563): "these 'adduct
+too. A carbon-free hydrate is labelled the same way (user decision 2026-11-01; since 2026-11-02 every carbon-free
+name is below the PIN,:2056,:2058, the salt without water included); (:37563): "these 'adduct
 names' are not PINs". """
 import pytest
 
@@ -35,10 +35,13 @@ def test_the_hydrate_word_of_a_salt_is_below_the_pin(smiles, expected):
     assert_full_rt(be["name"], smiles, what="best-effort: ")
 
 
-@pytest.mark.parametrize("smiles,expected", [
-    ("[Na+].CC(=O)[O-]", "sodium acetate"),
-    ("[Na+].[Cl-]", "sodium chloride"),
+@pytest.mark.parametrize("smiles,expected,tier", [
+    ("[Na+].CC(=O)[O-]", "sodium acetate", "pin_verified"),
+    # changed asserted label (2026-11-02, user decision "decide what the Blue Book says"; was pin_verified): a
+    # carbon-free salt has a preselected name at most, the Blue Book "... and that also contain at
+    # least one carbon atom in their structure";:2058), with or without its water
+    ("[Na+].[Cl-]", "sodium chloride", "systematic_verified"),
 ])
-def test_the_salt_without_water_keeps_its_label(smiles, expected):
+def test_the_salt_without_water_keeps_its_label(smiles, expected, tier):
     be = name_best_effort(smiles)
-    assert be["name"] == expected and be["tier"] == "pin_verified", be
+    assert be["name"] == expected and be["tier"] == tier, be

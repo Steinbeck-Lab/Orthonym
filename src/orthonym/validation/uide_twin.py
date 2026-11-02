@@ -56,6 +56,10 @@ def uide_twin_outcome(outcome: Optional[str]) -> bool:
     * a halogen -uide name read back through its twin (``twin_verified:uide_lambda``) and an additive organometallic
       name with halido ligands (``twin_verified:halido_o``): no OPSIN grammar reads these names at any tier, and the
       other twin families spell the form OPSIN reads there;
+    * the preselected name of a cage of one noncarbon element read back through its 'a' twin
+      (``twin_verified:preselected_cage``, ``validation.preselected_cage_twin``): (the Blue Book)
+      gives 'bicyclo[4.2.1]nonasilane (preselected name)' and the 'a' name only "for use in general nomenclature",
+      and no OPSIN grammar reads the preselected name;
     * a thioperoxol name read back through its twin (``twin_verified:thioperoxol_...``, ``validation.thioperoxol_twin``):
       the anion of -S-OH at every general tier, a neutral name only as the safety net of a molecule that only the PIN
       path names (``assembly.default_tier_offer.twin_last_resort_row``);
@@ -70,8 +74,8 @@ def uide_twin_outcome(outcome: Optional[str]) -> bool:
       fullerene name)."""
     from ..metrics.provenance import GATE_OUTCOME_RECONSTRUCTED_PREFIX, carveout_outcome, twin_outcome
     from .thioperoxol_twin import thioperoxol_twin_outcome
-    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), carveout_outcome("phane"),
-                        carveout_outcome("fullerene"))
+    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), twin_outcome("preselected_cage"),
+                        carveout_outcome("phane"), carveout_outcome("fullerene"))
             or thioperoxol_twin_outcome(outcome)
             or bool(outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX)))
 

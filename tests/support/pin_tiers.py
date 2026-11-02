@@ -38,3 +38,27 @@ def assert_declined_at_default(smiles: str) -> None:
     assert d.get("tier") != "pin_verified", d
     b = name_breadth(smiles)
     assert b.get("name") and name_is_rt_exact(b["name"], smiles), b
+
+
+#: The rule a carbon-free name follows (user decision 2026-11-02): PREFERRED IUPAC NAMES
+#: (the Blue Book) "the label 'PIN' is added to the names of compounds whose parent hydride contains
+#: at least one of the following elements: B, Si,... At, and that also contain at least one carbon atom in
+#: their structure";:2058 "... the label 'preselected name' is added to appropriate names";
+#: PRESELECTED NAMES (:2062).
+CARBON_FREE_RULE = "P-12.1 (BlueBookV2.md:2056, :2058): a carbon-free name is a preselected name, never a PIN"
+
+
+def assert_preselected_at_both_tiers(smiles: str, name: str) -> None:
+    """A carbon-free structure (``CARBON_FREE_RULE``): the default tier declines it (NO_VERIFIED_PIN) and the
+    breadth tier gives ``name``, unchanged, labelled systematic_verified, read back by an independent OPSIN call."""
+    assert name_is_rt_exact(name, smiles), f"the expected name does not read back to {smiles}: {name!r}"
+    d = name_default(smiles)
+    assert (d.get("tier"), d.get("limit_code")) == ("abstain", "NO_VERIFIED_PIN"), d
+    b = name_breadth(smiles)
+    assert (b.get("name"), b.get("tier"), b.get("is_pin")) == (name, "systematic_verified", False), b
+
+
+def is_carbon_free(smiles: str) -> bool:
+    """True iff the structure has no carbon atom (computed from the SMILES alone, not by the code under test)."""
+    from rdkit import Chem
+    return not any(a.GetAtomicNum() == 6 for a in Chem.MolFromSmiles(smiles).GetAtoms())

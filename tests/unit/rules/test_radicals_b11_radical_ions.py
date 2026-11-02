@@ -47,8 +47,15 @@ def _strict_rt(name, smiles):
     return parsed is not None and Chem.MolToSmiles(parsed) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
 
 
+def _carbon_free(smiles):
+    return not any(a.GetAtomicNum() == 6 for a in Chem.MolFromSmiles(smiles).GetAtoms())
+
+
 def _name(smiles):
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+    # a carbon-free radical ion has a preselected name at most, so the default tier declines it (user decision
+    # 2026-11-02; PREFERRED IUPAC NAMES, the Blue Book: the label 'PIN' goes to names of compounds "that
+    # also contain at least one carbon atom in their structure";:2058): the strict path's row is asserted
+    if (smiles in DEFAULT_TIER_DECLINES or _carbon_free(smiles)) and default_tier_rule_applies():
         return _declined_pin_row(smiles)
     with jvm_slots(1, purpose="test-radical-b11"):
         return Orthonym(style="pin").name_tiered(smiles)
@@ -72,12 +79,11 @@ def test_radical_ion(smiles, expected):
 # preselected name at most, the Blue Book;:2062).
 @pytest.mark.opsin_gate
 def test_carbon_free_radical_ion_is_a_preselected_name():
-    # Paper conformance (user decision 2026-09-30): the tier label is the one of the
-    # naming path, as in the paper's measured run ('sodium chloride' pin_verified);
-    # the name is unchanged.
+    # Changed asserted label (2026-11-02, user decision "decide what the Blue Book says",
+    # replacing the paper-run label pin_verified of 2026-09-30): no PIN; the name is unchanged.
     row = _name("[NH-]")
-    assert row["name"] == "azanidyl" and row["tier"] == "pin_verified"
-    assert row["is_pin"]
+    assert row["name"] == "azanidyl" and row["tier"] == "systematic_verified"
+    assert not row["is_pin"]
     assert _strict_rt("azanidyl", "[NH-]")
 
 
@@ -103,7 +109,10 @@ def test_carbon_free_radical_ion_is_a_preselected_name():
 ])
 def test_the_ionic_parent_hydride_holds_the_bonds_of_the_radical_ion(smiles, expected):
     row = _name(smiles)
-    assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
+    if _carbon_free(smiles):     # '[SH4+]', '[PH3-]': no PIN since 2026-11-02 (changed asserted label, see ``_name``)
+        assert row["name"] == expected and row["tier"] == "systematic_verified" and not row["is_pin"], row
+    else:
+        assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
     assert _strict_rt(expected, smiles)
 
 

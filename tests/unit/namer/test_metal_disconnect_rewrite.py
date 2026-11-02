@@ -194,8 +194,11 @@ def test_the_offer_is_made_once_per_call_by_the_caller_only(monkeypatch):
     assert row["name"] == "zinc diethanethiolate"
     assert calls == ["CCS[Zn]SCC"]
     calls.clear()
-    assert _row("[Cl-].[Cl-].[Zn+2]", "best-effort")["tier"] == "pin_verified"   # the twin runs for it
-    assert calls == ["[Cl-].[Cl-].[Zn+2]"]
+    # the twin runs for a pin_verified name; 'zinc dichloride' was the witness until 2026-11-02, when a carbon-free
+    # name left the PIN label, the Blue Book,:2058), so the twin no longer runs for it: the salt of
+    # an acid stands in, 'zinc diacetate', kept pin_verified by the maintainers)
+    assert _row("CC(=O)[O-].CC(=O)[O-].[Zn+2]", "best-effort")["tier"] == "pin_verified"   # the twin runs for it
+    assert calls == ["CC(=O)[O-].CC(=O)[O-].[Zn+2]"]
 
 
 def test_every_public_entry_names_the_ionic_drawing():
@@ -210,7 +213,10 @@ def test_every_public_entry_names_the_ionic_drawing():
     with pytest.raises(OrthonymLimitError) as raised:
         default.name("Cl[Zn]Cl", raise_on_limit=True)
     assert raised.value.code == "NO_VERIFIED_PIN"
-    assert default.name("[Cl-].[Cl-].[Zn+2]") == "zinc dichloride"
+    # the ionic drawing is carbon-free: a preselected name at most, never a PIN (user decision 2026-11-02;
+    # PREFERRED IUPAC NAMES, the Blue Book,:2058), so the default tier declines it too; best-effort names it
+    assert default.name("[Cl-].[Cl-].[Zn+2]") == ""
+    assert namer.name("[Cl-].[Cl-].[Zn+2]") == "zinc dichloride"
 
 
 AS_WRITTEN = "Cl[Zn]Cl.c1ccc(nc1)-c1ccccn1"      # panel D3, two fragments: named at START, as written, as an adduct of ZnCl2 and bipyridine

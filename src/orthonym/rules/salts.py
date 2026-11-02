@@ -1264,7 +1264,7 @@ def _with_solvate_suffix(mol, result: str, solvate_suffix: str, hydrogen_prefix:
     above. In general nomenclature, hydrates may be named by adding the words 'hydrate' to the name preceded by an
     appropriate numerical prefix". The word 'hydrate' is the general-nomenclature form, and (:4667) gives
     a mixed organic - inorganic adduct no preferred name. A carbon-free hydrate is labelled the same way (user decision
-    2026-11-01, which narrows the 2026-09-30 one: a carbon-free salt keeps its label, its hydrate does not).
+    2026-11-01; since 2026-11-02 every carbon-free name is below the PIN,, ``namer._is_carbon_free_compound``).
     (:37563): "these 'adduct names' are not PINs". Label only: the name is unchanged."""
     name = result + solvate_suffix
     if solvate_suffix and result:

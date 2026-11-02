@@ -45,7 +45,7 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CCNCNCC",
     "CN(C)CN(C)C",
     # '[Fr+].[NH2-]' left this set on 2026-10-30: the PIN path names it 'francium amide' pin_verified, as
-    # caesium amide and rubidium amide, a carbon-free salt (the contributor guide "Scope": kept pin_verified by the maintainers)
+    # caesium amide and rubidium amide (a carbon-free salt: since 2026-11-02 declined at the default tier, ``_pin_row``)
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -64,8 +64,16 @@ def _key(smiles):
     return Chem.MolToInchiKey(mol) if mol is not None else ""
 
 
+def _carbon_free(smiles):
+    return not any(a.GetAtomicNum() == 6 for a in Chem.MolFromSmiles(smiles).GetAtoms())
+
+
 def _pin_row(smiles):
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+    # a carbon-free structure has a preselected name at most, so the default tier declines it (user decision
+    # 2026-11-02; PREFERRED IUPAC NAMES, the Blue Book: the label 'PIN' goes to names of compounds
+    # "that also contain at least one carbon atom in their structure";:2058 "... the label 'preselected name'
+    # is added to appropriate names"): the strict path's row is asserted, and best-effort gives the same name
+    if (smiles in DEFAULT_TIER_DECLINES or _carbon_free(smiles)) and default_tier_rule_applies():
         return _declined_pin_row(smiles)
     return Orthonym().name_tiered(smiles)
 
@@ -248,16 +256,18 @@ def test_mononuclear_anion_neighbours_unchanged(smiles, expected):
 # rescues join the ions in the adduct notation ('lithium(1+)—azanetriide (3/1)'), the
 # format of adducts, the Blue Book,:3765), where a salt is named "by
 # citing the name of the cation(s) followed by the name of the anion",
-#:31563). The bare ions keep their names. The label is the one of the
-# naming path, as in the paper's measured run (user decision 2026-09-30: a carbon-free
-# compound, 'sodium chloride' pin_verified): the PIN path's salts pin_verified, the
-# retained-table name systematic_verified.
+#:31563). The bare ions keep their names. Changed asserted labels (2026-11-02,
+# user decision "decide what the Blue Book says"; was pin_verified, the paper-run label of
+# 2026-09-30): a carbon-free salt has a preselected name at most, never a PIN.
+# PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to names of compounds
+# "that also contain at least one carbon atom in their structure";:2058 "... the label
+# 'preselected name' is added to appropriate names". The names are unchanged.
 @pytest.mark.parametrize("smiles,expected,tier", [
-    ("[Li+].[Li+].[Li+].[N-3]", "lithium nitride", "pin_verified"),
-    ("[Mg+2].[Mg+2].[Mg+2].[N-3].[N-3]", "magnesium nitride", "pin_verified"),
-    ("[N-3].[N-3].[Sr+2].[Sr+2].[Sr+2]", "strontium nitride", "pin_verified"),
+    ("[Li+].[Li+].[Li+].[N-3]", "lithium nitride", "systematic_verified"),
+    ("[Mg+2].[Mg+2].[Mg+2].[N-3].[N-3]", "magnesium nitride", "systematic_verified"),
+    ("[N-3].[N-3].[Sr+2].[Sr+2].[Sr+2]", "strontium nitride", "systematic_verified"),
     # the PIN path names it since francium has its element name (errors._METAL_NAMES, 2026-10-30), as caesium amide
-    ("[Fr+].[NH2-]", "francium amide", "pin_verified"),
+    ("[Fr+].[NH2-]", "francium amide", "systematic_verified"),
 ])
 def test_element_ion_salt_keeps_its_name_at_best_effort(smiles, expected, tier):
     from tests.support.rt_assert import name_best_effort

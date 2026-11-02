@@ -14,6 +14,7 @@ the rule gives; ASSUMED a reading the book does not decide. The names are read b
 suite has it (2.9.0 in CI) to the input's full InChIKey, independently of the engine's own gate.
 """
 import pytest
+from tests.support.pin_tiers import assert_preselected_at_both_tiers, is_carbon_free
 from rdkit import Chem
 
 from orthonym import Orthonym
@@ -127,6 +128,11 @@ def _row(smiles):
 
 @pytest.mark.parametrize("smiles,name,cite", PRINTED, ids=[r[1] for r in PRINTED])
 def test_printed_name(smiles, name, cite):
+    if is_carbon_free(smiles):
+        # 'nitrous amide (preselected name)': no PIN. Changed asserted label 2026-11-02 (user decision "decide what
+        # the Blue Book says"; was pin_verified): ``pin_tiers.CARBON_FREE_RULE``, the Blue Book,:2058)
+        assert_preselected_at_both_tiers(smiles, name)
+        return
     row = _row(smiles)
     assert row["name"] == name, (cite, row)
     assert row["tier"] == "pin_verified" and row["is_pin"] is True, row

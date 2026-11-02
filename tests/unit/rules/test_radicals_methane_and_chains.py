@@ -5,6 +5,9 @@ Blue Book rows of the radical pack (benchmarks/bb_conformance/radical_pack.json)
 Every name passes a strict OPSIN -r round trip.
 """
 import pytest
+
+from tests.support.default_tier import assert_default_tier_declines, strict_path_row
+from tests.support.pin_tiers import is_carbon_free
 from rdkit import Chem
 
 from orthonym import Orthonym
@@ -30,6 +33,12 @@ def _strict_rt(name, smiles):
 ])
 def test_named(smiles, expected):
     with jvm_slots(1, purpose="test-radical-methane-chain"):
-        row = Orthonym(style="pin").name_tiered(smiles)
+        if is_carbon_free(smiles):
+            # a preselected name, no PIN (user decision 2026-11-02; ``pin_tiers.CARBON_FREE_RULE``,
+            # the Blue Book,:2058): the default tier declines it, the strict path builds the name
+            assert_default_tier_declines(smiles)
+            row = strict_path_row(smiles)
+        else:
+            row = Orthonym(style="pin").name_tiered(smiles)
     assert row["name"] == expected and row["tier"] != "abstain"
     assert _strict_rt(expected, smiles)

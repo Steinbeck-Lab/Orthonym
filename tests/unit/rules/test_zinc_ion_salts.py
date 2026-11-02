@@ -173,18 +173,23 @@ def test_carbanion_salts_of_zinc_are_not_pin_labelled(smiles, name):
 
 
 def test_carbon_free_and_acid_salts_keep_their_label():
-    """The named exceptions of section 3: carbon-free salts (the convention of 2026-09-30, kept for
-    every metal alike by user answer 3) and the salts of acids, alcohols and thiols (the pattern of
-     and, ASSUMED for zinc: the book prints no zinc example)."""
+    """The named exception of section 3: the salts of acids, alcohols and thiols (the pattern of and
+    , ASSUMED for zinc: the book prints no zinc example). Changed asserted labels (2026-11-02, user decision
+    "decide what the Blue Book says", replacing the carbon-free convention of 2026-09-30; were pin_verified at both
+    tiers): a carbon-free salt has a preselected name at most, never a PIN PREFERRED IUPAC NAMES,
+    the Blue Book: the label 'PIN' goes to compounds "that also contain at least one carbon atom in their
+    structure";:2058), so the PIN tier declines it and the best-effort tier gives the name below the PIN."""
     for smiles, name in [
-        ("[Cl-].[Cl-].[Zn+2]", "zinc dichloride"),
         ("CC(=O)[O-].CC(=O)[O-].[Zn+2]", "zinc diacetate"),
         ("CC[O-].CC[O-].[Zn+2]", "zinc diethoxide"),
-        ("[Na+].[Cl-]", "sodium chloride"),
     ]:
         for tier in ("pin", "best-effort"):
             row = _row(smiles, tier)
             assert (row["name"], row["tier"], row["is_pin"]) == (name, "pin_verified", True), (smiles, tier)
+    for smiles, name in [("[Cl-].[Cl-].[Zn+2]", "zinc dichloride"), ("[Na+].[Cl-]", "sodium chloride")]:
+        assert (_row(smiles, "pin")["tier"], _row(smiles, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
+        row = _row(smiles, "best-effort")
+        assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), smiles
 
 
 def test_cyanide_is_not_a_carbanion_for_the_label():
@@ -317,14 +322,16 @@ def test_the_predicate_clauses(smiles, name, expected):
     assert PREDICATE(smiles, name) is expected
 
 
-def test_the_coordination_list_names_are_not_demoted():
-    """Clause (d): a name of the exact-structure list keeps the label of its path (user decision
-    2026-09-30). The predicate is False for a name that ``_coordination_list_name`` accepts."""
+def test_the_coordination_list_names_are_not_an_exception():
+    """The former clause (d) is gone (2026-11-02, user decision "decide what the Blue Book says", replacing the
+    path label of 2026-09-30; changed asserted value, was False): a name of the exact-structure list is no PIN
+    either INTRODUCTION, the Blue Book, "Preferred IUPAC names (PINs) are not identified for the
+    compounds in this Chapter"; the namer labels it systematic_verified), so the predicate does not read the list."""
     import orthonym.namer as nm
     original = nm._coordination_list_name
     try:
         nm._coordination_list_name = lambda smiles, name: True
-        assert PREDICATE("[CH2-]C.[CH2-]C.[Zn+2]", "zinc bis(ethan-1-ide)") is False
+        assert PREDICATE("[CH2-]C.[CH2-]C.[Zn+2]", "zinc bis(ethan-1-ide)") is True
     finally:
         nm._coordination_list_name = original
     assert PREDICATE("[CH2-]C.[CH2-]C.[Zn+2]", "zinc bis(ethan-1-ide)") is True
@@ -387,6 +394,18 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
         if chapter_p10_name_is_no_pin(None, p10_name or ""):
             # relabel 2026-10-31: a salt of a Chapter anion ('copper diglycinate', is no
             # PIN:50943): the PIN tier declines it, the best-effort tier ships it below the PIN
+            if row["tier_req"] == "pin":
+                assert (now["tier"], now["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), key
+            else:
+                assert (now["name"], now["tier"], now["is_pin"]) == (p10_name, "systematic_verified", False), key
+            continue
+        if (row.get("tier") in ("pin_verified", "pin_unverified")
+                and not any(a.GetAtomicNum() == 6 for a in Chem.MolFromSmiles(row["smiles"]).GetAtoms())):
+            # 2026-11-02 (user decision "decide what the Blue Book says"; changed asserted labels, the baseline
+            # rows were pin_verified): a carbon-free salt has a preselected name at most, never a PIN.
+            # PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to names of compounds "that also
+            # contain at least one carbon atom in their structure";:2058. The PIN tier declines it, the
+            # best-effort tier ships the same name below the PIN.
             if row["tier_req"] == "pin":
                 assert (now["tier"], now["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), key
             else:

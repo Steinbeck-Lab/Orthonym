@@ -386,10 +386,10 @@ CHARGE_FIXED_RATIO_ROWS = [
 def test_stated_cation_charge_drops_the_stoichiometric_prefixes(smiles, expected):
     name, tier = _named(smiles)
     assert name == expected, name
-    # carbon-free: the label of the naming path, as in the paper's measured run (user
-    # decision 2026-09-30, 'sodium chloride' pin_verified; the merged rule of
-    # c4bf672b8)
-    assert tier == "pin_verified", tier
+    # carbon-free: a preselected name at most. Changed asserted label (2026-11-02, user decision "decide what
+    # the Blue Book says"; was pin_verified, the paper-run label of 2026-09-30): PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to names of compounds "that also contain at least one carbon atom in their structure";
+    #:2058 "... the label 'preselected name' is added to appropriate names"
+    assert tier == "systematic_verified", tier
 
 
 def test_rescue_memo_hit_keeps_the_producer_label():

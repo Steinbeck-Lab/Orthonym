@@ -72,12 +72,15 @@ def test_the_unchecked_numbering_predicate_sees_only_the_tetravalent_parent():
     assert has_unchecked_parent_numbering(None) is False
 
 
-def test_a_table_10_1_parent_on_an_unchecked_numbering_keeps_its_list_name_at_the_default_tier():
-    """The list name is emitted at the default tier and is no PIN: INTRODUCTION (the Blue Book;
-    :50943) "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." (lead decision
-    2026-10-17): label systematic_verified, verified 'identity'. The name is the book's own string (Table 10.1
-    (a),:51396), unchanged."""
-    row = name_default(LYCOPODANE)
+def test_a_table_10_1_parent_on_an_unchecked_numbering_keeps_its_list_name_on_the_strict_path():
+    """The list name is no PIN: INTRODUCTION (the Blue Book;:50943) "Preferred IUPAC names (PINs) are
+    not identified for the compounds in this Chapter." (lead decision 2026-10-17): label systematic_verified,
+    verified 'identity'. Since 2026-11-02 (user decision "decide what the Blue Book says") the PIN tier declines it
+    (it was emitted there as an exception); the strict path still builds it. The name is the book's own string
+    (Table 10.1 (a),:51396), unchanged."""
+    from tests.support.default_tier import assert_default_tier_declines, strict_path_row
+    assert_default_tier_declines(LYCOPODANE)
+    row = strict_path_row(LYCOPODANE)
     assert row.get("name") == "lycopodane", row
     assert row.get("tier") == "systematic_verified" and row["verified"] == "identity", row
     assert row["is_pin"] is False, row
