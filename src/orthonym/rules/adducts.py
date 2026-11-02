@@ -265,9 +265,9 @@ def _name_component(frag_smi: str, style: str, *,
 
     if (own_names or {}).get(frag_smi) or frag_smi.count(".") or len(frag_smi) < 4:
         return once()
-    from orthonym.assembly.nested_memo import cached_nested_call
+    from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
     key = (frag_smi, style, general_fallback, allow_aromatic_general, general_fallback_unverified,
-           charged_ok, ions_ok, _naming_context())
+           charged_ok, ions_ok, _naming_context(), renaming_state())
     return cached_nested_call("adduct_component", key, once, replay_budgets=False)
 
 
@@ -581,8 +581,9 @@ def _component_spellings(frag_smi: str, primary: str, style: str, flags: dict):
     """The other spellings of one adduct component (``_component_spellings_once``), once per
     top-level naming for the same component, first name, flags and ambient state
     (``_naming_context``); a hit replays the provenance the first run recorded."""
-    from orthonym.assembly.nested_memo import cached_nested_call
-    key = (frag_smi, primary, style, tuple(sorted(flags.items())), _naming_context())
+    from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
+    key = (frag_smi, primary, style, tuple(sorted(flags.items())), _naming_context(),
+           renaming_state())
     return list(cached_nested_call(
         "adduct_component_spellings", key,
         lambda: tuple(_component_spellings_once(frag_smi, primary, style, flags)),
@@ -647,8 +648,9 @@ def _readable_spellings(ordered: List[Tuple[str, int]],
     and ambient state (``_naming_context``): an adduct that no spelling repairs spends its whole
     read-back budget (``_READBACK_TRIALS``) on every build of it. A hit replays the provenance the
     first run recorded."""
-    from orthonym.assembly.nested_memo import cached_nested_call
-    key = (tuple(ordered), tuple(named), style, tuple(sorted(flags.items())), _naming_context())
+    from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
+    key = (tuple(ordered), tuple(named), style, tuple(sorted(flags.items())), _naming_context(),
+           renaming_state())
     out = list(cached_nested_call(
         "adduct_readable_spellings", key,
         lambda: tuple(_readable_spellings_once(ordered, named, style, flags)),

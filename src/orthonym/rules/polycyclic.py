@@ -1685,7 +1685,9 @@ class VonBaeyerAnalyzer:
         if skey is None:
             val = _by_object()
         else:
-            val = cache_or_compute("polycyclic.main_ring_struct", skey, _by_object)
+            # verify mode compares the ring, the bridge and the candidates; the units (val[3]) are what the
+            # search cost, less in a scope whose per-object memo is warmer
+            val = cache_or_compute("polycyclic.main_ring_struct", skey, _by_object, compared=lambda v: v[:3])
         if state["hit"] and val[3]:
             spend_perf_work(val[3])
         ring = list(val[0]) if val[0] else val[0]

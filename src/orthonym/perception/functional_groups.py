@@ -1293,8 +1293,8 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
 
 def _detect_by_structure(mol):
     """Lever K (2026-09-12): a second cache level keyed by the fragment's canonical SMILES plus
-    RDKit's atom output order, i.e. by the IDENTICAL indexed graph (the same argument the
-    fused_core memo uses). Fragment mols are new objects on every cut, so the weak-key level
+    RDKit's atom output order and each atom's neighbour order, i.e. by the IDENTICAL indexed
+    graph (the same argument the fused_core memo uses). Fragment mols are new objects on every cut, so the weak-key level
     above misses; two objects with the same indexed graph get the same index tuples. Scope =
     one naming call (assembly.memo). RWMol is never cached. FGFILTER verify mode recomputes and
     compares on a hit."""
@@ -1305,9 +1305,14 @@ def _detect_by_structure(mol):
         if _cache_var.get() is None:
             return _detect_functional_groups_impl(mol)
         smi = Chem.MolToSmiles(mol)
-        key = (smi, mol.GetProp("_smilesAtomOutputOrder") if mol.HasProp("_smilesAtomOutputOrder") else None)
-        if key[1] is None:
+        order = mol.GetProp("_smilesAtomOutputOrder") if mol.HasProp("_smilesAtomOutputOrder") else None
+        if order is None:
             return _detect_functional_groups_impl(mol)
+        # The order of each atom's neighbours too: the matcher walks them in that order, so two molecules with one
+        # canonical SMILES and one atom order but bonds added in another order list a match's atoms in another order
+        # ('secondary_alcohol' (13, 12, 11, 2) and (13, 12, 2, 11)); the value of this process-wide entry then
+        # depended on which molecule of the run reached it first.
+        key = (smi, order, tuple(tuple(n.GetIdx() for n in a.GetNeighbors()) for a in mol.GetAtoms()))
     except Exception:
         return _detect_functional_groups_impl(mol)
     # Perf lever A8: the key is the canonical SMILES + atom output order, so the value is

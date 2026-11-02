@@ -1771,12 +1771,9 @@ def _try_neutralize_and_name_without_carbohydrate(mol) -> str:
     # catalog would name (its dispatch predicate), so any other skeleton returns
     # at once; and the naming is memoised per molecule (the scope-bound replay
     # memo of nested namings, keyed like its other users by the skeleton and the
-    # breadth context the nested naming reads).
-    from ..assembly.nested_memo import cached_nested_call
-    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
-                                      full_coverage_ctx, general_fallback_ctx)
-    _key = (neutral_smiles, general_fallback_ctx.get(), best_effort_ctx.get(),
-            allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+    # ambient state the nested naming reads, nested_memo.renaming_state).
+    from ..assembly.nested_memo import cached_nested_call, renaming_state
+    _key = (neutral_smiles, renaming_state())
     return cached_nested_call(
         "anion_neutral_without_carbohydrate", _key,
         lambda: _name_neutral_without_carbohydrate(neutral_smiles))

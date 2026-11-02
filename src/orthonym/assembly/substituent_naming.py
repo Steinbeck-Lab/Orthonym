@@ -5356,18 +5356,15 @@ def _substitutive_peptide_acid_name(frag_smi: str) -> Optional[str]:
     Memoised for the top-level naming call (assembly.nested_memo: provenance side
     effects replayed on a hit; ORTHONYM_MEMO=verify recomputes): the recursion
     re-asks the same sub-peptide fragments many times (a 14-residue ChEBI peptide
-    made 8,176 calls, 239 of its 243 s). The key carries the breadth context the
-    fresh instance inherits. A hit charges no budget (replay_budgets=False; see
+    made 8,176 calls, 239 of its 243 s). A hit charges no budget (replay_budgets=False; see
     nested_memo.cached_nested_call): the unmemoised repeat ran warm, and replaying
     each fragment's cold cost per hit spent the 500-call analysis budget on the
-    ChEBI 12-residue peptides, which then abstained."""
-    from .nested_memo import cached_nested_call
-    from ..decomposition.engine import nacyl_float_refusing
-    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
-                                      full_coverage_ctx, general_fallback_ctx)
-    key = (frag_smi, general_fallback_ctx.get(), best_effort_ctx.get(),
-           allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-           nacyl_float_refusing())
+    ChEBI 12-residue peptides, which then abstained. The key is the fragment and the ambient naming state
+    (``nested_memo.renaming_state``)."""
+    from .nested_memo import cached_nested_call, renaming_state
+    # the whole ambient state of a re-entrant naming (the peptide handler's attempt included: inside it the fresh
+    # naming of '[H]OC(=O)C(N)CO' declined, outside it gave '2-amino-3-hydroxypropanoic acid')
+    key = (frag_smi, renaming_state())
     return cached_nested_call("substitutive_peptide_acid_name", key,
                               lambda: _substitutive_peptide_acid_name_fresh(frag_smi),
                               replay_budgets=False)

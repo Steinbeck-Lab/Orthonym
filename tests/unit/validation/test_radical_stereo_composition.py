@@ -131,3 +131,23 @@ def test_the_stereo_pass_is_not_active_while_the_offer_reads_a_name():
         for _name in _further_names(mol):
             seen.append(radical_floor_stereo_active())
     assert seen and not any(seen)
+
+
+@pytest.mark.parametrize("outside_first", [True, False])
+def test_one_memo_scope_keeps_the_two_readings_apart(outside_first):
+    """The map is memoised for the naming call, and its key carries the reading: in one memo scope the map read outside
+    the offer (none: the name does not parse without ``-r``) is not served inside it, nor the other way round. A key
+    without the reading served the 'none' to the radical offer, and a radical with a boron radical centre got a name
+    without its radical when the offer ran in the first pass's scope."""
+    from orthonym.assembly import memo
+    mol, name = Chem.MolFromSmiles("C[C@@H](C(=O)OC)[NH]"), "(1-methoxy-1-oxopropan-2-yl)amino"
+    tok = memo.push_scope()
+    try:
+        for inside in ((False, True) if outside_first else (True, False)):
+            if inside:
+                with radical_last_resort():
+                    assert opsin_atom_locant_map(name, mol)
+            else:
+                assert opsin_atom_locant_map(name, mol) is None
+    finally:
+        memo.pop_scope(tok)

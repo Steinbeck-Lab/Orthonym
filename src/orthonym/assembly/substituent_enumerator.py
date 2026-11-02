@@ -44,6 +44,7 @@ from ..metrics.candidate_ledger import Scope as _LedgerScope
 from ..metrics.candidate_ledger import Stage as _LedgerStage
 from ..metrics.candidate_ledger import record_candidate as _ledger_record
 from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from .memo_keys import mol_graph_key as _mol_graph_key
 from ..rules.seniority import get_prefix
 from ..errors import CASCADE_REFUSAL
 from .engine_prefix_ordering import engine_orders_with_mancude
@@ -1064,6 +1065,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     can only be used with molecules that have a single fragment", and logs the refusal
     on every call: the question is asked here, so it is not put to RDKit).
     """
+    from .nested_memo import renaming_state
     attach_in_frag = attach_idx in frag_atoms
     # RDKit refuses a fragment rooted at an atom of a molecule with more than one fragment ("rootedAtAtom
     # can only be used with molecules that have a single fragment"), so such a molecule (a mixture named as
@@ -1145,6 +1147,15 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     # did (it separates even symmetric fragments a rank collapses), so the key is
     # only FINER -> a false HIT can become only a MISS (recompute) -> byte-identity
     # preserved.
+    # The whole molecule's atom-ordered graph (``_mol_graph_key``, as in the key of
+    # ``name_substituent_for_ordering``): "within one scope the input is exactly (mol, frag_atoms,
+    # attach_idx)" holds for ONE molecule, and a scope holds several -- the nested namings of a
+    # glycoside name its smaller pieces as molecules of their own, with the same atom indices. The
+    # bits above did not tell them apart: the O-CH2 of {6, 7} was '{[...tetrahydroxyoxan-2-yl]methoxy}'
+    # in the sugar alone and '{[(...)-6-{[...]oxy}-3,4,5-trihydroxyoxan-2-yl]methoxy}' in the whole
+    # glycoside, and the first molecule's value was served to the second.
+    # The state of a re-entrant naming (``nested_memo.renaming_state``): 'NC(=O)C(N)CO' of one molecule
+    # was declined inside the peptide handler's attempt and is '2-amino-3-hydroxypropanamido' outside it.
     # a lever: the strict PIN twin (namer.py) runs with the four breadth flags OFF,
     # so a value cached at one configuration must never be served to another when the
     # twin shares this run's memo scope. ``best_effort_val`` is already the
@@ -1153,26 +1164,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     return (smi, attach_in_frag, ext_free_valence,
             bool(allow_mancude), best_effort_val, atom_cips, bond_cips,
             ext_bond_orders, frozenset(frag_atoms), attach_idx,
-            general_fallback_ctx.get(), allow_aromatic_general_ctx.get(),
-            full_coverage_ctx.get(), engine_orders_with_mancude())
-
-
-def _mol_graph_key(mol):
-    """A complete, atom-ORDERED description of *mol*'s graph (every atom's element,
-    charge, isotope, hydrogens, aromaticity and chiral tag; every bond's atoms,
-    order, stereo and direction), so two molecule objects share a key only when
-    atom indices mean the same atoms. Read-only: unlike ``MolToSmiles`` it sets no
-    output-order property."""
-    atoms = tuple(
-        (a.GetAtomicNum(), a.GetFormalCharge(), a.GetIsotope(), a.GetNumExplicitHs(),
-         a.GetNoImplicit(), a.GetIsAromatic(), int(a.GetChiralTag()),
-         a.GetNumRadicalElectrons())
-        for a in mol.GetAtoms())
-    bonds = tuple(
-        (b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()),
-         int(b.GetStereo()), tuple(b.GetStereoAtoms()), int(b.GetBondDir()))
-        for b in mol.GetBonds())
-    return atoms, bonds
+            engine_orders_with_mancude(), _mol_graph_key(mol), renaming_state())
 
 
 def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
@@ -1209,13 +1201,20 @@ def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
     # The fragment session depth is in the key too (a deep prefix is named against the depth
     # budget left at that depth), and so is ``allow_mancude``, the argument the general engine
     # names its prefixes with (``engine_prefix_ordering``). Finer key => only more misses.
+    # The CIP labels on the molecule object and the ambient naming state are in the key too, as in
+    # ``_substituent_memo_key``: a sort key named before the stereo was assigned has no '(3R)', and one
+    # named inside the peptide handler's attempt another form ('{1-oxo-3-[...]heptacosa-...-1-yl}amino'
+    # where the plain naming gives '(3R)-3-[...]heptacosa-...-heptaynamido').
     from .fragment_naming import _session_depth
+    from .nested_memo import renaming_state
     allow_mancude = engine_orders_with_mancude()
     try:
+        cips = (tuple(a.GetProp('_CIPCode') if a.HasProp('_CIPCode') else None for a in atoms_of(mol)),
+                tuple(b.GetProp('_CIPCode') if b.HasProp('_CIPCode') else None for b in bonds_of(mol)))
         key = (_mol_graph_key(mol), tuple(sorted(frag_atoms)), attach_idx,
                best_effort_ctx.get(), general_fallback_ctx.get(),
                allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-               _session_depth(), allow_mancude)
+               _session_depth(), allow_mancude, cips, renaming_state())
     except Exception:  # noqa: BLE001 -- no key, no memo
         return _name_substituent_for_ordering_uncached(mol, frag_atoms, attach_idx, allow_mancude)
     return cache_or_compute(

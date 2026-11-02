@@ -394,7 +394,7 @@ def pure_cache_or_compute(namespace, key, compute_fn):
     return val
 
 
-def cache_or_compute(namespace, key, compute_fn):
+def cache_or_compute(namespace, key, compute_fn, compared=None):
     """Return the memoized value for ``(namespace, key)``, computing it via
     ``compute_fn`` on a miss.
 
@@ -403,6 +403,9 @@ def cache_or_compute(namespace, key, compute_fn):
     * ``on`` -> return the cached value if present, else compute + store + return.
     * ``verify`` -> ALWAYS recompute; if a value is already stored for the key and
       differs, raise:class:`MemoMismatch`; then store + return the fresh value.
+      ``compared`` (a function of a value) is the part of a value that must agree,
+      for a value that also carries what its computation cost (the work units a
+      hit replays: a recompute in a warmer scope costs less for the same answer).
     """
     if _MODE == "off":
         return compute_fn()
@@ -412,7 +415,8 @@ def cache_or_compute(namespace, key, compute_fn):
     ck = _ck(namespace, key)
     if _MODE == "verify":
         val = compute_fn()
-        if ck in cache and cache[ck] != val:
+        _part = compared or (lambda v: v)
+        if ck in cache and _part(cache[ck]) != _part(val):
             # Record BEFORE raising: the naming cascade swallows the exception, so
             # this counter is the only observable signal of an incomplete key over a
             # full-engine corpus run (a review P3 Crit-2).

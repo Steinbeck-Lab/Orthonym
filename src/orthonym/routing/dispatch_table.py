@@ -1780,20 +1780,14 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
             # glycopeptides (the NATIVE_HANG rows). The replay-memo is scope-bound
             # (assembly.nested_memo: provenance side effects replayed on a hit,
             # ORTHONYM_MEMO=verify recomputes), and its key carries every input the
-            # sub-namer reads: the molecule, the style and the breadth and
-            # N-acyl-float context the fresh instance inherits. A hit charges no
+            # sub-namer reads: the molecule, the style and the ambient naming state
+            # (nested_memo.renaming_state) the fresh instance inherits. A hit charges no
             # budget (replay_budgets=False): the unmemoised repeat it replaces ran
             # warm (145 analysis calls cold, then 0, 0, 0 for a ChEBI 12-residue
             # peptide), and replaying the cold cost per hit spent the 500-call
             # budget, so the peptide abstained instead of shipping its name.
-            from orthonym.assembly.nested_memo import cached_nested_call
-            from orthonym.decomposition.engine import nacyl_float_refusing
-            from orthonym.metrics.provenance import (
-                allow_aromatic_general_ctx, best_effort_ctx, full_coverage_ctx,
-                general_fallback_ctx)
-            _key = (_in, style, general_fallback_ctx.get(), best_effort_ctx.get(),
-                    allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-                    nacyl_float_refusing())
+            from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
+            _key = (_in, style, renaming_state())
             _subst, _demoted = cached_nested_call(
                 "peptide_substitutive_attempt", _key, _attempt,
                 replay_budgets=False)

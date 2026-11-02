@@ -427,13 +427,19 @@ def test_multi_anion_row_does_not_repeat_the_neutral_namings(monkeypatch):
         calls["systematic"] += 1
         return real_sys(mol)
 
+    from orthonym.assembly import memo
+    from orthonym.assembly.nested_memo import renaming_state
+    keys = []
+
     def nc_spy(smiles):
         calls["no_carbohydrate"] += 1
+        keys.append(memo._ck("anion_neutral_without_carbohydrate", (smiles, renaming_state())))
         return real_nc(smiles)
     monkeypatch.setattr(ions, "_try_neutralize_and_name_systematic", sys_spy)
     monkeypatch.setattr(ions, "_name_neutral_without_carbohydrate", nc_spy)
     Orthonym().name_tiered(_LIPID_DIANION)
     # the released code ran the systematic namer 0 times on this row
     assert calls["systematic"] == 0, calls
-    # one fresh computation per breadth context the nested namings run in
-    assert calls["no_carbohydrate"] <= 6, calls
+    # one fresh computation per memo key: the skeleton, the naming state the nested naming reads
+    # (nested_memo.renaming_state) and the run's spelling forms (memo._ck); no key is named twice
+    assert 0 < len(keys) == len(set(keys)) <= 10, keys

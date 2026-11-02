@@ -11371,18 +11371,14 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
     if not include_confidence:
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
-            from .assembly.nested_memo import cached_nested_call
-            from .decomposition.engine import nacyl_float_refusing
-            from .metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
-                                             full_coverage_ctx, general_fallback_ctx)
-            # nacyl_float_refusing: decision A's N-acyl float scope changes the name
-            # (routing.dispatch_table._handle_peptide opens it), so it is a key part.
+            from .assembly.nested_memo import cached_nested_call, renaming_state
+            # The ambient state of a re-entrant naming (``nested_memo.renaming_state``: the tier flags,
+            # decision A's N-acyl float scope, the peptide handler's attempt,...) changes the name, so it is a
+            # key part.
             _key = (smiles, style, enable_triviality_controller, enable_group_splitting,
                     trivial_fallback, general_fallback, general_fallback_unverified,
                     allow_aromatic_general, full_coverage, mode, binding_proof,
-                    general_fallback_ctx.get(), best_effort_ctx.get(),
-                    allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-                    nacyl_float_refusing())
+                    renaming_state())
             return cached_nested_call("name_compound_nested", _key, lambda: _name_compound_impl(
                 smiles, style, include_confidence,
                 enable_triviality_controller=enable_triviality_controller,
@@ -11539,17 +11535,11 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
     # decomposition engine calls this re-entrantly on the same (smiles, style)
     # within one molecule (~9 dup calls / 0.85 s marginal on the perf sample). A
     # naive (smiles, style) key is PROVEN output-changing -- the result depends on
-    # the ambient tier contextvars (1 same-key-different-result observed), so those
-    # four vars are IN the key. push_scope creates a scope iff none is open (a
+    # the ambient tier contextvars (1 same-key-different-result observed), so the
+    # ambient naming state is IN the key. push_scope creates a scope iff none is open (a
     # standalone call), else shares the outer name scope. Fail-open + verify-mode
     # checked; plan internal notes Step 2.
     from .assembly.memo import cache_or_compute, pop_scope, push_scope
-    from .metrics.provenance import (
-        allow_aromatic_general_ctx,
-        best_effort_ctx,
-        full_coverage_ctx,
-        general_fallback_ctx,
-    )
 
     def _body():
         try:
@@ -11568,11 +11558,12 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
 
     _memo_token = push_scope()
     try:
-        from .decomposition.engine import nacyl_float_refusing
-        # nacyl_float_refusing: decision A's N-acyl float scope (see name's key).
-        _key = (smiles, style, general_fallback_ctx.get(), best_effort_ctx.get(),
-                allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-                nacyl_float_refusing(), wider_tier_ctx.get())
+        from .assembly.nested_memo import renaming_state
+        # The ambient state of a re-entrant naming call (the tier flags, decision A's N-acyl float scope, the peptide
+        # handler's attempt and its stand of a peptide name,...): a key of the tier flags and the N-acyl scope alone
+        # served '(2-amino-3-hydroxypropanamido)acetic acid', named outside the peptide handler's second attempt, to
+        # that attempt, where the same SMILES is '2-amino-3-hydroxypropanoylglycine'.
+        _key = (smiles, style, renaming_state(), wider_tier_ctx.get())
         return cache_or_compute("name_pipeline_only", _key, _body)
     finally:
         pop_scope(_memo_token)

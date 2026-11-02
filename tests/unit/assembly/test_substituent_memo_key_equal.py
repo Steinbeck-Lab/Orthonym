@@ -1,17 +1,15 @@
 """Lever G: the optimised _substituent_memo_key must return EXACTLY the value of the frozen
 reference below (a verbatim copy of the function as of commit b48165466, 2026-09-12), followed by
-the three breadth-flag components that dd759cc50 (a lever, 2026-09-17) appended on purpose and the
-engine-ordering mark that engine_prefix_ordering appended after them."""
+the engine-ordering mark that engine_prefix_ordering appended, the whole molecule's atom-ordered graph
+and the ambient naming state (2026-11-02: a scope holds several molecules with the same atom indices,
+and the peptide handler's attempt changes a fragment's name). The ambient state holds the three
+breadth-flag components that dd759cc50 (a lever, 2026-09-17) appended on purpose."""
 import itertools
 import pytest
 from rdkit import Chem
 from orthonym.assembly import substituent_enumerator as se
 from orthonym.assembly import memo
-from orthonym.metrics.provenance import (
-    allow_aromatic_general_ctx,
-    full_coverage_ctx,
-    general_fallback_ctx,
-)
+from orthonym.assembly.nested_memo import renaming_state
 from orthonym.perception.molcache import bonds_of
 
 
@@ -143,8 +141,7 @@ def test_key_identical_to_reference(smi):
                     assert key[:10] == ref
                     # engine_prefix_ordering appended the mark of a general-engine run (the engine's
                     # allow_mancude decides the ordering names of the prefixes it numbers): False here
-                    assert key[10:] == (general_fallback_ctx.get(), allow_aromatic_general_ctx.get(),
-                                        full_coverage_ctx.get(), False)
+                    assert key[10:] == (False, se._mol_graph_key(mol), renaming_state())
     finally:
         memo.pop_scope(tok)
 

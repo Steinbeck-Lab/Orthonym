@@ -126,6 +126,24 @@ def ambient_naming_state() -> tuple:
             book_forms_var.get(), getattr(_ALT_PARENT_RESCUE, 'active', False))
 
 
+def renaming_state() -> tuple:
+    """The state a memo of a whole naming started again inside a naming call (``namer.name_pipeline_only``,
+    ``name_compound`` re-entered, the peptide handler's attempt,...) and of ``name_substituent`` keys on: the four
+    tier flags, decision A's N-acyl float scope, the peptide handler's attempt and its stand of a peptide name
+    (``routing.dispatch_table._PEPTIDE_SUBST_ACTIVE`` / ``_PEPTIDE_NAME_STANDS``), and whether a fragment is being
+    named up the stack (``fragment_naming.in_fragment_recursion``: a name made there is the source of a prefix, not a
+    name offered).
+
+    The keys carried the tier flags and the N-acyl scope only, and ``ORTHONYM_MEMO=verify`` found 26 of 360 panel
+    rows served a value named in another state: inside and outside the peptide handler's attempt, and inside and
+    outside a fragment recursion (2026-11-02). The rest of:func:`ambient_naming_state` is left out, as before: the
+    same check found no value it changed, and with it (the visited set above all, which differs at every recursion
+    point) one key asked from several places hit far less often (+40% CPU on the slowest panel rows). Measured, not
+    proven: a verify run is the check."""
+    state = ambient_naming_state()
+    return (bool(state[0]),) + state[1:8]
+
+
 def cached_nested_call(namespace: str, key: tuple, fn: Callable[[], Any], *,
                        replay_budgets: bool = True) -> Any:
     """Return ``fn``'s result for ``(namespace, key)``; on a hit replay the EXACT
