@@ -20,6 +20,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 HANG = "CCCCCCCCCCCCCCCCCC"      # the structure whose naming never ends in these tests
 LIMIT = "0.3"                    # seconds
+# The limit of the tests whose lines after a timeout are drug-size structures (aspirin, alanine, naphthalene): they
+# take 50 to 100 ms on a fast core, a third of LIMIT, and ran out of it on a loaded four-core CI machine.
+FRESH_LIMIT = "2"
 NAMED = "CCO"
 NAMED2 = "CC(=O)O"
 LABEL = "no name within the time limit of 0.3 s"
@@ -178,7 +181,7 @@ def test_a_timed_out_line_leaves_no_state_and_the_next_lines_are_named_as_in_a_f
     others = [NAMED, "CC(=O)Oc1ccccc1C(=O)O", "C[C@H](N)C(=O)O", NAMED2, "c1ccccc1"]
     _, fresh, _ = _batch(capsys, tmp_path, others, *flags)
     status, timed, _ = _batch(capsys, tmp_path, [others[0], HANG, *others[1:], HANG, others[0]],
-                              "--time-limit", LIMIT, *flags)
+                              "--time-limit", FRESH_LIMIT, *flags)
     assert status == 0
     assert leaked_naming_state() == {}
     assert [line for line in timed if not line.startswith(HANG)] == fresh + [fresh[0]]
@@ -193,7 +196,8 @@ def test_the_lines_after_a_timeout_are_those_of_a_fresh_process(hang, capsys, tm
     src.write_text("".join(line + "\n" for line in others))
     fresh = subprocess.run([sys.executable, "-m", "orthonym", "--batch", str(src)], capture_output=True,
                            text=True, check=True, timeout=300).stdout.split("\n")[:-1]
-    status, timed, _ = _batch(capsys, tmp_path, [HANG, *others[:2], HANG, *others[2:]], "--time-limit", LIMIT)
+    status, timed, _ = _batch(capsys, tmp_path, [HANG, *others[:2], HANG, *others[2:]], "--time-limit",
+                              FRESH_LIMIT)
     assert status == 0
     assert [line for line in timed if not line.startswith(HANG)] == fresh
 
