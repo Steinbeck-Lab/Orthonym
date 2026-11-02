@@ -48,6 +48,10 @@ from ..data.locant_text import render_locants
 
 # Single-bonded halogen -> class-infix combining form (1)).
 _HALIDO_INFIX = {"Cl": "chlorido", "F": "fluorido", "Br": "bromido", "I": "iodido"}
+_HALIDE_WORDS = frozenset({"bromide", "chloride", "fluoride", "iodide"})
+# pseudohalide class word -> class-infix combining form
+_PSEUDOHALIDE_INFIX = {"azide": "azido", "cyanide": "cyanido", "isocyanide": "isocyanido", "cyanate": "cyanatido",
+                       "isocyanate": "isocyanatido", "thiocyanate": "thiocyanatido", "isothiocyanate": "isothiocyanatido"}
 
 # a phase: central-atom stems for the class-infix FRN engine,
 # WITHOUT the linking vowel (build_p_frn_acid_name appends it). Keyed by element,
@@ -885,6 +889,12 @@ def name_p_oxoacid_halide_amide(mol) -> Optional[str]:
         if organyl_names and n_prefixes:
             return None                              # E-/N- locant disambiguation, defer
         infix_counts = {"amido": len(amido_n)} if amido_n else {}
+        # (:35706) "names are formed on the basis of the senior class": beside a halide, a pseudohalide of
+        # an -ic acid is an infix, '(CH3)2N-P(O)(NCO)Cl N,N-dimethylphosphoramidisocyanatidic chloride (PIN)' (:35727);
+        # an -ous acid is not built ('sulfurimidisocyanatidous fluoride (PIN)',:35745): its two class words stay below the PIN
+        if oxo and _HALIDE_WORDS & set(class_counts):
+            for cls in [c for c in class_counts if c in _PSEUDOHALIDE_INFIX]:
+                infix_counts[_PSEUDOHALIDE_INFIX[cls]] = class_counts.pop(cls)
         stem_word = _pnictogen_acid_stem_word(
             symbol, oxo, skeletal, organyl_names, n_prefixes, infix_counts,
             _PNICTOGEN_OXOACID_STEMS, _PNICTOGEN_OUS_STEMS,

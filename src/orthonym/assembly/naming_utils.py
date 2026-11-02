@@ -411,8 +411,12 @@ _COMPOUND_S_SUFFIXES_COMPLEX = (
     'tellurinyl', 'telluronyl', 'tellanyl',
     # DD2 Fix B (Phase D, (1)): (alkyl)disulfanyl is a compound
     # substituent — '(methyldisulfanyl)methane'. Bare 'disulfanyl' (terminal
-    # -S-SH, no alkyl root) is simple and is not matched by the root loop.
-    'disulfanyl',
+    # -S-SH, no alkyl root) is simple and is not matched by the root loop. The
+    # selenium and tellurium chains are the same kind of prefix ('R'-disulfanyl',
+    # 'R'-diselanyl' or 'R'-ditellanyl'): '(methyldiselanyl)(methylsulfanyl)methane
+    # (PIN)' (the Blue Book).
+    'disulfanyl', 'diselanyl', 'ditellanyl',
+    'trisulfanyl', 'triselanyl', 'tritellanyl',
 )
 
 # C4-C: roots that are NOT a substituent group — a chalcogen suffix carrying
@@ -738,7 +742,7 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # omitted: 'ethaneperoxol' verbatim), 'ethanedithioperoxol', not
     # 'ethane-1-peroxol'. These route through _generate_suffix (no dedicated
     # handler), so the elision must be declared here.
-    "hydroperoxide", "so_thioperoxol", "os_thioperoxol", "dithioperoxol",
+    "hydroperoxide", "so_thioperoxol", "os_thioperoxol", "dithioperoxol", "diselenoperoxol", "ditelluroperoxol",
     # D-FOLLOWON item 1 /: the S/Se/Te oxoacid suffixes
     # (-sulfinic/-sulfonic/-selenonic/-seleninic/-telluronic/-tellurinic acid)
     # attach to a chain carbon whose locant is now computed (the _pick_locant_atom
@@ -1837,6 +1841,9 @@ def is_complex_substituent(name: str) -> bool:
             for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
                 if remainder == s_suffix:
                     return True
+    # a substituent prefix on a chalcogen prefix is compound: '[(acetylsulfanyl)peroxy]' (:39499)
+    if any(name_lower.endswith(s) and name_lower[:-len(s)].endswith('yl') for s in _COMPOUND_S_SUFFIXES_COMPLEX):
+        return True
     # DD2 Fix B (Phase D, (1)): (alkyl)peroxy is a compound substituent
     # requiring enclosing marks — '(methylperoxy)ethane', '(ethylperoxy)benzene'.
     # The simple 'peroxy' bridge and 'hydroperoxy' prefix are NOT compound.
@@ -2303,6 +2310,9 @@ _BIS_SUFFIX_EXCEPTION_TOKENS: frozenset = frozenset({
     'thioic acid', 'dithioic acid',
     'selenoic acid', 'diselenoic acid',
     'telluroic acid', 'ditelluroic acid',
+    # (e) (the Blue Book): 'bis' "before names beginning with a multiplicative prefix 'di'",
+    # 'bis(diazonium) (preselected suffix) (not didiazonium)'; the -SSH suffix is 'dithioperoxol'
+    'dithioperoxol', 'diselenoperoxol', 'ditelluroperoxol',
 })
 
 # Backwards-compatible alias: several sibling modules and tests import this name.

@@ -9,28 +9,13 @@ the PIN class plan, Task 28). (:31620): the acid salts of organic derivatives of
 oxoacids, carbonic acid included, are named by method (2) in a PIN: 'sodium hydrogen carbonate (PIN)' (:31623),
 'potassium hydrogen methylphosphonate (PIN)'.
 
-Where method (1) is not built (an anion of two carboxylates with a third group, a sulfonic acid), the method (2) name
-was labelled pin_verified; it is a valid name below the PIN now.
+Method (1) for a disulfonic acid and for a tricarboxylic acid on a chain is built: tests/unit/rules/test_sulfonate_acid_salt.py.
 """
 import pytest
 
-from tests.support.default_tier import assert_default_tier_declines
-from tests.support.rt_assert import assert_full_rt, name_best_effort
+from tests.support.rt_assert import name_best_effort
 
 pytestmark = pytest.mark.opsin_gate
-
-METHOD_2_BELOW_THE_PIN = [
-    ("OS(=O)(=O)CCS(=O)(=O)[O-].[Na+]", "sodium hydrogen ethane-1,2-disulfonate"),
-    ("[O-]C(=O)CC(C(=O)[O-])C(=O)O.[Na+].[Na+]", "disodium hydrogen ethane-1,1,2-tricarboxylate"),
-]
-
-
-@pytest.mark.parametrize("smiles,expected", METHOD_2_BELOW_THE_PIN)
-def test_the_hydrogen_word_of_an_organic_polybasic_acid_is_below_the_pin(smiles, expected):
-    assert_default_tier_declines(smiles)
-    be = name_best_effort(smiles)
-    assert be["name"] == expected and be["tier"] == "systematic_verified" and be["is_pin"] is False, be
-    assert_full_rt(be["name"], smiles, what="best-effort: ")
 
 
 @pytest.mark.parametrize("smiles,pin", [

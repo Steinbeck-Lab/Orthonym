@@ -108,7 +108,9 @@ def test_the_palladium_rows_are_named_at_best_effort(row):
 def test_declined_rows_keep_todays_output(row):
     """Every class the producer declines keeps the output it had before this route change: the label and
     the limit code at the default tier, the name byte for byte at best-effort. The two rows that change are
-    in ``CHANGES``."""
+    in ``CHANGES``. The von Baeyer names of ``radical_methyl`` and ``TPP_Hg_aryl`` give the free valence the
+    lowest locant ('...-undecaen-2-yl', NUMBERING (c) "principal characteristic groups and free valences",
+    the Blue Book), since the cage is mapped by the SMILES output order."""
     default = name_default(row["smiles"])
     assert (default.get("tier"), default.get("limit_code") or "", default.get("name") or "") == (
         row["default_tier"], row["default_limit_code"], row["default_name"]), default

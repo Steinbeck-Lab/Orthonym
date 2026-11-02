@@ -10260,44 +10260,37 @@ class Orthonym:
                 # (2-(naphthalen-2-yl)cyclohexan-1-ol, not naphthalene);
                 # (b) — the among-rings winner must BE the PAH
                 # system (2-(naphthalen-2-yl)furan: furan is senior).
-                from .rules.parent_selection import is_principal_group_on_ring
                 from .rules.polycyclics import get_polycyclic_core_atoms
                 _core = get_polycyclic_core_atoms(features.mol, pah_name)
                 _core_set = set(_core) if _core else set()
                 if _core_set:
-                    # Default False so the among-rings veto below runs
-                    # unchanged when there is NO principal characteristic group
-                    # (no PCG => none can sit on the PAH core). Assigned only
-                    # inside the principal_group_atoms branch otherwise.
-                    _pg_on_pah = False
+                    # counts the principal groups on each ring system: one with MORE than the PAH is the
+                    # parent ('4-[2-(1-hydroxynaphthalen-2-yl)ethyl]benzene-1,2-diol'). Only a PAH with strictly more
+                    # skips the veto below;:19422 "the same number of a characteristic group must be
+                    # present in all cyclic structures to be compared", so a tie (none on either included) runs it.
+                    _pah_more = False
                     if features.principal_group_atoms:
-                        _pg_on_pah = is_principal_group_on_ring(
-                            features.mol, _core_set,
-                            features.principal_group_atoms,
-                            features.principal_group,
-                        )
-                        _pg_on_other = any(
-                            is_principal_group_on_ring(
-                                features.mol, rs,
-                                features.principal_group_atoms,
-                                features.principal_group,
-                            )
-                            for rs in features.ring_systems
-                            if not (set(rs) & _core_set)
-                        )
-                        if _pg_on_other and not _pg_on_pah:
+                        from .rules.parent_selection import _count_pg_on_ring as _n_pg
+                        _pg_args = (features.principal_group_atoms, features.principal_group)
+                        _n_pah = _n_pg(features.mol, _core_set, *_pg_args)
+                        _n_other = max((_n_pg(features.mol, set(rs), *_pg_args) for rs in features.ring_systems
+                                        if not (set(rs) & _core_set)), default=0)
+                        if _n_other > _n_pah:
                             pah_name = None
+                        _pah_more = _n_pah > _n_other
+                    #: reuse the one authoritative computation; on a tie with groups, compares only the
+                    # ring systems that hold the most (a tertiary amine N on fluorene and on two phenyls: not carbazole)
+                    _senior = _principal_ring_system
+                    if pah_name and not _pah_more and features.principal_group_atoms and _n_pah:
+                        from .rules.ring_selection import select_principal_ring_system as _sel
+                        _senior = _sel(features.mol, [rs for rs in features.ring_systems if set(rs) & _core_set
+                                                      or _n_pg(features.mol, set(rs), *_pg_args) == _n_pah])
                     if pah_name:
-                        #: reuse the one authoritative computation
-                        _senior = _principal_ring_system
-                        # / build precedes: when
-                        # the principal characteristic group sits ON the PAH
-                        # core, a senior heterocyclic SUBSTITUENT ring must not
-                        # steal the parent (5-(1,3-dioxo-...-isoindol-2-yl)-
-                        # naphthalene-1-carboxylic acid). Only the among-rings
-                        # tie-break is skipped; already ran.
+                        # / build precedes: when the PAH has more principal groups, a
+                        # senior heterocyclic SUBSTITUENT ring must not steal the parent (5-(1,3-dioxo-...-isoindol-2-yl)-
+                        # naphthalene-1-carboxylic acid). Only the among-rings tie-break is skipped.
                         if (_senior and not (set(_senior) & _core_set)
-                                and not _pg_on_pah):
+                                and not _pah_more):
                             pah_name = None
             if pah_name:
                 features.polycyclic_name = pah_name

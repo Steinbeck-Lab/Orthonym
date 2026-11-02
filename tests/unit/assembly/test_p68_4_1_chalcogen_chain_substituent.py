@@ -48,8 +48,9 @@ class TestNoLeakTwoSulfur:
             "3-(ethyldisulfanyl)propanoic acid"
 
     def test_bare_disulfanyl_arene_unchanged(self):
-        # -S-SH terminal: bare disulfanyl (BB:17954).
-        assert name_compound("c1ccc(SS)cc1") == "disulfanylbenzene"
+        # a lone -S-SH is the principal group, so no disulfanyl prefix: suffix dithioperoxol,
+        # 'ethanedithioperoxol (PIN)':27998).
+        assert name_compound("c1ccc(SS)cc1") == "benzenedithioperoxol"
 
     def test_bis_disulfanyl_benzamide_unchanged(self):
         # BB:28021 verbatim PIN — two 2-sulfur runs, bis(disulfanyl).

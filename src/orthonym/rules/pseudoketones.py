@@ -255,9 +255,10 @@ _HUBS = frozenset({'Si', 'Ge', 'P', 'As'})
 _CHALCOGEN_HUBS = frozenset({'S', 'Se', 'Te'})
 
 
-def _acyl_hub_parts(mol):
+def _acyl_hub_parts(mol, carbon: Optional[int] = None, hubs: Optional[frozenset] = None):
     """The acyl group of ``mol`` that sits on an acyclic hub atom, as
-    ``(carbonyl carbon, hub, hub fragment, acyl chain)``, or None.
+    ``(carbonyl carbon, hub, hub fragment, acyl chain)``, or None. ``carbon`` reads only that carbonyl carbon,
+    ``hubs`` widens the hub elements (the oxygen end of a diacyl chalcogen chain).
 
     Fail-closed graph classifier (mirrors name_pseudoketone): one neutral fragment with
     exactly one non-ring carbonyl C whose heavy neighbours are {terminal =O, one chain C, one
@@ -272,11 +273,11 @@ def _acyl_hub_parts(mol):
     for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
-    all_hubs = _HUBS | _CHALCOGEN_HUBS
+    all_hubs = hubs or (_HUBS | _CHALCOGEN_HUBS)
 
     carbonyls = []
     for atom in atoms_of(mol):
-        if atom.GetSymbol() != 'C' or atom.IsInRing():
+        if atom.GetSymbol() != 'C' or atom.IsInRing() or (carbon is not None and atom.GetIdx() != carbon):
             continue
         oxo = hub = chain_c = None
         extra = False
@@ -388,8 +389,8 @@ def _group16_pseudoketone_name(mol, catom, hub, hub_frag, chain) -> Optional[str
         return None  # no compound-heteroatom substituent -> not this class
     from ..assembly.substituent_enumerator import name_substituent
     hubyl = name_substituent(mol, sorted(hub_frag), hub.GetIdx())
-    if not hubyl:
-        return None  # unnameable hub substituent -> fail closed
+    if not hubyl or 'substituent' in hubyl:
+        return None  # unnameable hub substituent (or its placeholder word) -> fail closed
     base_name = f"{get_chain_prefix(len(chain))}an"
     from ..assembly.naming_utils import _is_fully_enclosed, apply_enclosing_marks
     if _peroxy_pseudoester(catom, hub):
@@ -453,6 +454,28 @@ def _below_pin_if_other_acyl_is_longer(mol, name: Optional[str], catom, chain_le
     return name
 
 
+def _longer_acyl_on_the_oxygen_end(mol, catom, hub, chain_length: int):
+    """The parts of the acyl group at the far end of the chalcogen chain from ``hub`` when it is bonded to an oxygen
+    and its carbon chain is longer: (the Blue Book) names a diacyl chalcogen chain as a pseudoketone
+    on the senior acyl chain (b),:20916, the greater number of skeletal atoms), 'CH3-CH2-CO-OO-S-CO-CH3
+    1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499). Else None."""
+    prev, cur, prev_symbol = catom.GetIdx(), hub, None
+    for _ in range(8):
+        nxt = [nb for nb in cur.GetNeighbors() if nb.GetIdx() != prev and nb.GetAtomicNum() > 1]
+        if len(nxt) != 1:
+            return None
+        if nxt[0].GetSymbol() == 'C':
+            if cur.GetSymbol() != 'O' or prev_symbol != 'O' or not _acyl_carbon(nxt[0]):
+                return None                   # the acyl oxygen starts a peroxy group ('[(acetylsulfanyl)peroxy]')
+            parts = _acyl_hub_parts(mol, carbon=nxt[0].GetIdx(), hubs=frozenset({'O'}))
+            return parts if parts is not None and len(parts[3]) > chain_length else None
+        if nxt[0].GetSymbol() not in ('O', 'S', 'Se', 'Te'):
+            return None
+        prev_symbol = cur.GetSymbol()
+        prev, cur = cur.GetIdx(), nxt[0]
+    return None
+
+
 def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
     """(b) / acyl on Si/Ge/P/As (Wave-2 completion C):
     CC(=O)[SiH3] -> 1-silylethan-1-one, [PH2]C(=O)CCC -> 1-phosphanylbutan-1-one
@@ -472,6 +495,9 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         return None
     catom, hub, hub_frag, chain = parts
     if hub.GetSymbol() in _CHALCOGEN_HUBS:
+        longer = _longer_acyl_on_the_oxygen_end(mol, catom, hub, len(chain))
+        if longer is not None:
+            return _group16_pseudoketone_name(mol, *longer)
         return _below_pin_if_other_acyl_is_longer(
             mol, _group16_pseudoketone_name(mol, catom, hub, hub_frag, chain), catom, len(chain))
 

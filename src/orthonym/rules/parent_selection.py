@@ -68,6 +68,8 @@ SKELETAL_SUFFIX_PGS = {
     "so_thioperoxol",
     "os_thioperoxol",
     "dithioperoxol",
+    "diselenoperoxol",
+    "ditelluroperoxol",
     # "Hydroperoxides" (:27935): the suffix 'peroxol' for -OOH is 'ol' with one more oxygen: it
     # decorates a skeletal atom ('pyrrolidine-1-peroxol (PIN)':27959, '1,2,3,4-tetrahydronaphthalene-1-peroxol
     # (PIN)':27948), with no exocyclic-carbon form. The SMARTS leads with the hydroxy oxygen, so

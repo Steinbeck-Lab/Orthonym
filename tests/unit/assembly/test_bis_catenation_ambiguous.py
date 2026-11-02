@@ -88,7 +88,8 @@ class TestDisulfanylChainMultiplier:
     def test_single_disulfanyl_unchanged(self):
         # count == 1 takes no multiplier and the bare prefix stays bare.
         assert get_multiplier_prefix(1, "disulfanyl") == ""
-        assert name_compound("c1ccc(SS)cc1") == "disulfanylbenzene"
+        # the lone -SSH is the principal group: suffix dithioperoxol, 'ethanedithioperoxol (PIN)':27998)
+        assert name_compound("c1ccc(SS)cc1") == "benzenedithioperoxol"
 
     def test_compound_disulfanyl_prefix_unchanged(self):
         # A SUBSTITUTED disulfanyl prefix already took bis (via

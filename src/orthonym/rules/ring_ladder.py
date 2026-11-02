@@ -21,7 +21,8 @@ from rdkit import Chem
 
 def fusion_name_not_allowed(mol) -> bool:
     """True when the largest ring system of ``mol`` is an ortho- or ortho- and peri-fused system with fewer
-    than two rings of five or more members: its PIN is a von Baeyer name)."""
+    than two rings of five or more members: its PIN is a von Baeyer name). Only the largest ring
+    system is read; in a molecule with two polycyclic systems the other one is not tested here."""
     from .bridged_fused_pin import selection
     system = selection.ring_system(mol)
     rings = selection.fused_rings(mol, system) if system else None

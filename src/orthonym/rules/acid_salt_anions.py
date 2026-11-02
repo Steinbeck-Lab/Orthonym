@@ -206,3 +206,59 @@ def _acid_prefix_on_atom(mol, hetero, arms, parts, home) -> str:
         if block is not None:
             return block + 'amino'
     return ''
+
+
+def name_sulfonate_acid_salt_anion(mol) -> str:
+    """ method (1) (the Blue Book) for an unbranched carbon chain with one -SO3H and one -SO3(-) on
+    its two ends: "the free acid is cited as a prefix to the name of the anion", 'HO3S-CH2-CH2-SO3(-)'
+    '2-sulfoethane-1-sulfonate', as 'potassium 6-carboxyhexanoate (PIN)' (:31602) for the carboxylic acids. The
+    anion carbon takes locant 1 (the suffix). '' outside that shape."""
+    from ..data.chain_names import get_chain_prefix
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1 or mol.GetRingInfo().NumRings():
+        return ''
+    sulfo = Chem.MolFromSmarts('[CX4][SX4](=O)(=O)[OX2H1]')
+    anion = Chem.MolFromSmarts('[CX4][SX4](=O)(=O)[OX1-]')
+    free, ion = mol.GetSubstructMatches(sulfo), mol.GetSubstructMatches(anion)
+    if len(free) != 1 or len(ion) != 1:
+        return ''
+    c_ion, c_free = ion[0][0], free[0][0]
+    path = list(Chem.rdmolops.GetShortestPath(mol, c_ion, c_free)) if c_ion != c_free else []
+    carbons = [a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'C']
+    if len(path) < 2 or sorted(path) != sorted(carbons):
+        return ''
+    if any(a.GetFormalCharge() and a.GetIdx() != ion[0][4] for a in mol.GetAtoms()):
+        return ''
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in mol.GetBonds()
+           if b.GetBeginAtom().GetSymbol() == 'C' and b.GetEndAtom().GetSymbol() == 'C'):
+        return ''
+    if mol.GetNumAtoms() != len(path) + 8:
+        return ''                         # anything else on the chain is not built here
+    return f"{len(path)}-sulfo{get_chain_prefix(len(path))}ane-1-sulfonate"
+
+
+def name_dicarboxylate_acid_salt_anion(mol) -> str:
+    """ method (1) (the Blue Book) for an unbranched carbon chain that ends in two -COO(-) groups and
+    carries one -COOH on an inner carbon: the dianion is the parent and the free acid its 'carboxy' prefix,
+    '2-carboxybutanedioate'. The structure is known from the drawing, so method (1) gives the PIN; method (2)
+    ('hydrogen...tricarboxylate',:31612) is for a salt whose structure is unknown. '' outside that shape."""
+    from ..data.chain_names import get_chain_prefix
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1 or mol.GetRingInfo().NumRings():
+        return ''
+    ion = [m[0] for m in mol.GetSubstructMatches(Chem.MolFromSmarts('[CX3](=O)[OX1-]'))]
+    free = [m[0] for m in mol.GetSubstructMatches(Chem.MolFromSmarts('[CX3](=O)[OX2H1]'))]
+    if len(ion) != 2 or len(free) != 1 or Chem.GetFormalCharge(mol) != -2:
+        return ''
+    path = list(Chem.rdmolops.GetShortestPath(mol, ion[0], ion[1]))
+    carbons = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'C'}
+    if len(path) < 3 or set(path) | {free[0]} != carbons or free[0] in path:
+        return ''
+    if mol.GetNumAtoms() != len(carbons) + 6:
+        return ''                         # anything else on the chain is not built here
+    host = [nb.GetIdx() for nb in mol.GetAtomWithIdx(free[0]).GetNeighbors() if nb.GetSymbol() == 'C']
+    if len(host) != 1 or host[0] in (path[0], path[-1]):
+        return ''
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in mol.GetBonds()
+           if b.GetBeginAtom().GetSymbol() == 'C' and b.GetEndAtom().GetSymbol() == 'C'):
+        return ''
+    loc = min(path.index(host[0]) + 1, len(path) - path.index(host[0]))
+    return f"{loc}-carboxy{get_chain_prefix(len(path))}anedioate"

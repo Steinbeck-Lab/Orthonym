@@ -15,8 +15,8 @@ locant ('dione' and 'thione' keep the final 'e' of the parent, 'one' elides it, 
 The additive name ('thiolane 1,1-dioxide') is recorded as not the PIN (rule: the PIN tier declines it
 where no heterone is built (fused rings, unsaturated rings) and the default tier keeps it.
 
-Not built here (internal notes): the mancude and fused rings ('1H-1λ4-thiophen-1-one',
-'5H-λ6-thianthrene-5,5-dione',:29444: the indicated hydrogen of the lambda parent), rings with a stereocentre,
+Not built here: the fused rings and the substituted mancude rings ('5H-λ6-thianthrene-5,5-dione',:29444: the
+indicated hydrogen of the lambda parent; the bare '1H-1λ4-thiophen-1-one' is built), rings with a stereocentre,
 and a ring beside a group of the class of the ketone or a senior one.
 """
 import pytest
@@ -26,6 +26,7 @@ from tests.support.pin_tiers import assert_declined_at_default, assert_pin_at_bo
 pytestmark = pytest.mark.opsin_gate
 
 PIN_ROWS = [
+    ("O=S1C=CC=C1", "1H-1λ4-thiophen-1-one"),             #,:29440 (the bare mancude ring)
     ("S=S1CCCO1", "1,2λ4-oxathiolane-2-thione"),          #,:32162 ff.
     ("O=S1CCCCN1", "1λ4,2-thiazinan-1-one"),              #,:33290
     ("O=S1(=O)CCCCN1", "1λ6,2-thiazinane-1,1-dione"),     #,:33260
@@ -62,7 +63,6 @@ PIN_ROWS_MORE = [
 
 # Not built: the additive name is recorded as not the PIN, so the PIN tier declines it and best-effort keeps it.
 DECLINED_ROWS = [
-    "O=S1C=CC=C1",                       # thiophene 1-oxide: the BB heterone is '1H-1λ4-thiophen-1-one' (:29440)
     "O=S1(=O)C=Cc2ccccc12",              # 1-benzothiophene 1,1-dioxide
     "O=S1(=O)c2ccccc2-c2ccccc21",        # dibenzo[b,d]thiophene 5,5-dioxide
     "O=S1c2ccccc2-c2ccccc21",            # dibenzo[b,d]thiophene 5-oxide

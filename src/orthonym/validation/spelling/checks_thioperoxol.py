@@ -45,7 +45,8 @@ def enclosed_anion_suffix_check(mol, name):
 
 _DITHIOPEROXOL_GROUP = Chem.MolFromSmarts("[#6][SX2][SX2H1]")
 _DISULFANYL_PREFIX = re.compile(r"disulfanyl")
-_MULTIPLIED_DITHIOPEROXOL = re.compile(r"(?:di|tri|tetra|penta|hexa)dithioperoxol")
+# a simple multiplier, or a derived one with no enclosing marks ('bisdithioperoxol')
+_MULTIPLIED_DITHIOPEROXOL = re.compile(r"(?:di|tri|tetra|penta|hexa|bis|tris|tetrakis)(?:di(?:thio|seleno|telluro))peroxol")
 _PREFIX_ATOMS = frozenset({6, 9, 17, 35, 53})        # carbon and the halogens: prefixes only
 
 

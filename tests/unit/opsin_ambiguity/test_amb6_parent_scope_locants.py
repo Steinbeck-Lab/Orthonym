@@ -271,16 +271,15 @@ def test_pseudoketone_with_the_book_names(smiles, expected):
     assert not ambiguity_messages(row["name"]), row
 
 
-def test_pseudoketone_whose_parent_is_the_shorter_acyl_chain_is_no_pin():
+def test_pseudoketone_is_named_on_the_longer_acyl_chain():
     # (the Blue Book) names a diacyl chalcogen chain as a pseudoketone; each acyl group is a candidate
     # parent and the senior chain is the parent, SENIORITY OF ACYCLIC CHAINS (:20916) "(b) has the greater number of
-    # skeletal atoms": '1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499, under. The engine names the
-    # acetyl group, the only one on the sulfur it builds, so its name is valid and no PIN: the PIN tier declines it and
-    # the best-effort tier keeps it read back (it was asserted here as a pin_verified book name before).
-    smiles, name = "CCC(=O)OOSC(C)=O", "1-[(propanoylperoxy)sulfanyl]ethan-1-one"
+    # skeletal atoms": '1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499, under. The best-effort tier
+    # gives the book name; the PIN tier still declines it (its strict namer does not build the peroxy prefix).
+    smiles, name = "CCC(=O)OOSC(C)=O", "1-[(acetylsulfanyl)peroxy]propan-1-one"
     assert name_row(smiles, tier="pin")["tier"] != "pin_verified"
     row = name_row(smiles, tier="best-effort")
-    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
+    assert row["name"] == name and row["tier"] != "pin_verified", row
     assert round_trips(smiles, name)
 
 

@@ -247,8 +247,7 @@ def test_not_a_multiplicative_name(smiles, token):
     assert b.get("name") and name_is_rt_exact(b["name"], smiles), b
 
 
-@pytest.mark.xfail(strict=True, reason="needs PIN class program Task 18 (ENCLOSING_MARKS): the "
-                   "compound prefix '({4-[(2S)-butan-2-yl]phenyl}sulfanyl)' is enclosed, :22587")
 def test_configuration_differing_units_substitutive_pin():
+    """The compound prefix '({4-[(2S)-butan-2-yl]phenyl}sulfanyl)' is enclosed,:22587)."""
     assert_pin_at_both_tiers("CC[C@@H](C)c1ccc(Sc2ccc([C@@H](C)CC)cc2)cc1",
                              "1-[(2R)-butan-2-yl]-4-({4-[(2S)-butan-2-yl]phenyl}sulfanyl)benzene")

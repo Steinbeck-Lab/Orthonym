@@ -57,10 +57,47 @@ def _is_polycyclic(features: Any) -> bool:
     mol = getattr(features, 'mol', None)
     if mol is None:
         return False
+    # A mancude ring system with a retained PAH name, 'pleiadene (PIN)':11360) is named on that parent even
+    # when RDKit leaves a seven-membered ring of it non-aromatic and the system therefore counts as complex: the complex
+    # path refuses such a cage (a von Baeyer name would saturate it).
+    if _mancude_ring_system(mol):
+        return True
     #: shared memoization with partial_sat / ring_ester predicates.
     if cached_is_complex_ring_system(features):
         return False
     return True
+
+
+def _mancude_ring_system(mol) -> bool:
+    """True when ``mol`` is one fused ring system, mancude, with a ring atom RDKit leaves non-aromatic.
+
+    An all-aromatic system (a substituted naphthalene) and two systems joined by a single bond (a biaryl) are not
+    this case and keep the complex-ring gate below.
+    """
+    from rdkit import Chem
+    rings = mol.GetRingInfo().AtomRings()
+    ring = {i for r in rings for i in r}
+    if not ring or all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring):
+        return False
+    km = Chem.RWMol(mol)
+    try:
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:  # noqa: BLE001 -- a structure RDKit cannot kekulize is not this case
+        return False
+    in_double = {i for b in km.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE
+                 and b.GetBeginAtomIdx() in ring and b.GetEndAtomIdx() in ring
+                 for i in (b.GetBeginAtomIdx(), b.GetEndAtomIdx())}
+    if in_double != ring:
+        return False
+    seen, stack = {next(iter(ring))}, [next(iter(ring))]
+    while stack:
+        at = stack.pop()
+        for b in mol.GetAtomWithIdx(at).GetBonds():
+            nb = b.GetOtherAtomIdx(at)
+            if b.IsInRing() and nb not in seen:
+                seen.add(nb)
+                stack.append(nb)
+    return seen == ring
 
 
 def name_polycyclic(

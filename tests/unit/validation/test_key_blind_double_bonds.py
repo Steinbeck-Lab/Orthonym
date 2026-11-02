@@ -48,21 +48,41 @@ def test_a_salt_whose_name_omits_the_configuration_keeps_its_name():
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,name", [
-    ("C/N=C(/N)c1ccc(C(=O)O)cc1", "4-(N'-methylcarbamimidoyl)benzoic acid"),
-    ("C/C(N)=N/C", "N'-methylethanimidamide"),
+@pytest.mark.parametrize("smiles,name,plain_name", [
+    ("C/N=C(/N)c1ccc(C(=O)O)cc1", "4-[(E)-N'-methylcarbamimidoyl]benzoic acid", "4-(N'-methylcarbamimidoyl)benzoic acid"),
+    ("C/C(N)=N/C", "(1Z)-N'-methylethanimidamide", "N'-methylethanimidamide"),
 ])
-def test_a_name_that_omits_the_configuration_is_not_the_pin(smiles, name):
+def test_the_key_blind_configuration_is_cited_in_the_pin(smiles, name, plain_name):
     """ Stereodescriptors used in substitutive nomenclature (the Blue Book): "In preferred IUPAC
-    names, stereodescriptors, preceded by a locant, must be cited to specify each stereogenic unit". The name that
-    leaves the key-blind configuration out still names the input, so it ships below the PIN; the PIN tier declines it.
-    The same drawing without a configuration keeps its PIN."""
+    names, stereodescriptors, preceded by a locant, must be cited to specify each stereogenic unit". The producer
+    cites the configuration the key does not encode, and the gate checks it on the isomeric SMILES; the same
+    drawing without a configuration keeps its plain PIN."""
     from orthonym import Orthonym
     from orthonym.cli import _emit_tier_flags
-    best = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert (best["name"], best["tier"], best["is_pin"], best["stereo_unexpressed"]) == (
-        name, "systematic_verified", False, True), best
-    assert Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)["tier"] == "abstain"
+    pin = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)
+    assert (pin["name"], pin["tier"]) == (name, "pin_verified"), pin
     plain = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(Chem.MolToSmiles(
         Chem.MolFromSmiles(smiles), isomericSmiles=False))
-    assert plain["name"] == name and plain["tier"] == "pin_verified", plain
+    assert plain["name"] == plain_name and plain["tier"] == "pin_verified", plain
+
+
+@pytest.mark.parametrize("smiles,descriptor", [
+    ("C/N=C(/N)c1ccc(C(=O)O)cc1", "(E)-"),
+    # two ring amidines get one prefix form: the descriptor of the configured one is not given to both
+    ("OC(=O)c1cc(C(N)=NC)ccc1/C(N)=N/C", ""),
+    # the configured C=N is an oxime, not the amidine's own bond
+    ("OC(=O)c1cc(/C=N/O)ccc1C(N)=NC", ""),
+])
+def test_the_prefix_descriptor_belongs_to_the_one_ring_amidine(smiles, descriptor):
+    """Review fix: (b) (the Blue Book) cites a substituent group's descriptor at its front, so the
+    descriptor must be the configuration of that group's own C=N."""
+    from orthonym.rules.amidine_stereo import amidine_prefix_descriptor
+    assert amidine_prefix_descriptor(Chem.MolFromSmiles(smiles)) == descriptor
+
+
+@pytest.mark.opsin_gate
+def test_two_ring_amidines_keep_the_name_without_a_descriptor():
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("OC(=O)c1cc(C(N)=NC)ccc1/C(N)=N/C")
+    assert row["name"] == "2,5-bis(N'-methylcarbamimidoyl)benzoic acid", row

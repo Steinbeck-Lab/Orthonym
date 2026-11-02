@@ -63,8 +63,10 @@ def assembly_indicated_hydrogen_check(mol, name):
 
 
 # ------------------------------------------------------------------ added hydrogen at a ring nitrogen
-#: the locants of the ring nitrogens of the benzo-fused azines whose mancude parent has no hydrogen on them
+#: the locants of the ring nitrogens of the azines, monocyclic and benzo-fused, whose mancude parent has no
+#: hydrogen on them
 _AZINE_NITROGEN_LOCANTS = {
+    'pyridin': {1}, 'pyrimidin': {1, 3}, 'pyrazin': {1, 4}, 'pyridazin': {1, 2},
     'quinolin': {1}, 'isoquinolin': {2}, 'quinoxalin': {1, 4}, 'acridin': {10}, 'phenanthridin': {5},
     'phthalazin': {2, 3}, 'cinnolin': {1, 2}, 'quinazolin': {1, 3},
 }
@@ -85,7 +87,8 @@ def added_hydrogen_at_ring_nitrogen_check(mol, name):
     hydrogen to give, so the attachment is expressed by added hydrogen and 'hydro' prefixes cover the other positions:
     '1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one (PIN)' (:29376, under, '3,4-dihydroisoquinoline-2(1H)-
     carbonyl' (:29619), 'quinoline-1(2H)-carboxylic acid (PIN)' (:24701, under, not '1,2,3,4-tetrahydro
-    quinolin-1-yl'. Lexical: the name cites the nitrogen locant of the azine both in its 'hydro' prefix and as the site
+    quinolin-1-yl'; the same holds for a monocycle, 'pyridin-1(2H)-yl (preferred prefix)' (:24703), 'pyridin-1(2H)-ide
+    (PIN)' and not '1,2-dihydropyridine-1-ide' (:40928, under. Lexical: the name cites the nitrogen locant of the azine both in its 'hydro' prefix and as the site
     of the free valence or the suffix. A hydro-azine that is substituted on its nitrogen as a prefix
     ('1-methyl-1,2,3,4-tetrahydroquinoline') cites no such site and passes, and so does a cation at the nitrogen,
     '-1-ium': "Azanium (ammonium) and phosphanium (phosphonium) compounds" (:45978) prints the 'hydro' prefix

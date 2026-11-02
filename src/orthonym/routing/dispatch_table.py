@@ -131,6 +131,7 @@ class StoutClass(_StrEnumBase):
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # a phase Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion ethenone/dibromoethenone; priority 49)
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion / dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
+    AZINE_NITROGEN_SUFFIX = "azine_nitrogen_suffix"  # 'quinoline-1(2H)-carboxylic acid'; priority 49.65
     HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
     THIOIMIDE = "thioimide"                          # W2E-D3 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
     NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # B3 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
@@ -2359,6 +2360,17 @@ def _handle_cyclic_polyester(mol, smiles, canonical_smiles, features=None,
     return name_cyclic_polyester(mol)
 
 
+def _is_azine_nitrogen_suffix(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """ added hydrogen for a suffix on the ring nitrogen of an azine; priority 49.65."""
+    from orthonym.rules.ring_nitrogen_suffix import name_azine_nitrogen_suffix
+    return mol is not None and name_azine_nitrogen_suffix(mol) is not None
+
+
+def _handle_azine_nitrogen_suffix(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    from orthonym.rules.ring_nitrogen_suffix import name_azine_nitrogen_suffix
+    return name_azine_nitrogen_suffix(mol)
+
+
 def _is_hydro_fused_peroxol(mol, smiles, canonical_smiles, features=None,
                             **kwargs) -> bool:
     """W2E-P1FG; priority 49.6. -OOH on an sp3 carbon of a
@@ -2919,6 +2931,13 @@ _register_dispatch(
     iupac_section="Blue Book P-63.4.1",
     description="-OOH suffix on a partially saturated fused carbocycle "
                 "(1,2,3,4-tetrahydronaphthalene-1-peroxol); fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.AZINE_NITROGEN_SUFFIX, priority=49.65, tier=1,
+    predicate=_is_azine_nitrogen_suffix, handler=_handle_azine_nitrogen_suffix,
+    iupac_section="Blue Book P-14.7.2 / P-58.2.2.2",
+    description="Suffix on the ring nitrogen of an azine with added hydrogen "
+                "(quinoline-1(2H)-carboxylic acid); fail-closed",
 )
 # --- W2E-D3: THIOIMIDE at priority 49.7 (after HYDRO_FUSED_PEROXOL@49.6,
 # before ORGM@50). The acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' (BB verbatim

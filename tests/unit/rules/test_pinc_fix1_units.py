@@ -62,6 +62,14 @@ def test_amide_chain_of_equal_length_with_the_multiple_bond_is_the_parent():
     ("1,2,3,4-tetrahydroquinolin-1-ol", True),
     ("1-methyl-1,2,3,4-tetrahydroquinoline", False),
     ("1,2,3,4-tetrahydroquinolin-4-ol", False),
+    # a monocycle: 'pyridin-1(2H)-ide (PIN)', not '1,2-dihydropyridine-1-ide':40928)
+    ("1,2-dihydropyridine-1-carboxylic acid", True),
+    ("1,2-dihydropyridine-1-carboxamide", True),
+    ("1,4-dihydropyridin-1-ylium", True),
+    ("1,2,3,4-tetrahydropyrimidin-1-yl", True),
+    ("1-methyl-1,2-dihydropyridine", False),
+    ("3,4,5,6-tetrahydropyridin-2-ol", False),
+    ("1,2-dihydropyridin-1-ium", False),
 ])
 def test_added_hydrogen_check_leaves_the_ium_site_alone(name, flagged):
     assert (added_hydrogen_at_ring_nitrogen_check(None, name) is not None) is flagged

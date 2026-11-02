@@ -1150,14 +1150,13 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         if ester_anion:
             return ester_anion
 
-        # 169.6-03 (CHOKE-01): for every OTHER single-anion class delegate to the
-        # SINGLE route_charged chokepoint. It generalizes _name_oxoacid_anion
-        # (neutralize -> re-enter the full pipeline -> re-apply the class-correct
-        # ionic suffix), so the alkoxide/phenolate/carbanion/thiolate
-        # carbon-counting stubs (the heptanolate bug class) are DELETED. '' on
+        # 169.6-03 (CHOKE-01): every OTHER single-anion class goes to the SINGLE route_charged
+        # chokepoint (neutralize -> re-enter the full pipeline -> re-apply the class-correct ionic
+        # suffix; the carbon-counting stubs of the heptanolate bug class are DELETED). '' on
         # failure -> fall through to the legacy cascade below.
+        from .acid_salt_anions import name_sulfonate_acid_salt_anion
         from .charged_router import route_charged
-        routed = route_charged(mol, style)
+        routed = name_sulfonate_acid_salt_anion(mol) or route_charged(mol, style)
         if routed:
             return _validate_anion_name(mol, routed)
 

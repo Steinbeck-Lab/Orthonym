@@ -29,6 +29,9 @@ ROWS = [
     ("CC1=CC2=CC=C3C=C4C=CC5=CC=C6C=CC7=CC8=CC=C1C1=C2C3=C3C4=C5C6=C7C3=C18", "3-methylovalene"),
     # pleiaden-8-ol: 8 and 11 are equivalent by symmetry, and 8 is the lower locant
     ("C1=CC=C2C=CC=C3C=C4C(=CC=CC4=CC1=C23)O", "pleiaden-8-ol"),
+    # prefixes only: the seven-membered ring is not aromatic for RDKit, the parent is still the retained PAH
+    ("C1=CC=C2C=CC=C3C=C4C(=CC=CC4=CC1=C23)C", "8-methylpleiadene"),
+    ("C1=CC=C2C=CC=C3C=C4C(=CC=CC4=CC1=C23)Cl", "8-chloropleiadene"),
 ]
 
 

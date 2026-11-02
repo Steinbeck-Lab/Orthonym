@@ -39,3 +39,14 @@ def pnictogen_oxoacid_prefix(mol, sub_atoms, start_idx: int) -> Optional[str]:
     if any(o.GetSymbol() != 'O' or o.GetFormalCharge() != 0 or o.GetTotalNumHs() != 1 for o in singly):
         return None
     return prefix
+
+
+def dichalcoganyl_prefix(mol, start_idx: int, ring_atoms) -> Optional[dict]:
+    """-SeSeH / -TeTeH on a ring: 'diselanyl' / 'ditellanyl', as -SSH is 'disulfanyl', the prefix
+    of the 'diselenoperoxol' / 'ditelluroperoxol' suffix, Table 6.1, the Blue Book)."""
+    symbol = mol.GetAtomWithIdx(start_idx).GetSymbol()
+    nb = [n for n in mol.GetAtomWithIdx(start_idx).GetNeighbors() if n.GetIdx() not in ring_atoms]
+    if (symbol in ('Se', 'Te') and len(nb) == 1 and nb[0].GetSymbol() == symbol and nb[0].GetDegree() == 1
+            and nb[0].GetTotalNumHs() == 1):
+        return {'name': {'Se': 'diselanyl', 'Te': 'ditellanyl'}[symbol], 'atoms': [start_idx, nb[0].GetIdx()]}
+    return None

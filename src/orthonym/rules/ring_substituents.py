@@ -1790,22 +1790,20 @@ def _universal_cage_substituent_name(
             cage.total_atoms, cage.unsaturation)
         if not parent_block:
             return None
-        # suffix elision: elide the terminal 'e' of the parent stem
-        # before '-<loc>-yl' (octane -> octan-3-yl; pentadec-1(15)-ene ->
-        # pentadec-1(15)-en-8-yl). _build_parent_with_unsaturation always
-        # returns an 'e'-terminal stem (…ane / …ene / …yne / …diene).
+        # elision of the terminal 'e' before '-<loc>-yl' (octan-3-yl, pentadec-1(15)-en-8-yl).
         stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
-        # - lead 1: retained PIN stem in place of the von Baeyer
-        # descriptor. Until now this function emitted `tricyclo[3.3.1.1^3,7]
-        # decan-N-yl` for a cage whose PIN stem is `adamantan-`, so a retained
-        # name where a retained name exists was missing on the substituent side while the
-        # parent side already had it (`tricyclo.get_retained_tricyclo_name`).
+        # - lead 1: retained PIN stem ('adamantan-') in place of the von Baeyer descriptor, as on the
+        # parent side (`tricyclo.get_retained_tricyclo_name`).
         _retained = _retained_pin_cage_stem(cage, stem)
         if _retained is not None:
             _numbering = _lowest_locant_cage_numbering(
                 sub, cage, cage_atoms, attach_sub)
             _loc = _numbering.get(attach_sub, loc)
             return f'{_retained}-{_loc}-yl'
+        # (c): the free valence takes the lowest locant the cage's symmetry allows, whatever the atom mapping
+        _u = cage.unsaturation or {}
+        loc = _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub, preserve_kekule=bool(
+            _u.get('double_bonds') or _u.get('triple_bonds'))).get(attach_sub, loc)
         return f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
     except Exception:
         return None

@@ -34,8 +34,9 @@ from ..assembly.naming_utils import (
     get_suffix_multiplier_prefix,
     prefix_citation_sort_key,
     should_omit_locant_one,
+    suffix_takes_derived_multiplier,
 )
-from .benzene_prefix_forms import hydroxy_is_principal, pnictogen_oxoacid_prefix
+from .benzene_prefix_forms import dichalcoganyl_prefix, hydroxy_is_principal, pnictogen_oxoacid_prefix
 from .benzene_acid_suffixes import ACID_SUFFIX_FGS, ACID_SUFFIX_SMARTS
 from .hydroximic_acids import (
     BENZENE_SUFFIX_NAMES, DEMOTED_PREFIX, IMIDIC_DEMOTED_PREFIX, UNHANDLED, acid_suffix_extra, claims_benzene_group,
@@ -151,8 +152,8 @@ _SUFFIX_PRIORITY = [
     # 17) and senior to the amines (class 19): 'C6H5-OOH' is 'benzeneperoxol' as 'CH3-CH2-OOH' is 'ethaneperoxol (PIN)'
     # THE SUFFIX 'PEROXOL', FOR –OOH, the Blue Book); the -OOH reaches the ring as the 'hydroperoxy'
     # prefix and is promoted
-    # (``benzene_prefix_suffix_promotion``)
-    'peroxol',
+    # (``benzene_prefix_suffix_promotion``); -SSH/-SeSeH/-TeTeH likewise ('ethanedithioperoxol (PIN)',:28007)
+    'peroxol', 'dithioperoxol', 'diselenoperoxol', 'ditelluroperoxol',
     # C4 /: amine is JUNIOR to alcohol and all C/S/Se/Te/P
     # acids, amides, nitriles, aldehydes, ketones. It MUST be the LAST entry so
     # it only becomes the ring parent suffix ('aniline') when nothing more
@@ -171,6 +172,7 @@ _SUFFIX_TO_PREFIX = {
     'selenol': 'selanyl',
     'tellurol': 'tellanyl',
     'peroxol': 'hydroperoxy',
+    'dithioperoxol': 'disulfanyl', 'diselenoperoxol': 'diselanyl', 'ditelluroperoxol': 'ditellanyl',
     'carboxylic acid': 'carboxy',
     'sulfonic acid': 'sulfo',
     # D-FOLLOWON item 5 (prefix forms; seniority.py FG_PREFIXES already has these).
@@ -353,8 +355,8 @@ def benzene_prefix_suffix_promotion(
 
     # The hydroperoxide (class 18) holds the suffix when it is the principal group and nothing more senior does:
     # 'benzeneperoxol', '4-methylbenzene-1-peroxol'.
-    if _own == 'peroxol' and 'hydroperoxy' in prefix_names and not suffix_names:
-        return 'peroxol', frozenset({'hydroperoxy'})
+    if _own in ('peroxol', 'dithioperoxol', 'diselenoperoxol', 'ditelluroperoxol') and _SUFFIX_TO_PREFIX[_own] in prefix_names and not suffix_names:
+        return _own, frozenset({_SUFFIX_TO_PREFIX[_own]})
 
     # The amine (aniline) promotion runs only when NOTHING holds the suffix -- and
     # if the -ol promotion had fired, ``suffix_groups`` would hold 'ol' by now, so
@@ -1525,7 +1527,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int], principal_g
     # Selanyl / tellanyl ethers R-Se- / R-Te- method (1)); the oxoacid
     # suffixes on Se/Te were recognised above.
     if symbol in ('Se', 'Te'):
-        return _chalcogen_linked_carbon_substituent(mol, start_idx, ring_atoms)
+        return dichalcoganyl_prefix(mol, start_idx, ring_atoms) or _chalcogen_linked_carbon_substituent(mol, start_idx, ring_atoms)
 
     # Boron-based groups: the borono prefix -B(OH)2 preselected
     # substituent prefix). HEAD dropped the whole boron unit on ring parents
@@ -3068,8 +3070,10 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 except (ValueError, KeyError):
                     alkyl_name = None
             if alkyl_name:
+                # a compound R ('4-methylphenyl') is enclosed inside '{R}sulfanyl'
+                from ..assembly.naming_utils import enclose_if_compound
                 return {
-                    'name': f'{alkyl_name}sulfanyl',
+                    'name': f'{enclose_if_compound(alkyl_name)}sulfanyl',
                     'atoms': [s_idx] + alkyl_atoms,
                 }
 
@@ -4192,7 +4196,7 @@ def _name_substituted_benzene(
     # _OL_JUNIOR_SUFFIXES is module level (Phase C Task 9); it is read by
     # ``benzene_prefix_suffix_promotion``, which is where the seniority test that
     # used to be inlined here now lives.
-    if _promoted_suffix in ('ol', 'peroxol'):
+    if _promoted_suffix in ('ol', 'peroxol', 'dithioperoxol', 'diselenoperoxol', 'ditelluroperoxol'):
         # The promoted group IS the principal group: it moves from prefix to suffix ('benzeneperoxol' as 'phenol').
         suffix_groups[_promoted_suffix] = _pop_promoted_locants(prefix_groups, _promoted_prefixes)
     if _promoted_suffix == 'ol':
@@ -4465,8 +4469,7 @@ def _assemble_benzene_with_suffix(
         # 4-(N-methylcarbamimidoyl)benzoic acid. n_substituents_map is keyed by
         # the SUFFIX name ('carboximidamide') and holds (nlocant, name) tuples;
         # prepend the N/N' prefix to the base 'carbamimidoyl'. The resulting
-        # hyphenated name is 'complex', so format_substituent_prefix wraps it in
-        # parentheses. Bare carbamimidoyl (no N-subs) keeps the plain prefix.
+        # hyphenated name is 'complex' (format_substituent_prefix wraps it); bare carbamimidoyl stays plain.
         if sfx_name == 'carboximidamide':
             # (BB 34490/34496, plan P1AM Task 6): a hydrazino-
             # bearing ring amidine demotes to 'hydrazinecarboximidoyl', not the
@@ -4478,8 +4481,9 @@ def _assemble_benzene_with_suffix(
             else:
                 n_subs = n_substituents_map.get('carboximidamide', [])
                 n_prefix = _build_amidine_n_prefix(n_subs)
+                from .amidine_stereo import amidine_prefix_descriptor
                 if n_prefix:
-                    prefix_form = f"{n_prefix}{prefix_form}"
+                    prefix_form = f"{amidine_prefix_descriptor(mol)}{n_prefix}{prefix_form}"
         #: a demoted N-substituted sulfonamide is the
         # '{N-substituents}sulfamoyl' substituent prefix, the N-substituents cited
         # WITHOUT the italic N -- BB '2-(dimethylsulfamoyl)benzene-1-sulfonic acid'
@@ -4723,6 +4727,9 @@ def _assemble_benzene_with_suffix(
     )
 
     # Assemble: {prefix}benzene-{locants}-{multiplier}{suffix}
+    if chosen_count > 1 and suffix_takes_derived_multiplier(chosen_suffix):
+        # a 'bis' suffix is enclosed: 'benzene-1,4-bis(dithioperoxol)', as 'ethanebis(dithioic acid)' (b))
+        return f"{prefix_part}benzene-{locant_str}-{multiplier}({chosen_suffix})"
     if chosen_count > 1:
         return f"{prefix_part}benzene-{locant_str}-{multiplier}{chosen_suffix}"
     elif prefix_part:

@@ -624,10 +624,41 @@ def _stereo_aware_match(mol, canon):
     wants the Z at the lower locant). With ``useChirality`` the mapping keeps stereo; when no such
     match exists the plain one stands, as before.
     """
+    order = _output_order_match(mol, canon)
+    if order is not None:
+        return order
     match = mol.GetSubstructMatch(canon, useChirality=True)
     if len(match) != mol.GetNumAtoms():
         match = mol.GetSubstructMatch(canon)
     return match
+
+
+def _output_order_match(mol, canon):
+    """The mapping of ``canon`` onto ``mol`` read from the order in which ``Chem.MolToSmiles`` wrote the atoms of
+    ``mol`` (``canon`` is the parse of that SMILES, so its atom k is atom ``order[k]`` of ``mol``), when every atom and
+    bond agrees under it; else None. Linear, so a large symmetric molecule cannot stall the substructure search, which
+    runs in native code that no alarm interrupts."""
+    if not mol.HasProp('_smilesAtomOutputOrder') or canon.GetNumAtoms() != mol.GetNumAtoms():
+        return None
+    try:
+        order = tuple(int(x) for x in mol.GetProp('_smilesAtomOutputOrder').strip('[],').split(','))
+    except ValueError:
+        return None
+    if sorted(order) != list(range(mol.GetNumAtoms())):
+        return None
+    for k, i in enumerate(order):
+        a, c = mol.GetAtomWithIdx(i), canon.GetAtomWithIdx(k)
+        if (a.GetAtomicNum(), a.GetFormalCharge(), a.GetTotalNumHs(), a.GetIsAromatic(), a.GetIsotope()) != (
+                c.GetAtomicNum(), c.GetFormalCharge(), c.GetTotalNumHs(), c.GetIsAromatic(), c.GetIsotope()):
+            return None
+    where = {i: k for k, i in enumerate(order)}
+    if mol.GetNumBonds() != canon.GetNumBonds():
+        return None
+    for bond in mol.GetBonds():
+        cb = canon.GetBondBetweenAtoms(where[bond.GetBeginAtomIdx()], where[bond.GetEndAtomIdx()])
+        if cb is None or cb.GetBondType() != bond.GetBondType():
+            return None
+    return order
 
 
 def _canonical_copy_and_match(mol):

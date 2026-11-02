@@ -6517,8 +6517,7 @@ def _assemble_amidine_name(features: Any, style: str):
     if c_idx is None:
         return None
 
-    # The chain (parent) atoms carry the amidine; exclude them so the detector
-    # walks only the true N-substituents.
+    # The chain (parent) atoms carry the amidine; the detector walks only the true N-substituents.
     parent_atoms = set(features.principal_chain or [])
     parent_atoms.add(c_idx)
     n_subs = _detect_amidine_n_substituents(mol, c_idx, parent_atoms)
@@ -6605,7 +6604,8 @@ def _assemble_amidine_name(features: Any, style: str):
     n_prefix = _build_amidine_n_prefix(n_subs)
     if not n_prefix:
         return None
-    return f"{n_prefix}{base_name}"
+    from ..rules.amidine_stereo import amidine_cn_descriptor
+    return f"{amidine_cn_descriptor(mol, c_idx)}{n_prefix}{base_name}"
 
 
 def _assemble_geminal_dicarboximidamide_name(features: Any, style: str):

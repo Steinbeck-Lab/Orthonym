@@ -560,6 +560,10 @@ FUNCTIONAL_GROUP_SMARTS = {
     "so_thioperoxol": "[#6;!$([CX3]=[OX1]);!$([CX3]=[SX1])][SX2][OX2H]",   # R-S-OH -> -SO-thioperoxol (was retired sulfenic acid)
     "os_thioperoxol": "[#6;!$([CX3]=[OX1]);!$([CX3]=[SX1])][OX2][SX2H]",   # R-O-SH -> -OS-thioperoxol
     "dithioperoxol": "[#6][SX2][SX2H]",    # R-S-SH -> dithioperoxol (suffix) / disulfanyl (prefix)
+    # the selenium and tellurium analogues of Table 6.1, the Blue Book): '-diselenoperoxol' -SeSeH
+    # and '-ditelluroperoxol' -TeTeH, demoted to 'diselanyl' / 'ditellanyl'
+    "diselenoperoxol": "[#6][SeX2][SeX2H]",
+    "ditelluroperoxol": "[#6][TeX2][TeX2H]",
 
     # === HYDROXYLAMINES (functional-group perception fix/, 169.7: class 21) ===
     # R-NH-OH / R2N-OH — the N bears an -OH and >=1 carbon. MUST be checked before
@@ -1658,10 +1662,9 @@ def _resolve_fg_collisions(results):
         # -O-SH (`os_thioperoxol`): the S bears the H but is bonded to O, not C, so
         # `thiol` would not match anyway; suppress any `ether`/`thioether` read.
         ('os_thioperoxol', ['thiol', 'ether', 'thioether']),
-        # -S-SH (`dithioperoxol`): terminal disulfanyl. The H-bearing S is bonded
-        # to S (not C) so `thiol` cannot match; the inner S-S has only one C end so
-        # the carbon-flanked `disulfide` cannot match — suppress defensively anyway.
+        # -S-SH / -Se-SeH / -Te-TeH: terminal; `thiol` and the carbon-flanked `disulfide` cannot match (defensive)
         ('dithioperoxol', ['thiol', 'thioether', 'disulfide']),
+        ('diselenoperoxol', ['selenol', 'selenoether']), ('ditelluroperoxol', ['tellurol']),
         #: hydrazine suppresses primary_amine on its -NH2 nitrogen
         ('hydrazine_fg', ['primary_amine']),
         #: hydrazide is more specific than hydrazine_fg

@@ -462,12 +462,12 @@ def _fragment_atom_indices(mol, frag_mol):
 
 #: A free-acid prefix ('carboxy', not 'carboxylato' / 'carboxylate') or an
 #: embedded 'hydrogen' in an anion word: the word already expresses acid hydrons.
-_ACID_H_IN_WORD_RE = re.compile(r"carboxy(?!l)|hydrogen")
+_ACID_H_IN_WORD_RE = re.compile(r"carboxy(?!l)|sulfo(?!n)|hydrogen")
 
 
 def _anion_word_expresses_acid_hydrons(word: str) -> bool:
-    """True iff the anion word cites acid hydrons itself: a 'carboxy' prefix
-    (method (1), 'potassium 6-carboxyhexanoate') or an embedded 'hydrogen'
+    """True iff the anion word cites acid hydrons itself: a 'carboxy'
+    or 'sulfo' prefix (method (1), 'potassium 6-carboxyhexanoate') or an embedded 'hydrogen'
     ('hydrogen carbonate', 'dihydrogen phosphate'). 'propane-1,2,3-tricarboxylate'
     does not: its 'carboxy' is part of the '-carboxylate' suffix."""
     return bool(word) and bool(_ACID_H_IN_WORD_RE.search(word))
@@ -752,10 +752,11 @@ def _anion_word(frag_mol, assembly, style: str, best_effort: bool) -> str:
     """The word of one anion of a salt: the ligand of a metal complex that the scope table admits to
     ``MACROCYCLE`` at the tiers that name ions (``rules/metal_macrocycles.py``), else the chokepoint
     ``route_charged`` and the legacy ``name_anion``."""
+    from .acid_salt_anions import name_dicarboxylate_acid_salt_anion, name_sulfonate_acid_salt_anion
     from .charged_router import route_charged
     from .metal_macrocycles import macrocycle_anion_name
-    return ((best_effort and macrocycle_anion_name(frag_mol, assembly))
-            or route_charged(frag_mol, style) or name_anion(frag_mol, style))
+    return ((best_effort and macrocycle_anion_name(frag_mol, assembly)) or name_sulfonate_acid_salt_anion(frag_mol)
+            or name_dicarboxylate_acid_salt_anion(frag_mol) or route_charged(frag_mol, style) or name_anion(frag_mol, style))
 
 
 def _ion_fragment_roundtrips(frag_mol, name: str) -> bool:

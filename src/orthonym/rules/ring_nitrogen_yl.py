@@ -44,8 +44,9 @@ def ring_yl_in_scope(mol, atom_idx: int, fragment_atoms: Iterable[int]) -> bool:
 def ring_yl_branch_in_scope(mol, fragment_atoms: Iterable[int], parent_atoms: Iterable[int]) -> bool:
     """``ring_yl_in_scope`` for a fragment bonded to the parent through a chain: the fragment holds a ring, every
     ring system in it is within the bounds, the whole fragment has at most ``MAX_RING_YL_SYSTEM`` atoms, and
-    the parent ring system bears the most principal characteristic groups of the molecule, so no
-    other ring system could be the parent: '2-[(decahydronaphthalen-1-yl)methyl]benzene-1,3-diol'). The size limit
+    the parent ring system bears at least as many principal characteristic groups as every other ring system
+    : '2-[(decahydronaphthalen-1-yl)methyl]benzene-1,3-diol'). A tie is accepted here: the criteria after
+     are not applied, and the name still goes through the read-back and the spelling checks. The size limit
     of the writers guards against naming a ring as the parent of a molecule whose parent is another ring;
     the groups tell which ring that is."""
     fragment = set(fragment_atoms)

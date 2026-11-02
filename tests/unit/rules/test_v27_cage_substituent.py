@@ -87,9 +87,11 @@ def test_adamantane_cage_substituent():
 
 
 def test_tricyclo_bridged_cage_substituent():
+    # 3 and 5 are equivalent by the cage's symmetry; the free valence takes the lower NUMBERING (c),
+    # the Blue Book)
     sub, attach = _detach("C12C3C(C(CC31)C2)CCO")
     assert _universal_cage_substituent_name(sub, attach) == \
-        "tricyclo[2.2.1.0^2,6]heptan-5-yl"
+        "tricyclo[2.2.1.0^2,6]heptan-3-yl"
 
 
 def test_bicyclo_cage_substituent():
@@ -127,9 +129,11 @@ def test_mancude_cage_gated_off_by_default():
 
 
 def test_mancude_cage_named_when_enabled():
+    # 2 and 5 are equivalent under the cage's Kekule symmetry; the free valence takes the lower NUMBERING
+    # (c) "principal characteristic groups and free valences", the Blue Book), whatever the atom mapping.
     sub, attach = _detach("c1ccc2ccccc2c1CCO")
     assert _universal_cage_substituent_name(sub, attach, allow_mancude=True) == \
-        "bicyclo[4.4.0]deca-1,3,5,7,9-pentaen-5-yl"
+        "bicyclo[4.4.0]deca-1,3,5,7,9-pentaen-2-yl"
 
 
 def test_retained_aromatic_precedence_over_polyene():

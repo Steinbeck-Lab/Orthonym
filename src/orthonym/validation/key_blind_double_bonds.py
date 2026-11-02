@@ -16,6 +16,10 @@ no such bond, is never rejected by it ('n/a'), so a correct name is never lost t
 that carries no configuration on those bonds is an omission ('omission'), not another molecule: the name ships, labelled
 below the PIN (``namer._record_key_blind_omission``,: a PIN cites each stereogenic unit); only the opposite
 configuration ('mismatch') refuses it.
+
+The C=N of a hydroximic acid has its own verdict, ``rules.hydroximic_acids.cn_configuration_verdict``, which refuses an
+omitted descriptor too: that producer builds PINs, and a PIN states every stereogenic unit,:44718). The two
+verdicts stay apart because their answers to an omission differ.
 """
 from typing import Optional
 
@@ -51,7 +55,12 @@ def _cleared(mol, bond_indices):
 def key_blind_double_bond_verdict(smiles: Optional[str], opsin_smiles: Optional[str]) -> str:
     """'mismatch' when the input draws a configured double bond its InChI leaves out and the OPSIN parse, drawn as
     the same constitution, has another configuration; 'omission' when the parse leaves those configurations out;
-    'match' when it has the same; 'n/a' otherwise."""
+    'match' when it has the same; 'n/a' otherwise.
+
+    The test compares the whole canonical isomeric SMILES, not only the key-blind bonds. A caller that has already
+    seen the two InChIKeys agree therefore refuses on any stereo difference the key cannot see; that refusal is
+    right, but its label ('double_bond_configuration_mismatch') names the key-blind bond as the cause, which is the
+    usual one, not the only one."""
     if not smiles or not opsin_smiles:
         return "n/a"
     mol_in = Chem.MolFromSmiles(smiles)

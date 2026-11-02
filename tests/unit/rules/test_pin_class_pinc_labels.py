@@ -41,8 +41,6 @@ from tests.support.pin_tiers import assert_declined_at_default, assert_pin_at_bo
 pytestmark = pytest.mark.opsin_gate
 
 DECLINED_ROWS = [
-    #:3725 (the carboxylic acid 'quinoline-1(2H)-carboxylic acid' form,:24701, is not built)
-    "OC(=O)N1CCCc2ccccc21",
     #:21730
     "CNC(=O)CCc1cc(CC(C)C(N)=O)ccc1C",
     "CNC(=O)CCc1ccccc1CC(C)C(N)=O",
@@ -51,19 +49,16 @@ DECLINED_ROWS = [
     "NC(=O)CCc1ccc(/C=C/C(=O)NC)cc1",          #:21033: the N-methylamide chain has the multiple bond
     #:32368,:39499
     "CCC(=O)OOSC(C)=O",
-    #:35730
-    "CN(C)P(=O)(Cl)N=C=O",
+    #:35730: built as the PIN, tests/unit/rules/test_acid_halide_pseudohalide_infix.py
     #:46008
     "CO[As@](C)(=O)c1ccccc1",
     #:26632,:26636
     "CN(C)CCC(CC[N+](C)(C)[O-])N(C)C",
     "CN(C)CCCCC[N+](C)(C)[O-]",
     "NC(=O)c1cc(CC[NH2+][O-])cc(C(=O)O)c1",
-    #:27963, (e):7134
-    "SSc1ccc(SS)cc1",
-    "SSc1ccccc1",
-    "SSCCSS",
 ]
+# '3,4-dihydroquinoline-1(2H)-carboxylic acid' (:24701) is built as the PIN: tests/unit/rules/test_ring_nitrogen_suffix.py
+# The -SSH rows:27963, (e):7134) are built as PINs: tests/unit/rules/test_ring_dithioperoxol.py
 
 # The ring-nitrogen prefixes of (:3725) are built since lane PINREST: the retained 'hydro' stem is not used for
 # a free valence on the nitrogen of a hydroquinoline, hydroisoquinoline or hydroquinoxaline, and the fusion-name

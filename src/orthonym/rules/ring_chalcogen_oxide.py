@@ -221,6 +221,39 @@ def _name_ring_heterone(mol) -> Optional[str]:
     return name
 
 
+def _mancude_thiophene_heterone(mol) -> Optional[str]:
+    """The bare mancude ring of (the Blue Book) with one =O on its chalcogen: '1H-1lambda4-thiophen-1-one
+    (PIN)' (:29440, again:43216), not 'thiophene oxide'. Only the printed shape is built: the bare five-membered
+    ring with one chalcogen and one =O; selenium and tellurium by analogy, below the PIN as in ``_name_ring_heterone``."""
+    from .lambda_convention import LAMBDA
+    if mol is None or mol.GetNumAtoms() != 6 or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    rings = mol.GetRingInfo().AtomRings()
+    if len(rings) != 1 or len(rings[0]) != 5:
+        return None
+    het = [i for i in rings[0] if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+    if len(het) != 1 or mol.GetAtomWithIdx(het[0]).GetSymbol() not in _CHALCOGENS:
+        return None
+    x = mol.GetAtomWithIdx(het[0])
+    oxo = [nb for nb in x.GetNeighbors() if nb.GetIdx() not in rings[0]]
+    if (len(oxo) != 1 or oxo[0].GetSymbol() != 'O' or oxo[0].GetDegree() != 1
+            or mol.GetBondBetweenAtoms(x.GetIdx(), oxo[0].GetIdx()).GetBondTypeAsDouble() != 2.0):
+        return None
+    if any(a.GetFormalCharge() or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return None
+    doubles = sum(1 for b in mol.GetBonds() if b.GetBondTypeAsDouble() == 2.0 and b.GetBeginAtomIdx() in rings[0]
+                  and b.GetEndAtomIdx() in rings[0])
+    if doubles != 2 or any(mol.GetAtomWithIdx(i).GetTotalNumHs() != 1 for i in rings[0] if i != het[0]):
+        return None
+    stem = {'S': 'thiophen', 'Se': 'selenophen', 'Te': 'tellurophen'}[x.GetSymbol()]
+    name = f"1H-1{LAMBDA}4-{stem}-1-one"
+    if x.GetSymbol() != 'S':
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name, rule="P-64.4.2", detail="the ring heterone of P-64.4.2 is worded for a ring sulfur; "
+                                                          "the selenium and tellurium ring heterones are named by analogy")
+    return name
+
+
 def name_ring_chalcogen_oxide(mol) -> Optional[str]:
     """Return the additive ring-chalcogen oxide name, else ``None``."""
     if mol is None:
@@ -228,7 +261,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
 
     # and: the heterone (the sultone and the sultam among them)
     # takes precedence over the additive '...dioxide' form.
-    heterone = _name_ring_heterone(mol)
+    heterone = _name_ring_heterone(mol) or _mancude_thiophene_heterone(mol)
     if heterone is not None:
         return heterone
 

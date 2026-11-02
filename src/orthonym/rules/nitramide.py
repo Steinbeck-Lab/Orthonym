@@ -221,7 +221,7 @@ _JUNIOR_GROUPS = frozenset({
     'nitrile', 'isocyanide',
     'aldehyde', 'ketone', 'thioaldehyde', 'thioketone',
     'alcohol', 'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'phenol', 'enol',
-    'thiol', 'hydroperoxide', 'so_thioperoxol', 'os_thioperoxol', 'dithioperoxol',
+    'thiol', 'hydroperoxide', 'so_thioperoxol', 'os_thioperoxol', 'dithioperoxol', 'diselenoperoxol', 'ditelluroperoxol',
     'primary_amine', 'secondary_amine', 'tertiary_amine', 'aromatic_amine',
     'imine', 'oxime', 'hydrazone', 'hydroxylamine', 'hydrazine_fg', 'aminooxy',
     'ether', 'aromatic_ether', 'vinyl_ether', 'thioether', 'selenoether', 'disulfide', 'peroxide', 'sulfoxide', 'sulfone',

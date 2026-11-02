@@ -376,6 +376,8 @@ SENIORITY_ORDER = [
     "so_thioperoxol",  # R-S-OH -> -SO-thioperoxol (replaces retired sulfenic acid)
     "os_thioperoxol",  # R-O-SH -> -OS-thioperoxol
     "dithioperoxol",   # R-S-SH -> dithioperoxol (suffix) / disulfanyl (prefix)
+    "diselenoperoxol",   # R-Se-SeH (Table 6.1,:27972)
+    "ditelluroperoxol",  # R-Te-TeH
 
     # Hydroxylamines (functional-group perception fix, 169.7: class 21; ranked just above amines)
     "hydroxylamine",
@@ -757,6 +759,8 @@ SUFFIX_FORMS = {
     "so_thioperoxol": ("SO-thioperoxol", "SO-thioperoxol"),
     "os_thioperoxol": ("OS-thioperoxol", "OS-thioperoxol"),
     "dithioperoxol": ("dithioperoxol", "dithioperoxol"),
+    "diselenoperoxol": ("diselenoperoxol", "diselenoperoxol"),
+    "ditelluroperoxol": ("ditelluroperoxol", "ditelluroperoxol"),
     # functional-group perception fix (169.7): hydroxylamine + free oxoacids + Se/Te ethers are named via
     # their handler / functional-parent / / functional-class paths,
     # NOT as a chain suffix — None per the SUFFIX_FORMS contract (like thioether).
@@ -916,6 +920,8 @@ PREFIX_FORMS = {
     "so_thioperoxol": "hydroxysulfanyl",
     "os_thioperoxol": "sulfanyloxy",
     "dithioperoxol": "disulfanyl",
+    "diselenoperoxol": "diselanyl",
+    "ditelluroperoxol": "ditellanyl",
     # functional-group perception fix (169.7): hydroxylamine + free oxoacids are functional parents
     # /; not expressed as detachable prefixes (None, like thioether).
     "hydroxylamine": None,
