@@ -512,17 +512,31 @@ def default_tier_name_scope(fn):
                 or _BOOK_RETRY_OWNED.get() or name_scope_depth() > 0):
             return fn(self, *args, **kwargs)
         from ..errors import OrthonymLimitError, is_failure_name
+        from .fragment_naming import hang_budget_trips
+        from .memo import recording_scopes, scope_entries, seeded_scopes
         clear_held()
-        try:
-            produced = fn(self, *args, **kwargs)
-        except OrthonymLimitError:
-            offered = _offered_name(self, args, kwargs)
-            if offered is None:
-                raise
-            return offered
+        trips = hang_budget_trips()
+        with recording_scopes() as passes:
+            try:
+                produced = fn(self, *args, **kwargs)
+            except OrthonymLimitError as exc:
+                produced, limit = None, exc
+            else:
+                limit = None
         if produced and not is_failure_name(produced):
             return produced
-        offered = _offered_name(self, args, kwargs)
+        if hang_budget_trips() != trips:
+            passes = []                     # a naming that ran out of a hang budget hands on nothing
+        from ..metrics.abstention import peek_abstention, restore_abstention
+        declined = peek_abstention()
+        with seeded_scopes(scope_entries(passes)):  # the offers start with what the naming computed
+            offered = _offered_name(self, args, kwargs)
+        if offered is None:
+            # an offer is a naming of its own and clears the slot; served from the seeded entries it does not
+            # record the reason again, and the reason the caller reads is the naming's
+            restore_abstention(declined)
+            if limit is not None:
+                raise limit
         return produced if offered is None else offered
     return _wrapper
 

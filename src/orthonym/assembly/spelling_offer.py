@@ -53,7 +53,7 @@ def name_tiered_with_offer(namer, smiles: str, run) -> dict:
     earlier naming are cleared first, so what the row is offered never depends on what was named before it."""
     from .default_tier_offer import clear_held, offer_default_tier_row
     from .fragment_naming import hang_budget_trips
-    from .memo import recording_scopes
+    from .memo import recording_scopes, scope_entries, seeded_scopes
     _AMINE_CHAIN_PARENT.set(None)
     clear_held()
     trips = hang_budget_trips()
@@ -61,7 +61,9 @@ def name_tiered_with_offer(namer, smiles: str, run) -> dict:
         row = run(smiles)
     if hang_budget_trips() != trips:
         passes = ()                         # a naming that ran out of a hang budget hands on nothing
-    return offer_default_tier_row(namer, smiles, prefer_clean_name(namer, smiles, row, passes))
+    row = prefer_clean_name(namer, smiles, row, passes)
+    with seeded_scopes(scope_entries(passes)):      # the offers start with what the naming computed
+        return offer_default_tier_row(namer, smiles, row)
 
 
 def prefer_clean_name(namer, smiles: str, row: dict, passes=()) -> dict:

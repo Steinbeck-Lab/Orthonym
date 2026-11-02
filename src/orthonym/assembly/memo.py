@@ -261,6 +261,20 @@ def shareable_entries(scopes, into=None) -> dict:
     return out
 
 
+def scope_entries(scopes) -> dict:
+    """Every entry of ``scopes`` and its side record, for the offers of the default tier
+    (``default_tier_offer``): they name the same molecule again after its naming left it without a name,
+    with the breadth flags of their own engines, and every key carries what its value depends on (the
+    breadth flags where a value depends on them; ``ORTHONYM_MEMO=verify`` with one scope around the
+    naming and its offers: 3 of 360 panel rows mismatch, all of them rows that ran out of time, whose
+    values depend on the budget left)."""
+    out = {_SIDE_KEY: {}}
+    for scope in scopes:
+        out.update((k, v) for k, v in scope.items() if k != _SIDE_KEY)
+        out[_SIDE_KEY].update(scope.get(_SIDE_KEY, {}))
+    return out
+
+
 @contextlib.contextmanager
 def seeded_scopes(entries):
     """Every top-level memo scope opened in the body starts with a copy of ``entries``
