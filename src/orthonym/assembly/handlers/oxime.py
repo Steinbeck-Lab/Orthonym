@@ -238,7 +238,7 @@ def _insert_n_hydroxy(sub: str, token: str = "N-hydroxy") -> Optional[str]:
 
     m = _SUBST_IMINE_RE.match(sub)
     if not m:
-        return None
+        return _insert_n_hydroxy_unlocanted(sub, token)
     pre, par = m.group("pre"), m.group("par")
     tokens = _split_prefix_block(pre)
     if not tokens:
@@ -257,6 +257,50 @@ def _insert_n_hydroxy(sub: str, token: str = "N-hydroxy") -> Optional[str]:
     entries.append((alpha_sort_key("hydroxy"), token))
     entries.sort(key=lambda e: e[0])
     return _join([e[1] for e in entries]) + par
+
+
+def _insert_n_hydroxy_unlocanted(sub: str, token: str) -> Optional[str]:
+    """'N-hydroxy' among the locant-free prefixes of a one-carbon imine parent, in alphanumerical order;
+    the carbon of 'methanimine' holds no hydrogen, so its prefixes cite no locant,:
+    '(4-chlorophenyl)(phenyl)methanimine' -> '(4-chlorophenyl)-N-hydroxy(phenyl)methanimine', as the imine
+    producer writes '(4-chlorophenyl)-N-methyl(phenyl)methanimine',:47666 cites this oxime). A
+    bare prefix that follows 'N-hydroxy' takes enclosing marks, so that it is not read as part of 'hydroxy'
+    ('N-hydroxy(phenyl)(pyridin-2-yl)methanimine'). None for any other shape."""
+    from ..naming_utils import alpha_sort_key
+    if token != "N-hydroxy" or not sub.endswith("methanimine") or not _balanced(sub):
+        return None
+    pre = sub[:-len("methanimine")]
+    tokens, cur, depth = [], "", 0
+    for ch in pre:
+        if ch == "(" and depth == 0 and cur:
+            tokens.append(cur)
+            cur = ""
+        cur += ch
+        depth += ch == "("
+        depth -= ch == ")"
+        if ch == ")" and depth == 0:
+            tokens.append(cur)
+            cur = ""
+    if cur:
+        tokens.append(cur)
+    # each prefix enclosed or a plain word: a locant anywhere outside the marks is another shape
+    if len(tokens) < 2 or any(not (t.startswith("(") and t.endswith(")")) and not t.isalpha() for t in tokens):
+        return None
+    keys = [alpha_sort_key(t.strip("()")) for t in tokens]
+    if "hydroxy" in keys or len(set(keys)) != len(keys):
+        return None
+    entries = sorted(zip(keys, tokens))
+    out, placed = "", False
+    for key, tok in entries:
+        if not placed and alpha_sort_key("hydroxy") < key:
+            out += ("-" if out else "") + token
+            placed = True
+            if not tok.startswith("("):
+                tok = f"({tok})"
+        out += tok
+    if not placed:
+        out += "-" + token
+    return out + "methanimine"
 
 
 _DESCRIPTOR_BLOCK_RE = _re.compile(r"^\((\d*[RSEZrsez*](?:,\d*[RSEZrsez*])*)\)-")

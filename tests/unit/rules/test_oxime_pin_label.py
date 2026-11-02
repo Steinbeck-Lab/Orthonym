@@ -10,8 +10,9 @@ recommendations" (the example:38468: 'N-hydroxypentan-2-imine (PIN)... pentan-2-
 The oxime handler builds the substitutive name for a parent whose imine name it can cite 'N-hydroxy' in
 (a plain or substituted alkane or cycloalkane parent, with the configuration of the C=N, one oxime or two:
 ``test_oxime_substitutive_pin``) and falls back to the functional class name for the rest (a bicyclic parent,
-whose imine has no PIN at the default tier; a one-carbon parent with two aryl groups, whose order of prefixes
-the book prints against (:47666); an unsaturated parent). That fallback was labelled pin_verified: camphor
+whose imine has no PIN at the default tier; an unsaturated parent). A one-carbon parent with two aryl groups
+now takes the substitutive PIN, 'N-hydroxy' among its prefixes in the order of
+(``test_oxime_substitutive_pin``, UNLOCANTED). That fallback was labelled pin_verified: camphor
 oxime '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one oxime'. It is recorded as not the PIN: the default
 tier declines it, the best-effort tier gives it unchanged (systematic_verified), and every name reads back
 to the input's full InChIKey (OPSIN 2.9.0, independent of the engine).
@@ -28,8 +29,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 FUNCTIONAL_CLASS = [
     ("bicyclic ketoxime with stereocentres (camphor oxime)", "C[C@@]12CC[C@@H](C1(C)C)CC2=NO",
      "(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one oxime"),
-    ("one-carbon parent with two aryl groups", "O/N=C(/c1ccccc1)c1ccc(Cl)cc1",
-     "(Z)-(4-chlorophenyl)(phenyl)methanone oxime"),
     ("unsaturated parent", "CC(=NO)C=C", "but-3-en-2-one oxime"),
 ]
 

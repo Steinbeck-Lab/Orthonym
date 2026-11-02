@@ -90,7 +90,6 @@ def test_the_descriptor_of_the_name_is_the_one_of_the_input(smiles, name):
 
 @pytest.mark.parametrize("smiles", [
     "C[C@@]12CC[C@@H](C1(C)C)CC2=NO",           # the imine of a bicyclic parent has no PIN at the default tier
-    "O/N=C(/c1ccccc1)c1ccc(Cl)cc1",             # the book's order of the prefixes (:47666) is not 's
     "CC(=NO)C=C",                               # an unsaturated parent
 ])
 def test_a_parent_the_builder_does_not_cite_stays_below_the_pin(smiles):
@@ -99,3 +98,24 @@ def test_a_parent_the_builder_does_not_cite_stays_below_the_pin(smiles):
     b = name_breadth(smiles)
     assert b.get("tier") == "systematic_verified" and b.get("is_pin") is False, b
     assert name_is_rt_exact(b["name"], smiles)
+
+
+#: A one-carbon parent whose carbon holds no hydrogen cites its prefixes without locants, and
+#: 'N-hydroxy' stands among them in alphanumerical order. ALPHANUMERICAL ORDER (:3440): "Alphanumerical order
+#: is used to establish the order of citation of detachable substituent prefixes... Nonitalic Roman letters are
+#: considered first, unless used as locants... for example, 'N'": 'N-hydroxy' sorts under 'h'. The book prints this
+#: oxime with 'N-hydroxy' first (:47666), against its own rule; the order of is the one the imine producer
+#: writes ('(4-chlorophenyl)-N-methyl(phenyl)methanimine'), and the one ruled on 2026-11-01. A bare prefix after
+#: 'N-hydroxy' takes enclosing marks, so that it is not read as part of it.
+UNLOCANTED = [
+    ("O/N=C(/c1ccccc1)c1ccc(Cl)cc1", "(Z)-(4-chlorophenyl)-N-hydroxy(phenyl)methanimine"),
+    ("ON=C(c1ccccc1)c1ccc(Cl)cc1", "(4-chlorophenyl)-N-hydroxy(phenyl)methanimine"),
+    ("ON=C(c1ccccc1)c1ccccn1", "N-hydroxy(phenyl)(pyridin-2-yl)methanimine"),
+    ("ON=C(C1CCCCC1)c1ccccc1", "cyclohexyl-N-hydroxy(phenyl)methanimine"),
+]
+
+
+@pytest.mark.parametrize("smiles, pin", UNLOCANTED, ids=[r[1] for r in UNLOCANTED])
+def test_n_hydroxy_stands_among_unlocanted_prefixes_in_alphanumerical_order(smiles, pin):
+    assert_pin_at_both_tiers(smiles, pin)
+    assert _isomeric_read_back(pin, smiles)
