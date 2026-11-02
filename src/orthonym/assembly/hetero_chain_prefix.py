@@ -66,8 +66,31 @@ def fragment_parent_to_prefix(mol, sub_atoms, attach_idx, parent_name: str, carb
             from ..metrics.provenance import record_uncertified_pin_name
             record_uncertified_pin_name(prefix)
         return prefix
+    if parent_name.strip() == 'dioxidane' and _is_bare_hydroperoxy(mol, sub_atoms, attach_idx):
+        # Hydroperoxides (the Blue Book): "The prefix 'hydroperoxy' is formed by concatenation to
+        # describe the group –OOH as a substituent in the presence of a characteristic group having priority for
+        # citation as a suffix"; the book's PINs cite it ('2-hydroperoxyethan-1-ol (PIN)',:28013;
+        # '2-hydroperoxy-1-phenylethan-1-one (PIN)',:27953). The hydride prefix 'dioxidanyl' is no PIN vocabulary.
+        return 'hydroperoxy'
     from .substituent_naming import ATTACH_LOCANT_UNKNOWN, parent_to_prefix
     return parent_to_prefix(parent_name, chain_length=carbon_count, attach_locant=ATTACH_LOCANT_UNKNOWN)
+
+
+def _is_bare_hydroperoxy(mol, sub_atoms, attach_idx) -> bool:
+    """True when the fragment is exactly the group –O–OH (two neutral, unlabelled oxygens, the outer one with one
+    hydrogen), attached through the inner oxygen."""
+    try:
+        sub = set(sub_atoms)
+        if attach_idx is None or attach_idx not in sub or len(sub) != 2:
+            return False
+        inner = mol.GetAtomWithIdx(attach_idx)
+        (outer_idx,) = sub - {attach_idx}
+        outer = mol.GetAtomWithIdx(outer_idx)
+        return (inner.GetSymbol() == outer.GetSymbol() == 'O' and outer.GetTotalNumHs() == 1
+                and not any(a.GetFormalCharge() or a.GetIsotope() or a.GetNumRadicalElectrons() for a in (inner, outer))
+                and mol.GetBondBetweenAtoms(attach_idx, outer_idx) is not None)
+    except Exception:  # noqa: BLE001 -- an unreadable fragment keeps the hydride prefix
+        return False
 
 
 def _has_principal_group(mol) -> bool:

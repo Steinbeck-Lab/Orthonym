@@ -5004,9 +5004,9 @@ _P1634_PARENS_SUFFIXES = (
 # unit, so the suffix locant is cited: '2,2'-sulfanediyldi(cyclopentane-1-thiol)
 # (PIN)', the Blue Book), '3,4'-disulfanediyldi(benzene-1-thiol)'
 # (:27593), 'di(cyclohexane-1-carboxylic acid)' (e),:7085). Longest
-# suffix first ('thiol' before 'ol'); only a cycloalkane or benzene stem, so the
+# suffix first ('thiol' and 'peroxol' before 'ol'); only a cycloalkane or benzene stem, so the
 # retained 'phenol' and 'aniline' never match.
-_P1634_LOCANT_OMITTED_SUFFIXES = ('selenol', 'tellurol', 'thiol', 'amine', 'ol')
+_P1634_LOCANT_OMITTED_SUFFIXES = ('selenol', 'tellurol', 'peroxol', 'thiol', 'amine', 'ol')
 _SYMMETRIC_RING_STEM = r"^(?:cyclo[a-z]+?an|benzen)e?$"
 
 

@@ -325,8 +325,8 @@ class TestConfidenceSurface:
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
 
     def test_confidence_dict_carries_abstention_on_failure_ring_witness(self):
-        # A ring-fallback witness (``TestEndToEndCodes._RING_FALLBACK_SMI``; the former one, PubChem CID 10887849, is
-        # named since 2026-11-01) whose decline is not served from a seeded memo entry: name_with_confidence carries
+        # A ring-fallback witness (``TestEndToEndCodes._RING_FALLBACK_SMI``; the former one, PubChem CID 10887849, no
+        # longer abstains with this code since 2026-11-01) whose decline is not served from a seeded memo entry: name_with_confidence carries
         # its BRANCH_UNNAMEABLE code.
         meta = Orthonym(
             general_fallback=True, general_fallback_unverified=True,

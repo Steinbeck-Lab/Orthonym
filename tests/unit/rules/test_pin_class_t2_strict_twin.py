@@ -76,14 +76,16 @@ PIN_ROWS = [
     # an XFAIL_PIN_ROWS row); OPSIN 2.9.0 full InChIKey exact
     ("COc1cc2c(Oc3ccc4[nH]c(C)cc4c3F)ncnc2cc1OCCCN1CCCC1",
      "4-[(4-fluoro-2-methyl-1H-indol-5-yl)oxy]-6-methoxy-7-[3-(pyrrolidin-1-yl)propoxy]quinazoline"),  #:19437
+    # 2026-11-01 (was an XFAIL_PIN_ROWS row): the fragment namer spells the bare -OOH 'hydroperoxy',
+    #:27944, method (1) "leads to preferred IUPAC names"), so the strict path builds this Blue Book PIN
+    ("O=C1CCCCC1OOC1(O)CCCCC1OO",
+     "2-[(2-hydroperoxy-1-hydroxycyclohexyl)peroxy]cyclohexan-1-one"),     #:28154
 ]
 
 _NEEDS_COMPOSITION = ("needs a best-effort composition producer at the strict path "
                       "(PIN class program Task 2 (C), TRIAGE: the measured relabels)")
 XFAIL_PIN_ROWS = [
     ("O=C(O)c1ccc(CSO)cc1", "4-[(hydroxysulfanyl)methyl]benzoic acid"),    #:29962
-    ("O=C1CCCCC1OOC1(O)CCCCC1OO",
-     "2-[(2-hydroperoxy-1-hydroxycyclohexyl)peroxy]cyclohexan-1-one"),     #:28154
     # "4-[(4-fluoro-2-methyl-1H-indol-5-yl)oxy]-6-methoxy-7-[3-(pyrrolidin-1-yl)
     # propoxy]quinazoline" (:19437) -- moved to PIN_ROWS 2026-10-09 (fix-all): the
     # strict path now builds and verifies it.

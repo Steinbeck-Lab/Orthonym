@@ -135,7 +135,9 @@ def test_f3b_hydroperoxy_token_is_parseable():
     # direct: the hydride family keeps its 'an' stem
     assert parent_to_prefix("dioxidane", 2, attach_locant=None) == "dioxidanyl"
     assert parent_to_prefix("oxidane", 1, attach_locant=None) == "oxidanyl"
-    # end to end: -OOH on a ring -> a parseable token
+    # end to end: -OOH on a ring -> the prefix 'hydroperoxy' Hydroperoxides, the Blue Book: "The
+    # prefix 'hydroperoxy' is formed by concatenation to describe the group -OOH as a substituent"; the book's PINs
+    # cite it, '2-hydroperoxyethan-1-ol (PIN)',:28013; 2026-11-01, was the hydride prefix 'dioxidanyl'), parseable
     m = Chem.MolFromSmiles("OOC1CCCCC1")
     ring = set()
     for r in m.GetRingInfo().AtomRings():
@@ -145,4 +147,4 @@ def test_f3b_hydroperoxy_token_is_parseable():
                   and any(n.GetIdx() in ring for n in a.GetNeighbors()))
     branch = [i for i in range(m.GetNumAtoms()) if i not in ring]
     tok = name_substituent(m, branch, attach)
-    assert tok == "dioxidanyl", f"expected dioxidanyl, got {tok!r}"
+    assert tok == "hydroperoxy", f"expected hydroperoxy, got {tok!r}"

@@ -515,6 +515,10 @@ _RING_OH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2H1]')
 # -adjacent; `1,2,3,4-tetrahydronaphthalen-1-amine` is the PIN at
 # the Blue Book). Neutral, exactly two H, single bond.
 _RING_NH2_SMARTS = Chem.MolFromSmarts('[#6;R][NX3;H2;+0]')
+# A ring carbon bearing an exocyclic -O-OH -> the '-peroxol' suffix Hydroperoxides, the Blue Book;
+# '1,2,3,4-tetrahydronaphthalene-1-peroxol (PIN)',:27948). class 18: junior to the hydroxy compounds
+# (class 17) and senior to the amines (class 19).
+_RING_OOH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2;+0][OX2H1;+0]')
 
 # Suffix spelling per PCG kind. The '-ol' form elides the parent's terminal 'e'
 # only when no multiplying prefix intervenes (a)): the Blue Book prints
@@ -523,6 +527,8 @@ _RING_NH2_SMARTS = Chem.MolFromSmarts('[#6;R][NX3;H2;+0]')
 _PARTIAL_SAT_PCG_SUFFIX = {
     'carboxylic_acid': ('carboxylic acid', False),
     'ol': ('ol', True),
+    # consonant-initial: the parent keeps its 'e' ('...naphthalene-2-peroxol')
+    'peroxol': ('peroxol', False),
     # A vowel-initial suffix, so it elides the parent's terminal 'e'
     # (`naphthalen-1-amine`); a multiplied form keeps it (`naphthalene-1,5-diamine`).
     'amine': ('amine', True),
@@ -565,23 +571,54 @@ def _partial_sat_pcg(
             ol_ring.add(ring_c)
             ol_oxygens.add(oxygen)
     if not ol_ring:
-        # No ring -OH: the next-junior scoped suffix this path spells is the
-        # primary amine puts amines below alcohols, so -ol above always
-        # wins when present).
+        # No ring -OH: the next-junior scoped suffixes this path spells are the
+        # hydroperoxide and then the primary amine puts both below the
+        # alcohols, so -ol above always wins when present).
+        peroxol = _partial_sat_pcg_peroxol(mol, fused_ring_atoms)
+        if peroxol[0]:
+            return peroxol
         return _partial_sat_pcg_amine(mol, fused_ring_atoms)
     # Exactly one -OH per PCG ring carbon: a geminal diol would need a
     # different construction than one locant per suffix position.
     if len(ol_oxygens) != len(ol_ring):
         return (None, set())
-    # Every heteroatom in the molecule must be one of those hydroxy oxygens,
-    # and the species must be neutral and non-radical — otherwise -ol is not
-    # provably the senior group and this path must not claim the suffix.
+    # Every heteroatom in the molecule must be one of those hydroxy oxygens or an
+    # oxygen of a ring -O-OH (class 18, junior to -ol: a 'hydroperoxy' prefix,
+    # '6-hydroperoxy-5,6,7,8-tetrahydronaphthalen-2-ol'), and the species must be
+    # neutral and non-radical — otherwise -ol is not provably the senior group and
+    # this path must not claim the suffix.
+    junior = {i for match in mol.GetSubstructMatches(_RING_OOH_SMARTS) for i in match[1:]} if _RING_OOH_SMARTS else set()
     for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return (None, set())
-        if atom.GetAtomicNum() != 6 and atom.GetIdx() not in ol_oxygens:
+        if atom.GetAtomicNum() != 6 and atom.GetIdx() not in ol_oxygens | junior:
             return (None, set())
     return ('ol', ol_ring)
+
+
+def _partial_sat_pcg_peroxol(
+    mol, fused_ring_atoms: Set[int]
+) -> Tuple[Optional[str], Set[int]]:
+    """The '-peroxol' PCG of a partially-saturated fused carbocycle: ring carbons each bearing one
+    exocyclic -O-OH. Scoped FAIL-CLOSED as the '-ol' path is: the only heteroatoms present are those oxygens, neutral
+    and non-radical, so the hydroperoxide is provably the senior characteristic group. ``(None, set)`` when it does
+    not apply."""
+    if _RING_OOH_SMARTS is None:
+        return (None, set())
+    ring: Set[int] = set()
+    oxygens: Set[int] = set()
+    for ring_c, inner, outer in mol.GetSubstructMatches(_RING_OOH_SMARTS):
+        if ring_c in fused_ring_atoms and ring_c not in ring:
+            ring.add(ring_c)
+            oxygens.update((inner, outer))
+    if not ring or len(oxygens) != 2 * len(ring):
+        return (None, set())
+    for atom in atoms_of(mol):
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return (None, set())
+        if atom.GetAtomicNum() != 6 and atom.GetIdx() not in oxygens:
+            return (None, set())
+    return ('peroxol', ring)
 
 
 def _partial_sat_pcg_amine(
@@ -636,8 +673,13 @@ def _partial_sat_pcg_exocyclic_atoms(
                 for nn in n.GetNeighbors():
                     if nn.GetIdx() != rc and nn.GetSymbol() == 'O':
                         out.add(nn.GetIdx())
-            elif pcg_kind == 'ol' and n.GetSymbol() == 'O':
+            elif pcg_kind == 'ol' and n.GetSymbol() == 'O' and n.GetDegree() == 1:
+                # the hydroxy oxygen only (an -O-OH on the same carbon is a prefix: 'hydroperoxy')
                 out.add(n.GetIdx())
+            elif pcg_kind == 'peroxol' and n.GetSymbol() == 'O':
+                # the inner oxygen and the hydroxy oxygen of -O-OH
+                out.add(n.GetIdx())
+                out.update(nn.GetIdx() for nn in n.GetNeighbors() if nn.GetIdx() != rc and nn.GetSymbol() == 'O')
             elif pcg_kind == 'amine' and n.GetSymbol() == 'N':
                 out.add(n.GetIdx())
     return out

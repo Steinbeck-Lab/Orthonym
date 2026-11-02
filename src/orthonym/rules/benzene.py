@@ -146,6 +146,12 @@ _SUFFIX_PRIORITY = [
     'thiol',
     'selenol',
     'tellurol',
+    # class 18, hydroperoxides, junior to the hydroxy compounds and their chalcogen analogues (class
+    # 17) and senior to the amines (class 19): 'C6H5-OOH' is 'benzeneperoxol' as 'CH3-CH2-OOH' is 'ethaneperoxol (PIN)'
+    # THE SUFFIX 'PEROXOL', FOR –OOH, the Blue Book); the -OOH reaches the ring as the 'hydroperoxy'
+    # prefix and is promoted
+    # (``benzene_prefix_suffix_promotion``)
+    'peroxol',
     # C4 /: amine is JUNIOR to alcohol and all C/S/Se/Te/P
     # acids, amides, nitriles, aldehydes, ketones. It MUST be the LAST entry so
     # it only becomes the ring parent suffix ('aniline') when nothing more
@@ -163,6 +169,7 @@ _SUFFIX_TO_PREFIX = {
     'thiol': 'sulfanyl',
     'selenol': 'selanyl',
     'tellurol': 'tellanyl',
+    'peroxol': 'hydroperoxy',
     'carboxylic acid': 'carboxy',
     'sulfonic acid': 'sulfo',
     # D-FOLLOWON item 5 (prefix forms; seniority.py FG_PREFIXES already has these).
@@ -272,6 +279,14 @@ def _has_functional_class_fg(detected_fgs) -> bool:
     return any(fg in _FUNCTIONAL_CLASS_FGS for fg in detected_fgs)
 
 
+def _pop_promoted_locants(prefix_groups, promoted_prefixes) -> List[int]:
+    """The locants of the promoted prefixes, taken out of ``prefix_groups`` (they become the suffix)."""
+    locants: List[int] = []
+    for pname in promoted_prefixes:
+        locants.extend(prefix_groups.pop(pname, []))
+    return sorted(locants)
+
+
 def benzene_prefix_suffix_promotion(
     suffix_names,
     prefix_names,
@@ -334,6 +349,11 @@ def benzene_prefix_suffix_promotion(
     senior_to_ol = {s for s in suffix_names if s not in _OL_JUNIOR_SUFFIXES}
     if 'hydroxy' in prefix_names and not senior_to_ol:
         return 'ol', frozenset({'hydroxy'})
+
+    # The hydroperoxide (class 18) holds the suffix when it is the principal group and nothing more senior does:
+    # 'benzeneperoxol', '4-methylbenzene-1-peroxol'.
+    if _own == 'peroxol' and 'hydroperoxy' in prefix_names and not suffix_names:
+        return 'peroxol', frozenset({'hydroperoxy'})
 
     # The amine (aniline) promotion runs only when NOTHING holds the suffix -- and
     # if the -ol promotion had fired, ``suffix_groups`` would hold 'ol' by now, so
@@ -4171,16 +4191,14 @@ def _name_substituted_benzene(
     # _OL_JUNIOR_SUFFIXES is module level (Phase C Task 9); it is read by
     # ``benzene_prefix_suffix_promotion``, which is where the seniority test that
     # used to be inlined here now lives.
+    if _promoted_suffix in ('ol', 'peroxol'):
+        # The promoted group IS the principal group: it moves from prefix to suffix ('benzeneperoxol' as 'phenol').
+        suffix_groups[_promoted_suffix] = _pop_promoted_locants(prefix_groups, _promoted_prefixes)
     if _promoted_suffix == 'ol':
-        # No suffix FG senior to -ol, and no competing functional-class FG -- hydroxyl
-        # IS the principal group. Move from prefix to suffix, and demote any junior
+        # No suffix FG senior to -ol, and no competing functional-class FG: demote any junior
         # suffix that was holding the slot back to its own prefix form. The prefix
         # NAME comes from the shared authority rather than a literal here, so the
         # anchor and the promotion cannot disagree about which prefix moves.
-        _promoted_locants: List[int] = []
-        for _pname in _promoted_prefixes:
-            _promoted_locants.extend(prefix_groups.pop(_pname, []))
-        suffix_groups['ol'] = sorted(_promoted_locants)
         for _junior in list(suffix_groups):
             if _junior in _OL_JUNIOR_SUFFIXES:
                 _jlocs = suffix_groups.pop(_junior)
