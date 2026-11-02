@@ -228,6 +228,38 @@ def fused_lambda_entries(mol, ring_atoms, atom_to_locant):
     return sorted(entries)
 
 
+#: the ring atoms whose =O is a ketone or heterone suffix ('one'): carbon, and the atoms that take the lambda state
+#: with it, HETERONES:29384); a ring nitrogen =O is not a heterone here
+HETERONE_RING_ATOMS = frozenset({'C', 'S', 'Se', 'Te', 'P', 'As', 'Sb', 'Bi', 'I', 'Br', 'Cl'})
+
+
+def merge_lambda_into_benzo_locants(name: str, mol, ring_atoms, atom_to_locant) -> Optional[str]:
+    """``name`` with each lambda token cited at its locant in the heteroatom locants that begin a benzo name, or
+    None when ``name`` does not begin with such locants or a lambda atom is not among them: '1λ4,5-benzodithiepine
+    (PIN)' (BlueBookV2.md:3326), '2,1λ5-benzoxabismole' (:39307); a bracketed fusion name keeps the tokens at its
+    front (P-25.3.2.5.2, '5λ5-phosphinino[2,1-d]phosphinolizine (PIN)')."""
+    import re
+    m = re.match(r'(\d+(?:,\d+)*)-(benzo?[a-z])', name)
+    entries = fused_lambda_entries(mol, ring_atoms, atom_to_locant)
+    if m is None or not entries:
+        return None
+    locs = m.group(1).split(',')
+    lam = {str(loc): n for loc, n in entries}
+    if not set(lam) <= set(locs):
+        return None
+    from ..data.locant_text import render_locants
+    merged = render_locants(format_lambda_token(int(x), lam[x]) if x in lam else x for x in locs)
+    return merged + name[len(m.group(1)):]
+
+
+def fused_lambda_name_and_prefix(name: str, mol, ring_atoms, atom_to_locant):
+    """``(name, lambda prefix)``: the benzo name with its lambda tokens merged into its heteroatom locants and ``''``
+    (``merge_lambda_into_benzo_locants``), else ``name`` and ``fused_lambda_prefix`` (None: the name is declined)."""
+    prefix = fused_lambda_prefix(mol, ring_atoms, atom_to_locant)
+    merged = merge_lambda_into_benzo_locants(name, mol, ring_atoms, atom_to_locant) if prefix else None
+    return (merged, '') if merged is not None else (name, prefix)
+
+
 def fused_lambda_prefix(mol, ring_atoms, atom_to_locant) -> Optional[str]:
     """The lambda tokens cited at the beginning of a fused name, ``'1λ4-'`` or ``'1λ4,3λ4-'``;
     ``''`` when no ring atom has a nonstandard bonding number; ``None`` when the name must be

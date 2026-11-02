@@ -122,9 +122,7 @@ _DEMOTED = [
     # (the whole-graph R/S pregna-1,4-diene row of canary DK-P101CIP left this list, NPL 2026-11-01:
     # INTRODUCTION, the Blue Book "PINs are not identified for the compounds in this Chapter", so the route
     # offers the systematic name, a pin_verified row of ``_NPL_SYSTEMATIC`` below)
-    #: acyloxy prefixes on an alcohol (canary DK-GLYSUB)
-    ("CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
-     "(2R)-1-(octadecanoyloxy)-2-[(9Z)-octadec-9-enoyloxy]propan-3-ol"),
+    # (canary DK-GLYSUB is a method (1) PIN now: tests/unit/rules/test_partial_polyester_method_1.py)
     # Suite fix j4 (TRIAGE g3 C10b): polyol esters cited as acyloxy prefixes on the
     # bare hydride -- the decomposition weave (glycerol diester ether) and the
     # rules.esters.name_polyol_polyester fallback. (:31698);

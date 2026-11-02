@@ -4133,11 +4133,8 @@ def _name_ether_substituted_chain(
     group(s), numbered from the attachment point (free valence = locant 1,
      /; the ether expressed as an (R-oxy) prefix,.
 
-     C- (V-3, V1 constitutional-fidelity theme). Fixes the defect where the
-    recursive path (Step 3-4) caps the fragment to a FREE molecule whose retained
-    name is then naively ``-yl``-ed, losing the attachment locus:
-    ``-CH2-O-C6H5`` -> capped ``anisole`` -> ``anisolyl`` (a DIFFERENT
-    constitution — implies the free valence is on the ring). Here the backbone
+     C-T2: the recursive path capped the fragment to a FREE molecule and '-yl'-ed its retained name
+    (``-CH2-O-C6H5`` -> ``anisolyl``, a DIFFERENT constitution). Here the backbone
     carbon bearing each ether is numbered from the free valence and each ``-O-R``
     is named via:func:`get_alkoxy_prefix`:
 
@@ -4154,9 +4151,11 @@ def _name_ether_substituted_chain(
     """
     if not sub_atoms:
         return None
+    from ..rules.replacement_chain_prefix import replacement_chain_prefix    #: four heterounits, 'a' name
+    if (_a_name := replacement_chain_prefix(mol, sub_atoms, attach_idx)) is not None:
+        return _a_name
     sub_set = set(sub_atoms)
     ring_info = mol.GetRingInfo()
-
     attach_atom = mol.GetAtomWithIdx(attach_idx)
     if attach_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(attach_idx) > 0:
         return None  # attach via heteroatom / ring -> not this handler

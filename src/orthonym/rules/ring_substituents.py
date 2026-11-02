@@ -4636,9 +4636,9 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
             format_stereodescriptor_string as _fmt_sd,
         )
         _ring_a2l = {atom_idx: loc for loc, atom_idx in order.items()}
-        _stereo_prefix = _fmt_sd(
-            _collect_sd(mol, _ring_a2l, include_near_parent_ez=False)
-        )
+        _stereo_prefix = _fmt_sd(_collect_sd(mol, _ring_a2l, include_near_parent_ez=False))
+        from .ylidene_stereo_label import label_ylidene_ez_in_prefix    # method (b) of: below the PIN
+        label_ylidene_ez_in_prefix(mol, ring_list, _stereo_prefix)
 
     if het:
         if stem is _HW_STEM_FROM_NUMBERING:

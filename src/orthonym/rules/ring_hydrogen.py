@@ -65,6 +65,12 @@ def exocyclic_double_atoms(mol, ring_atoms: Iterable[int]) -> FrozenSet[int]:
     return frozenset(out)
 
 
+def _outside_bonds(mol, a, ring) -> int:
+    """The bond orders from ring atom ``a`` to atoms outside ``ring``, hydrogen excluded."""
+    return int(sum(b.GetBondTypeAsDouble() for b in mol.GetAtomWithIdx(a).GetBonds()
+                   if b.GetOtherAtomIdx(a) not in ring))
+
+
 def _kekule(mol):
     km = Chem.Mol(mol)
     try:
@@ -100,8 +106,10 @@ def ring_hydrogen(mol, ring_atoms: Iterable[int], suffix_atoms: Iterable[int],
     state = hydro.hydro_state(km, Split(ring, (), (), None, n_double, frozenset(unsat)))
     if state is None:
         return None
+    # a =X suffix takes two hydrogen atoms of the parent; a lambda atom gives one for each further bond outside the
+    # ring as well ('1-hydroxy-1λ5,2-benziodoxole-1,3-dione': the =O and the hydroxy on the iodine)
     groups = frozenset(a for a in suffix_atoms if a in ring
-                       and hydro.lacks_hydrogen(state, a, 2))
+                       and hydro.lacks_hydrogen(state, a, max(2, _outside_bonds(km, a, ring))))
     got = hydro.accommodate(state, atom_to_locant, groups)
     if got is None:
         return None

@@ -201,11 +201,9 @@ def test_heterounits_are_counted_per_run_of_consecutive_heteroatoms():
 
 @pytest.mark.opsin_gate
 def test_integration_label():
-    """The default tier (best-effort) ships the substitutive name unchanged and lowers its label to
-    ``systematic_verified``; the PIN-only tier declines it."""
+    """The alkyl group of the ester is named by skeletal replacement ('a') nomenclature now
+    (``rules.replacement_chain_prefix``), the PIN of; the check passes it."""
+    pin = "3,6,9,12,15,18,21,24,27-nonaoxahentriacontan-1-yl acetate"
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(BUTOXY_PEG_ACETATE)
-    assert row["name"] == FAILS[3][1], row
-    assert row["tier"] == "systematic_verified", row
-    assert row["spelling_failures"][0]["rule"] == "P-51.4.1.1", row
-    assert name_compound(BUTOXY_PEG_ACETATE) == FAILS[3][1]
-    assert name_compound(BUTOXY_PEG_ACETATE, emit_tier="pin") == ""
+    assert (row["name"], row["tier"]) == (pin, "pin_verified") and not row["spelling_failures"], row
+    assert name_compound(BUTOXY_PEG_ACETATE, emit_tier="pin") == pin

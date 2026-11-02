@@ -124,3 +124,58 @@ def bare_letter_allowed(original: Chem.Mol, element: str, atoms: Optional[Iterab
     """Whether ``element``'s italic letter may be cited without its number: the atoms it could denote (the
     default, the whole structure; ``atoms``, those of one unit) are one symmetry class."""
     return distinct_classes(original, element, atoms) <= 1
+
+
+def _carboxy_carbons(mol):
+    """The carbons of the carboxy groups of ``mol``: one terminal =O and one single-bonded O that carries only
+    hydrogen (a deuterium or tritium atom included) or nothing."""
+    out = []
+    for c in mol.GetAtoms():
+        if c.GetSymbol() != 'C':
+            continue
+        oxo = [nb for nb in c.GetNeighbors() if nb.GetSymbol() == 'O' and nb.GetDegree() == 1
+               and mol.GetBondBetweenAtoms(c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 2.0]
+        hydroxy = [nb for nb in c.GetNeighbors() if nb.GetSymbol() == 'O'
+                   and mol.GetBondBetweenAtoms(c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+                   and all(x.GetAtomicNum() == 1 for x in nb.GetNeighbors() if x.GetIdx() != c.GetIdx())]
+        if len(oxo) == 1 and len(hydroxy) == 1:
+            out.append((c.GetIdx(), oxo[0].GetIdx()))
+    return out
+
+
+def heavy_oxygen_on_carboxyl_carbonyl(mol) -> bool:
+    """True when every isotopically modified oxygen of ``mol`` is the =O of a carboxy group and the carboxy groups
+    are alike (one, or several the structure cannot tell apart), so the nuclide has one place.
+    (the Blue Book) cites it without a locant and the other oxygen by the italic letter: 'CH3-C18O-O2H
+    (O-2H,18O)acetic acid (PIN)'."""
+    from rdkit import Chem
+    labelled = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'O' and a.GetIsotope()}
+    groups = _carboxy_carbons(mol)
+    if not labelled or not labelled <= {o for _c, o in groups}:
+        return False
+    bare = Chem.RWMol(mol)
+    for a in bare.GetAtoms():
+        a.SetIsotope(0)
+    ranks = list(Chem.CanonicalRankAtoms(Chem.RemoveHs(bare.GetMol(), sanitize=False), breakTies=False))
+    return len({ranks[c] for c, _o in groups}) == 1
+
+
+def mixed_carboxyl_candidate(skel: str, keys, original) -> Optional[str]:
+    """'(O-2H,18O)acetic acid' for the acid ``skel`` when the molecule's nuclides are one hydrogen nuclide on the
+    hydroxy oxygen and one oxygen nuclide on the =O of its one carboxy group, the Blue Book,
+    'CH3-C18O-O2H (O-2H,18O)acetic acid (PIN)': the italic letter for the hydrogen, no locant for the oxygen
+    nuclide); None for any other set of nuclides (the shared-locant search stays the answer)."""
+    if not skel or not skel.endswith(' acid') or not skel[0].isalpha() or len(keys) != 2:
+        return None
+    by_el = {el: (mass, count) for (mass, el), count, _maxpos in keys}
+    if set(by_el) != {'H', 'O'} or by_el['H'][1] != 1 or by_el['O'][1] != 1:
+        return None
+    if not heavy_oxygen_on_carboxyl_carbonyl(original) or len(_carboxy_carbons(original)) != 1:
+        return None
+    c, _oxo = _carboxy_carbons(original)[0]
+    hydroxy = next(nb for nb in original.GetAtomWithIdx(c).GetNeighbors() if nb.GetSymbol() == 'O'
+                   and original.GetBondBetweenAtoms(c, nb.GetIdx()).GetBondTypeAsDouble() == 1.0)
+    heavy_h = [a for a in original.GetAtoms() if a.GetAtomicNum() == 1 and a.GetIsotope()]
+    if len(heavy_h) != 1 or heavy_h[0].GetNeighbors()[0].GetIdx() != hydroxy.GetIdx():
+        return None
+    return f"(O-{by_el['H'][0]}H,{by_el['O'][0]}O){skel}"

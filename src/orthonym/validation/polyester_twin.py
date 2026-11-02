@@ -34,9 +34,10 @@ _MULTIPLIERS = {2: "bis", 3: "tris", 4: "tetrakis", 5: "pentakis"}
 _WORD_MULTIPLE = {"di": 2, "tri": 3, "tetra": 4, "penta": 5}
 _BIS = {"bis": 2, "tris": 3, "tetrakis": 4, "pentakis": 5}
 
-#: ``[(2S)-]<parent>ane-<locants>-<di|tri|tetra|penta>yl <anion words>``
+#: ``[(2S)-][3-hydroxy]<parent>ane-<locants>-<di|tri|tetra|penta>yl <anion words>``
 _SHAPE = re.compile(
-    r"^(?P<descriptor>\([^()\s]*\)-)?(?P<parent>[a-z]+ane)-(?P<locants>\d+(?:,\d+)*)-"
+    r"^(?P<descriptor>\([^()\s]*\)-)?(?P<hydroxy>\d+(?:,\d+)*-(?:di|tri|tetra)?hydroxy)?"
+    r"(?P<parent>[a-z]+ane)-(?P<locants>\d+(?:,\d+)*)-"
     r"(?P<count>di|tri|tetra|penta)yl (?P<words>\S.*)$")
 #: an anion word: the locants it is cited under, then the anion (a multiplied anion with its prefix)
 _WORD = re.compile(r"^(?P<locants>\d+(?:,\d+)*)-(?P<anion>.+)$")
@@ -117,7 +118,9 @@ def polyester_twin(name: str) -> str:
         cited.extend(locants)
     if sorted(cited, key=int) != sorted(parent_locants, key=int):
         return name
-    return f"{found['descriptor'] or ''}{'-'.join(prefixes)}{found['parent']}"
+    # a free hydroxy of the polyol stays a prefix of the parent ('3-hydroxy-2-[decanoyloxy]-1-[...]propane')
+    hydroxy = f"{found['hydroxy']}-" if found['hydroxy'] else ""
+    return f"{found['descriptor'] or ''}{hydroxy}{'-'.join(prefixes)}{found['parent']}"
 
 
 _FREE_ACID = Chem.MolFromSmarts("[CX3](=O)[OX2H1,OX1-]")

@@ -254,7 +254,10 @@ CI_BENCHMARK = [
     ),
     pytest.param(
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
-        _declined_at_default("(2S)-3-(decanoyloxy)-2-hydroxypropyl docosanoate"),
+        # 2026-11-02: "Esters of polyols" (the Blue Book) "When anions are different, two
+        # methods are used"; "Method (1) generates preferred IUPAC names" (:31836), 'propane-1,2,3-triyl
+        # 1,2-diacetate 3-propanoate (PIN)' (:31833). OPSIN reads the PIN through its acyloxy twin.
+        _ships("(2S)-2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate"),
         marks=_GATE,
     ),
     # L4: a free acid owns the suffix, so the ester is the prefix of a partial ester of a

@@ -71,14 +71,24 @@ def _parent_valence(mol, atom) -> Optional[int]:
     same rule for ``1H-1λ4-thiophene``). ``None`` for a lambda halogen with an exocyclic
     multiple bond: its valences are spent outside the ring, which the matching below would
     not see."""
-    from ..lambda_convention import ring_lambda_valence
+    from ..lambda_convention import nonstandard_bonding_number, ring_lambda_valence
     lam = ring_lambda_valence(mol, atom.GetIdx())
     if lam is None:
-        return Chem.GetPeriodicTable().GetDefaultValence(atom.GetAtomicNum())
+        # a ring heteroatom in the lambda state with a =O of a heterone,:29384): the parent has its bonding
+        # number, '2H-2λ6-naphtho[1,8-cd][1,2]oxathiole-2,2-dione (PIN)' (:32160), and the =O takes its hydrogen
+        if atom.GetAtomicNum() != 6 and atom.IsInRing() and _heterone_oxo(atom):
+            lam = nonstandard_bonding_number(mol, atom.GetIdx())
+        return lam or Chem.GetPeriodicTable().GetDefaultValence(atom.GetAtomicNum())
     if any(b.GetBondTypeAsDouble() >= 2 for b in atom.GetBonds()
-           if not b.IsInRing()):
+           if not b.IsInRing()) and not _heterone_oxo(atom):
         return None
     return lam
+
+
+def _heterone_oxo(atom) -> bool:
+    """True when ring atom ``atom`` carries a terminal exocyclic =O."""
+    return any(b.GetBondTypeAsDouble() == 2.0 and not b.IsInRing() and b.GetOtherAtom(atom).GetSymbol() == 'O'
+               and b.GetOtherAtom(atom).GetDegree() == 1 for b in atom.GetBonds())
 
 
 def hydro_state(mol, split: Split) -> Optional[HydroState]:

@@ -168,9 +168,13 @@ def iodine_drawing_row(namer, smiles) -> Optional[dict]:
         return _declined(namer, smiles)
     row = namer.name_tiered(drawing.iodine_smiles)
     iodine_name = row.get('name')
-    if row.get('tier') == 'abstain' or not iodine_name or stem_may_change_the_spelling(iodine_name):
+    # 'benzo' elides its 'o' before the vowel of 'iod' ('benziodoxole') and keeps it before 'chlor'/'brom'
+    # (f), the Blue Book: "the terminal letter 'o' of 'benzo' in names of 'benzoheterocycles' formed by
+    # fusion of a benzene ring to a heteromonocycle whose name begins with a vowel"): that elision is spelled here
+    if (row.get('tier') == 'abstain' or not iodine_name
+            or stem_may_change_the_spelling(iodine_name.replace('benziod', 'benzo-iod'))):
         return _declined(namer, smiles)
-    name = iodine_name.replace('iod', drawing.stem)
+    name = iodine_name.replace('benziod', 'benzo' + drawing.stem).replace('iod', drawing.stem)
     if not _reads_back(name, drawing):
         return _declined(namer, smiles)
     from rdkit.Chem import rdMolDescriptors
@@ -206,7 +210,8 @@ def halogen_drawing_scope(fn):
     @functools.wraps(fn)
     def _wrapper(self, smiles, *args, **kwargs):
         from .fragment_naming import is_top_level_naming
-        row = iodine_drawing_row(self, smiles) if is_top_level_naming() else None
+        from .ocene_drawing import ocene_drawing_row      # a substituted metallocene, through its cyclopentyl drawing
+        row = (iodine_drawing_row(self, smiles) or ocene_drawing_row(self, smiles)) if is_top_level_naming() else None
         if row is None:
             return fn(self, smiles, *args, **kwargs)
         if kind == 'name_tiered':

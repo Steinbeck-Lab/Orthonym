@@ -39,9 +39,8 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
-})
+# the diacylglycerol below is a PIN by method (1) now, tests/unit/rules/test_phase6_diacylglycerol.py)
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
@@ -176,7 +175,8 @@ def test_regression_diacylglycerol_unchanged(namer):
     smi = "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC"
     name = _dt_obj_name(namer, smi)
     assert name == (
-        "(2S)-1-hydroxy-3-[(9Z)-pentadec-9-enoyloxy]propan-2-yl "
-        "(9Z)-octadec-9-enoate"
+        "(2S)-3-hydroxypropane-1,2-diyl 2-[(9Z)-octadec-9-enoate] "
+        "1-[(9Z)-pentadec-9-enoate]"
     ), name
-    assert _rt(smi, name), name
+    from orthonym.validation.polyester_twin import polyester_twin
+    assert _rt(smi, polyester_twin(name)), name     # method (1) is read through its acyloxy twin

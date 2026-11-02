@@ -258,13 +258,12 @@ _CANARY_DEFECT_REASONS = {
         "('N,N-diethylethanamine (PIN)' :26235); the old fixture value was right"
     ),
     "DK-GLYM2": (
-        "method (2) polyol ester name; P-65.6.3.3.3.2 :31836 makes method (1) the PIN, "
-        "which OPSIN 2.9.0 cannot parse (verification-blocked, T5 rows 10/11)"
+        "the fixture holds a trivial-acyl acyloxy name; the engine gives the method (1) PIN of "
+        "P-65.6.3.3.3.2 :31833, read back through its acyloxy twin (validation.polyester_twin)"
     ),
     "DK-GLYSUB": (
-        "acyloxy prefixes on a propanol ('...propan-3-ol'): the ester outranks the "
-        "alcohol (P-41 Table 4.1, R5) and the -ol takes the lowest locant; PIN is the "
-        "method (1) ester (P-65.6.3.3.3.2 :31836)"
+        "the fixture holds acyloxy prefixes on a propanol ('...propan-3-ol'), but the ester outranks "
+        "the alcohol (P-41 Table 4.1); the engine gives the method (1) PIN (P-65.6.3.3.3.2 :31833)"
     ),
     "DK-GUAN": (
         "'guanidino' is not acceptable in PINs; the preferred prefix is "
@@ -462,11 +461,11 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (277,),
     ),
     "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@@H](CO)COC(=O)CCC": (
-        "(2S)-1-(butanoyloxy)-3-hydroxypropan-2-yl (9Z)-octadec-9-enoate",
+        "(2S)-3-hydroxypropane-1,2-diyl 1-butanoate 2-[(9Z)-octadec-9-enoate]",
         "DK-GLYM2", (281,),
     ),
     "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC": (
-        "(2S)-3-(decanoyloxy)-2-hydroxypropyl docosanoate",
+        "(2S)-2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate",
         "DK-GLYM2", (284,),
     ),
     "OC1C2CC3CC1CC(O)(C3)C2": (
@@ -640,15 +639,15 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (624,),
     ),
     "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC": (
-        "(2R)-1-(octadecanoyloxy)-2-[(9Z)-octadec-9-enoyloxy]propan-3-ol",
+        "(2R)-3-hydroxypropane-1,2-diyl 1-octadecanoate 2-[(9Z)-octadec-9-enoate]",
         "DK-GLYSUB", (633,),
     ),
     "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCC(=O)OC[C@H](O)COC(=O)CCC/C=C\\C/C=C\\C/C=C\\CCCCCCCC": (
-        "(2S)-2-hydroxy-3-[(5Z,8Z,11Z)-icosa-5,8,11-trienoyloxy]propyl (7Z,10Z,13Z,16Z)-docosa-7,10,13,16-tetraenoate",
+        "(2S)-2-hydroxypropane-1,3-diyl 1-[(7Z,10Z,13Z,16Z)-docosa-7,10,13,16-tetraenoate] 3-[(5Z,8Z,11Z)-icosa-5,8,11-trienoate]",
         "DK-GLYM2", (648,),
     ),
     "CCC(C)CCCCCCCCCCCCC(=O)OC[C@H](O)COC(=O)CCCCCCCCCCC(C)CC": (
-        "(2S)-2-hydroxy-3-[(12-methyltetradecanoyl)oxy]propyl 14-methylhexadecanoate",
+        "(2S)-2-hydroxypropane-1,3-diyl 1-(14-methylhexadecanoate) 3-(12-methyltetradecanoate)",
         "DK-GLYM2", (649,),
     ),
     "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
@@ -668,7 +667,7 @@ CANARY_KNOWN_DEFECTS = {
     # the prefixes tie, {2,5,11,14,20,23,29,32}).
     # 599 left (quick-wins F-Q1, as 661 above): the fixture's '...trioxatricyclo[19.3.1.1^5,8]...'.
     "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCC(=O)OC[C@H](O)COC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC": (
-        "(2R)-2-hydroxy-3-[(11Z,14Z)-icosa-11,14-dienoyloxy]propyl (7Z,10Z,13Z,16Z,19Z)-docosa-7,10,13,16,19-pentaenoate",
+        "(2R)-2-hydroxypropane-1,3-diyl 1-[(7Z,10Z,13Z,16Z,19Z)-docosa-7,10,13,16,19-pentaenoate] 3-[(11Z,14Z)-icosa-11,14-dienoate]",
         "DK-GLYM2", (672,),
     ),
     "CCCCOc1ccc(CC(=O)NO)cc1": (
@@ -676,7 +675,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-NOTEXACT", (678,),
     ),
     "CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCCCCCC": (
-        "(2S)-2-hydroxy-3-(tetradecanoyloxy)propyl octadecanoate",
+        "(2S)-2-hydroxypropane-1,3-diyl 1-octadecanoate 3-tetradecanoate",
         "DK-GLYM2", (683,),
     ),
     "N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (

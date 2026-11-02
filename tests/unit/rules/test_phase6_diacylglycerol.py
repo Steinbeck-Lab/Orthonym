@@ -31,11 +31,8 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "C(CCCCCCC/C=C\\CCCCC)(=O)OC[C@@H](OC(CCCCCCC/C=C\\CCCCCCCC)=O)CO",
-    "CC(=O)OCC(O)COC(=O)CCCCC",
-    "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
-})
+# The diacylglycerols below are PINs by method (1) now (see WITNESS_NAME), so none is declined.
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
@@ -71,8 +68,10 @@ pytestmark = pytest.mark.opsin_gate
 
 def _rt_matches(smiles: str, name: str) -> bool:
     """True iff OPSIN parses `name` back to the SAME molecule as `smiles`
-    (canonical InChIKey match) -- the project's 0-wrong oracle."""
-    opsin_smi = opsin_parse(name)
+    (canonical InChIKey match) -- the project's 0-wrong oracle. A method (1) name is read through its acyloxy
+    twin, the form OPSIN reads (``validation.polyester_twin``)."""
+    from orthonym.validation.polyester_twin import polyester_twin
+    opsin_smi = opsin_parse(polyester_twin(name))
     if not opsin_smi:
         return False
     a = Chem.MolFromSmiles(smiles)
@@ -85,9 +84,13 @@ def _rt_matches(smiles: str, name: str) -> bool:
 # The user-found witness: a 1,2-diacylglycerol with two DIFFERENT unsaturated
 # acyl groups (C15 pentadecenoyl + C18 octadecenoyl) plus a free -OH.
 WITNESS = "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC"
+# method (1) (the Blue Book) "Method (1) generates preferred IUPAC names": the anions in
+# alphanumerical order, each after its locant, the free hydroxy a prefix of the organyl group (as in
+# '2-hydroxypropane-1,3-diyl diacetate'); the method (2) name '(2S)-1-hydroxy-3-[(9Z)-pentadec-9-enoyloxy]propan-
+# 2-yl (9Z)-octadec-9-enoate' is acceptable in general nomenclature.
 WITNESS_NAME = (
-    "(2S)-1-hydroxy-3-[(9Z)-pentadec-9-enoyloxy]propan-2-yl "
-    "(9Z)-octadec-9-enoate"
+    "(2S)-3-hydroxypropane-1,2-diyl 2-[(9Z)-octadec-9-enoate] "
+    "1-[(9Z)-pentadec-9-enoate]"
 )
 WITNESS_INCHIKEY = "OALWFBDEUFFROY-KBMTVBSSSA-N"
 
@@ -131,7 +134,7 @@ def test_1_3_diacylglycerol_different_acyls_names_by_senior_ester():
     ('2-(acetyloxy)ethyl methyl butanedioate (PIN)') is exactly this shape."""
     smi = "CC(=O)OCC(O)COC(=O)CCCCC"
     name = _dt_name(smi)
-    assert name == "3-(acetyloxy)-2-hydroxypropyl hexanoate", name
+    assert name == "2-hydroxypropane-1,3-diyl 1-acetate 3-hexanoate", name    # method (1), see WITNESS_NAME
     assert _rt_matches(smi, name), name
 
 

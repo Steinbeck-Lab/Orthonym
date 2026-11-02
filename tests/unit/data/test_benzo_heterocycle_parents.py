@@ -8,7 +8,8 @@ The catalogue lacked 2-benzothiophene, 1,2-benzothiazole, 1-benzoselenophene and
 ('benzo[c]thiophene', 'benzo[d]isothiazole',...), valid but never the PIN, and the default
 tier declined. The hydro twins take the catalogue parent through the mancude twin. A ring atom
 with a nonstandard bonding number keeps the catalogue match from firing; the descriptor path
-then takes the catalogue benzo name for the same skeleton ('1H-1λ4-1-benzothiophene'), and its
+then takes the catalogue benzo name for the same skeleton, the lambda token on its heteroatom locant
+('1H-1λ4-benzothiophene', as '1H-1λ3-benziodole (PIN)':39692), and its
 one indicated hydrogen is the mancude count ('1H-1λ4-thiophene (PIN)',,:9167).
 Every name read back by OPSIN 2.9.0 to the input's full InChIKey.
 """
@@ -30,7 +31,7 @@ pytestmark = pytest.mark.opsin_gate
     ("OC(=O)c1scc2ccccc12", "2-benzothiophene-1-carboxylic acid"),
     ("c1scc2c1CCCC2", "4,5,6,7-tetrahydro-2-benzothiophene"),
     ("c1nsc2c1CCCC2", "4,5,6,7-tetrahydro-1,2-benzothiazole"),
-    ("[SH2]1C=CC2=C1C=CC=C2", "1H-1λ4-1-benzothiophene"),
+    ("[SH2]1C=CC2=C1C=CC=C2", "1H-1λ4-benzothiophene"),
     ("c1ccc2sccc2c1", "1-benzothiophene"),
 ])
 def test_benzo_parent_at_both_tiers(smiles, pin):

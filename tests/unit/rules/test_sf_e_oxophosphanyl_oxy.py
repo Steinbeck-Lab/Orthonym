@@ -69,13 +69,15 @@ def test_two_branches_keep_the_phosphoryl_forms(smiles, expected):
     assert name_pa(m, o, c) == expected
 
 
-@pytest.mark.parametrize("smiles", [
-    "CCOP(=O)O",            # -O-PH(=O)OH: one branch and a P-H; no prefix here spells it
-    "CCOP(=O)OC",
+@pytest.mark.parametrize("smiles,expected", [
+    # -O-PH(=O)R: the lambda5-phosphanyl group with its oxo and R prefixes, the Blue Book
+    # 'hydroxy(oxo)-λ5-phosphanylidene'), below the PIN (tests/unit/rules/test_h_phosphonate_oxy.py)
+    ("CCOP(=O)O", "[hydroxy(oxo)-λ5-phosphanyl]oxy"),
+    ("CCOP(=O)OC", "[methoxy(oxo)-λ5-phosphanyl]oxy"),
 ])
-def test_one_branch_p_h_is_declined(smiles):
+def test_one_branch_p_h_is_the_lambda5_phosphanyl_form(smiles, expected):
     m, o, c = _o_and_parent(smiles)
-    assert name_pa(m, o, c) is None
+    assert name_pa(m, o, c) == expected
 
 
 def test_bare_group_nested_in_a_bridge_is_oxophosphanyl_oxy_branch():

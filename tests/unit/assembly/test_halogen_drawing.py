@@ -95,7 +95,6 @@ def test_stem_may_change_the_spelling(iodine_name, changes):
 @pytest.mark.parametrize("smiles", [
     "Cc1cccc(Cl)c1Br(=O)=O",          # 1-bromyl-2-chloro-3-methylbenzene, not the iodine drawing's order
     "FCl(F)c1cccc(CC(F)F)c1",         # the difluoro-λ3-chloranyl prefix sorts before difluoroethyl
-    "O=C1OCl(O)c2ccccc21",            # benzochloroxol, not benzchloroxol
 ])
 def test_a_name_whose_spelling_the_element_may_change_is_declined(smiles):
     with jvm_slots(1, purpose="test-halogen-drawing"):
@@ -126,3 +125,12 @@ def test_every_entry_point_names_it():
         assert row["iodine_name"] == "1-fluoro-4-(methylidene-λ3-iodanyl)benzene"
         with pytest.raises(OrthonymLimitError):
             Orthonym().name("CC(C)(C)Cl=C", raise_on_limit=True)
+
+
+@pytest.mark.opsin_gate
+def test_the_benzo_elision_before_iod_is_respelled():
+    """ (f) (the Blue Book) elides the 'o' of 'benzo' only before a vowel: the iodine drawing's
+    'benziodoxol' is 'benzochloroxol' for the chlorine compound, read back to the input."""
+    with jvm_slots(1, purpose="test-halogen-drawing"):
+        row = Orthonym(**_BEST_EFFORT).name_tiered("O=C1OCl(O)c2ccccc21")
+        assert (row["name"], row["tier"]) == ("1-hydroxy-1λ3,2-benzochloroxol-3(1H)-one", "systematic_verified"), row

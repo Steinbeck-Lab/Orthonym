@@ -433,6 +433,84 @@ def _mancude_ring_stem(mol, system_atoms: Set[int]) -> Optional[str]:
     return stem
 
 
+def _fused_system(mol, system_atoms: Set[int]) -> bool:
+    """True when ``system_atoms`` is one ring system of two or more rings."""
+    return sum(1 for r in mol.GetRingInfo().AtomRings() if set(r) <= set(system_atoms)) >= 2
+
+
+def _fused_skeleton_key(mol, system_atoms: Set[int]) -> Optional[str]:
+    """The skeleton of a fused ring system (its elements and ring bonds, all single, no hydrogen) when one of the
+    assembly's components is that system in its mancude state: (the Blue Book) '2'H-1,4'a-binaphthalene (PIN)'
+    (:15630) joins an aromatic naphthalene and its 4a-substituted 2H tautomer. None for a monocycle (the stem of
+    ``_mancude_ring_stem`` decides there)."""
+    if not _fused_system(mol, system_atoms):
+        return None
+    rw = Chem.RWMol()
+    idx = {}
+    for i in sorted(system_atoms):
+        idx[i] = rw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(i).GetAtomicNum()))
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in idx and j in idx:
+            rw.AddBond(idx[i], idx[j], rdchem.BondType.SINGLE)
+    try:
+        return 'fused:' + Chem.MolToSmiles(rw.GetMol())
+    except Exception:  # noqa: BLE001 -- no key, no merge
+        return None
+
+
+def _fused_tautomer_assembly_name(mol, ring_systems, ring_name: str) -> Optional[str]:
+    """The name of two identical fused ring systems joined by one single bond, one aromatic and one the same mancude
+    parent with indicated hydrogen: (the Blue Book) "The maximum number of noncumulative double bonds is
+    then added taking into account the junction positions. Any remaining saturated ring positions are designated as
+    indicated hydrogen, placed together with the appropriate locant(s) at the front of the name of the assembly",
+    '2'H-1,4'a-binaphthalene (PIN)' (:15630). Each component is numbered over its own symmetry: the lowest junction
+    locant:15567), then the lowest indicated hydrogen; the component with the lower junction is unprimed.
+    None outside that shape (a parent name that is not one word, no junction, a fusion atom left unnumbered)."""
+    from .bridged_fused_pin.numbering import loc_key
+    from .fused_rings import _ring_system_automorphisms
+    from .fusion_numbering import compute_fused_numbering
+    if not re.fullmatch(r"[a-z]+", ring_name or ""):
+        return None
+    try:
+        km = Chem.Mol(mol)
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:  # noqa: BLE001 -- not this shape
+        return None
+    a_set, b_set = (set(x) for x in ring_systems)
+    joins = [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()
+             if {b.GetBeginAtomIdx(), b.GetEndAtomIdx()} & a_set and {b.GetBeginAtomIdx(), b.GetEndAtomIdx()} & b_set]
+    if len(joins) != 1 or mol.GetNumAtoms() != len(a_set) + len(b_set):
+        return None
+    parts = []
+    for sys_atoms in (a_set, b_set):
+        junction = next(i for i in joins[0] if i in sys_atoms)
+        canonical = compute_fused_numbering(mol, sys_atoms)
+        if not canonical:
+            return None
+        ih_atoms = [i for i in sys_atoms if i != junction and not any(
+            bd.GetBondType() == Chem.BondType.DOUBLE for bd in km.GetAtomWithIdx(i).GetBonds())]
+        best = None
+        for perm in _ring_system_automorphisms(mol, sys_atoms, ignore_bond_order=True):
+            try:
+                locs = {i: canonical[perm[i]] for i in sys_atoms}
+            except KeyError:
+                return None
+            key = (loc_key(locs[junction]), sorted(loc_key(locs[i]) for i in ih_atoms))
+            if best is None or key < best[0]:
+                best = (key, locs[junction], sorted((locs[i] for i in ih_atoms), key=loc_key))
+        if best is None:
+            return None
+        parts.append(best)
+    parts.sort(key=lambda p: p[0])
+
+    def text(loc, prime):
+        return f"{loc[0]}{prime}{loc[1]}" if isinstance(loc, tuple) else f"{loc}{prime}"
+    ih = [text(loc, prime) + 'H' for prime, (_k, _j, locs) in zip(("", "'"), parts) for loc in locs]
+    junctions = render_locants(text(j, prime) for prime, (_k, j, _l) in zip(("", "'"), parts))
+    return (render_locants(ih) + "-" if ih else "") + f"{junctions}-bi{ring_name}"
+
+
 def _is_mancude_ylidene_component(mol, system_atoms: Set[int]) -> bool:
     """True if a ring system is a single mancude heterocyclic ring nameable as a
     / ylidene assembly component (``furan`` -> ``bifuranylidene``).
@@ -475,9 +553,9 @@ def _is_mancude_indicated_h_state(mol, system_atoms: Set[int]) -> bool:
     """
     ri = mol.GetRingInfo()
     ring = next((r for r in ri.AtomRings() if set(r) == set(system_atoms)), None)
-    if ring is None:
+    if ring is None and not _fused_system(mol, system_atoms):
         return False
-    ring_set = set(ring)
+    ring_set = set(system_atoms)        # a fused system's ring bonds are those inside it
     try:
         km = Chem.Mol(mol)
         Chem.Kekulize(km, clearAromaticFlags=True)
@@ -1073,7 +1151,8 @@ def detect_ring_assembly(
         # indicated-H tautomers.
         if double_bond_junction:
             return None
-        stems = [_mancude_ring_stem(mol, sys_atoms) for sys_atoms in ring_systems]
+        stems = [_mancude_ring_stem(mol, sys_atoms) or _fused_skeleton_key(mol, sys_atoms)
+                 for sys_atoms in ring_systems]
         if not (all(s is not None for s in stems) and len(set(stems)) == 1):
             return None
         if not all(_is_mancude_indicated_h_state(mol, sys_atoms)
@@ -3346,17 +3425,15 @@ def name_ring_assembly(
     if multiplier is None:
         return None  # Unsupported assembly size
 
-    # Determine parent ring name from the first system
+    # the parent name of the first system; a mancude tautomer pair takes its mancude component's:15630)
     ring_name = _get_ring_parent_name(mol, ring_systems[0])
+    if ring_name is None and assembly_info.get('mancude_tautomer'):
+        ring_name = next((n for n in (_get_ring_parent_name(mol, s) for s in ring_systems[1:]) if n), None)
     if ring_name is None:
         return None
 
-    # a phase: ring stems carrying an embedded indicated-H
-    # descriptor (e.g. "phenanthridin-6(5H)-one", "acridin-9(10H)-one") need a
-    # per-ring threading strategy the placement-subset fix doesn't implement;
-    # fail closed (return None) so a higher-level fallback can attempt naming
-    # rather than emit the buggy mid-string `2,2'-biphenanthridin-6(5H)-one`
-    # form. Deeper rewrite is a phase Follow-up 12 main-thread territory.
+    # a phase: a stem with an embedded indicated-H descriptor ("acridin-9(10H)-one") is not
+    # threaded per ring; fail closed rather than emit '2,2'-biphenanthridin-6(5H)-one'.
     if _INDICATED_H_EMBEDDED_RE.search(ring_name):
         return None
 
@@ -3571,6 +3648,8 @@ def name_ring_assembly(
     # closed to the established path if the mancude stems disagree or numbering is
     # missing (no wrong names); substituted rows are out of this narrow scope.
     if assembly_info.get("mancude_tautomer") and not substituent_list:
+        if count == 2 and all(_fused_skeleton_key(mol, s) for s in ring_systems):
+            return _fused_tautomer_assembly_name(mol, ring_systems, ring_name)
         stems = [_mancude_ring_stem(mol, s) for s in ring_systems]
         if (stems[0] and all(s == stems[0] for s in stems)
                 and all(locs is not None for locs in per_ring_ih_locants)):

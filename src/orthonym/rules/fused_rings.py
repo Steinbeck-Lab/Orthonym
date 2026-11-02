@@ -54,7 +54,7 @@ from .stereochemistry import (
 )
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from .fused_interior import interior_pin_name as _interior_pin_name
-from .lambda_convention import fused_lambda_prefix
+from .lambda_convention import HETERONE_RING_ATOMS, fused_lambda_name_and_prefix
 from ..data.locant_text import render_locants
 
 # Simple multiplicative prefixes for substituent naming
@@ -1597,7 +1597,7 @@ def _try_algorithmic_fusion_name(mol, require_certified: bool = False) -> Option
     #. Fail-closed: a lambda atom without a determinate NUMERIC
     # fused locant (or on skeletal carbon) invalidates the whole name -- the
     # lambda-less name would denote a DIFFERENT molecule.
-    lam_prefix = fused_lambda_prefix(mol, ring_atom_set, atom_to_locant)
+    name, lam_prefix = fused_lambda_name_and_prefix(name, mol, ring_atom_set, atom_to_locant)
     if lam_prefix is None:
         return None
 
@@ -3421,12 +3421,12 @@ def _identify_fused_substituent(
 
         # Check for oxo group (=O double-bonded to ring carbon)
         if h_count == 0 and len(neighbors_outside_core) == 0:
-            # Oxo group: O with no H, double-bonded to core carbon
+            # an oxo on a ring carbon, or a heterone on a ring atom in the lambda state,:29384)
             for bond in start_atom.GetBonds():
                 other_idx = bond.GetOtherAtomIdx(start_idx)
                 if other_idx in excluded:  # Bond to core atom
                     other_atom = mol.GetAtomWithIdx(other_idx)
-                    if other_atom.GetSymbol() == 'C' and bond.GetBondTypeAsDouble() == 2.0:
+                    if other_atom.GetSymbol() in HETERONE_RING_ATOMS and bond.GetBondTypeAsDouble() == 2.0:
                         return {
                             'name': 'oxo',
                             'type': 'oxo',  # Special type for suffix handling

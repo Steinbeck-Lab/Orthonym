@@ -254,6 +254,26 @@ def _mancude_thiophene_heterone(mol) -> Optional[str]:
     return name
 
 
+def _fused_ring_heterone(mol) -> Optional[str]:
+    """The heterone name of a fused ring system with =O on a ring chalcogen, built by the fused-ring namer (its
+    =O on a lambda ring atom is the suffix 'one', P-64.4 :29384): '1H-1λ4-benzothiophen-1-one' on the model of
+    '1H-1λ4-thiophen-1-one (PIN)' (:29440), '2H-2λ6-naphtho[1,8-cd][1,2]oxathiole-2,2-dione (PIN)' (:32160)."""
+    from .fused_rings import name_fused_heterocycle
+    from .lambda_convention import LAMBDA
+    if mol is None or mol.GetRingInfo().NumRings() < 2 or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if not any(a.GetSymbol() in _CHALCOGENS and a.IsInRing() and any(
+            b.GetBondTypeAsDouble() == 2.0 and b.GetOtherAtom(a).GetSymbol() == 'O' and not b.IsInRing()
+            for b in a.GetBonds()) for a in mol.GetAtoms()):
+        return None
+    try:
+        got = name_fused_heterocycle(mol)
+    except Exception:  # noqa: BLE001 -- the additive form below stays the answer
+        return None
+    name = got[0] if isinstance(got, tuple) else got
+    return name if isinstance(name, str) and LAMBDA in name and name.endswith('one') else None
+
+
 def name_ring_chalcogen_oxide(mol) -> Optional[str]:
     """Return the additive ring-chalcogen oxide name, else ``None``."""
     if mol is None:
@@ -261,7 +281,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
 
     # and: the heterone (the sultone and the sultam among them)
     # takes precedence over the additive '...dioxide' form.
-    heterone = _name_ring_heterone(mol) or _mancude_thiophene_heterone(mol)
+    heterone = _name_ring_heterone(mol) or _mancude_thiophene_heterone(mol) or _fused_ring_heterone(mol)
     if heterone is not None:
         return heterone
 

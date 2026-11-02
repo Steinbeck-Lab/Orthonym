@@ -55,12 +55,17 @@ def test_the_check_fails_a_substitutive_name_and_passes_an_a_name():
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", FOUR[:3])
-def test_the_substitutive_name_is_below_the_pin_and_still_given(smiles):
-    assert default_tier_row(smiles)["is_pin"] is False
-    be = name_best_effort(smiles)
-    assert be["tier"] == "systematic_verified" and be["is_pin"] is False, be
-    assert_full_rt(be["name"], smiles, what="best-effort: ")
+@pytest.mark.parametrize("smiles,name", [
+    (FOUR[0], "4-[(2,5,8,11-tetraoxatridecan-13-yl)oxy]benzoic acid"),
+    # a ring with an atom as senior as the chain's, the Blue Book) is the parent
+    (FOUR[1], "2-[(2,5,8,11-tetraoxatridecan-13-yl)oxy]oxolane"),
+    (FOUR[2], "1-(2,5,8,11-tetraoxatridecan-13-yl)-1H-imidazole"),
+])
+def test_the_a_name_of_the_chain_is_the_pin(smiles, name):
+    """The 'a' prefix is built (``rules.replacement_chain_prefix``), so the PIN of is given."""
+    row = default_tier_row(smiles)
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+    assert_full_rt(row["name"], smiles)
 
 
 @pytest.mark.opsin_gate

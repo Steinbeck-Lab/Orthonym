@@ -87,7 +87,10 @@ def licensed_ambiguity(name: str, smiles: Optional[str]) -> Optional[str]:
       ``rules.pseudoketones.pseudoester_book_name``, the producer's own class predicate; the
       name is the one the producer builds for it. The book spells the pseudoketones of
        (the diacyl analogue) and of with the locant in front of the marks,
-      and those names are read once, so they are not in this class."""
+      and those names are read once, so they are not in this class.
+    * (:43808): a heavy oxygen on the =O of a carboxy group is cited without a locant, the other oxygen
+      by the italic letter, 'CH3-C18O-O2H (O-2H,18O)acetic acid (PIN)' (``rules.isotope_letters.
+      heavy_oxygen_on_carboxyl_carbonyl``); only when the warnings are about the position of that isotope."""
     if not name or not smiles:
         return None
     try:
@@ -107,6 +110,10 @@ def licensed_ambiguity(name: str, smiles: Optional[str]) -> Optional[str]:
         if (messages and all(m.startswith("Position of isotope on") for m in messages)
                 and heavy_label_on_delocalized_atoms(mol)):
             return "P-76"
+        from ..rules.isotope_letters import heavy_oxygen_on_carboxyl_carbonyl
+        if (messages and all(m.startswith("Position of isotope on") for m in messages)
+                and heavy_oxygen_on_carboxyl_carbonyl(mol)):
+            return "P-82.2.4"
     except Exception:                                           # noqa: BLE001
         return None
     return None

@@ -2243,6 +2243,10 @@ def _find_best_placement(
             #: the first locant-form that yields ANY round-tripper is
             # the lowest-locant form; do not consider higher-locant forms.
             break
+    from .isotope_letters import mixed_carboxyl_candidate    # '(O-2H,18O)acetic acid (PIN)',
+    _mixed = mixed_carboxyl_candidate(skel, keys, original)
+    if _mixed and _isotope_round_trips(_mixed, original, stereo_blind=stereo_blind):
+        return _mixed, 0, _mixed[:_mixed.index(')') + 1], 'O'
     below_pin = False
     if not won and held:
         won, below_pin = held, True
@@ -2252,9 +2256,8 @@ def _find_best_placement(
     # (w[3], adjacent-to-affix beats front-detached) -> locant of the modified group -> insertion offset.
     won.sort(key=functools.partial(placement_order, equivalent_site=nuclide_has_equivalent_site(original)))
     _, loc_rank, _sub_rank, _q, off, desc, candidate = won[0]
-    # (the Blue Book "1,2-di[(13C)methyl]benzene"): a descriptor spliced
-    # INSIDE a substituent's own enclosing marks makes that substituent compound,
-    # so the marks step up  ->  -> { } ('1-(amino(14C)methyl)cyclopentan-
+    # (the Blue Book "1,2-di[(13C)methyl]benzene"): a descriptor spliced INSIDE a substituent's own enclosing
+    # marks makes that substituent compound, so the marks step up  ->  -> { } ('1-(amino(14C)methyl)cyclopentan-
     # 1-ol' -> '1-[amino(14C)methyl]cyclopentan-1-ol'). Escalate for THIS
     # single-descriptor placement; the multi-attachment caller
     # (:func:`_decorate_multi_position`) discards this candidate and runs its own
@@ -2280,10 +2283,8 @@ def _find_best_placement(
         hyphenated = candidate[:_end] + "-" + candidate[_end:]
         if _isotope_round_trips(hyphenated, original, stereo_blind=stereo_blind):
             candidate = hyphenated
-    # Below the PIN: a locant-free form kept for want of a locanted one that OPSIN
-    # reads, and a letter locant repeated for one heteroatom ('(N,N-2H2)aniline'),
-    # where the Blue Book cites the letter once ('(N-2H2)aniline (PIN)',
-    # the Blue Book), a form OPSIN 2.9.0 cannot parse.
+    # Below the PIN: a locant-free form kept for want of a locanted one OPSIN reads; a letter locant repeated for one
+    # heteroatom ('(N,N-2H2)aniline', BB '(N-2H2)aniline (PIN)':43830, a form OPSIN 2.9.0 cannot parse).
     # And a count subscript the preferred form omits ('ethan-1-(2H1)ol' where the
     # Blue Book writes 'ethan(2H)ol (PIN)',, the Blue Book, and
     # '(1-2H1)ethan-1-(2H)ol (PIN)' when a locant is required,:44214): the
@@ -2306,8 +2307,7 @@ def _find_best_placement(
     # of the element the letter names ('(O-2H,O-18O)phenol'): the Blue Book
     # gives that heteroatom nuclide no locant, '(O-2H,18O)acetic acid (PIN)'
     #, the Blue Book) and '(18O-2H,18O)acetic acid (PIN)'
-    # (:43810), a mixed form this search does not build (it shares one locant
-    # across the descriptor).
+    # (:43810): the search shares one locant across the descriptor (the first is built above, the second is not).
     # And a nuclide of an oxoacid centre cited anywhere but before its suffix (``rules.isotope_oxoacid``).
     if (below_pin or _sub_rank == 1 or (desc and _unprinted_slot(skel, off))
             or (isinstance(loc_rank, str) and desc

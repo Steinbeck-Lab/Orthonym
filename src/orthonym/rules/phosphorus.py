@@ -1870,6 +1870,8 @@ def name_phosphoanhydride_oxy_substituent(
     #:2060: "noncarbon-containing characteristic groups, prefixes, and suffixes used in
     # PINs are designated as preselected prefixes or suffixes"). One branch is a P-H
     # (-O-PH(=O)OR), which no prefix here spells: decline.
+    if p.GetTotalNumHs() == 1 and len(branches) == 1:
+        return _h_phosphonate_oxy(branches[0])
     if p.GetTotalNumHs() != 0 or len(branches) not in (0, 2):
         return None
     if not branches:
@@ -1921,6 +1923,24 @@ def name_phosphoanhydride_oxy_substituent(
                          if tok == 'hydroxy' else _enc(tok))
     body = ''.join(parts) + 'phosphoryl'
     return apply_enclosing_marks(body, -1) + 'oxy'
+
+
+def _h_phosphonate_oxy(branch: str) -> Optional[str]:
+    """'[hydroxy(oxo)-λ5-phosphanyl]oxy' for -O-PH(=O)-R (R = 'hydroxy', an alkoxy,...): the P with one hydrogen
+    is the λ5-phosphanyl group with its oxo and R prefixes, as (the Blue Book) names '=P(O)OH'
+    'hydroxy(oxo)-λ5-phosphanylidene (preselected prefix)' (:36279). The acyl-group name 'hydroxyphosphonoyl' (PH(O)<,
+    :36049) is not read by OPSIN, so this valid name ships below the PIN; a declined P-H made a large phosphate
+    polyether search every other split of its chain (it ran out of time)."""
+    from ..assembly.naming_utils import apply_enclosing_marks
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    from .lambda_convention import LAMBDA
+    block = mononuclear_substituent_block([branch, 'oxo'])
+    if not block:
+        return None
+    name = apply_enclosing_marks(f"{block}-{LAMBDA}5-phosphanyl", -1) + 'oxy'
+    from ..metrics.provenance import record_non_pin_fragment
+    record_non_pin_fragment(name)
+    return name
 
 
 def bare_oxophosphanyl_oxy_prefix(mol, sub_atoms, ring_set) -> Optional[str]:

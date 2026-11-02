@@ -12,8 +12,9 @@ from orthonym.namer import name_compound
 @pytest.mark.unit
 def test_lambda4_benzothiophene_pin():
     # BB mechanism + indicated-H, on the
-    # algorithmic 2-component fusion path (benzo + thiophene).
-    assert name_compound("[SH2]1C=CC2=C1C=CC=C2") == "1H-1λ4-1-benzothiophene"
+    # algorithmic 2-component fusion path (benzo + thiophene). The token joins the heteroatom locant of the
+    # benzo name, '1H-1λ3-benziodole (PIN)' (the Blue Book), '1λ4,5-benzodithiepine (PIN)' (:3326).
+    assert name_compound("[SH2]1C=CC2=C1C=CC=C2") == "1H-1λ4-benzothiophene"
 
 
 @pytest.mark.unit

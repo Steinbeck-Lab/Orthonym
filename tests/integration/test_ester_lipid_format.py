@@ -100,33 +100,41 @@ class TestPolyfunctionalEsterDemotion:
         # (TRIAGE.csv; re-checked in Task 7/8).
         assert result == "2-hydroxypropane-1,3-diyl diacetate", result
 
-    # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 10/11)
-    # change-asserted-value. The old premise ('-ol' suffix, both acids as acyloxy
-    # prefixes) is not a Blue Book name: the ester is the principal class,
-    # the Blue Book "9 Esters" above:18190 "17 Hydroxy compounds") and a
+    # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 10/11), re-asserted
+    # 2026-11-02 (change-asserted-value). The ester is the principal class,
+    # the Blue Book "9 Esters" above:18190 "17 Hydroxy compounds"), and a
     # polyester of one 'alcoholic' component with different anions is named by
     # (:31831) "When anions are different, two methods are used";
     # "Method (1) generates preferred IUPAC names but names formed by using method
-    # (2) are acceptable in general nomenclature" (:31836). The method (1) PIN,
-    # '(2S)-2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate', cannot be verified
-    # (OPSIN 2.9.0 does not parse it), so it is not shipped (named blocker); the
-    # method (2) name ships, round-trip exact, at the general tier -- never as
-    # pin_verified. The senior anion is the longer chain.
+    # (2) are acceptable in general nomenclature" (:31836), with the example
+    # 'propane-1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)' (:31833). The PIN tier
+    # now builds the method (1) PIN. OPSIN 2.9.0 has no grammar for it and reads it
+    # through its acyloxy twin ('validation.polyester_twin'), so the default tier,
+    # which ships a name only when OPSIN reads it directly, keeps the method (2) name.
+    # Both run in production state (the OPSIN validity gate on).
     DIGLYCERIDE = "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
+    DIGLYCERIDE_METHOD_1 = "(2S)-2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate"
     DIGLYCERIDE_METHOD_2 = "(2S)-3-(decanoyloxy)-2-hydroxypropyl docosanoate"
 
+    @pytest.mark.opsin_gate
     def test_diglyceride_mixed_acids(self):
-        """Mixed-acid diglyceride: functional class ester, method (2) of."""
+        """Mixed-acid diglyceride: the PIN tier gives the method (1) PIN of
+        , read back through its twin; the default tier gives the
+        method (2) name, read back directly."""
         from orthonym import Orthonym
-        from tests.support.rt_assert import name_is_rt_exact
-        res = Orthonym(style="pin").name_tiered(self.DIGLYCERIDE)
-        assert res["name"] == self.DIGLYCERIDE_METHOD_2
-        assert name_is_rt_exact(res["name"], self.DIGLYCERIDE)
-        assert res["tier"] != "pin_verified", res
+        from orthonym.cli import _emit_tier_flags
+        from tests.support.rt_assert import name_is_rt_exact, name_reads_back
+        row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(self.DIGLYCERIDE)
+        assert (row["name"], row["tier"]) == (self.DIGLYCERIDE_METHOD_1, "pin_verified"), row
+        assert name_reads_back(row["name"], self.DIGLYCERIDE)
+        result = name_compound(self.DIGLYCERIDE)
+        assert result == self.DIGLYCERIDE_METHOD_2, result
+        assert name_is_rt_exact(result, self.DIGLYCERIDE)
 
+    @pytest.mark.opsin_gate
     def test_diglyceride_has_acyloxy_prefixes(self):
-        """Method (2): the junior ester is an acyloxy prefix of the organyl, the
-        senior one the anion."""
+        """Method (2) at the default tier: the junior ester is an acyloxy prefix of
+        the organyl, the senior one the anion."""
         result = name_compound(self.DIGLYCERIDE)
         assert "decanoyloxy" in result
         assert result.endswith(" docosanoate"), result
@@ -198,8 +206,10 @@ class TestEsterOPSINRoundTrip:
         assert opsin_smi, f"OPSIN failed to parse: {name!r}"
 
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    @pytest.mark.opsin_gate
     def test_opsin_mixed_diglyceride(self):
-        """Mixed-acid diglyceride (decanoyloxy + docosanoyloxy + -ol) parses via OPSIN."""
+        """Mixed-acid diglyceride: the default tier's name (method (2), the method (1)
+        PIN has no OPSIN grammar) parses via OPSIN."""
         name = name_compound(
             "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
         )
