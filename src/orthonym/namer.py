@@ -5136,6 +5136,8 @@ class Orthonym:
                             # its teardown, in the same order as the hooked exits
                             # (proof asserted while the session is still live,
                             # session ended before the value is handed back).
+                            if raise_on_limit and is_failure_name(_iso_name):
+                                raise classify_failure_limit(_iso_probe, smiles=smiles)
                             return self._finish(_iso_name, smiles)
                         # Decorator failed closed on an isotope-labeled molecule: REFUSE.
                         # Falling through would emit the UNLABELED skeleton name (label
@@ -5145,6 +5147,8 @@ class Orthonym:
                         from .metrics.abstention import AbstentionCode, record_abstention
                         record_abstention(AbstentionCode.OTHER,
                                           detail='isotope_decorator_failed')
+                        if raise_on_limit:
+                            raise classify_failure_limit(_iso_probe, smiles=smiles)
                         return self._finish(_descriptive_fallback(smiles), smiles)
             # The input is named as drawn: nothing here rewrites ``smiles`` before the
             # producers and the gates see it, because every gate compares the name

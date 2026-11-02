@@ -100,10 +100,15 @@ PARENT_STEMS = ("androst", "estr", "pregn", "cholest", "chol", "ergost", "campes
                 "trop", "cinchon", "aporphin", "ergolin", "aconit", "berbin", "ajmal",
                 "gorgost", "poriferast", "spirost", "furost")
 
+#: The table words with the anion and ester form of each acid ('isolysergic acid' -> 'isolysergate'): a name of the
+#: salt or the ester cites the same semisystematic parent.
+_NP_WORDS = NATURAL_PRODUCT_TABLE_WORDS | {w[:-len("ic acid")] + "ate" for w in NATURAL_PRODUCT_TABLE_WORDS
+                                          if w.endswith("ic acid")}
+
 _NP_NAME = re.compile(
     r"(?:(?:" + "|".join(sorted(PARENT_STEMS, key=len, reverse=True)) + r")(?:a-|an(?:e|-|\b)|-\d)"
     r"|(?:morphinan|tropan|cinchonan|aporphin|ergolin|aconitan|berbin|ajmalan)(?:e|-|\b)"
-    r"|(?:" + "|".join(re.escape(w) for w in sorted(NATURAL_PRODUCT_TABLE_WORDS, key=len, reverse=True)) + r")"
+    r"|(?:" + "|".join(re.escape(w) for w in sorted(_NP_WORDS, key=len, reverse=True)) + r")"
     r"(?![a-z]))")
 
 

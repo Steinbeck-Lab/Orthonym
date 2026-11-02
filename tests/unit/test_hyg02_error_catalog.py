@@ -210,3 +210,19 @@ def test_back_compat_metal_names_import():
     from orthonym.namer import _METAL_NAMES, _ORGANIC_ELEMENTS
     assert _METAL_NAMES["Au"] == "gold"
     assert "C" in _ORGANIC_ELEMENTS
+
+
+@pytest.mark.parametrize("smiles", ["[2H]", "[3H]", "[2H][2H]", "[2H+]"])
+def test_an_isotope_that_gets_no_name_raises_with_raise_on_limit(smiles):
+    """The isotope exit of ``name`` returns before the main exit's limit check: a failure string it hands back
+    raises there too, as for an unlabelled structure. Without the flag the name is empty, as before."""
+    from orthonym import name_compound
+    from orthonym.errors import OrthonymLimitError
+    with pytest.raises(OrthonymLimitError):
+        name_compound(smiles, raise_on_limit=True)
+    assert name_compound(smiles) == ""
+
+
+def test_an_isotope_label_that_is_named_does_not_raise():
+    from orthonym import name_compound
+    assert name_compound("[2H]C", raise_on_limit=True) == "(2H1)methane"

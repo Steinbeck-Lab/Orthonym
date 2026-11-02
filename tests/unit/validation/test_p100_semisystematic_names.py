@@ -111,6 +111,8 @@ def test_the_stems_of_the_check_are_the_stems_of_the_natural_product_tables():
     # NPL 2026-11-01: names INTRODUCTION, the Blue Book), a stem with an ending or a locant too
     "5α-cholestan-3β-ol", "androst-4-ene-3,17-dione", "(1R,3s,5S)-trop-6-en-3-ol", "17-methylmorphin-7-ene",
     "cinchon-9-ene", "abietane", "cholesterol", "lysergic acid", "2-methylbornane",
+    # the anion and the ester of a table acid cite the same parent,:50941)
+    "isolysergate", "methyl lysergate", "sodium dihydroisolysergate", "dihydrolysergate",
 ])
 def test_a_natural_product_name_is_flagged(name):
     assert getattr(chapter_p10_name_is_no_pin(None, name), "rule", None) == "P-100", name
@@ -122,3 +124,16 @@ def test_a_natural_product_name_is_flagged(name):
 ])
 def test_a_systematic_name_beside_a_natural_product_stem_is_not_flagged(name):
     assert chapter_p10_name_is_no_pin(None, name) is None, name
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", [
+    ("CN1C[C@H](C=C2[C@H]1Cc1c[nH]c3cccc2c13)C(=O)[O-]", "isolysergate"),
+    ("CN1C[C@@H](C=C2[C@H]1Cc1c[nH]c3cccc2c13)C(=O)OC", "methyl lysergate"),
+])
+def test_the_anion_and_the_ester_of_a_table_acid_are_not_pins(smiles, expected):
+    """ (:50941) covers the salt and the ester of a acid as it covers the acid: the name ships below
+    the PIN and the PIN tier declines it."""
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    assert (row["name"], row["is_pin"]) == (expected, False)
+    assert Orthonym().name_tiered(smiles)["limit_code"] == "NO_VERIFIED_PIN"
