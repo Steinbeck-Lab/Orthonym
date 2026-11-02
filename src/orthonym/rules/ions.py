@@ -2146,11 +2146,11 @@ def _cumulative_unsaturation_endings(stem: str, double_bonds, triple_bonds, loc_
     if d_locs:
         dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
         joiner = 'a' if dmult else ''
-        endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
+        endings += f"{joiner}-{render_locants(d_locs)}-{dmult}en"
     if t_locs:
         tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
         joiner = 'a' if tmult else ''
-        endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
+        endings += f"{joiner}-{render_locants(t_locs)}-{tmult}yn"
     return endings, False
 
 
@@ -2333,7 +2333,7 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str,
         locants_sorted = sorted(locants)
         count = len(locants_sorted)
         mult = get_multiplier_prefix(count, sub_name)
-        loc_str = ','.join(str(l) for l in locants_sorted)
+        loc_str = render_locants(locants_sorted)
         from ..assembly.naming_utils import is_complex_substituent
         from ..assembly.naming_utils import multiplied_component as _mc
         if is_complex_substituent(sub_name) and count > 1:
@@ -2539,7 +2539,7 @@ def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
     locants = sorted(loc_map[sib_carbon[s]] for s in siblings)
     count = len(locants)
     from ..assembly.naming_utils import multiplied_component as _mc
-    loc_str = ','.join(str(l) for l in locants)
+    loc_str = render_locants(locants)
     prefix_str = f"{loc_str}-{_mc(count, sib_prefix, sib_prefix)}"
     return f"{prefix_str}{core}"
 
@@ -2685,7 +2685,7 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
         locants_sorted = sorted(locants)
         count = len(locants_sorted)
         mult = get_multiplier_prefix(count, sub_name)
-        loc_str = ','.join(str(l) for l in locants_sorted)
+        loc_str = render_locants(locants_sorted)
         # /: a complex/compound substituent prefix (a
         # ``4-methylcyclohexyl`` / ``2-chlorophenyl`` ring substituent, cited ONCE
         # or MULTIPLIED) takes enclosing marks — BB ``2-(propan-2-yl)…`` (PIN). The
@@ -2716,7 +2716,7 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
         if not locs:
             continue
         mult = get_multiplier_prefix(len(locs), word)  # '' for 1, di/tri for >=2
-        loc_str = ','.join(str(l) for l in locs)
+        loc_str = render_locants(locs)
         ending += f"-{loc_str}-{mult}{word}"
 
     # --- 7. Base + elision + assemble -------------------------------
@@ -2851,7 +2851,7 @@ def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
     base = f"{stem}{unsat}e" if unsat else f"{stem}ane"
     if cover_all:
         return f"{base}{mult}ide"                            # ethynediide / ethanediide
-    return f"{base}-{','.join(map(str, ide_locs))}-{mult}ide"  # butane-1,4-diide
+    return f"{base}-{render_locants(ide_locs)}-{mult}ide"  # butane-1,4-diide
 
 
 def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
@@ -2982,7 +2982,7 @@ def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
     # The parent-hydride terminal 'e' is KEPT: the ending begins with a locant-
     # hyphen (the Blue Book 'ethane-1,2-bis(ylium)', 'propane-1,3-bis(ylium)').
     base = f"{stem}{unsat}e" if unsat else f"{stem}ane"
-    return f"{base}-{','.join(map(str, yl_locs))}-{mult}(ylium)"
+    return f"{base}-{render_locants(yl_locs)}-{mult}(ylium)"
 
 
 def _elide_terminal_e(name: str) -> str:
@@ -3686,7 +3686,7 @@ def emit_catenated_hydride_cation(mol, center_idx: int) -> str:
     for nm, locs in name_to_locants.items():
         locs_sorted = sorted(locs)
         mult = get_multiplier_prefix(len(locs_sorted), nm)
-        loc_str = ','.join(str(l) for l in locs_sorted)
+        loc_str = render_locants(locs_sorted)
         # / enclosing marks: a complex/compound substituent
         # prefix (a detachable ``propan-2-yl``, ``bromomethyl``, …) is enclosed
         # whether cited ONCE or MULTIPLIED — BB ``2-methyl-5-(propan-2-yl)phenol``
@@ -4154,7 +4154,7 @@ def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
     except ValueError:
         return ''
     mult = get_suffix_multiplier_prefix(n_double, 'ene') or ''
-    loc_str = ','.join(str(l) for l in dbl_locs)
+    loc_str = render_locants(dbl_locs)
     #: the linking 'a' precedes a consonant-initial multiplied suffix
     # (…a-2,4-dien…); a single vowel-initial 'ene' takes no 'a' (…-2-en…).
     if mult:
@@ -5491,7 +5491,7 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
         count = len(locants)
         multiplier = multiplying_prefix(count, table=MULTIPLIERS)
 
-        locant_str = ','.join(str(loc) for loc in locants)
+        locant_str = render_locants(locants)
         prefix = f"{locant_str}-{multiplier}{sub_name}"
         prefixes.append(prefix)
 
@@ -5601,7 +5601,7 @@ def _build_partial_acid_salt_chain_name(
             if len(ene) > 1:
                 block += 'a'
             mult = simple_multiplier_word(len(ene)) if len(ene) > 1 else ''
-            block += '-' + ','.join(str(loc) for loc in ene) + '-' + (mult or '') + 'en'
+            block += '-' + render_locants(ene) + '-' + (mult or '') + 'en'
         if yne:
             if len(yne) > 1:
                 block += 'a' if not ene else ''
@@ -5626,7 +5626,7 @@ def _build_partial_acid_salt_chain_name(
     for name in sorted(groups.keys()):
         locs = groups[name]
         mult = multiplying_prefix(len(locs), table=plain_mult)
-        loc_str = ','.join(str(loc) for loc in locs)
+        loc_str = render_locants(locs)
         parts.append(f"{loc_str}-{mult}{name}")
     return '-'.join(parts) + stem
 
@@ -7313,7 +7313,7 @@ def _cumulative_chain_hydride_base(element, length, db_locants):
         ene_mult = _HETEROCHAIN_NUM_PREFIX.get(len(db_locants))
         if ene_mult is None:
             return None
-        locs = ','.join(str(d) for d in db_locants)
+        locs = render_locants(db_locants)
         return f"{mult}az-{locs}-{ene_mult}ene"
     if element in ('O', 'S'):
         if db_locants:
@@ -7500,7 +7500,7 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
         locants_sorted = sorted(locants)
         count = len(locants_sorted)
         mult = get_multiplier_prefix(count, nm)
-        loc_str = ','.join(str(x) for x in locants_sorted)
+        loc_str = render_locants(locants_sorted)
         from ..assembly.naming_utils import multiplied_component as _mc
         if is_complex_substituent(nm) and count > 1:
             body = _mc(count, nm, f"({nm})")

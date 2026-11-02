@@ -355,7 +355,7 @@ def hetero_mono_name(km, ring: FrozenSet[int], numbering: Dict[int, int]) -> Opt
         parts.append((_MULT[cnt] if cnt > 1 else "") + pre)
         locs.extend(sorted(by_el[el]))
     body = "".join(parts) + "cyclo" + num[:-1] + "ine"
-    return ",".join(str(x) for x in locs) + "-" + body
+    return render_locants(locs) + "-" + body
 
 
 def hetero_mono_stem(km, ring: FrozenSet[int], numbering: Dict[int, int]) -> Optional[str]:

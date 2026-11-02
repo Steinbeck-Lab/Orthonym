@@ -252,7 +252,7 @@ def _build_locanted_substituent_string(names: List[str], locant: str) -> Optiona
             return None
         marked = enclose_if_compound(name)
         token = multiplied_component(count, name, marked) if count > 1 else marked
-        parts.append(f"{','.join([locant] * count)}-{token}")
+        parts.append(f"{render_locants([locant] * count)}-{token}")
     return "-".join(parts)
 
 

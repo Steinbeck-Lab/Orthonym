@@ -25,6 +25,7 @@ from rdkit import Chem
 from ..assembly.naming_utils import get_alkyl_name
 from ..data.chain_names import get_acid_stem, get_chain_prefix
 from ..data.chain_names import get_alkyl_name as _chain_alkyl_name
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from ..data.trivial_acids import get_acylate_name
 from ..perception.smarts_cache import compiled as _compiled_smarts
@@ -3881,7 +3882,7 @@ def _polyol_organyl_name(mol, attach_atoms: list, ester_oxygens: set,
     fwd_locs = sorted(fwd[a] for a in attach_atoms)
     rev_locs = sorted(rev[a] for a in attach_atoms)
     locs = fwd_locs if fwd_locs <= rev_locs else rev_locs
-    return (f"{parent_prefix}ane-{','.join(str(x) for x in locs)}-"
+    return (f"{parent_prefix}ane-{render_locants(locs)}-"
             f"{_POLYOL_VALENCE[len(attach_atoms)]}")
 
 
@@ -4089,7 +4090,7 @@ def name_symmetric_multiplicative_diacid_diester(
     fwd_locs = sorted(fwd[a] for a in attach)
     rev_locs = sorted(rev[a] for a in attach)
     locs = fwd_locs if fwd_locs <= rev_locs else rev_locs
-    diyl = f"{diol_prefix}ane-{','.join(str(x) for x in locs)}-diyl"
+    diyl = f"{diol_prefix}ane-{render_locants(locs)}-diyl"
 
     # Name the two terminal monovalent alcohols; require them IDENTICAL
     # (symmetric case). name_independent_esters / handle the

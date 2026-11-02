@@ -21,6 +21,7 @@ from typing import List, Optional
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
 from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
     atoms_of,
     bonds_of,
@@ -201,7 +202,7 @@ def _name_ring_heterone(mol) -> Optional[str]:
     suffix = {1: {'one': 'one', 'thione': 'thione'}, 2: {'one': 'dione', 'thione': 'dithione'}}[count][kind]
     # 'one' begins with a vowel: the final 'e' of the parent is elided (a)); 'dione' and 'thione' do not
     stem = parent[:-1] if suffix == 'one' and parent.endswith('e') else parent
-    core = f"{stem}-{','.join([str(site_loc)] * count)}-{suffix}"
+    core = f"{stem}-{render_locants([str(site_loc)] * count)}-{suffix}"
 
     groups = {}
     for a, names in subs.items():

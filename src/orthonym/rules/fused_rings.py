@@ -1075,7 +1075,7 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
     if mult is None:
         return None                             # >10 hydro -> defer
     hydro_locs = sorted((cand[a] for a in hydro_atoms), key=_fused_locant_num)
-    hydro_prefix = f"{','.join(str(l) for l in hydro_locs)}-{mult}hydro"
+    hydro_prefix = f"{render_locants(hydro_locs)}-{mult}hydro"
     cited_ih = set() if from_catalogue else (set(ih_set) | arom_ih)
     if cited_ih:
         ih_prefix = render_locants(
@@ -4858,7 +4858,7 @@ def _assemble_fused_heterocycle_name(
         from ..assembly.naming_utils import _join_multiplied_suffix
         count = len(chosen_locants)
         multiplier = multiplying_prefix(count) if count > 1 else ""
-        locant_str = ",".join(str(loc) for loc in chosen_locants)
+        locant_str = render_locants(chosen_locants)
         #: elide multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
         suffix_part = f"-{locant_str}-{_join_multiplied_suffix(multiplier, chosen_suffix)}"
 
@@ -5125,7 +5125,7 @@ def _format_suffix(suffix_base: str, locants: List, added_hydrogen=()) -> str:
         Formatted suffix like '-6-amine' or '-2,6-dione' or '-4(3H)-one'
     """
     count = len(locants)
-    locant_str = ','.join(str(loc) for loc in locants)
+    locant_str = render_locants(locants)
     if added_hydrogen:
         locant_str += '(' + render_locants(f"{loc}H" for loc in added_hydrogen) + ')'
 
@@ -5190,7 +5190,7 @@ def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
     Per IUPAC, compound substituent names containing locants
     are enclosed in parentheses to prevent ambiguity.
     """
-    locant_str = ",".join(str(loc) for loc in locants)
+    locant_str = render_locants(locants)
     # Wrap compound names (those containing digits or hyphens) in parentheses
     # to prevent locant ambiguity (e.g., 8-(2-methylpropyl) not 8-2-methylpropyl)
     display_name = name

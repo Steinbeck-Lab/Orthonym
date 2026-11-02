@@ -248,7 +248,7 @@ def hydro_text(state: HydroState, hydro_atoms, atom_to_locant: Dict[int, Any],
     if state.n_double == 0 and not (set(ih) & set(need) and set(ih) - set(need)):
         return word
     locs = sorted((atom_to_locant[a] for a in hydro_atoms), key=loc_key)
-    return f"{','.join(str(x) for x in locs)}-{word}"
+    return f"{render_locants(locs)}-{word}"
 
 
 def ih_text(ih_atoms, atom_to_locant: Dict[int, Any]) -> str:

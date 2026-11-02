@@ -2238,7 +2238,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             count = len(locants)
             enc = _enc(acyloxy_name, -1)
             if count > 1 and valid_locants:
-                locant_str = ",".join(str(loc) for loc in valid_locants)
+                locant_str = render_locants(valid_locants)
                 from ..assembly.naming_utils import multiplied_component as _mc
                 all_prefixes.append(f"{locant_str}-{_mc(count, acyloxy_name, enc)}")
             elif valid_locants:

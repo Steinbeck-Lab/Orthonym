@@ -26,6 +26,7 @@ import re
 from typing import List, Optional, Tuple
 
 from ..data.chain_names import multiplying_prefix
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from .naming_utils import (
     italicized_prefix_is_bare,
@@ -189,12 +190,12 @@ def _build_unsaturation_infix(
     segments = []
 
     if num_double > 0:
-        loc_str = ",".join(str(loc) for loc in double_locants)
+        loc_str = render_locants(double_locants)
         multiplier = multiplying_prefix(num_double) if num_double > 1 else ""
         segments.append((loc_str, multiplier, "en"))
 
     if num_triple > 0:
-        loc_str = ",".join(str(loc) for loc in triple_locants)
+        loc_str = render_locants(triple_locants)
         multiplier = multiplying_prefix(num_triple) if num_triple > 1 else ""
         segments.append((loc_str, multiplier, "yn"))
 
@@ -356,10 +357,10 @@ def _build_hydrocarbon_name(
             if omit_bond_locant:
                 segments.append((None, "", "en"))
             else:
-                loc_str = ",".join(str(loc) for loc in double_locants)
+                loc_str = render_locants(double_locants)
                 segments.append((loc_str, "", "en"))
         else:
-            loc_str = ",".join(str(loc) for loc in double_locants)
+            loc_str = render_locants(double_locants)
             mult = multiplying_prefix(num_double)
             segments.append((None if _cumulated_ring else loc_str, mult, "en"))
 
@@ -368,10 +369,10 @@ def _build_hydrocarbon_name(
             if omit_bond_locant and num_double == 0:
                 segments.append((None, "", "yn"))
             else:
-                loc_str = ",".join(str(loc) for loc in triple_locants)
+                loc_str = render_locants(triple_locants)
                 segments.append((loc_str, "", "yn"))
         else:
-            loc_str = ",".join(str(loc) for loc in triple_locants)
+            loc_str = render_locants(triple_locants)
             mult = multiplying_prefix(num_triple)
             segments.append((loc_str, mult, "yn"))
 

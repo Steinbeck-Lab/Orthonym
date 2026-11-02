@@ -1937,7 +1937,7 @@ def _build_o_acyl_prefix_terms(o_acyl_mods):
     marker = f"{mult}-O-" if mult else "O-"
     # (the Blue Book): a compound acyl group is cited in enclosing marks
     from ..assembly.naming_utils import enclose_if_compound
-    return [(word, f"{','.join(str(x) for x in locs)}-{marker}{enclose_if_compound(word)}")]
+    return [(word, f"{render_locants(locs)}-{marker}{enclose_if_compound(word)}")]
 
 
 def _bfs_branch(mol, start_idx: int, exclude_idx: int):
@@ -2011,7 +2011,7 @@ def _build_o_acid_prefix_terms(o_sulfo, o_phospho):
             return None
         locs = sorted(locs)
         marker = f"{m}-O-" if m else "O-"  # BB "1,6-di-O-phosphonato-"
-        terms.append((word, f"{','.join(str(x) for x in locs)}-{marker}{word}"))
+        terms.append((word, f"{render_locants(locs)}-{marker}{word}"))
     return terms
 
 
@@ -2590,7 +2590,7 @@ def name_monosaccharide_systematic(mol, for_glycosidic_unit: bool = False) -> Op
         )
         if amino_locants:
             prefix_terms.append(
-                ("amino", f"{','.join(str(x) for x in amino_locants)}-amino")
+                ("amino", f"{render_locants(amino_locants)}-amino")
             )
         # N-SULFO (Engine-2, heparin's N-sulfoglucosamine): the N-H
         # replaced by -SO3H is ALSO a deoxy position (the same "N replaces a
@@ -3166,7 +3166,7 @@ def _name_sugar_acyl_ester(mol) -> Optional[str]:
         ester_term = f"({word})"
     else:
         ester_term = word
-    locant_str = ",".join(str(x) for x in locs)
+    locant_str = render_locants(locs)
     candidate = f"{sugar_name} {locant_str}-{mult}{ester_term}"
     if not _mono_name_rt_ok(mol, candidate):
         return None

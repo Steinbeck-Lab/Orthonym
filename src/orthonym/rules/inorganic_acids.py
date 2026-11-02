@@ -1928,7 +1928,7 @@ def name_carbonic_frn_family(mol):
         if omit:
             frags.append(f"{mult}{infix}")
         else:
-            frags.append(f"{','.join(str(x) for x in locs)}-{mult}{infix}")
+            frags.append(f"{render_locants(locs)}-{mult}{infix}")
     prefix = "-".join(frags)
     return f"{prefix}{_CARB_MULT[n]}carbonic acid"
 
@@ -2170,7 +2170,7 @@ def _name_polycarbonic_diamide(mol) -> Optional[str]:
         mult = _CARB_MULT.get(len(locs))
         if mult is None:
             return None
-        frags.append(f"{','.join(str(x) for x in locs)}-{mult}{infix}")
+        frags.append(f"{render_locants(locs)}-{mult}{infix}")
     parent = f"{'-'.join(frags)}{_CARB_MULT[n]}carbonic diamide"
 
     by_name = {}

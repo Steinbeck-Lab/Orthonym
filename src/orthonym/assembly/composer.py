@@ -4853,7 +4853,7 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         if count == 1:
             prefix_parts.append(f"{_render_primed_locant(locants[0])}-{enclose_if_compound(name)}")
         else:
-            locant_str = ",".join(_render_primed_locant(loc) for loc in locants)
+            locant_str = render_locants(_render_primed_locant(loc) for loc in locants)
             from .naming_utils import multiplied_component as _mc
             #: a compound/complex substituent takes enclosing marks; the
             # multiplicative prefix (bis/tris) is cited outside them.
@@ -5106,7 +5106,7 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
             locants = sorted(
                 ring_atom_to_locant.get(a, 1) for a in attach_atoms_list
             )
-            locant_str = ",".join(str(loc) for loc in locants)
+            locant_str = render_locants(locants)
             from .naming_utils import multiplied_component as _mc
             if is_acyloxy:
                 prefix_parts.append(
@@ -5423,7 +5423,7 @@ def _build_bicyclo_unsaturation_suffix(
 
     # Build unsaturation part
     if num_double > 0:
-        double_str = ",".join(str(loc) for loc in double_locants)
+        double_str = render_locants(double_locants)
         if num_double == 1:
             parts.append(f"-{double_str}-en")
         else:
@@ -5431,7 +5431,7 @@ def _build_bicyclo_unsaturation_suffix(
             parts.append(f"a-{double_str}-{multiplier}en")
 
     if num_triple > 0:
-        triple_str = ",".join(str(loc) for loc in triple_locants)
+        triple_str = render_locants(triple_locants)
         if num_triple == 1:
             parts.append(f"-{triple_str}-yn")
         else:
@@ -5677,7 +5677,7 @@ def _build_bicyclo_principal_suffix(
     # Principal-group suffixes always take the SIMPLE multiplier (di/tri), never
     # bis/tris (those are for complex substituents).
     multiplier = multiplying_prefix(count) if count > 1 else ""
-    locant_str = ",".join(str(loc) for loc in locants)
+    locant_str = render_locants(locants)
 
     #: elide the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol);
     # _join_multiplied_suffix is a no-op for any other suffix ('carb...'/one/amine).
@@ -6962,7 +6962,7 @@ def _unsaturated_amide_in_one_series(fragments, n_subs, n_prefix, base_name, sty
         for p in sorted(prefixes, key=lambda x: (alpha_sort_key(x.text),
                                                   cip_descriptor_rank_key(x.text))):
             if p.locants and not str(p.text)[:1].isdigit():
-                rendered = f"{','.join(str(_l) for _l in p.locants)}-{p.text}"
+                rendered = f"{render_locants(p.locants)}-{p.text}"
             else:
                 rendered = p.text
             c_items.append((rendered, None, list(p.locants or ())))
@@ -7445,7 +7445,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     # dropped the FG locant (chloroacetamide -> PIN 2-chloroacetamide;
                     # 3-chloropropanamide). Prepend.locants only when text lacks one.
                     if p.locants and not str(p.text)[:1].isdigit():
-                        _loc = ",".join(str(_l) for _l in p.locants)
+                        _loc = render_locants(p.locants)
                         prefix_parts.append(f"{_loc}-{p.text}")
                     else:
                         prefix_parts.append(p.text)
@@ -8063,7 +8063,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         # keep it separate ('hydroxy', locants=(2,)). Prepend.locants only when the
         # text lacks a leading digit (same shape as amide handler composer.py:3713).
         if p.locants and not str(p.text)[:1].isdigit():
-            _loc = ",".join(str(_l) for _l in p.locants)
+            _loc = render_locants(p.locants)
             c_prefix_items.append((rendered_prefix_citation_key(p.text), f"{_loc}-{p.text}"))
         else:
             c_prefix_items.append((rendered_prefix_citation_key(p.text), p.text))
@@ -8870,13 +8870,13 @@ def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment
             except ValueError:
                 multiplied = multiplying_prefix(total_count) + base_name
             if all_locants:
-                locant_str = ",".join(str(l) for l in all_locants)
+                locant_str = render_locants(all_locants)
                 text = f"{locant_str}-{multiplied}"
             else:
                 text = multiplied
         else:
             if all_locants:
-                locant_str = ",".join(str(l) for l in all_locants)
+                locant_str = render_locants(all_locants)
                 text = f"{locant_str}-{base_name}"
             else:
                 text = base_name
@@ -9039,7 +9039,7 @@ def _detect_fused_het_inner_subs(
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
         locs = sorted(sub_groups[name], key=lambda x: (int(x) if str(x).isdigit() else 999, str(x)))
         count = len(locs)
-        loc_str = ','.join(str(l) for l in locs)
+        loc_str = render_locants(locs)
         if count == 1:
             prefix_parts.append(f'{loc_str}-{enclose_if_compound(name)}')
         else:
@@ -9916,7 +9916,7 @@ def _build_substituted_ring_name(
             from ..assembly.naming_utils import enclose_if_compound, multiplied_component
             prefix_parts.append(multiplied_component(count, name, enclose_if_compound(name)))
             continue
-        loc_str = ','.join(str(l) for l in locs)
+        loc_str = render_locants(locs)
         # Wave2 T3a: compound FG-on-alkyl prefixes (hydroxymethyl) take
         # enclosing marks with a simple multiplier — the a phase
         # '1,3,5-tri(hydroxymethyl)benzene' convention (needs_brackets;
@@ -12065,7 +12065,7 @@ def _name_c_attached_chain_substituent_fallback(
                         locs = sorted(hal_positions[hal])
                         cnt = len(locs)
                         mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
-                        loc_str = ','.join(str(l) for l in locs)
+                        loc_str = render_locants(locs)
                         halogen_parts.append(f'{loc_str}-{mp}{halogen_prefix_map[hal]}')
 
                     return '(' + ''.join(halogen_parts) + alkyl + ')'

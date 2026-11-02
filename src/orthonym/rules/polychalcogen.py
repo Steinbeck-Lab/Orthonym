@@ -29,6 +29,7 @@ from typing import List, Optional, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import apply_vowel_elision
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 from .substituent_purity import organyl_prefix_name
@@ -269,7 +270,7 @@ def _cite_locanted_prefixes(by_name: dict) -> str:
         if len(locs) not in _SUB_MULTIPLIER:
             return None
         marked = enclose_if_compound(name)
-        loc_str = ','.join(str(l) for l in locs)
+        loc_str = render_locants(locs)
         parts.append(
             f"{loc_str}-{multiplied_component(len(locs), name, marked)}")
     return '-'.join(parts)
@@ -497,7 +498,7 @@ def name_chalcogen_chain(mol) -> Optional[str]:
         fwd = sorted((p + 1, -l) for p, l in lam_by_pos.items())
         rev = sorted((n - p, -l) for p, l in lam_by_pos.items())
         chosen = min(fwd, rev)
-        prefix = ','.join(format_lambda_token(loc, -neg) for loc, neg in chosen)
+        prefix = render_locants(format_lambda_token(loc, -neg) for loc, neg in chosen)
         return f"{prefix}-{base}"
 
     if not subs:
@@ -660,7 +661,7 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
     one_mult = _ONE_SUFFIX_MULT.get(total_oxo)
     if one_mult is None:
         return None
-    oxo_suffix = f"-{','.join(str(l) for l in oxo_locs)}-{one_mult}one"
+    oxo_suffix = f"-{render_locants(oxo_locs)}-{one_mult}one"
 
     # substituent block (alphanumeric by name, each with ascending locants).
     by_name: dict = {}

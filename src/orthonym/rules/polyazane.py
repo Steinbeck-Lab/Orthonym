@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .substituent_purity import organyl_prefix_name
@@ -287,7 +288,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         if len(locs) not in _SUB_MULTIPLIER:
             return None
         marked = enclose_if_compound(name)
-        loc_str = ','.join(map(str, locs))
+        loc_str = render_locants(locs)
         parts.append(
             f"{loc_str}-{multiplied_component(len(locs), name, marked)}")
     return '-'.join(parts)
@@ -377,7 +378,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
         # ('1,2-di-tert-butyl', never '1,2-ditert-butyl').
         enclosed = enclose_if_compound(name)
         parts.append(
-            f"{','.join(map(str, locs))}-"
+            f"{render_locants(locs)}-"
             f"{multiplied_component(len(locs), name, enclosed)}")
     from ..assembly.substituent_naming import _joined_prefix_parts
     return ''.join(_joined_prefix_parts(parts)) + parent

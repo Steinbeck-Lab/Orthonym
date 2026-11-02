@@ -6,6 +6,8 @@ size budget) and given the '-ylidene' mode of ``rules.ring_ylidene_prefix``.
 """
 from typing import Dict, List, Optional, Set, Tuple
 
+from ..data.locant_text import render_locants
+
 # Wave2 T6b: hydro-prefix multipliers for the heteromonocyclic substituent
 # emitter (hydro counts are always even — each hydrogenated mancude double
 # bond contributes two positions).
@@ -185,7 +187,7 @@ def _unsaturated_heteromonocyclic_substituent(
         mult = _HYDRO_MULTIPLIERS.get(len(hydro_locs))
         if mult is None:
             return None
-        hydro_part = f"{','.join(str(loc) for loc in hydro_locs)}-{mult}hydro"
+        hydro_part = f"{render_locants(hydro_locs)}-{mult}hydro"
     ih_part = f"{ih_locs[0]}H-" if ih_locs else ''
     if hydro_part and ih_part:
         core = f"{hydro_part}-{ih_part}{stem}"

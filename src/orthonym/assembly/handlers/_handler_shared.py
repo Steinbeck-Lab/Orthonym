@@ -99,6 +99,7 @@ from ..naming_utils import (
     rendered_prefix_citation_key,
     should_omit_locant_one,
 )
+from ...data.locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +269,7 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
             _locs = sorted(_het_positions[_sym])
             _mult = multiplying_prefix(len(_locs), table=_MULT)
             _terms.append(
-                f"{','.join(str(x) for x in _locs)}-{_mult}{_REPL[_sym]}"
+                f"{render_locants(_locs)}-{_mult}{_REPL[_sym]}"
             )
         stem = ''.join(_terms) + stem
 
@@ -3153,7 +3154,7 @@ def _assemble_fragments(
         text = f.text
         already_has_locant = bool(re.match(r'^\d', text))
         if f.locants and not already_has_locant:
-            loc_str = ",".join(str(l) for l in f.locants)
+            loc_str = render_locants(f.locants)
             prefix_texts.append(f"{loc_str}-{text}")
         else:
             prefix_texts.append(text)

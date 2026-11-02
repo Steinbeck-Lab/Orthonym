@@ -26,6 +26,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
 from ..data.chain_names import get_chain_prefix
+from ..data.locant_text import render_locants
 
 # Retained acyl names (chain length -> retained acyl prefix)
 RETAINED_ACYL_NAMES = {
@@ -782,7 +783,7 @@ def _name_benzene_polycarbonyl_halide(mol, combined) -> Optional[str]:
         locs = _lowest_locants(_ring_cycle(mol, set(ring_fs)),
                                [a for a, _ in items])
         k = len(items)
-        loc_str = ",".join(str(l) for l in locs)
+        loc_str = render_locants(locs)
         mult_c = get_multiplier_prefix(k, "carbonyl")
         mult_h = get_multiplier_prefix(k, halide_word)
         return f"benzene-{loc_str}-{mult_c}carbonyl {mult_h}{halide_word}"

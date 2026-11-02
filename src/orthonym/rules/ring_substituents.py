@@ -939,7 +939,7 @@ def _decorated_heteroaryl_substituent_name(
     )
     from ..assembly.naming_utils import (
         enclose_if_compound as _enclose_if_compound,
-        multiplied_component as _multiplied_component,
+        multiplied_component as _multiplied_component, render_locants,
     )
     deco_atoms = [ra for ra, _ in decorations]
     best_key = None
@@ -1046,7 +1046,7 @@ def _decorated_heteroaryl_substituent_name(
         # 'bis' for a substituted prefix (a),:7104). A private
         # 'di'/'tri' table wrote '3,5-ditert-butylphenyl' and could never write
         # 'bis'.
-        text = (f"{','.join(str(l) for l in locs)}-"
+        text = (f"{render_locants(locs)}-"
                 f"{_multiplied_component(len(locs), nm, _enclose_if_compound(nm))}")
         prefix_parts.append((_cited(nm), text))   # R before S::22603,:45465
     prefix_parts.sort(key=lambda x: x[0])
@@ -1110,7 +1110,7 @@ def _decorated_fused_substituent_name(
     )
     from ..assembly.naming_utils import (
         enclose_if_compound as _enclose_if_compound,
-        multiplied_component as _multiplied_component,
+        multiplied_component as _multiplied_component, render_locants,
     )
     from .fused_rings import (
         _fused_locant_num,
@@ -1229,7 +1229,7 @@ def _decorated_fused_substituent_name(
         if mult is None:
             return None
         # The multiplier as on the monocyclic path (``multiplied_component``).
-        text = (f"{','.join(str(l) for l in locs)}-"
+        text = (f"{render_locants(locs)}-"
                 f"{_multiplied_component(len(locs), nm, _enclose_if_compound(nm))}")
         prefix_parts.append((_cited(nm), text))   # R before S::22603,:45465
     prefix_parts.sort(key=lambda x: x[0])

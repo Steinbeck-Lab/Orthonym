@@ -52,6 +52,7 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
+from ..data.locant_text import render_locants
 from .name_tree import NameTreeNode, _alphabetize_prefixes
 
 
@@ -256,7 +257,7 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
     for text, locants in prefix_pairs:
         already_has_locant = bool(re.match(r'^\d', text))
         if locants and not already_has_locant:
-            loc_str = ",".join(str(l) for l in locants)
+            loc_str = render_locants(locants)
             prefix_texts.append(f"{loc_str}-{text}")
         else:
             prefix_texts.append(text)

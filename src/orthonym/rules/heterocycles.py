@@ -1007,7 +1007,7 @@ def build_hw_name(
     if ((total_het > 1 or lambda_by_locant) and not _no_isomer
             and (cite_locants or lambda_by_locant)):
         from .lambda_convention import format_lambda_token
-        locant_prefix = ','.join(
+        locant_prefix = render_locants(
             format_lambda_token(loc, lambda_by_locant.get(loc))
             for loc in cited_locants
         ) + '-'
@@ -2243,7 +2243,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     if cited_ih != ih_locants:
         return None
 
-    locant_str = ','.join(str(loc) for loc in hydro_locants)
+    locant_str = render_locants(hydro_locants)
     # Hyphen before a digit-initial (intrinsic-IH) parent: 2,3-dihydro-1H-pyrrole.
     sep = '-' if parent_name[:1].isdigit() else ''
     return f"{locant_str}-{prefix}{sep}{parent_name}"
@@ -3194,7 +3194,7 @@ def _build_replacement_name(
         locants = sorted(element_locants[elem])
         count = len(locants)
 
-        locant_str = ','.join(str(loc) for loc in locants)
+        locant_str = render_locants(locants)
         if count > 1:
             multiplier = multiplying_prefix(count)
             prefix_parts.append(f"{locant_str}-{multiplier}{hw_prefix}")
@@ -5189,7 +5189,7 @@ def name_substituted_heterocycle(
 
         count = len(chosen_locants)
         multiplier = get_suffix_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
-        locant_str = ",".join(str(loc) for loc in chosen_locants)
+        locant_str = render_locants(chosen_locants)
         # /: elide the multiplier's terminal 'a' before a
         # vowel-initial suffix ('tetra'+'ol' -> 'tetrol', not 'tetraol').
         suffix_token = _join_multiplied_suffix(multiplier, chosen_suffix)
@@ -5665,7 +5665,7 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
     structural predicate, it defaults False, and the ENCLOSING MARKS and multiplier
     below are still applied -- only the ``{locants}-`` head is withheld.
     """
-    locant_str = ",".join(str(loc) for loc in locants)
+    locant_str = render_locants(locants)
     # Wrap compound names in enclosing marks to prevent locant ambiguity
     display_name = name
     from ..assembly.naming_utils import (

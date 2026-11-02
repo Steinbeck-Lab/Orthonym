@@ -1348,7 +1348,7 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
             return None
         if ylidene:
             word = word + "idene"
-        body = f"{hyd}-{','.join(map(str, locs))}-{word}"
+        body = f"{hyd}-{render_locants(locs)}-{word}"
         if entries:
             from ..assembly.composition_primitives import _join_prefix_to_name
             pre = _render_prefixes([(num[h], p) for h, p in entries], False)
@@ -1403,7 +1403,7 @@ def _ring_comp_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optiona
         if comp.ring_name == "benzene" and len(locs) == 2:
             names.add(f"{locs[0]},{locs[1]}-phenylene")
         else:
-            names.add(f"{comp.ring_name}-{','.join(map(str, locs))}-{word}")
+            names.add(f"{comp.ring_name}-{render_locants(locs)}-{word}")
     if len(names) != 1:
         return None
     return names.pop(), True

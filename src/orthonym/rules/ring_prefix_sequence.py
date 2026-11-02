@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from ..data.locant_text import render_locants
+
 
 def ring_prefix_sequence(mol, groups: Dict[str, List[int]], atom_prefixes: Dict[int, List[str]],
                          order: Dict[int, int], attachment_atom: int,
@@ -118,7 +120,7 @@ def ring_prefix_sequence(mol, groups: Dict[str, List[int]], atom_prefixes: Dict[
         # string order it always had ('disulfanyl' stays under 'd')
         for name in sorted(groups, key=lambda nm: (_strip_italic_prefix(nm)[0], nm)):
             locs = sorted(groups[name])
-            loc_str = ','.join(str(loc) for loc in locs)
+            loc_str = render_locants(locs)
             from ..assembly.naming_utils import multiplied_component as _mc
             parts.append(f'{loc_str}-{_mc(len(locs), name, name)}')
         prefix_str = '-'.join(parts)

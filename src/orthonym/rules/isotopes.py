@@ -187,12 +187,12 @@ def format_isotope_descriptor(groups, force_show: bool = False,
             # once per substituted atom at ONE shared position -> (2,2,2-2H3).) The
             # tuple form is what the mixed-descriptor builder passes for a count>1
             # group whose atoms sit at distinct positions.
-            loc_part = ",".join(str(l) for l in locant)
+            loc_part = render_locants(locant)
         else:
             # BB: the locant is repeated once per substituted atom at that position
             # for a grouped multi-count token (2,2,2-2H3); for count 1 a single
             # locant + hyphen (2-14C).
-            loc_part = ",".join(str(locant) for _ in range(count))
+            loc_part = render_locants(str(locant) for _ in range(count))
         return f"{loc_part}-{sym}{sub}"
 
     def _loc_sort_val(loc):
@@ -3594,7 +3594,7 @@ def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
         base, parent = tail[:k], tail[k:]
         bare_locs = [L for L in locs if L != lab_loc]
         lab_seg = f"{lab_loc}-{desc}{base}"
-        bare_seg = f"{','.join(str(L) for L in bare_locs)}-{_RED[len(bare_locs)]}{base}"
+        bare_seg = f"{render_locants(bare_locs)}-{_RED[len(bare_locs)]}{base}"
         # (the Blue Book): "The isotopically modified substituent
         # is preferred alphabetically to the unmodified substituent", whatever the
         # locants ('N-[7-(131I)iodo-6-iodo-9H-fluoren-2-yl]acetamide (PIN)',:43762).

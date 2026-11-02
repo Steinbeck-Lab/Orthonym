@@ -48,6 +48,7 @@ from ..assembly.book_prefixes import (
 )
 from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name, multiplied_component
 from .ring_replacement import build_replacement_prefix
+from ..data.locant_text import render_locants
 
 # Monovalent halogens (F/Cl/Br/I/At) are NEVER skeletal replacement-chain atoms
 # / skeletal replacement uses only C and the 'a'-elements). A
@@ -283,7 +284,7 @@ def _assemble_prefixes(tokens) -> str:
     for tok in sorted(grouped, key=lambda t: keys[t]):
         locs = sorted(grouped[tok], key=locant_key)
         from ..assembly.naming_utils import multiplied_component as _mc
-        parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), tok, tok)}")
+        parts.append(f"{render_locants(locs)}-{_mc(len(locs), tok, tok)}")
     return "-".join(parts)
 
 
@@ -334,7 +335,7 @@ def _chain_stem_with_unsaturation(n: int, ene: List[int],
         mult = SIMPLE_MULTIPLIERS.get(len(locs))
         if mult is None:
             return None
-        return (True, "-" + ",".join(str(x) for x in locs) + "-" + mult + suffix)
+        return (True, "-" + render_locants(locs) + "-" + mult + suffix)
 
     ene_part = _suffix_part(ene, "en")
     if ene_part is None:

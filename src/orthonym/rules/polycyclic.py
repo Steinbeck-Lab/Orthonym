@@ -50,6 +50,7 @@ from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
     spend_perf_work,
 )
+from ..data.locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -4676,7 +4677,7 @@ def _assemble_substituent_prefix(
         count = len(locants)
         multiplier = get_multiplier_prefix(count, name)
 
-        locant_str = ','.join(str(loc) for loc in locants)
+        locant_str = render_locants(locants)
         from ..assembly.naming_utils import multiplied_component as _mc
         parts.append(f"{locant_str}-{_mc(count, name, enclose_if_compound(name))}")
 
@@ -4751,7 +4752,7 @@ def _build_parent_with_unsaturation(
         if double_bonds:
             count = len(double_bonds)
             mult = multiplying_prefix(count, table=unsat_multipliers)
-            locant_str = ','.join(str(loc) for loc in double_bonds)
+            locant_str = render_locants(double_bonds)
             if count > 1:
                 parts.append(f"-{locant_str}-{mult}en")
             else:
@@ -4760,7 +4761,7 @@ def _build_parent_with_unsaturation(
         if triple_bonds:
             count = len(triple_bonds)
             mult = multiplying_prefix(count, table=unsat_multipliers)
-            locant_str = ','.join(str(loc) for loc in triple_bonds)
+            locant_str = render_locants(triple_bonds)
             if count > 1:
                 parts.append(f"-{locant_str}-{mult}yn")
             else:
@@ -4787,7 +4788,7 @@ def _build_parent_with_unsaturation(
             if double_bonds:
                 count = len(double_bonds)
                 mult = multiplying_prefix(count, table=unsat_multipliers)
-                locant_str = ','.join(str(loc) for loc in double_bonds)
+                locant_str = render_locants(double_bonds)
                 if count > 1:
                     parts.append(f"-{locant_str}-{mult}en")
                 else:
@@ -4795,7 +4796,7 @@ def _build_parent_with_unsaturation(
             if triple_bonds:
                 count = len(triple_bonds)
                 mult = multiplying_prefix(count, table=unsat_multipliers)
-                locant_str = ','.join(str(loc) for loc in triple_bonds)
+                locant_str = render_locants(triple_bonds)
                 if count > 1:
                     parts.append(f"-{locant_str}-{mult}yn")
                 else:
@@ -4814,7 +4815,7 @@ def _build_parent_with_unsaturation(
         mult = multiplying_prefix(count, table=fg_multipliers)
         full_suffix = _join_multiplied_suffix(mult, suffix_text)
         if suffix_locants:
-            locant_str = ','.join(str(loc) for loc in suffix_locants)
+            locant_str = render_locants(suffix_locants)
             return f"{parent_base}-{locant_str}-{full_suffix}"
         else:
             return f"{parent_base}-{full_suffix}"
@@ -4831,7 +4832,7 @@ def _build_parent_with_unsaturation(
     if double_bonds:
         count = len(double_bonds)
         mult = multiplying_prefix(count, table=unsat_multipliers)
-        locant_str = ','.join(str(loc) for loc in double_bonds)
+        locant_str = render_locants(double_bonds)
         if count > 1:
             unsat_parts.append(f"-{locant_str}-{mult}en")
         else:
@@ -4840,7 +4841,7 @@ def _build_parent_with_unsaturation(
     if triple_bonds:
         count = len(triple_bonds)
         mult = multiplying_prefix(count, table=unsat_multipliers)
-        locant_str = ','.join(str(loc) for loc in triple_bonds)
+        locant_str = render_locants(triple_bonds)
         if count > 1:
             unsat_parts.append(f"-{locant_str}-{mult}yn")
         else:

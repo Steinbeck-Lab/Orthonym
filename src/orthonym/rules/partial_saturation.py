@@ -273,7 +273,7 @@ def format_saturation_prefix(
     # All other saturation prefixes MUST have locants per IUPAC
     if locants:
         sorted_locants = _sort_locants(locants)
-        locant_str = ','.join(str(loc) for loc in sorted_locants)
+        locant_str = render_locants(sorted_locants)
         return f"{locant_str}-{prefix}"
 
     # Fallback: return prefix without locants (not ideal, but better than nothing)
@@ -1079,7 +1079,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
         return None
 
     hydro_display = sorted((best_map[a] for a in sp3_atoms), key=_locant_key)
-    locant_str = ','.join(_locant_display(loc) for loc in hydro_display)
+    locant_str = render_locants(_locant_display(loc) for loc in hydro_display)
     return f"{locant_str}-{prefix}{parent}"
 
 
@@ -1322,7 +1322,7 @@ def name_added_h_fused_carbocycle_suffix(mol: Chem.Mol) -> Optional[str]:
     # (a): elide the parent's terminal 'e' only before a vowel-initial
     # suffix (single -ol/-amine); the multiplied di-/tri- forms keep it.
     stem = parent[:-1] if (parent.endswith('e') and suffix_word[0] in 'aeiou') else parent
-    sloc = ','.join(_locant_display(x) for x in suffix_locs)
+    sloc = render_locants(_locant_display(x) for x in suffix_locs)
     ih_str = ('(' + ','.join(f"{_locant_display(x)}H" for x in ih_locs) + ')') if ih_locs else ''
     return f"{stem}-{sloc}{ih_str}-{suffix_word}"
 
@@ -2502,7 +2502,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol,
     _, loc, added_ih, hydro, parent_name = best
 
     carb_sorted = sorted(carbonyls, key=lambda c: _locant_key(loc[c]))
-    carb_str = ','.join(_locant_display(loc[c]) for c in carb_sorted)
+    carb_str = render_locants(_locant_display(loc[c]) for c in carb_sorted)
     suffix = suffix_table.get(len(carbonyls))
     if suffix is None:
         return None
@@ -2523,7 +2523,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol,
             return None
         hy_sorted = sorted(hydro, key=lambda a: _locant_key(loc[a]))
         sep = '-' if name[:1].isdigit() else ''  # hyphen before a digit-initial parent (1H-inden...)
-        name = f"{','.join(_locant_display(loc[a]) for a in hy_sorted)}-{prefix}{sep}{name}"
+        name = f"{render_locants(_locant_display(loc[a]) for a in hy_sorted)}-{prefix}{sep}{name}"
 
     # N-substituted ring imine: render each N-substituent as an N-locant prefix
     # (N1,N4-dimethylnaphthalene-1,4-diimine), grouped by name with N-locants
@@ -2863,7 +2863,7 @@ def name_hydro_mancude_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     if prefix is None:
         return None
     hy_sorted = sorted(hydro, key=lambda a: _locant_key(loc[a]))
-    hy = ','.join(_locant_display(loc[a]) for a in hy_sorted)
+    hy = render_locants(_locant_display(loc[a]) for a in hy_sorted)
     # A hyphen before a digit-initial parent (the intrinsic-IH `5H-...` stem).
     sep = '-' if parent_name[:1].isdigit() else ''
     return f"{hy}-{prefix}{sep}{parent_name}"

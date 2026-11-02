@@ -37,6 +37,7 @@ from ..perception.natural_products import (
     get_scaffold_substituents,
 )
 from ..perception.stereo import assign_stereochemistry
+from ..data.locant_text import render_locants
 
 # ---------------------------------------------------------------------------
 # Steroid angular methyl positions for nor-detection
@@ -202,7 +203,7 @@ def format_np_modification_prefix(modifications: List[Dict]) -> str:
         if prefix == "nor":
             count = len(locants)
             multiplier = multiplying_prefix(count, table=_NOR_MULTIPLIERS)
-            locant_str = ",".join(str(loc) for loc in locants)
+            locant_str = render_locants(locants)
             if locant_str:
                 parts.append(f"{locant_str}-{multiplier}{prefix}")
             else:
@@ -1758,14 +1759,14 @@ def _assemble_np_name(
             hal_by_type[hal_name].append(loc)
         for hal_name in sorted(hal_by_type.keys()):
             locs = sorted(hal_by_type[hal_name])
-            locant_str = ",".join(_greek_locant(loc) for loc in locs)
+            locant_str = render_locants(_greek_locant(loc) for loc in locs)
             count = len(locs)
             multiplier = multiplying_prefix(count) if count > 1 else ""
             prefix_entries.append((hal_name, f"{locant_str}-{multiplier}{hal_name}"))
 
     # Methoxy prefixes (e.g., "3-methoxy")
     if methoxys:
-        locant_str = ",".join(_greek_locant(loc) for loc in methoxys)
+        locant_str = render_locants(_greek_locant(loc) for loc in methoxys)
         count = len(methoxys)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_entries.append(("methoxy", f"{locant_str}-{multiplier}methoxy"))
@@ -1789,7 +1790,7 @@ def _assemble_np_name(
         _acyloxy_by_word[_word].append(_loc)
     for _word in sorted(_acyloxy_by_word):
         _locs = sorted(_acyloxy_by_word[_word])
-        _locant_str = ",".join(_greek_locant(loc) for loc in _locs)
+        _locant_str = render_locants(_greek_locant(loc) for loc in _locs)
         _mult = "bis" if len(_locs) > 1 else ""
         prefix_entries.append((_word, f"{_locant_str}-{_mult}({_word})"))
 
@@ -1800,7 +1801,7 @@ def _assemble_np_name(
     # IUPAC: principal group as suffix only.
     # IUPAC: non-principal groups as prefixes only.
     if hydroxyls:
-        locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
+        locant_str = render_locants(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_entries.append(("hydroxy", f"{locant_str}-{multiplier}hydroxy"))
@@ -1819,14 +1820,14 @@ def _assemble_np_name(
     if identical_prefixes_grouped():
         alkyl_groups = combine_identical_prefix_groups(alkyl_groups)
     for alkyl_name, locs in alkyl_groups:
-        locant_str = ",".join(_greek_locant(loc) for loc in locs)
+        locant_str = render_locants(_greek_locant(loc) for loc in locs)
         count = len(locs)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_entries.append((alkyl_name, f"{locant_str}-{multiplier}{alkyl_name}"))
 
     # Oxo prefixes: ketones below a principal carboxylic acid order above).
     if oxos:
-        locant_str = ",".join(str(loc) for loc in oxos)
+        locant_str = render_locants(oxos)
         count = len(oxos)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_entries.append(("oxo", f"{locant_str}-{multiplier}oxo"))
@@ -1867,7 +1868,7 @@ def _assemble_np_name(
     if ene_locs or yne_locs:
         parts = []
         if ene_locs:
-            ene_locant_str = ",".join(_fmt_ene_locant(loc) for loc in ene_locs)
+            ene_locant_str = render_locants(_fmt_ene_locant(loc) for loc in ene_locs)
             ene_count = len(ene_locs)
             if ene_count == 1:
                 parts.append(f"-{ene_locant_str}-en")
@@ -1875,7 +1876,7 @@ def _assemble_np_name(
                 ene_multi = multiplying_prefix(ene_count)
                 parts.append(f"-{ene_locant_str}-{ene_multi}en")
         if yne_locs:
-            yne_locant_str = ",".join(str(loc) for loc in yne_locs)
+            yne_locant_str = render_locants(yne_locs)
             yne_count = len(yne_locs)
             if yne_count == 1:
                 parts.append(f"-{yne_locant_str}-yn")
@@ -1891,7 +1892,7 @@ def _assemble_np_name(
     ketone_suffix = ""
     ketone_word = ""  # the multiplier+suffix word (one/dione/trione) for (a) elision
     if ketones:
-        locant_str = ",".join(str(loc) for loc in ketones)
+        locant_str = render_locants(ketones)
         count = len(ketones)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         ketone_word = f"{multiplier}one"
@@ -1925,7 +1926,7 @@ def _assemble_np_name(
         acid_word = f"{acid_mult}oic acid"
         e = (_saturated_parent_e(stem, scaffold_name, acid_word)
              if unsat_suffix == "an" else _np_parent_e(acid_word))
-        acid_suffix = f"-{','.join(str(loc) for loc in acids)}-{acid_word}"
+        acid_suffix = f"-{render_locants(acids)}-{acid_word}"
         body = stem if unsat_suffix == "an" else effective_stem
         return (f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, body)}"
                 f"{unsat_suffix}{e}{acid_suffix}")
@@ -1948,7 +1949,7 @@ def _assemble_np_name(
     # If only hydroxyls and no ketone -> use -ol suffix instead of prefix
     # Methyl/halogen prefixes are still included as prefixes
     if hydroxyls and not ketones:
-        locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
+        locant_str = render_locants(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         #: elide the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
@@ -2430,28 +2431,28 @@ def _assemble_np_ester_name(
             hal_by_type[hal_name].append(loc)
         for hal_name in sorted(hal_by_type.keys()):
             locs = sorted(hal_by_type[hal_name])
-            locant_str = ",".join(_greek_locant(loc) for loc in locs)
+            locant_str = render_locants(_greek_locant(loc) for loc in locs)
             count = len(locs)
             multiplier = multiplying_prefix(count) if count > 1 else ""
             prefix_parts.append(f"{locant_str}-{multiplier}{hal_name}")
 
     # Hydroxyl groups -> "hydroxy" prefix
     if hydroxyls:
-        locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
+        locant_str = render_locants(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}hydroxy")
 
     # Methyl prefixes
     if methyls:
-        locant_str = ",".join(_greek_locant(loc) for loc in methyls)
+        locant_str = render_locants(_greek_locant(loc) for loc in methyls)
         count = len(methyls)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}methyl")
 
     # Ketone groups -> "oxo" prefix (NOT "-one" suffix in functional class format)
     if ketones:
-        locant_str = ",".join(_greek_locant(loc) for loc in ketones)
+        locant_str = render_locants(_greek_locant(loc) for loc in ketones)
         count = len(ketones)
         multiplier = multiplying_prefix(count) if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}oxo")
@@ -2499,7 +2500,7 @@ def _assemble_np_ester_name(
     if ene_locs or yne_locs:
         parts = []
         if ene_locs:
-            ene_locant_str = ",".join(
+            ene_locant_str = render_locants(
                 _fmt_ene_locant_ester(loc) for loc in ene_locs
             )
             ene_count = len(ene_locs)
@@ -2534,7 +2535,7 @@ def _assemble_np_ester_name(
         acylate_word = acylate_names[0]
     elif len(set(acylate_names)) == 1:
         # Multiple esters with same acid: stem-unsaturation-locant,locant-diyl diacylate
-        locant_str = ",".join(_greek_locant(loc) for loc in ester_locants)
+        locant_str = render_locants(_greek_locant(loc) for loc in ester_locants)
         count = len(esters)
         yl_multi = multiplying_prefix(count)
         yl_suffix = f"-{locant_str}-{yl_multi}yl"

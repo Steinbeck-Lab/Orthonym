@@ -23,6 +23,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ...data.locant_text import render_locants
 from ...data.multipliers import multiplier_table
 from ..partial_saturation import _PARTIAL_SAT_PCG_SUFFIX
 from ..stereochemistry import format_stereodescriptor_string
@@ -396,7 +397,7 @@ def _assemble(mol, system: Set[int], parent: BridgedParent, suffix, added=frozen
         if mult.endswith("a") and stem[:1] in ("a", "o"):
             mult = mult[:-1]
         extra = f"({hydro.ih_text(added, a2l)})" if added else ""
-        suffix_text = f"-{','.join(str(x) for x in locs)}{extra}-{mult}{stem}"
+        suffix_text = f"-{render_locants(locs)}{extra}-{mult}{stem}"
         elide = elides and not mult
     assign_stereochemistry(mol)
     descriptors = collect_stereodescriptors(mol, a2l)

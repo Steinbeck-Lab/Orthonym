@@ -110,6 +110,7 @@ from .lambda_convention import (
     FUSED_RING_LAMBDA_HALOGENS, format_lambda_token, nonstandard_bonding_number,
     ring_halogen_ion, ring_halogen_ion_lambda,
 )
+from ..data.locant_text import render_locants
 
 # ---------------------------------------------------------------------------
 # Blue Book Table 1.5, COMPLETE -- element -> (prefix, STANDARD bonding number).
@@ -429,7 +430,7 @@ def build_replacement_prefix(
     for element in sorted(by_element, key=lambda s: HETEROATOM_PREFIXES[s][1]):
         entries = sorted(by_element[element], key=lambda e: e[0])
         stem = HETEROATOM_PREFIXES[element][0]
-        locant_str = ','.join(
+        locant_str = render_locants(
             format_lambda_token(loc, lam) for loc, lam, _idx in entries)
         count = len(entries)
         if count > 1:

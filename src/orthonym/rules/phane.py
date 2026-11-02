@@ -1194,7 +1194,7 @@ def _unsaturated_phane_name(skeletal_name: str, doubles, triples) -> Optional[st
         multiplier = "" if len(locants) == 1 else SIMPLE_MULTIPLIERS.get(len(locants))
         if multiplier is None:
             return None
-        segments.append((multiplier, f"-{','.join(str(x) for x in locants)}-{multiplier}{stem}"))
+        segments.append((multiplier, f"-{render_locants(locants)}-{multiplier}{stem}"))
     base = skeletal_name[:-1] if not segments[0][0] else skeletal_name
     return base + "".join(text for _, text in segments) + "e"
 
@@ -1281,7 +1281,7 @@ def build_phane_pin(mol: Optional[Chem.Mol]) -> Optional[str]:
     cited = render_locants(f"{loc}{descriptors[loc]}" for loc in sorted(descriptors))
 
     superatom_locants = sorted(sup for sup, _ in per_amp)
-    superatom_str = ",".join(str(x) for x in superatom_locants)
+    superatom_str = render_locants(superatom_locants)
     attach_str = ",".join(str(x) for x in shared_attach)
     return f"{f'({cited})-' if cited else ''}{superatom_str}({attach_str})-{multiplied_prefix}{skeletal_name}"
 
@@ -1351,7 +1351,7 @@ def _apply_skeletal_replacement(
         count = len(locants)
         stem = REPLACEMENT_TERMS[element]
         mult = multiplying_prefix(count) if count > 1 else ""
-        loc_str = ",".join(str(x) for x in locants)
+        loc_str = render_locants(locants)
         parts.append(f"{loc_str}-{mult}{stem}")
     return "-".join(parts) + "-" + base_name
 

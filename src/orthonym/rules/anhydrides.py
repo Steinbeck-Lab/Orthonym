@@ -27,6 +27,7 @@ from typing import List, Optional, Tuple
 from rdkit import Chem
 
 from ..data.chain_names import get_chain_prefix
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -1480,7 +1481,7 @@ def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Opt
     for nm in sorted(groups, key=alpha_sort_key):
         locs = sorted(groups[nm])
         from ..assembly.naming_utils import multiplied_component as _mc
-        parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), nm, nm)}")
+        parts.append(f"{render_locants(locs)}-{_mc(len(locs), nm, nm)}")
     # The substituent prefix attaches DIRECTLY to the parent stem (no separating
     # hyphen): '3-methyloxolane-2,5-dione', not '3-methyl-oxolane-2,5-dione'.
     prefix = "-".join(parts)

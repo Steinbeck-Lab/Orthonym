@@ -448,7 +448,7 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False,
     if ending is None:
         return None
     # ``omit_locant``: (the Blue Book) for a two-carbon chain, 'chloroethynide'
-    text = ending if omit_locant and n == 1 else '-' + ','.join(map(str, locants)) + '-' + ending
+    text = ending if omit_locant and n == 1 else '-' + render_locants(locants) + '-' + ending
     charged_atom_ids = tuple(sorted(site['atom_idx'] for site in charged))
     return text, charged_atom_ids
 
@@ -505,7 +505,7 @@ def _cumulative_charge_suffix_text(mol, atom_to_locant) -> Optional[Tuple[str, T
         ending = _multiplied_ionic_suffix(kind, len(locants))
         if ending is None:
             return None
-        text += '-' + ','.join(map(str, locants)) + '-' + ending
+        text += '-' + render_locants(locants) + '-' + ending
     return text, tuple(sorted(charged_ids))
 
 
@@ -2009,7 +2009,7 @@ def _emit_ring_from_analysis(
         if text is None:
             return _refuse("multiplicity beyond table")
         prefix_entries.append(
-            (_citation_key(prefix), ','.join(map(str, locs)) + '-' + text))
+            (_citation_key(prefix), render_locants(locs) + '-' + text))
     prefix_entries.sort(key=lambda t: t[0])
     prefix_parts = [tok for _, tok in prefix_entries]
 
@@ -2174,7 +2174,7 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        entries.append((_citation_key(prefix), ','.join(map(str, locs)) + '-' + text))
+        entries.append((_citation_key(prefix), render_locants(locs) + '-' + text))
     entries.sort(key=lambda t: t[0])
     joined = '-'.join(tok for _k, tok in entries)
     if ketone_form is not None:
@@ -2754,7 +2754,7 @@ def name_general_monocycle(
         if text is None:
             return _refuse("multiplicity beyond table")
         prefix_parts.append(text if _omit_ring_locant
-                            else ','.join(map(str, locs)) + '-' + text)
+                            else render_locants(locs) + '-' + text)
 
     # --- suffix text + parent-'e' elision ---
     bindings = frag_bindings

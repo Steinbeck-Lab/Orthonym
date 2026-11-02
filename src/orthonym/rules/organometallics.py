@@ -41,6 +41,7 @@ from ..data.organometallics import (
     TERMINAL_LIGAND_PREFIXES,
 )
 from ..data.organometallics import RETAINED_METALLOCENES  # noqa: F401 re-exported: imported FROM this module by assembly/handlers/organometallic.py, scripts/verify_orgm_canary.py
+from ..data.locant_text import render_locants
 
 # a phase Stock-notation Roman numerals (scope -3.. +8 per internal notes)
 _ROMAN_NUMERALS: Dict[int, str] = {
@@ -1533,7 +1534,7 @@ def _build_metallacycle_candidate(
         locants = sorted(sub_groups[name])
         all_sub_locants.extend(locants)
         mult = _multiplicative_prefix(len(locants))
-        loc_str = ','.join(str(x) for x in locants)
+        loc_str = render_locants(locants)
         sub_prefix_tokens.append(f"{loc_str}-{mult}{name}")
 
     ring_token = f"1-{a_prefix}{ring_core}"

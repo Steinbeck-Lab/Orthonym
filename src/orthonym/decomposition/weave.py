@@ -69,6 +69,7 @@ from ..assembly.naming_utils import (
 )
 from ..assembly.substituent_enumerator import name_substituent
 from ..data.chain_names import get_chain_prefix
+from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 
 # Onium elements whose closed-shell cation (no free H) can terminate a
@@ -514,7 +515,7 @@ def _prefix_string(groups: Dict[str, List[int]]) -> Optional[str]:
         mult = '' if len(locs) == 1 else table.get(len(locs))
         if mult is None:
             return None
-        loc_str = ','.join(str(x) for x in locs)
+        loc_str = render_locants(locs)
         parts.append(f"{loc_str}-{mult}{tok_cited}")
     return '-'.join(parts)
 
@@ -539,7 +540,7 @@ def _assemble(mol, parent: List[int], numbering: Dict[int, int],
         ol_mult = _HYDRO_MULT.get(len(ol_locs))
         if ol_mult is None:
             return None
-        loc_str = ','.join(str(x) for x in ol_locs)
+        loc_str = render_locants(ol_locs)
         suffix = f"-{loc_str}-{ol_mult}ol"
     else:
         suffix = ""

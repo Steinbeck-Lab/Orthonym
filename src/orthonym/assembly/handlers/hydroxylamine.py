@@ -27,6 +27,7 @@ from typing import Any, List, Optional, Set, Tuple
 from ..name_tree import NameTreeNode, NamingResult
 from ..naming_utils import strip_italicized_structural_prefix
 from ...perception.molcache import atoms_of, bonds_of
+from ...data.locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +227,7 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
         counts[n] = counts.get(n, 0) + 1
     for sub_name, count in counts.items():
         enclosed = enclose_if_compound(sub_name)
-        locs = ",".join([locant] * count)
+        locs = render_locants([locant] * count)
         if count > 1:
             mult = multiplying_prefix(count)
             # (d) (the Blue Book, 'di-*tert*-butyl':6964): a

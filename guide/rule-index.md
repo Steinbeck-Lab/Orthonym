@@ -22,12 +22,12 @@ Blue Book: <!-- rule-index:begin bb:P-14.3,P-16.2 -->P-14.3 Locants; P-16.2 Punc
 
 | Helper | Module | Used outside its module |
 |:--|:--|:--|
-| `render_locants` | `data/locant_text.py` | 63 calls in 31 other files |
+| `render_locants` | `data/locant_text.py` | 227 calls in 63 other files |
 | `format_substituent_prefix` | `assembly/naming_utils.py` | 38 calls in 17 other files |
 | `format_suffix_with_locants` | `assembly/naming_utils.py` | 8 calls in 6 other files |
 | `multiplied_component` | `assembly/naming_utils.py` | 396 calls in 55 other files |
 
-Code that writes a locant into a name by hand: **547 places** in **263 functions** of **85 files** (a locant joined with commas or hyphens: 210; an f-string `{locant}-...`: 379; a locant plus `"-"`: 35; a line can match more than one pattern). 184 of those functions call none of the helpers above. The files with most places: `rules/ions.py` (56), `assembly/composer.py` (52), `rules/natural_products.py` (52), `rules/heterocycles.py` (24), `rules/ring_substituents.py` (24). 5 of the comma joins sort the locants inside the join; the others write them in the order they are given. 63 places write a list of locants with `render_locants`.
+Code that writes a locant into a name by hand: **437 places** in **254 functions** of **84 files** (a locant joined with commas or hyphens: 46; an f-string `{locant}-...`: 379; a locant plus `"-"`: 35; a line can match more than one pattern). 92 of those functions call none of the helpers above. The files with most places: `rules/ions.py` (41), `assembly/composer.py` (39), `rules/natural_products.py` (34), `rules/ring_substituents.py` (22), `rules/ring_assemblies.py` (20). 5 of the comma joins sort the locants inside the join; the others write them in the order they are given. 227 places write a list of locants with `render_locants`.
 
 <!-- rule-index:end locant-render -->
 

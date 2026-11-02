@@ -35,6 +35,7 @@ from ..data.chain_names import get_chain_prefix, multiplying_prefix
 # embedded chain heteroatom cites its bonding number after the locant
 # (``...lambda<n>...``); standard valences emit the bare locant (byte-identical).
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
+from ..data.locant_text import render_locants
 
 # ============================================================================
 # Replacement term table (IUPAC, Table 2.3)
@@ -466,7 +467,7 @@ def _format_substituent_prefix(placed: List[Tuple[int, str]]) -> str:
     for name in sorted(by_name):
         locs = sorted(by_name[name])
         from ..assembly.naming_utils import multiplied_component as _mc
-        parts.append(f"{','.join(str(l) for l in locs)}-{_mc(len(locs), name, name)}")
+        parts.append(f"{render_locants(locs)}-{_mc(len(locs), name, name)}")
     return '-'.join(parts)
 
 
@@ -1600,7 +1601,7 @@ def _build_replacement_name(
     parts = []
     for symbol, locants in sorted_groups:
         term = REPLACEMENT_TERMS[symbol]
-        locant_str = ','.join(
+        locant_str = render_locants(
             format_lambda_token(loc, lambda_by_locant.get(loc)) for loc in locants
         )
         count = len(locants)
@@ -1661,7 +1662,7 @@ def _build_replacement_name(
                           if len(ene_locants) > 1 else '')
             if multiplier:
                 stem += 'a'
-            locs = ','.join(str(loc) for loc in ene_locants)
+            locs = render_locants(ene_locants)
             stem += f'-{locs}-{multiplier}en'
             if not yne_locants:
                 stem += 'e'
@@ -1670,7 +1671,7 @@ def _build_replacement_name(
                           if len(yne_locants) > 1 else '')
             if multiplier and not ene_locants:
                 stem += 'a'
-            locs = ','.join(str(loc) for loc in yne_locants)
+            locs = render_locants(yne_locants)
             stem += f'-{locs}-{multiplier}yne'
         return f'{replacement_prefix}{stem}'
 
@@ -1888,7 +1889,7 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     parts = []
     for symbol, locants in sorted_groups:
         term = REPLACEMENT_TERMS[symbol]
-        locant_str = '' if omit_locants else ','.join(
+        locant_str = '' if omit_locants else render_locants(
             format_lambda_token(loc, lambda_by_locant.get(loc)) for loc in locants)
         count = len(locants)
 

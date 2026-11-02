@@ -60,6 +60,7 @@ from ..metrics.provenance import (  # a lever: breadth flags enter the name_subs
     full_coverage_ctx,
     general_fallback_ctx,
 )
+from ..data.locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -4257,7 +4258,7 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
-        text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
+        text = f"{render_locants(locs)}-{_mc(len(locs), dname, token)}"
         parts.append((citation_key(dname), text))
     parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in parts)
@@ -4591,7 +4592,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
         locs = sorted(locs)
         token = enclose_if_compound(dname)
         text = _mc(len(locs), dname, token) if _dinuclear_omit else \
-            f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
+            f"{render_locants(locs)}-{_mc(len(locs), dname, token)}"
         parts.append((alpha_sort_key(dname), text))
     parts.sort(key=lambda x: x[0])
     if _dinuclear_omit and len(parts) >= 2:

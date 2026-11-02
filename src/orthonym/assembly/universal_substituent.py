@@ -166,6 +166,7 @@ from rdkit import Chem
 from rdkit.Chem import inchi
 
 from ..data.chain_names import get_alkyl_name, get_chain_name, multiplying_prefix
+from ..data.locant_text import render_locants
 from ..perception.ions import get_ion_sites
 from ..perception.rings import get_ring_systems
 from ..perception.stereo import assign_stereochemistry
@@ -2885,7 +2886,7 @@ def _polyradical_name(parent_name: str, centres: FrozenSet[int], atom_to_locant:
     if first in centres and atom_to_locant[first] in locants:   # the valence of ``first`` is cited first
         locants.remove(atom_to_locant[first])
         locants.insert(0, atom_to_locant[first])
-    return f"{parent_name}-{','.join(_locant_display(loc) for loc in locants)}-{multiplying_prefix(len(locants))}yl"
+    return f"{parent_name}-{render_locants(_locant_display(loc) for loc in locants)}-{multiplying_prefix(len(locants))}yl"
 
 
 def _poly_radical_host(ctx: _Ctx, component: FrozenSet[int]):
@@ -3874,7 +3875,7 @@ def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, 
         term = REPLACEMENT_TERMS[el]
         count = len(entries)
         mult = multiplying_prefix(count) if count > 1 else ""
-        locant_str = ",".join(format_lambda_token(loc, lam) for loc, lam in entries)
+        locant_str = render_locants(format_lambda_token(loc, lam) for loc, lam in entries)
         parts.append(f"{locant_str}-{mult}{term}")
     return "-".join(parts)
 
@@ -4687,7 +4688,7 @@ def _resolve_internal_oxide_suffix(
         mult = _MULT_SIMPLE.get(n)
         if mult is None:
             return None, frozenset()  # multiplicity beyond the simple table
-    text = "-" + ",".join(map(str, locants)) + "-" + mult + "ium"
+    text = "-" + render_locants(locants) + "-" + mult + "ium"
     return text, frozenset(ids)
 
 

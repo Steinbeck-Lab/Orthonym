@@ -349,7 +349,7 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
         if count == 1:
             prefix_parts.append(f"{locants[0]}-{enclosed}")
         else:
-            locant_str = ",".join(str(loc) for loc in locants)
+            locant_str = render_locants(locants)
             from ..assembly.naming_utils import multiplied_component as _mc
             prefix_parts.append(f"{locant_str}-{_mc(count, name, enclosed)}")
 

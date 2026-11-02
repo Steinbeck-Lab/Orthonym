@@ -25,6 +25,7 @@ from ..data.chain_names import get_chain_prefix, multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..data.sugar_names import sugar_to_glycosyloxy_prefix
 from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+from ..data.locant_text import render_locants
 
 logger = logging.getLogger(__name__)
 
@@ -437,7 +438,7 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
     if n_acyl == 3:
         attach = "propane-1,2,3-triyl"
     elif n_acyl == 2:
-        attach = f"propane-{','.join(str(x) for x in acyl_locants)}-diyl"
+        attach = f"propane-{render_locants(acyl_locants)}-diyl"
     else:  # 1
         loc = acyl_locants[0]
         attach = "propyl" if loc == 1 else f"propan-{loc}-yl"
@@ -464,7 +465,7 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
         _parts = []
         for _aname in _ordered:
             _locs = sorted(_groups[_aname])
-            _loc_str = ",".join(str(x) for x in _locs)
+            _loc_str = render_locants(_locs)
             _word = _multiplied_acylate(_aname, len(_locs), substituted_by_loc[_locs[0]])
             if len(_locs) == 1 and (_aname.startswith("(") or _aname[:1].isdigit()):
                 # A single anion that carries its own stereodescriptor is enclosed
@@ -535,7 +536,7 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
     if oh_atoms:
         locs = sorted(num[a] for a in oh_atoms)
         mult = multiplier_table(3, one="")[len(locs)]
-        rendered = f"{','.join(str(x) for x in locs)}-{mult}hydroxy"
+        rendered = f"{render_locants(locs)}-{mult}hydroxy"
         subs.append(("hydroxy", rendered))
     for a in glyco_atoms:
         anomer, config, base = atom_site[a][2]

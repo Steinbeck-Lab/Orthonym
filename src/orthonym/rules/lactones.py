@@ -36,6 +36,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
 )
 from ..rules.heterocycles import build_hw_name
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..data.locant_text import render_locants
 
 # ---------------------------------------------------------------------------
 # Lactone detection
@@ -349,7 +350,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     # through the SAME elision rule as every other branch here ('ene' + a
     # vowel-initial suffix elides its terminal 'e': tridec-10-en-2-one).
     locs = sorted(ene_locants)
-    loc_str = ",".join(str(l) for l in locs)
+    loc_str = render_locants(locs)
     mult = multiplier_table(6, one="").get(len(locs))
     if mult is None:
         return None  # more double bonds than this namer enumerates -> fail closed
@@ -753,7 +754,7 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     if mult is None:
         return None
     suffix = f"{mult}one"  # 'dione' / 'trione' (consonant-initial: no elision)
-    loc_str = ",".join(str(x) for x in c_locs)
+    loc_str = render_locants(c_locs)
     stem = parent[:-1] if (parent.endswith("e") and suffix[0] in _ELISION_VOWELS) else parent
     core = f"{stem}-{loc_str}-{suffix}"
 
@@ -791,7 +792,7 @@ def name_cyclic_polyester(mol) -> Optional[str]:
         for nm in sorted(groups, key=alpha_sort_key):
             locs = sorted(groups[nm])
             from ..assembly.naming_utils import multiplied_component as _mc
-            parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), nm, nm)}")
+            parts.append(f"{render_locants(locs)}-{_mc(len(locs), nm, nm)}")
         prefix = "-".join(parts)
 
     if prefix:

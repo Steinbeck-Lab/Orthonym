@@ -35,6 +35,7 @@ from typing import Dict, List, Optional, Set
 from rdkit import Chem
 from ..data.multipliers import multiplier_table
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..data.locant_text import render_locants
 
 
 def name_acyclic_polyol_polyester(mol) -> Optional[str]:
@@ -302,7 +303,7 @@ def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str
         mult = '' if len(locs) == 1 else table.get(len(locs))
         if mult is None:
             return None
-        loc_str = ','.join(str(x) for x in locs)
+        loc_str = render_locants(locs)
         from ..assembly.naming_utils import multiplied_component as _mc
         parts.append(f"{loc_str}-{_mc(len(locs), tok, tok)}")
     prefix_str = '-'.join(parts)
@@ -313,7 +314,7 @@ def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str
         len(ol_locs))
     if ol_mult is None:
         return None
-    loc_str = ','.join(str(x) for x in ol_locs)
+    loc_str = render_locants(ol_locs)
     suffix = f"-{loc_str}-{ol_mult}ol"
 
     # (a) (the Blue Book): the parent's final 'e' is elided before

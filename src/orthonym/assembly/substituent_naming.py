@@ -602,12 +602,12 @@ def _build_alkenyl_name(
 
     segments = []
     if double_locants:
-        loc_str = ",".join(str(l) for l in double_locants)
+        loc_str = render_locants(double_locants)
         mult = simple_multiplier_word(num_double) or ""
         segments.append((loc_str, mult, "en"))
 
     if triple_locants:
-        loc_str = ",".join(str(l) for l in triple_locants)
+        loc_str = render_locants(triple_locants)
         mult = simple_multiplier_word(num_triple) or ""
         segments.append((loc_str, mult, "yn"))
 
@@ -1004,7 +1004,7 @@ def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
             # ``oxo_hosts`` is non-empty here (refused above otherwise) and every host counts at
             # least once, so ``oxo_locs`` has an entry: the count is never 0.
             _M = multiplier_table(4, one="")
-            ostr = f"{','.join(map(str, oxo_locs))}-{multiplying_prefix(len(oxo_locs), table=_M)}oxo"
+            ostr = f"{render_locants(oxo_locs)}-{multiplying_prefix(len(oxo_locs), table=_M)}oxo"
             best = (key, f"{ostr}{stem}", pos)            # '3-oxo' + 'prop-1-en-2-yl'
     if not best:
         return None
@@ -1441,7 +1441,7 @@ def _name_saturated_substituted_chain(
     part_strings = []
     for prefix in sorted(groups.keys()):
         locs = sorted(groups[prefix])
-        loc_str = ",".join(str(loc) for loc in locs)
+        loc_str = render_locants(locs)
         mult = _MULT[len(locs)] if len(locs) in _MULT else (simple_multiplier_word(len(locs)) or "")
         part_strings.append(f"{loc_str}-{mult}{prefix}")
 
@@ -3659,7 +3659,7 @@ def _unsaturated_substituent_name(
         return None
 
     # Build the ene stem: mono -> 'prop-1-en'; poly -> euphonic-'a' 'penta-1,3-dien'.
-    eloc_str = ",".join(str(x) for x in ene_locs)
+    eloc_str = render_locants(ene_locs)
     from .composition_primitives import bond_locant_omitted_on_dinuclear_chain
     if bond_locant_omitted_on_dinuclear_chain(stem, ene_locs, []):
         # (d) (the Blue Book): a two-carbon chain has one place for
@@ -3800,7 +3800,7 @@ def _located_prefix_part(prefix: str, locants, *, cite_locants: bool = True) -> 
     head = multiplied_component(len(locs), prefix, prefix)
     if not cite_locants:
         return head
-    return f"{','.join(str(loc) for loc in locs)}-{head}"
+    return f"{render_locants(locs)}-{head}"
 
 
 def _ether_chain_locants_omitted(mol, sub_atoms, backbone, groups,
@@ -4413,7 +4413,7 @@ def _name_ether_substituted_chain(
             marked = prefix
         head = multiplied_component(n_occ, prefix, marked)
         if cite_locants:
-            loc_str = ",".join(str(loc) for loc in locs)
+            loc_str = render_locants(locs)
             part_strings.append(f"{loc_str}-{head}")
         else:
             part_strings.append(head)

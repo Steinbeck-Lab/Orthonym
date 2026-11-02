@@ -52,7 +52,7 @@ def amplification_block(placed: Tuple[Placed, ...]) -> Optional[str]:
         groups = {}
         for p in items:
             groups.setdefault(p.cited, []).append(p.locant)
-        text = render_locants(render_locants(sorted(locs)) + "(" + ",".join(_loc(x) for x in cited) + ")"
+        text = render_locants(render_locants(sorted(locs)) + "(" + render_locants(_loc(x) for x in cited) + ")"
                         for cited, locs in sorted(groups.items(), key=lambda kv: min(kv[1])))
         multiplied = _multiplied_amplificant(items[0].amp.hydride.prefix, len(items))
         if multiplied is None:
@@ -85,7 +85,7 @@ def skeleton_word(skel: PhaneSkeleton) -> Optional[str]:
 
 
 def _locs(locants: Sequence) -> str:
-    return ",".join(map(str, locants))
+    return render_locants(locants)
 
 
 def _mult(locants: Sequence) -> Optional[str]:

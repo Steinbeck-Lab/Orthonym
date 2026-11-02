@@ -3,6 +3,7 @@ from typing import Dict
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
 from .ions import (
     _anion_name_keeps_hydron_sites,
     _carboxyl_ring_anchor,
@@ -98,7 +99,7 @@ def name_ring_acid_salt_anion(mol, anion_site: Dict) -> str:
             mult = get_suffix_multiplier_prefix(k, 'carboxylate') if k > 1 else ''
         except ValueError:
             return ''
-        name = (f"{_join_prefix_stem(prefix, stem)}-{','.join(str(x) for x in locs)}"
+        name = (f"{_join_prefix_stem(prefix, stem)}-{render_locants(locs)}"
                 f"-{mult}carboxylate")
     return name if _anion_name_keeps_hydron_sites(mol, name) else ''
 

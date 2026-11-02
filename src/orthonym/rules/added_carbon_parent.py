@@ -36,6 +36,7 @@ from ..data.multipliers import multiplier_table
 from ..perception.chains import find_longest_carbon_chain
 from .seniority import SUFFIX_FORMS
 from ..perception.molcache import inchikey_of
+from ..data.locant_text import render_locants
 
 # Principal-group FG names that take an added-carbon ``carbo*`` suffix form and
 # whose match tuple carries the carbonyl/nitrile carbon at index 0. The value is
@@ -389,7 +390,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             if omit_locants:
                 parts.append(_mc(len(locs), nm, disp))
             else:
-                locstr = ",".join(str(x) for x in locs)
+                locstr = render_locants(locs)
                 parts.append(f"{locstr}-{_mc(len(locs), nm, disp)}")
         #: hyphen-join the ordered prefix fragments.
         prefix_str = "-".join(parts) if len(parts) > 1 else parts[0]
@@ -403,7 +404,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         emult = multiplier_table(4, one="").get(len(elocs))
         if emult is None:
             return None
-        eloc_str = ",".join(str(x) for x in elocs)
+        eloc_str = render_locants(elocs)
         from ..assembly.composition_primitives import bond_locant_omitted_on_dinuclear_chain
         if bond_locant_omitted_on_dinuclear_chain(stem, elocs, []):
             # Dinuclear chain: the double bond can only be 1-2, so its locant is omitted
@@ -422,7 +423,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     if length == 1:
         name = f"{stereo_prefix}{prefix_str}{parent_core}{multiplier}{carbo}"
     else:
-        locant_str = ",".join(str(x) for x in suffix_locants)
+        locant_str = render_locants(suffix_locants)
         name = f"{stereo_prefix}{prefix_str}{parent_core}-{locant_str}-{multiplier}{carbo}"
 
     # Gate-INDEPENDENT re-anchor for the NEW unsaturated branch only (saturated path

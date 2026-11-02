@@ -10,6 +10,7 @@ molecule here and cited after the locant.
 import re
 from typing import Dict, Optional
 
+from ..data.locant_text import render_locants
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 
 _GROUP = re.compile(r"(\d+(?:,\d+)*)-((?:di|tri|tetra|penta|hexa)?[a-z]+a)")
@@ -37,7 +38,7 @@ def lambda_hetero_prefix(mol, hetero_prefix: str, atom_to_locant: Dict[int, int]
     for m in groups:
         locants = [int(x) for x in m.group(1).split(",")]
         cited.update(locants)
-        parts.append(",".join(format_lambda_token(loc, lam.get(loc)) for loc in locants) + "-" + m.group(2))
+        parts.append(render_locants(format_lambda_token(loc, lam.get(loc)) for loc in locants) + "-" + m.group(2))
     if not set(lam) <= cited:
         return None  # a lambda atom the prefix does not cite is no heteroatom of it
     return "-".join(parts) + ("-" if hetero_prefix.endswith("-") else "")

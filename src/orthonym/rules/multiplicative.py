@@ -292,7 +292,7 @@ def _central_arene_substituent_name(
     locs = _lowest_locant_set(ring_cyclic, attach_set)
     if not locs:
         return None
-    loc_str = ",".join(str(loc) for loc in locs)
+    loc_str = render_locants(locs)
     n = len(attach_set)
     if n == 2:
         return f"{loc_str}-phenylene"
@@ -1115,7 +1115,7 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
     prefix_parts = []
     for sub_name in sorted(by_name):
         locs = by_name[sub_name]
-        loc_str = ','.join(str(x) for x in locs)
+        loc_str = render_locants(locs)
         if len(locs) > 1:
             m = SIMPLE_MULTIPLIERS.get(len(locs))
             if m is None:
@@ -3877,7 +3877,7 @@ def _attachment_anchored_benzene_unit(
     for sname in sorted(by_name):
         locs = sorted(by_name[sname])
         mult = multiplying_prefix(len(locs)) if len(locs) > 1 else ''
-        parts.append(f"{','.join(str(l) for l in locs)}-{mult}{sname}")
+        parts.append(f"{render_locants(locs)}-{mult}{sname}")
     return ('-'.join(parts) + 'benzene', 1)
 
 

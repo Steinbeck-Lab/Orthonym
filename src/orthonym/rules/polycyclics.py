@@ -60,6 +60,7 @@ from .hydrocarbon_series import (
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..data.locant_text import render_locants
 
 
 def _pah_entry(pah_name: str) -> Optional[Dict[str, Any]]:
@@ -1747,7 +1748,7 @@ def name_substituted_polycyclic(
         # Build suffix with locant(s)
         count = len(chosen_locants)
         multiplier = get_suffix_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
-        locant_str = ",".join(str(loc) for loc in chosen_locants)
+        locant_str = render_locants(chosen_locants)
 
         # Assemble: prefix-part + parent-locant-suffix
         # e.g., "naphthalene-2-carboxylic acid", "3-chloronaphthalene-2-carbaldehyde"
@@ -2124,7 +2125,7 @@ def _assemble_partially_saturated_carbocycle_name(
         if _mult is None:
             return None  # too many suffix groups for this scoped path
         _stem, _elides = _PARTIAL_SAT_PCG_SUFFIX[pcg_kind]
-        _loc_str = ",".join(_locant_display(l) for l in pcg_locants)
+        _loc_str = render_locants(_locant_display(l) for l in pcg_locants)
         pcg_suffix = f"-{_loc_str}-{_mult}{_stem}"
         # (a): elide the parent's terminal 'e' before a vowel-initial
         # suffix. A multiplying prefix ('di', 'tri', 'tetra') is

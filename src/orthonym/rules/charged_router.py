@@ -73,6 +73,7 @@ from .azaniumyl_zwitterions import fully_ionised_azaniumyl_zwitterion
 from .ester_zwitterions import phosphodiester_zwitterion_name
 from .olate_anions import olate_anion_name, olate_on_nitrogen_must_read_back
 from .ring_position_kinds import one_kind_of_substitutable_position
+from ..data.locant_text import render_locants
 
 # =============================================================================
 # The charged route sets no size limit. Its re-entry of the full naming pipeline
@@ -1676,7 +1677,7 @@ def _name_poly_diazonium(mol, cation_indices, style: str) -> str:
     mult = COMPLEX_MULTIPLIERS.get(len(locs))
     if not mult:
         return ''
-    name = f"{parent}-{','.join(map(str, locs))}-{mult}(diazonium)"
+    name = f"{parent}-{render_locants(locs)}-{mult}(diazonium)"
     # 6. 0-wrong RT-gate (ring-numbering coupling can differ from the parent
     # name's own numbering on an exotic heteroarene): ship only if it parses
     # back to the input structure.

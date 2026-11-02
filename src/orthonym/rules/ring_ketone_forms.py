@@ -12,6 +12,8 @@ the ring as drawn is ``rules.fused_forms.fused_system_form``'s; this module rout
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
+from ..data.locant_text import render_locants
+
 
 def has_exocyclic_multiple_bond(mol, ring_atoms) -> bool:
     """True when a ring atom carries a double or triple bond to an atom outside the ring."""
@@ -48,7 +50,7 @@ def decorated_ketone_fused_name(mol, ring_atoms, attach, decorations: List[Tuple
         locs = sorted(locs)
         if _DECO_MULT.get(len(locs)) is None:
             return None
-        parts.append((alpha_sort_key(name), f"{','.join(str(loc) for loc in locs)}-"
+        parts.append((alpha_sort_key(name), f"{render_locants(locs)}-"
                       f"{multiplied_component(len(locs), name, enclose_if_compound(name))}"))
     parts.sort(key=lambda part: part[0])
     sep = '-' if (tail[:1].isdigit() or begins_with_italic_designator(tail)) else ''
