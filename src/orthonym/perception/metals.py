@@ -27,7 +27,7 @@ from typing import FrozenSet, List, Optional, Tuple
 
 from rdkit import Chem
 
-from ..data.metal_scope import (BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION, DATIVE, DISCONNECT,
+from ..data.metal_scope import (BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION, DATIVE, DISCONNECT, GROUP_13_HYDRIDE_METALS,
                                 GROUP_1, GROUP_2, ION_SALTS, has_mechanism, has_valence)
 from ..data.organometallics import TERMINAL_LIGAND_PREFIXES
 from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
@@ -939,10 +939,11 @@ def connect_anion_to_organometal_cation_sites(mol: "Chem.Mol") -> Optional[List[
     """
     if mol is None:
         return None
-    # the true metals, and a Group 14 metal that the table admits to CONNECT_ANION (tin, lead: the bonded drawing
-    # is a substituted stannane or plumbane,
+    # the true metals, and a Group 14 or 13 metal that the table admits to CONNECT_ANION (tin, lead, aluminium,...:
+    # the bonded drawing is a substituted stannane, plumbane or alumane,,
     metals = [a for a in atoms_of(mol) if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO
-              or (a.GetSymbol() in ('Sn', 'Pb') and has_mechanism(a.GetSymbol(), CONNECT_ANION))]
+              or (a.GetSymbol() in ('Sn', 'Pb') + GROUP_13_HYDRIDE_METALS
+                  and has_mechanism(a.GetSymbol(), CONNECT_ANION))]
     cations = [a for a in metals if a.GetFormalCharge() > 0]
     if len(cations) != 1 or any(a.GetDegree() for a in metals if a.GetIdx() != cations[0].GetIdx()):
         return None

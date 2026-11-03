@@ -246,9 +246,18 @@ def test_a_demoted_group_keeps_the_name_it_had(smiles, name):
     assert name_breadth(smiles).get("name") == name
 
 
+@pytest.mark.parametrize("smiles,name", [
+    ("NC(=O)CC(=O)NO", "N1-hydroxypropanediamide"),             # a hydroxamic acid beside an amide is a diamide
+    ("ONC(=O)CCCCCCC(=O)NO", "N1,N8-dihydroxyoctanediamide"),   # two hydroxamic acids, N1,N8 locants
+])
+def test_hydroxamic_acids_of_one_chain_are_a_diamide(smiles, name):
+    """ (the Blue Book): hydroxamic acids "are named as N-hydroxy amides"; with another amide group
+    on the same chain the chain is a diamide,:18875, the parent with the most principal groups)."""
+    row = Orthonym().name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+
+
 @pytest.mark.parametrize("smiles", [
-    "NC(=O)CC(=O)NO",                 # a hydroxamic acid beside an amide is a diamide,:18875)
-    "ONC(=O)CCCCCCC(=O)NO",           # two hydroxamic acids: N1,N8 locants, not built
     "ONC(=O)CCC(=O)O",                # under a senior acid
     "ONC(=O)N",                       # a carbonic acid derivative
     "CC(=NCCO)O",                     # a group on the N that has a group of its own

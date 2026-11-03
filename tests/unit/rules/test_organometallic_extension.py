@@ -51,8 +51,9 @@ _CONTROLS = [
     ("C[Zn]C", "dimethylzinc"),
     ("CC[Zn]CC", "diethylzinc"),
     ("C[Mg]Cl", "methylmagnesium chloride"),
-    # SPELLING (the Blue Book): "aluminium not aluminum"
-    ("C[Al](C)C", "trimethylaluminium"),
+    # (the Blue Book): the Group 13 metals are named on their preselected hydrides,
+    # "trimethylalumane for (CH3)3Al" (:1671,:2901)
+    ("C[Al](C)C", "trimethylalumane"),
     ("C[Na]", "methylsodium"),
     ("C[Hg]C", "dimethylmercury"),
     ("O=O", "dioxygen"),

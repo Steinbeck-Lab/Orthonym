@@ -1026,6 +1026,23 @@ def inject_stereo_from_locant_map(
     return f"{prefix}{name}"
 
 
+def _block_repeats_a_locant(name: str) -> bool:
+    """Whether the leading stereodescriptor block of ``name`` cites one locant with two different descriptors
+    ('(1S,1R,1Z)-'): OPSIN's own numbering gives the atoms of several substituents the locant 1, and such a block
+    rests on the order of reading, never on the position of a stereogenic unit, the Blue Book; every
+    one was refused by the round trip, so the check spares the OPSIN call). A locant repeated with one descriptor
+    ('(1S,1'S,1'S,...)') is left to the round trip."""
+    m = re.match(r"\(([^()]*)\)-", name)
+    if not m:
+        return False
+    seen: Dict[str, str] = {}
+    for part in m.group(1).split(","):
+        found = re.fullmatch(r"(.*?)([A-Za-z*]+)", part)
+        if found and found.group(1) and seen.setdefault(found.group(1), found.group(2)) != found.group(2):
+            return True
+    return False
+
+
 def inject_stereo_reanchored_rt_gated(
     base_name: str,
     mol,
@@ -1088,7 +1105,7 @@ def inject_stereo_reanchored_rt_gated(
             base_name, mol, rmap,
             include_near_parent_ez=include_near_parent_ez,
         )
-        if candidate_b != candidate_a:
+        if candidate_b != candidate_a and not _block_repeats_a_locant(candidate_b):
             try:
                 if opsin_roundtrip_check(input_smiles, candidate_b)["passed"]:
                     logger.debug(

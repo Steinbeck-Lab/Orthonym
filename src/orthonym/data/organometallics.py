@@ -59,12 +59,15 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
     'Sr': {'direct': 'strontium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Ba': {'direct': 'barium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Ra': {'direct': 'radium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
-    # Group 13 (metal-direct except B which uses hydride-parent 'borane')
+    # Group 13 on the parent hydrides: (the Blue Book) "the systematic names alumane, gallane,
+    # indigane and thallane are preselected names", used in general nomenclature; 'trimethylalumane' (:2901),
+    # 'diethylalumanol' (:27236). A centre that is not the hydride's derivative (a radical, an ion) keeps the
+    # metal name (``rules.organometallics``).
     'B':  {'direct': 'boron',     'hydride_parent': 'borane',    'naming_system': 'hydride_parent'},
-    'Al': {'direct': 'aluminium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
-    'Ga': {'direct': 'gallium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
-    'In': {'direct': 'indium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
-    'Tl': {'direct': 'thallium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Al': {'direct': 'aluminium', 'hydride_parent': 'alumane',   'naming_system': 'hydride_parent'},
+    'Ga': {'direct': 'gallium',   'hydride_parent': 'gallane',   'naming_system': 'hydride_parent'},
+    'In': {'direct': 'indium',    'hydride_parent': 'indigane',  'naming_system': 'hydride_parent'},
+    'Tl': {'direct': 'thallium',  'hydride_parent': 'thallane',  'naming_system': 'hydride_parent'},
     # Group 14 (hydride-parent per IUPAC
     'Si': {'direct': 'silicon',   'hydride_parent': 'silane',    'naming_system': 'hydride_parent'},
     'Ge': {'direct': 'germanium', 'hydride_parent': 'germane',   'naming_system': 'hydride_parent'},

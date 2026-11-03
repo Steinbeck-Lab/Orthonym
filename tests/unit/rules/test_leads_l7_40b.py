@@ -123,6 +123,7 @@ class TestLOmissionLicenceIsPerPeptide:
 
     @pytest.mark.opsin_gate
     def test_pipeline_emits_the_corrected_spelling(self):
+        # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN, so the pipeline ships that; the residue spelling is checked on the assembler above
         r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(GLU_ORN)
-        assert r["name"] == "L-glutamyl-L-ornithine", r
-        assert r["tier"] == "systematic_verified", r  # no PIN claim: gives no PINs here
+        assert r["name"] == "(4S)-4-amino-5-{[(1S)-4-amino-1-carboxybutyl]amino}-5-oxopentanoic acid", r
+        assert r["tier"] == "pin_verified", r

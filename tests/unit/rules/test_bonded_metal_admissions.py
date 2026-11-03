@@ -21,8 +21,8 @@ names") and to the halides beside a multiply bonded ligand ('dichloro(methyliden
 import pytest
 
 from orthonym.cli import _tiered_namer
-from orthonym.data.metal_scope import (ALL_MECHANISMS, BONDED_METAL_VALENCES, METAL_SCOPE,
-                                       MORE_BONDED_METAL_VALENCES, has_valence, is_complete_metal)
+from orthonym.data.metal_scope import (ALL_MECHANISMS, BONDED_METAL_VALENCES, GROUP_13_HYDRIDE_METALS, METAL_SCOPE,
+                                       MORE_BONDED_METAL_VALENCES, PARENT_HYDRIDE_IONS, has_valence, is_complete_metal)
 from tests.support.rt_assert import name_best_effort, name_is_rt_exact, smiles_without_dative_bonds
 
 pytestmark = pytest.mark.opsin_gate
@@ -70,11 +70,13 @@ def test_pin_tier_ships_no_pin(smiles, _expected):
     assert _tiered_namer("pin", "pin").name_tiered(smiles)["tier"] != "pin_verified"
 
 
-def test_trimethylaluminium_is_spelled_as_the_book_asks():
-    """ SPELLING (the Blue Book): "aluminium not aluminum"; OPSIN reads both spellings to one structure."""
-    res = name_best_effort("C[Al](C)C")
-    assert res["name"] == "trimethylaluminium", res
-    assert name_is_rt_exact(res["name"], "C[Al](C)C")
+def test_aluminium_is_spelled_as_the_book_asks():
+    """ SPELLING (the Blue Book): "aluminium not aluminum", in the metal name of a centre that is no
+    derivative of alumane (a radical); the neutral R3Al is 'trimethylalumane',:2901)."""
+    for smiles, name in (("C[Al]c1ccccc1", "methyl(phenyl)aluminium"), ("C[Al](C)C", "trimethylalumane")):
+        res = name_best_effort(smiles)
+        assert res["name"] == name, res
+        assert name_is_rt_exact(res["name"], smiles)
 
 
 def test_the_salt_of_an_acid_takes_the_label_zinc_takes():
@@ -90,7 +92,9 @@ def test_the_table_admits_the_eight_metals_to_every_mechanism():
     assert sorted(BONDED_METAL_VALENCES) == ["Al", "Hg", "Pd", "Pt", "Ru", "Ti", "V", "W"]
     assert METAL_SCOPE["Zn"].mechanisms == ALL_MECHANISMS
     for symbol, valences in BONDED_METAL_VALENCES.items():
-        assert METAL_SCOPE[symbol].mechanisms == ALL_MECHANISMS, symbol
+        # aluminium takes the cations of alumane as well, the Blue Book)
+        extra = {PARENT_HYDRIDE_IONS} if symbol in GROUP_13_HYDRIDE_METALS else set()
+        assert METAL_SCOPE[symbol].mechanisms == ALL_MECHANISMS | extra, symbol
         assert METAL_SCOPE[symbol].valences == frozenset(valences), symbol
         assert is_complete_metal(symbol) is False, symbol      # eta and multiply bonded ligands have no producer yet
     assert has_valence("Pt", 4) is True and has_valence("Pt", 3) is False

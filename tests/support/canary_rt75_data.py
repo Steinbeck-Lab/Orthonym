@@ -334,7 +334,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",
-        "L-aspartyl-L-seryl-L-serine",
+        "(3S)-3-amino-4-{[(2S)-1-{[(1S)-1-carboxy-2-hydroxyethyl]amino}-3-hydroxy-1-oxopropan-2-yl]amino}-4-oxobutanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-aspartyl-L-seryl-L-serine' (known-defect name 'aspartylserylserine')
     ),
     (
         "N[C@@H](Cc1ccc(Br)cc1)C(=O)O",
@@ -1329,7 +1329,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](CS)C(=O)O",
-        "L-glutamyl-L-threonyl-L-cysteine",
+        "(4S)-4-amino-5-{[(2S,3R)-1-{[(1R)-1-carboxy-2-sulfanylethyl]amino}-3-hydroxy-1-oxobutan-2-yl]amino}-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-glutamyl-L-threonyl-L-cysteine' (known-defect name 'glutamylthreonylcysteine')
     ),
     (
         "CC/C=C/CCCC(=O)CCCCCC(=O)O",
@@ -2068,7 +2068,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O",  # acyclic,polyfunctional,medium
-        "glycyl-L-aspartyl-L-alanine",
+        "(3S)-3-(2-aminoacetamido)-4-{[(1S)-1-carboxyethyl]amino}-4-oxobutanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'glycyl-L-aspartyl-L-alanine' (known-defect name 'glycylaspartylalanine')
     ),
     (
         "CC1CCC2C(C(=O)O)=CC3CC(C)(C)CC132",  # fused-ring,medium
@@ -2341,7 +2341,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-glutaminyl-L-glutamyl-L-alanine",
+        "(4S)-5-{[(1S)-1-carboxyethyl]amino}-4-[(2S)-2,5-diamino-5-oxopentanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-glutaminyl-L-glutamyl-L-alanine' (known-defect name 'glutaminylglutamylalanine')
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -2461,7 +2461,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-glutaminyl-L-glutamyl-L-valine",
+        "(4S)-5-{[(S)-1-carboxy-2-methylpropyl]amino}-4-[(2S)-2,5-diamino-5-oxopentanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-glutaminyl-L-glutamyl-L-valine' (known-defect name 'glutaminylglutamylvaline')
     ),
     (
         "Fc1ccc(Br)cc1",  # aromatic,small
@@ -2517,7 +2517,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCC(=O)N[C@@H](CCC(=O)O)C(=O)NCC(=O)O",  # acyclic,polyfunctional,medium
-        "glycyl-L-glutamylglycine",
+        "(4S)-4-(2-aminoacetamido)-5-[(carboxymethyl)amino]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'glycyl-L-glutamylglycine' (known-defect name 'N-(glycylglutamyl)glycine')
     ),
     (
         "CC(C)CCC(=O)O",  # acyclic,small
@@ -2655,7 +2655,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CCC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-glutamyl-L-lysyl-L-threonine",
+        "(4S)-4-amino-5-{[(2S)-6-amino-1-{[(1S,2R)-1-carboxy-2-hydroxypropyl]amino}-1-oxohexan-2-yl]amino}-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-glutamyl-L-lysyl-L-threonine' (known-defect name 'glutamyllysylthreonine')
     ),
     (
         "OCC(O)C(O)C(O)C(O)C(O)C(O)CO",  # acyclic,medium
@@ -2759,7 +2759,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-asparaginyl-L-glutamyl-L-leucine",
+        "(4S)-5-{[(S)-1-carboxy-3-methylbutyl]amino}-4-[(2S)-2,4-diamino-4-oxobutanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-asparaginyl-L-glutamyl-L-leucine' (known-defect name 'asparaginylglutamylleucine')
     ),
     (
         "CC(C)CC1C(=O)N2CC(C)CC2C(=O)NC(C(C)C)C(=O)OC(C(C)C)C(=O)N2NCCCC2C(=O)N2NCC(O)CC2C(=O)N1C",  # heterocycle,fused-ring,polyfunctional,large
@@ -2787,7 +2787,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)N[C@@H](CS)C(=O)O",  # acyclic,polyfunctional,small
-        "L-aspartyl-L-cysteine",
+        "(3S)-3-amino-4-{[(1R)-1-carboxy-2-sulfanylethyl]amino}-4-oxobutanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-aspartyl-L-cysteine' (known-defect name 'aspartylcysteine')
     ),
     (
         "CC1=C(O)C(=O)[C@H](O)[C@H](O)C1",  # small

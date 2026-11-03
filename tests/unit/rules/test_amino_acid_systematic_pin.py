@@ -66,9 +66,11 @@ def test_without_a_systematic_name_the_retained_name_ships_below_the_pin(monkeyp
         assert Orthonym().name_tiered(smiles)["limit_code"] == "NO_VERIFIED_PIN", smiles
 
 
-def test_a_peptide_keeps_its_residue_names():
+def test_a_peptide_gets_its_systematic_pin():
+    # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN; the amino-acid offer is not what names it
     row = _best_effort().name_tiered("C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)CN)C(=O)O")
-    assert row["name"] == "glycylglutamylalanine"
+    assert (row["name"], row["tier"]) == (
+        "(4S)-4-(2-aminoacetamido)-5-{[(1S)-1-carboxyethyl]amino}-5-oxopentanoic acid", "pin_verified"), row
 
 
 def test_the_offer_is_only_for_the_whole_molecule():

@@ -32,12 +32,28 @@ _DIAMIDE_PRINCIPAL_GROUPS = ('primary_amide', 'secondary_amide')
 
 
 def _collect_amide_matches(features: Any) -> List[tuple]:
-    """Union of primary_amide + secondary_amide SMARTS matches."""
+    """Union of primary_amide + secondary_amide SMARTS matches whose carbonyl carbon is a principal-chain atom: an
+    amide of an N-substituent is named inside that substituent's prefix ('[1-(methylamino)-1-oxobutan-2-yl]'), as
+     picks the chain with the most amide groups as the parent."""
     fgs = getattr(features, 'functional_groups', None) or {}
+    chain = set(getattr(features, 'principal_chain', None) or ())
     matches: List[tuple] = []
     matches.extend(fgs.get('primary_amide', []) or [])
     matches.extend(fgs.get('secondary_amide', []) or [])
-    return matches
+    return [m for m in matches if m[0] in chain]
+
+
+def _carboxamide_off_the_chain(features: Any) -> bool:
+    """An amide off the principal chain whose carbonyl carbon is bonded to a chain atom: it can be a '-carboxamide'
+    suffix of a chain that carries more amide groups ('N1-ethyl-N'1,N3-dimethylpropane-1,1,3-tricarboxamide (PIN)',
+    , so the chain is no diamide parent. An amide inside an N-substituent is no such group."""
+    fgs = getattr(features, 'functional_groups', None) or {}
+    chain = set(getattr(features, 'principal_chain', None) or ())
+    mol = features.mol
+    for m in list(fgs.get('primary_amide', []) or []) + list(fgs.get('secondary_amide', []) or []):
+        if m[0] not in chain and any(nb.GetIdx() in chain for nb in mol.GetAtomWithIdx(m[0]).GetNeighbors()):
+            return True
+    return False
 
 
 def _is_chain_diamide(features: Any) -> bool:
@@ -54,7 +70,7 @@ def _is_chain_diamide(features: Any) -> bool:
         return False
 
     matches = _collect_amide_matches(features)
-    if len(matches) != 2:
+    if len(matches) != 2 or _carboxamide_off_the_chain(features):
         return False
 
     chain = getattr(features, 'principal_chain', None)

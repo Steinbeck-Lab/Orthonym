@@ -1,7 +1,8 @@
 """Is ``namer.py`` calling ``rules.ring_assemblies.detect_hydro_ring_assembly`` (leads R2A)?
 
 The producer of the hydro-modified ring assemblies, is reached from the namer by one
-call in ``Orthonym._classify`` (``proposals/R2A-namer-hydro-assembly.patch``). A test of the engine on a
+call in ``Orthonym._classify`` (``proposals/R2A-namer-hydro-assembly.patch``), whose phases live in
+``classify_parts.py``. A test of the engine on a
 molecule the producer names is an expected failure until that call is in the tree: ``needs_wiring`` says so
 (strict, so it is a failure again once the call is there and the test does not pass).
 
@@ -13,9 +14,10 @@ import inspect
 
 import pytest
 
+import orthonym.classify_parts as _classify_parts_module
 import orthonym.namer as _namer_module
 
-_SOURCE = inspect.getsource(_namer_module)
+_SOURCE = inspect.getsource(_namer_module) + inspect.getsource(_classify_parts_module)
 WIRED = "detect_hydro_ring_assembly" in _SOURCE
 LABEL_WIRED = "hydro_assembly_withheld" in _SOURCE
 

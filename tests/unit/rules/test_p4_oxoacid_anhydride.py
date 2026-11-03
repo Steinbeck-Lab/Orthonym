@@ -65,9 +65,9 @@ class TestLinearPolyanhydrideVerify:
     butanedioic 4-(propanoyloxy)-4-oxobutanoic dianhydride (PIN)' and (2) 'acetic dibutanedioic propanoic
     trianhydride'. The method (2) name describes the molecule and is no PIN, so the default tier (a PIN or a
     decline; a name the book gives no PIN for is systematic_verified at best) declines it, and no tier ships it
-    (OPSIN reads no 'trianhydride', so the wider tiers do not): the method (1) name is not built.
-    This test said the default tier ships the method (2) name, from the days the grammar-gap carve-out shipped
-    every name of the class with no read-back."""
+    (OPSIN reads no 'trianhydride', so the wider tiers do not). The default tier ships the method (1) name
+    (``rules/polyanhydride_method_one.py``, read back through its acids). This test said the default tier ships the
+    method (2) name, from the days the grammar-gap carve-out shipped every name of the class with no read-back."""
 
     SMILES = "CC(=O)OC(=O)CCC(=O)OC(=O)CCC(=O)OC(=O)CC"
 
@@ -78,10 +78,12 @@ class TestLinearPolyanhydrideVerify:
         assert best["name"] and "trianhydride" not in best["name"]
         assert_full_rt(best["name"], self.SMILES)
 
-    def test_the_default_tier_declines_it_with_no_name(self):
+    def test_the_default_tier_ships_the_method_one_name(self):
         from tests.support.default_tier import default_tier_row
         row = default_tier_row(self.SMILES)
-        assert row["tier"] == "abstain" and row["is_pin"] is False, row
+        assert (row["name"], row["tier"]) == (
+            "acetic butanedioic 4-oxo-4-(propanoyloxy)butanoic dianhydride", "pin_verified"), row
+        assert row["verified"] == "opsin_acids", row
 
 
 @pytest.mark.unit

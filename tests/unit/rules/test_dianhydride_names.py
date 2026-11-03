@@ -237,17 +237,20 @@ def test_a_multiplied_acid_is_never_cited_with_di_before_a_locant(smiles, wrong)
 @pytest.mark.parametrize("smiles,name", NO_PIN_POLYANHYDRIDE)
 def test_method_two_of_p65762_is_no_pin(smiles, name):
     """: 'Method (1) generates preferred IUPAC names'; the 'trianhydride' name of method (2) is a
-    correct name that is not the PIN, so the default tier gives it no name (the substitutive method (1) name is
-    not built here) and the best-effort tier gives a name that reads back."""
+    correct name that is not the PIN, so the default tier gives the method (1) dianhydride
+    (``rules/polyanhydride_method_one.py``) and the best-effort tier gives a name that reads back."""
     row = default_tier_row(smiles)
-    assert row["tier"] == "abstain" and row["name"] != name, row
+    assert row["tier"] == "pin_verified" and row["name"] != name and row["name"].endswith(" dianhydride"), row
     best = name_best_effort(smiles)
     assert best["name"] and not is_failure_name(best["name"]) and best["name"] != name, best
     assert_full_rt(best["name"], smiles)
 
 
 # two links whose central acid has two different ends and no locants: the acids do not say which way round it lies,
-# so no dianhydride name is offered and the substitutive spelling of the anhydride (read by OPSIN) names it
+# so no dianhydride name is offered and the substitutive spelling of the anhydride (read by OPSIN) names it at the
+# wider tiers; a name of one class word for two links is no PIN, the Blue Book, "Method (1)
+# generates preferred IUPAC names"; the substituted centre needs the locanted words of:32413), so the default tier
+# declines it
 UNDETERMINED = [
     ("CCCC(=O)OC(=O)C(C)CC(=O)OC(=O)CC", "butanoic 2-methyl-4-oxo-4-(propanoyloxy)butanoic anhydride"),
 ]
@@ -255,9 +258,9 @@ UNDETERMINED = [
 
 @pytest.mark.parametrize("smiles,name", UNDETERMINED)
 def test_a_name_the_acids_do_not_determine_is_not_offered(smiles, name):
-    for row in (default_tier_row(smiles), name_best_effort(smiles)):
-        assert row["name"] == name, row
-        assert row["verified"] == "opsin", row
+    assert default_tier_row(smiles)["tier"] == "abstain"
+    row = name_best_effort(smiles)
+    assert (row["name"], row["tier"], row["verified"]) == (name, "systematic_verified", "opsin"), row
     assert _independent_parse(name, smiles) is not None
 
 

@@ -94,6 +94,23 @@ def get_amide_type(mol, amide_atoms: tuple) -> str:
         return "tertiary"
 
 
+def _n_oxy_substituent(mol, o_idx: int, n_idx: int) -> Optional[Dict]:
+    """``{"atoms", "name", "carbon_count"}`` of the oxygen substituent of an amide nitrogen: 'hydroxy' for a bare
+    -OH, the oxy prefix of the substituent namer for -O-R ('methoxy'), else None."""
+    from ..assembly.substituent_enumerator import name_substituent
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    if o_atom.GetFormalCharge() or o_atom.GetIsotope():
+        return None
+    atoms = _bfs_substituent(mol, o_idx, {n_idx})
+    if len(atoms) == 1:
+        return {"atoms": atoms, "name": "hydroxy", "carbon_count": 0} if o_atom.GetTotalNumHs() == 1 else None
+    name = name_substituent(mol, set(atoms), o_idx)
+    if not name or name == 'substituent' or not name.endswith('oxy'):
+        return None
+    return {"atoms": atoms, "name": name,
+            "carbon_count": sum(1 for i in atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C')}
+
+
 def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
     """
     Get substituents attached to the amide nitrogen.
@@ -136,6 +153,14 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
     # Find carbon substituents on nitrogen (excluding the carbonyl carbon)
     for neighbor in nitrogen.GetNeighbors():
         nbr_idx = neighbor.GetIdx()
+        if neighbor.GetSymbol() == 'O':
+            # (the Blue Book): a hydroxamic acid is an N-hydroxy amide ('N-hydroxyacetamide (PIN)');
+            # an O-substituted one cites its oxy prefix the same way
+            oxy = _n_oxy_substituent(mol, nbr_idx, nitrogen_idx)
+            if oxy is None:
+                return [{"atoms": [nbr_idx], "name": None, "carbon_count": 0}]     # fail closed: no prefix
+            substituents.append(oxy)
+            continue
         if neighbor.GetSymbol() != 'C':
             continue
         if nbr_idx == carbonyl_carbon_idx:

@@ -524,9 +524,10 @@ def _rescue_spy(monkeypatch):
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", CHARGED_GLYCOPEPTIDE_PIECES[1:],
-                         ids=["ac-ala-glu-lys-ala-ala", "glcnac-pp-prenyl"])
+@pytest.mark.parametrize("smiles", CHARGED_GLYCOPEPTIDE_PIECES[2:], ids=["glcnac-pp-prenyl"])
 def test_t4_rescue_runs_once_per_fragment_and_context(monkeypatch, smiles):
+    # the peptide piece 'ac-ala-glu-lys-ala-ala' is named by the substitutive route of the strict path now,
+    # the Blue Book, gives the peptide name no PIN), so no rescue is asked for it
     """Call-count guard (fails without the memo): fewer fresh rescues than asks,
     and the name is the one the unmemoised rescue gives."""
     from orthonym.decomposition import engine as de

@@ -36,7 +36,7 @@ from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
-from .hetero_chain_prefix import fragment_parent_to_prefix
+from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
@@ -2382,7 +2382,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
 
     # ---- Pass 1: carboxy (-C(=O)OH / -C(=O)O-). The carboxy carbon and its two
     # oxygens are consumed; the prefix is recorded on the carboxy carbon's single
-    # carbon neighbour (a backbone carbon). ----
+    # carbon neighbour (a backbone carbon); one behind a heteroatom is its branch's (carbon_component). ----
     for idx in sub_set:
         a = mol.GetAtomWithIdx(idx)
         if a.GetSymbol() != 'C' or a.GetFormalCharge() != 0:
@@ -2410,7 +2410,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 clean = False
         if not clean:
             continue
-        if len(dbl_o) == 1 and len(oh_o) == 1 and len(c_nbr) == 1:
+        if len(dbl_o) == 1 and len(oh_o) == 1 and len(c_nbr) == 1 and c_nbr[0] in carbon_component(mol, sub_set, attach_idx):
             o_single = oh_o[0]
             if (o_single.GetDegree() == 1
                     and (o_single.GetTotalNumHs() >= 1
@@ -5349,7 +5349,7 @@ def _is_retained_peptide_name(name: Optional[str]) -> bool:
 
 
 def _substitutive_peptide_acid_name(frag_smi: str) -> Optional[str]:
-    """The substitutive name of an acid fragment with the PEPTIDE class excluded,
+    """The substitutive name of an acid fragment ('aminoacetic acid', never 'glycine':, the Blue Book),
     or None. Used only when the ordinary recursive name is a retained peptide
     name without a convertible acid suffix (TRIAGE g3 C05 / g5 C15).
 
@@ -5377,7 +5377,7 @@ def _substitutive_peptide_acid_name_fresh(frag_smi: str) -> Optional[str]:
         from ..routing.dispatch_table import StoutClass
         name = Orthonym(
             style="pin",
-            _seed_excluded_dispatch_classes=frozenset({StoutClass.PEPTIDE}),
+            _seed_excluded_dispatch_classes=frozenset({StoutClass.PEPTIDE, StoutClass.AMINO_ACID, StoutClass.RETAINED_NAME}),
         ).name(frag_smi)
     except Exception:  # noqa: BLE001 - a helper retry must never break naming
         return None

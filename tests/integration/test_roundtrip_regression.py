@@ -1009,7 +1009,9 @@ PHASE24_RT_ANALYSIS = [
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",
-        "aspartylserylserine",
+        # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN,:32920)
+        "(3S)-3-amino-4-{[(2S)-1-{[(1S)-1-carboxy-2-hydroxyethyl]amino}-3-hydroxy-1-oxopropan-2-yl]amino}-4-oxobutanoic"
+        " acid",
         "peptide-asp-ser-ser",
     ),
     # --- Cyclohexenone OPSIN-compatible format ---

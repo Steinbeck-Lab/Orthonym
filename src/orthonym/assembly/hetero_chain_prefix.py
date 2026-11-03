@@ -72,8 +72,29 @@ def fragment_parent_to_prefix(mol, sub_atoms, attach_idx, parent_name: str, carb
         # citation as a suffix"; the book's PINs cite it ('2-hydroperoxyethan-1-ol (PIN)',:28013;
         # '2-hydroperoxy-1-phenylethan-1-one (PIN)',:27953). The hydride prefix 'dioxidanyl' is no PIN vocabulary.
         return 'hydroperoxy'
+    if amide_joined_at_nitrogen(parent_name, mol, sub_atoms, attach_idx):
+        # the string converter reads '2-aminoacetamide' as a group joined at the far chain carbon
+        # ('2-amino-2-oxoethyl'); joined at the amide nitrogen it is an acylamino group,
+        # ('2-aminoacetamido'), which a later tier names from the structure
+        return None
     from .substituent_naming import ATTACH_LOCANT_UNKNOWN, parent_to_prefix
     return parent_to_prefix(parent_name, chain_length=carbon_count, attach_locant=ATTACH_LOCANT_UNKNOWN)
+
+
+def amide_joined_at_nitrogen(parent_name: str, mol, sub_atoms, attach_idx) -> bool:
+    """True when ``parent_name``, the name of the capped fragment, is an amide and the fragment is joined through a
+    nitrogen bonded to a C=O carbon of the fragment: ``parent_to_prefix`` reads the name as a group joined at the far
+    chain carbon, so its prefix would be the name of another structure."""
+    if not parent_name or not parent_name.strip().endswith('amide'):
+        return False
+    if attach_idx is None or attach_idx not in set(sub_atoms):
+        return False
+    atom = mol.GetAtomWithIdx(attach_idx)
+    if atom.GetSymbol() != 'N':
+        return False
+    return any(nb.GetIdx() in set(sub_atoms) and nb.GetSymbol() == 'C'
+               and any(b.GetBondTypeAsDouble() == 2.0 and b.GetOtherAtom(nb).GetSymbol() == 'O' for b in nb.GetBonds())
+               for nb in atom.GetNeighbors())
 
 
 def _is_bare_hydroperoxy(mol, sub_atoms, attach_idx) -> bool:
@@ -102,3 +123,18 @@ def _has_principal_group(mol) -> bool:
         return get_principal_group(mol, detect_functional_groups(mol))[0] is not None
     except Exception:  # noqa: BLE001 -- an unreadable molecule has none that is known
         return False
+
+
+def carbon_component(mol, sub_set, start: int) -> set:
+    """The carbons of ``sub_set`` joined to ``start`` through carbons only (all of them when ``start`` is no carbon): a
+    carboxy group behind a heteroatom (the -NH-CH2-COOH of an amide branch) is its branch's, whose own prefix names it
+    ('2-[(carboxymethyl)amino]-2-oxoethyl')."""
+    if mol.GetAtomWithIdx(start).GetSymbol() != 'C':
+        return {i for i in sub_set if mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
+    seen, stack = {start}, [start]
+    while stack:
+        for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+            if nb.GetIdx() in sub_set and nb.GetIdx() not in seen and nb.GetSymbol() == 'C':
+                seen.add(nb.GetIdx())
+                stack.append(nb.GetIdx())
+    return seen

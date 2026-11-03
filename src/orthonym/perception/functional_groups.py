@@ -1178,9 +1178,44 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
                     if _het_matches:
                         results[_cls] = _het_matches
 
-    _reclassify_ring_heterols(mol, results)
+    _reclassify_classes(mol, results)
 
     return dict(results)
+
+
+def _reclassify_classes(mol, results) -> None:
+    """The ring heterols and the hydroxamic acids beside amides, moved to the classes that name them."""
+    _reclassify_ring_heterols(mol, results)
+    _hydroxamic_acids_beside_amides(mol, results)
+
+
+def _hydroxamic_acids_beside_amides(mol, results) -> None:
+    """``## ****...`` (the Blue Book): "Hydroxamic acids have the generic structure R-CO-NH-OH
+    and are named as *N*-hydroxy amides". Beside another amide the hydroxamic acid is one more amide group of the
+    principal class, the parent with the most principal groups: 'N1-hydroxy-N4-methylbutanediamide'), and so
+    is a second hydroxamic acid ('N1,N4-dihydroxybutanediamide'); its
+    match (C, =O, N, O on N) has the shape of a ``secondary_amide`` match (C, =O, N, the N substituent). Alone it keeps
+    its own class and handler ('N-hydroxyacetamide (PIN)',:30148), and so does one that shares no carbon parent with
+    another amide group: behind an amide nitrogen it stands in that amide's N-substituent, whose prefix names it
+    ('N-[7-(hydroxyamino)-7-oxoheptyl]pyrimidine-5-carboxamide'). Mutates ``results`` in place."""
+    hydroxamic = results.get("hydroxamic_acid") or []
+    amides = [m for k in ("primary_amide", "secondary_amide", "tertiary_amide") for m in (results.get(k) or [])]
+    acyl = {m[0] for m in hydroxamic} | {m[0] for m in amides}
+    joined = [m for m in hydroxamic if (_carbon_reach(mol, m[0]) & acyl) - {m[0]}]
+    if joined:
+        results["secondary_amide"] = sorted(set(results.get("secondary_amide") or []) | set(joined))
+        results["hydroxamic_acid"] = [m for m in hydroxamic if m not in joined]
+
+
+def _carbon_reach(mol, start: int) -> Set[int]:
+    """The carbons joined to the carbon ``start`` through carbons only."""
+    seen, stack = {start}, [start]
+    while stack:
+        for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+            if nb.GetAtomicNum() == 6 and nb.GetIdx() not in seen:
+                seen.add(nb.GetIdx())
+                stack.append(nb.GetIdx())
+    return seen
 
 
 def _reclassify_ring_heterols(mol, results) -> None:

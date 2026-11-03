@@ -42,7 +42,7 @@ INTERNAL = [
     ("Cc1ccc2cc(N3CC[C@H](NC(=O)Cn4cnc(C#N)n4)C3)ccc2n1", "Stereo backstop"),
     ("NC(CO)C(=O)NNCc1ccc(O)c(O)c1O", "Could not name compound substituent at locant"),
     ("NC(CO)C(=O)NNCc1ccc(O)c(O)c1O", "universal_pipeline_unnameable_substituent substituent_skip"),
-    ("CCCCCCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCC(=O)/C=C/C(=O)O",
+    ("CCCCCC/C=C\\CCCCCCCCCCCCCCCCCCC(COC[C@@H](O)COP(=O)(O)OCCN)OC",
      "substituent_recursion_depth_exceeded substituent_skip"),
     # these two were logged through the ROOT logger (bare ``logging.warning``), outside the
     # ``orthonym`` logger the census tools read

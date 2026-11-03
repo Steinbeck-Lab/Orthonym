@@ -662,7 +662,8 @@ def _is_retained_name(mol, smiles, canonical_smiles, features=None, *, _style: s
     from orthonym.data import ALL_RETAINED_NAMES
     name = ALL_RETAINED_NAMES.get(canonical_smiles)
     if name is None:
-        return False
+        from orthonym.rules.benzo_peri_parents import benzo_peri_fused_name
+        return benzo_peri_fused_name(mol) is not None    # benzo rings on ovalene or coronene
     from orthonym.rules.amino_acids import retained_amino_acid_names_off
     if retained_amino_acid_names_off():
         # the naming of rules.amino_acids.systematic_amino_acid_name: no retained amino-acid name ('glycine')
@@ -1829,6 +1830,9 @@ def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,
     from orthonym.data import ALL_RETAINED_NAMES
     from orthonym.data.pin_policy import PIN_DENY
     name = ALL_RETAINED_NAMES.get(canonical_smiles)
+    if name is None:
+        from orthonym.rules.benzo_peri_parents import benzo_peri_fused_name
+        return benzo_peri_fused_name(mol)
     from orthonym.rules.benzene_unnumbered import retained_benzene_group_is_labelled
     if name and retained_benzene_group_is_labelled(mol, name):      #: 'benzonitrile' numbers no group carbon
         return None

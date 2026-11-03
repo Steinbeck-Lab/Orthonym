@@ -196,6 +196,10 @@ class TestNoBarePhenylamino:
 # PB lane S, S3 (2026-10-16): the two peptide rows 368 and 669 (DK-PEP; an N-terminal Asp) now give the 'carboxy' amido names
 # (acyl_amido_polyacid;, the Blue Book), each OPSIN 2.9.0 full-InChIKey exact (fresh java run), tag 'PB-S S3'.
 
+# Program 3 item 22 (2026-11-03, change-asserted-value): the nine peptide rows 36, 251, 428, 494, 524, 538, 572, 596, 603 (DK-PEP; an
+# acidic or middle residue) now give their substitutive PIN, the Blue Book, gives the peptide names no PIN;
+#,:32920), each OPSIN 2.9.0 full-InChIKey exact (fresh java run); tag 'L8 item 22'.
+
 # Class -> reason (Task 11, 2026-09-26). The reasons, the Blue Book lines and the best-effort
 # evidence per row are in internal notes (disposition 'known-defect').
 _CANARY_DEFECT_REASONS = {
@@ -372,10 +376,6 @@ CANARY_KNOWN_DEFECTS = {
         "glutamylglutamylisoleucine",
         "DK-PEP", (35,),
     ),
-    "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O": (
-        "aspartylserylserine",
-        "DK-PEP", (36,),
-    ),
     "CC1(C)C[C@H](O)[C@]23CC[C@@H](O)[C@](C)(CC[C@@H]12)C3": (
         "(3S,3aS,6R,7R,9aS)-1,1,7-trimethyldecahydro-3a,7-methanocyclopenta[8]annulene-3,6-diol",
         "DK-BRIDGEDFUSED", (39,),
@@ -444,10 +444,6 @@ CANARY_KNOWN_DEFECTS = {
         "aspartylglycyltryptophan",
         "DK-PEP", (239,),
     ),
-    "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](CS)C(=O)O": (
-        "glutamylthreonylcysteine",
-        "DK-PEP", (251,),
-    ),
     "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
         "aspartylvalylphenylalanine",
         "DK-PEP", (255,),
@@ -504,10 +500,6 @@ CANARY_KNOWN_DEFECTS = {
         "glutaminylglutamylisoleucine",
         "DK-PEP", (419,),
     ),
-    "C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O": (
-        "glycylaspartylalanine",
-        "DK-PEP", (428,),
-    ),
     "CC1CCC2C(C(=O)O)=CC3CC(C)(C)CC132": (
         "2,10,10-trimethyltricyclo[6.3.0.0^1,5]undec-6-ene-6-carboxylic acid",
         "DK-VBFUSED", (429,),
@@ -544,10 +536,6 @@ CANARY_KNOWN_DEFECTS = {
         "(2R,5S,9R,12R)-13,13-dimethyl-7-oxatetracyclo[7.5.0.0^1,5.0^2,12]tetradecane-4,8-dione",
         "DK-VBFUSED", (486,),
     ),
-    "C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
-        "glutaminylglutamylalanine",
-        "DK-PEP", (494,),
-    ),
     "N[C@@H](CO)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "serylaspartylhistidine",
         "DK-PEP", (495,),
@@ -563,16 +551,6 @@ CANARY_KNOWN_DEFECTS = {
     "C[C@H](CC[C@H](O)C(C)(C)O)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3": (
         "(3S,6R)-6-[(3S,5R,10S,13R,14R,17R)-3-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-2-methylheptane-2,3-diol",
         "DK-STEROIDYL", (522,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
-        "glutaminylglutamylvaline",
-        "DK-PEP", (524,),
-    ),
-    "NCC(=O)N[C@@H](CCC(=O)O)C(=O)NCC(=O)O": (
-        # (the Blue Book) encloses the compound acyl group; (:54480);
-        # OPSIN 2.9.0 full-InChIKey exact
-        "N-(glycylglutamyl)glycine",
-        "DK-PEP", (538,),
     ),
     "CC1=CC2/C=C(\\C)CCC3OC3/C=C/C(=O)C23C(=O)NC(CC(C)C)C3C1C": (
         "(7E,12E)-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,9,10,10a,11a-octahydro-1H-oxireno[2',3':7,8]cycloundeca[1,2-d]isoindole-1,14(2H)-dione",
@@ -598,14 +576,6 @@ CANARY_KNOWN_DEFECTS = {
         "4-(acetyloxy)heptadec-16-yne-1,2-diol",
         "DK-NOTEXACT", (567,),
     ),
-    "C[C@@H](O)[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CCC(=O)O)C(=O)O": (
-        "glutamyllysylthreonine",
-        "DK-PEP", (572,),
-    ),
-    "CC(C)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CC(N)=O)C(=O)O": (
-        "asparaginylglutamylleucine",
-        "DK-PEP", (596,),
-    ),
     "CC(C)CC1C(=O)N2CC(C)CC2C(=O)NC(C(C)C)C(=O)OC(C(C)C)C(=O)N2NCCCC2C(=O)N2NCC(O)CC2C(=O)N1C": (
         "unknown organic compound",
         "DK-NOTEXACT", (597,),
@@ -617,10 +587,6 @@ CANARY_KNOWN_DEFECTS = {
     "C[C@@]12C=C[C@]3(C1)[C@@H](O)C[C@H]1[C@@](C)(CCC[C@@]1(C)C(=O)O)[C@@H]3CC2": (
         "(4R,4aS,6S,6aS,9S,11aS,11bS)-6-hydroxy-4,9,11b-trimethyl-1,2,3,4,4a,5,6,9,10,11,11a,11b-dodecahydro-6a,9-methanocyclohepta[a]naphthalene-4-carboxylic acid",
         "DK-BRIDGEDFUSED", (601,),
-    ),
-    "N[C@@H](CC(=O)O)C(=O)N[C@@H](CS)C(=O)O": (
-        "aspartylcysteine",
-        "DK-PEP", (603,),
     ),
     "[NH2+]=C(C[C@H](O)[C@H](O)CO)C(=O)[O-]": (
         "unknown organic compound",

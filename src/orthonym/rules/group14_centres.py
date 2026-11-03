@@ -18,8 +18,12 @@ from rdkit import Chem
 # element -> (name of the cation, standard bonding number,
 _GROUP_YLIUM = {'Si': ('silylium', 4), 'Ge': ('germylium', 4), 'B': ('boranylium', 3),
                 # the metals of the same paragraph, read only where the table admits them (PARENT_HYDRIDE_IONS)
-                'Sn': ('stannylium', 4), 'Pb': ('plumbylium', 4)}
-_METAL_YLIUM = frozenset({'Sn', 'Pb'})
+                'Sn': ('stannylium', 4), 'Pb': ('plumbylium', 4),
+                # Group 13 on its preselected hydrides,:2062), where no metal name is built for the cation:
+                # the ending of borane, 'boranylium'
+                'Al': ('alumanylium', 3), 'Ga': ('gallanylium', 3), 'In': ('indiganylium', 3),
+                'Tl': ('thallanylium', 3)}
+_METAL_YLIUM = frozenset({'Sn', 'Pb', 'Al', 'Ga', 'In', 'Tl'})
 
 # "ANIONS FORMED BY ADDITION OF HYDRIDE IONS" (the Blue Book), method (2) (:41094): 'ide' on a
 # parent hydride whose bonding number at the anionic site is higher than the standard one and is expressed by

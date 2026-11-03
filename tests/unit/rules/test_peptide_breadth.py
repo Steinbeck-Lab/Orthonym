@@ -38,7 +38,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "NC(CCC(=O)NC1(C(=O)O)CC1)C(=O)O",
-    "N[C@@H](CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O)C(=O)O",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -131,7 +130,9 @@ class TestLeverBGammaLink:
         smi = "N[C@@H](CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O)C(=O)O"
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
-        assert result == "(4S)-4-amino-4-carboxybutanoylcysteinylglycine", result
+        # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN: the Glu chain, the longest with one acid group)
+        assert result == ("(2S)-2-amino-5-({(2R)-1-[(carboxymethyl)amino]-1-oxo-3-sulfanylpropan-2-yl}amino)-5-"
+                          "oxopentanoic acid"), result
         assert _full_rt(smi, result), result
 
     def test_gamma_glu_gly_stereo_defined(self):

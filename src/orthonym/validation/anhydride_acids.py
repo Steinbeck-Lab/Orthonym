@@ -128,12 +128,14 @@ def _acid(stem: str, memo: Dict[str, object]):
     return memo[stem]
 
 
-def _input_acids(mol, bridge_z: int) -> Optional[Tuple[int, List[str]]]:
-    """``(links, sorted InChIKeys of the acids)`` of the input split at its anhydride links, or None when a
-    link has a bridge of another element than the class word's."""
+def _input_acids(mol, bridge_z: int, cut: Optional[Sequence[int]] = None) -> Optional[Tuple[int, List[str]]]:
+    """``(links, sorted InChIKeys of the acids)`` of the input split at its anhydride links (at the links ``cut``
+    only, when given), or None when a link has a bridge of another element than the class word's."""
     bridges = sorted({match[1] for match in mol.GetSubstructMatches(_LINK)})
+    if any(mol.GetAtomWithIdx(bridge).GetAtomicNum() != bridge_z for bridge in bridges):
+        return None
     rw = Chem.RWMol(mol)
-    for bridge in bridges:
+    for bridge in bridges if cut is None else cut:
         atom = rw.GetAtomWithIdx(bridge)
         if atom.GetAtomicNum() != bridge_z:
             return None
@@ -328,8 +330,14 @@ def _read_back(name: str, smiles: Optional[str]) -> Optional[str]:
     if links + 1 > _MAX_ACIDS:
         return None
     split = _input_acids(mol, bridge_z)
-    if split is None or split[0] != links:
+    if split is None or split[0] < links:
         return None
+    # method (1) (the Blue Book): a dianhydride of a longer chain cites the further links in the
+    # acyloxy prefix of an adjoining acid, so its words are the acids of the input split at as many links as the
+    # class word gives
+    bridges = sorted({match[1] for match in mol.GetSubstructMatches(_LINK)})
+    splits = [split[1]] if split[0] == links else [
+        s[1] for cut in itertools.combinations(bridges, links) if (s := _input_acids(mol, bridge_z, cut))]
     memo: Dict[str, object] = {}
     budget = [_MAX_BUILDS]
     verified = False
@@ -343,7 +351,7 @@ def _read_back(name: str, smiles: Optional[str]) -> Optional[str]:
                 break
             acids += [acid] * count
         else:
-            if sorted(_key(acid) or "" for acid in acids) != split[1]:
+            if sorted(_key(acid) or "" for acid in acids) not in splits:
                 return None
             if not _every_build_is(acids, bridge_z, input_key, budget):
                 return None

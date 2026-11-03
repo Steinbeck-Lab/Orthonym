@@ -55,9 +55,13 @@ def test_the_rewrite_guards(name, expected):
     # the cyclopentane parent is the ocene: (the Blue Book), 'ferrocenecarbaldehyde' (:3963)
     ("cyclopentanecarboxylic acid", "ferrocenecarboxylic acid"),
     ("cyclopentanol", "ferrocenol"),
-    # an unenclosed compound prefix and a locanted cyclopentane parent are not rewritten
+    # an unenclosed compound prefix is not rewritten; a locanted cyclopentane parent keeps its locants (the ocene
+    # ring is numbered as cyclopentane,
     ("1-cyclopentyloxybenzene", None),
-    ("1,2-dimethylcyclopentane", None),
+    ("1,2-dimethylcyclopentane", "1,2-dimethylferrocene"),
+    # a prefix already enclosed alone keeps its marks; a multiplied prefix after it is another prefix
+    ("di(adamantan-1-yl)(cyclopentyl)phosphane", "di(adamantan-1-yl)(ferrocen-1-yl)phosphane"),
+    ("cyclopentyldi(phenyl)phosphane", "(ferrocen-1-yl)di(phenyl)phosphane"),
 ], ids=lambda v: v)
 def test_rewrite_cites_the_ocene_in_its_place(surrogate_name, name):
     from orthonym.assembly.ocene_drawing import rewrite_surrogate_prefix
@@ -76,3 +80,49 @@ def test_ocenes_named_after_the_new_order(smiles, name):
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert row["name"] == name, row
     assert row["tier"] == "systematic_verified", row
+
+
+@pytest.mark.parametrize("name,groups,expected", [
+    # more groups on the ring: the substituted 'cyclopentyl' is position 1 of the ocenyl prefix, its marks exist
+    ("N,N-dimethyl-1-[2-(phenylselanyl)cyclopentyl]ethan-1-amine", 2,
+     "N,N-dimethyl-1-[2-(phenylselanyl)ferrocen-1-yl]ethan-1-amine"),
+    ("2-methylcyclopentane-1-carboxylic acid", 2, "2-methylferrocene-1-carboxylic acid"),
+    ("2-methylcyclopentyl benzoate", 2, None),          # a substituted ring needs its marks
+])
+def test_rewrite_of_a_ring_with_more_groups(name, groups, expected):
+    assert rewrite_surrogate_prefix(name, "ferrocen", groups) == expected
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,name", [
+    # (the Blue Book): the positions of the second ring are primed ('1'-methylruthenocene',:40139)
+    ("C[C-]1C=CC=C1.C[C-]1C=CC=C1.[Fe+2]", "1,1'-dimethylferrocene"),
+    ("CC(C)(C)[C-]1C=CC(C)=C1.C[C-]1C=CC=C1.[Fe+2]", "1-tert-butyl-1',3-dimethylferrocene"),
+    ("OC(=O)[C-]1C=CC=C1.OC(=O)[C-]1C=CC=C1.[Fe+2]", "ferrocene-1,1'-dicarboxylic acid"),
+    ("OC(=O)[C-]1C=CC=C1.C[C-]1C=CC=C1.[Fe+2]", "1'-methylferrocene-1-carboxylic acid"),
+    # the same group of another parent on both rings: the multiplicative name, the book's own PIN (:40133)
+    ("CC(=O)[C-]1C=CC=C1.CC(=O)[C-]1C=CC=C1.[Fe+2]", "1,1'-(ferrocene-1,1'-diyl)di(ethan-1-one)"),
+    ("OC[C-]1C=CC=C1.OC[C-]1C=CC=C1.[Fe+2]", "(ferrocene-1,1'-diyl)dimethanol"),
+    ("c1ccc(cc1)P(c1ccccc1)[C-]1C=CC=C1.c1ccc(cc1)P(c1ccccc1)[C-]1C=CC=C1.[Fe+2]",
+     "(ferrocene-1,1'-diyl)bis[di(phenyl)phosphane]"),
+    ("C1=C[C-](C=C1)C2=NN=CC=C2.C1=C[C-](C=C1)C2=NN=CC=C2.[Fe+2]", "3,3'-(ferrocene-1,1'-diyl)dipyridazine"),
+    # the other ring's groups as primed prefixes on the ocenyl prefix
+    ("[CH-]1C=CC(=C1)Cc1ccccc1.[CH-]1C=CC(=C1)Cc1ccccc1.[Fe+2]", "[(1'-benzylferrocen-1-yl)methyl]benzene"),
+    # two groups on one ring, a nitro group (a bonded N+/O- pair) in a group
+    ("CC([C-]1C=CC=C1[Se]CC2=CC=CC=C2)N(C)C.[CH-]1C=CC=C1.[Fe+2]",
+     "1-[2-(benzylselanyl)ferrocen-1-yl]-N,N-dimethylethan-1-amine"),
+    ("[CH-]1C=CC=C1.C1=C[C-](C(=C1)NC2=CC=C(C=C2)[N+](=O)[O-])O.[Fe+2]", "2-(4-nitroanilino)ferrocen-1-ol"),
+])
+def test_ocenes_with_more_groups(smiles, name):
+    row = name_best_effort(smiles)
+    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
+    assert_full_rt(row["name"], smiles)
+
+
+@pytest.mark.parametrize("smiles", [
+    "C1CCC2=C(C1)[CH-]C=C2.C1CCC2=C(C1)[CH-]C=C2.[Ru+2]",           # an indenide: another ligand (eta names)
+    "[CH-]1C=CC=C1.[CH-]1C=CC=C1[C-]2C=C3C=CC(=CC3=[O+]2)O.[Fe+2]",  # a C-/O+ pair is not a nitro-like pair
+])
+def test_out_of_scope_drawings_are_not_rewritten(smiles):
+    from orthonym.assembly.ocene_drawing import _surrogate
+    assert _surrogate(smiles) is None

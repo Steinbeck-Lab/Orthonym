@@ -14,6 +14,7 @@ polyunsaturated, branched, and hydroxy acyls uniformly.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import re
 from typing import Optional
@@ -89,6 +90,12 @@ def _isolated_acid_smiles_uncached(mol, carbonyl_idx: int, ester_o_idx: int,
     return None
 
 
+#: the nesting of:func:`_name_fragment` in one naming: an acyl group whose acid carries an ester of its own (an
+#: estolide) is named at depth 2; a deeper probe names part of a polyester, never an acyl group of the name
+_FRAGMENT_DEPTH = contextvars.ContextVar("orthonym_lipid_fragment_depth", default=0)
+_MAX_FRAGMENT_DEPTH = 2
+
+
 def _name_fragment(smiles: Optional[str]) -> Optional[str]:
     """The engine's name for an isolated fragment, or None (unnamed / unknown).
 
@@ -104,6 +111,17 @@ def _name_fragment(smiles: Optional[str]) -> Optional[str]:
     ``_acid_to_acyl`` / ``_acid_to_oate``)."""
     if not smiles:
         return None
+    if _FRAGMENT_DEPTH.get() >= _MAX_FRAGMENT_DEPTH:
+        return None     # an acid inside the acid of an acid: no acyl group of a lipid (an octaester cage asked 41)
+    token = _FRAGMENT_DEPTH.set(_FRAGMENT_DEPTH.get() + 1)
+    try:
+        return _name_fragment_once(smiles)
+    finally:
+        _FRAGMENT_DEPTH.reset(token)
+
+
+def _name_fragment_once(smiles: str) -> Optional[str]:
+    """The body of:func:`_name_fragment`."""
     from orthonym import name_compound  # lazy: re-entrant on a non-lipid fragment
     from ..assembly.nested_memo import ambient_naming_state, cached_nested_call
     from ..metrics.provenance import (get_provenance, record_non_pin_fragment,

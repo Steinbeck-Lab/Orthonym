@@ -33,6 +33,9 @@ _AZABICYCLO = "C[C@H]1CCOC[C@@H]2N1C3=NC(=NC4=C3C(=NC(=C4F)Cl)N2C5CC5)OC[C@@]67C
 _AZABICYCLO_REPEATED = (
     "(3S,3R,5S,8R)-12-chloro-9-cyclopropyl-13-fluoro-16-[(3-fluoro-1-azabicyclo[3.3.0]octan-5-yl)methoxy]-3-methyl-"
     "6-oxa-2,9,11,15,17-pentaazatetracyclo[8.7.1.0^2,8.0^14,18]octadeca-1(18),10,12,14,16-pentaene")
+_AZABICYCLO_PLACED = (
+    "(3S,8R)-12-chloro-9-cyclopropyl-13-fluoro-16-{[(3R,5S)-3-fluoro-1-azabicyclo[3.3.0]octan-5-yl]methoxy}-3-methyl-"
+    "6-oxa-2,9,11,15,17-pentaazatetracyclo[8.7.1.0^2,8.0^14,18]octadeca-1(18),10,12,14,16-pentaene")
 # PubChem CID57339753: one descriptor at each repeated locant, and every stereo unit stated (16 of 16)
 _SULFOOXY = (
     "C1=C[C@H]([C@H]([C@@H]([C@H]1N([C@H]2C=C[C@H]([C@H]([C@@H]2OS(=O)(=O)O)OS(=O)(=O)O)OS(=O)(=O)O)"
@@ -77,11 +80,14 @@ def test_name_and_name_tiered_agree():
 def test_a_repeated_locant_with_two_descriptors_is_declined():
     # (the Blue Book): the descriptors are "preceded by a numerical or letter locant to describe the
     # position of the stereogenic unit". The composed name is (3S,3R,5S,8R)-...: OPSIN reads it to the input and
-    # (3R,3S,5S,8R)-... to a diastereomer, so it rests on the order of reading and the abstention stands.
+    # (3R,3S,5S,8R)-... to a diastereomer, so it rests on the order of reading and is never shipped. The engine's
+    # own name cites the substituent's descriptors in front of the substituent, where they give the positions.
     row = name_best_effort(_AZABICYCLO)
-    assert row["tier"] == "abstain" and row["name"] is None and row["limit_code"] == "UNNAMEABLE", row
+    assert row["name"] == _AZABICYCLO_PLACED and "(3S,3R," not in row["name"], row
+    assert_full_rt(row["name"], _AZABICYCLO)
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    assert is_failure_name(namer.name(_AZABICYCLO, on_failure="label"))
+    assert namer.name(_AZABICYCLO, on_failure="label") == _AZABICYCLO_PLACED
 
 
 @pytest.mark.parametrize("name,smiles,expected", [

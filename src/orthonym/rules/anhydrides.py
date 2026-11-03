@@ -65,6 +65,17 @@ _MIXED_INORGANIC_ANHYDRIDE_SMARTS = {
 
 
 def name_anhydride(features) -> Optional[str]:
+    """:func:`_name_anhydride_impl`; a molecule of two or more links named with one class word ('X Y anhydride', the
+    further links cited in an acid word) is labelled below the PIN: (the Blue Book) "Method (1)
+    generates preferred IUPAC names", a dianhydride."""
+    name = _name_anhydride_impl(features)
+    if name and name.endswith(" anhydride"):
+        from .polyanhydride_method_one import record_one_link_name
+        record_one_link_name(features.mol, name)
+    return name
+
+
+def _name_anhydride_impl(features) -> Optional[str]:
     """
     Name an anhydride compound using functional class nomenclature.
 
@@ -571,17 +582,22 @@ def _offered_poly_anhydride(mol, links, class_word: str) -> Optional[str]:
     carbon)`` and the class word ``class_word``, or None when the producer has no PIN to offer.
 
      (the Blue Book) names the dianhydride by its acid groups; with three links or more
-     (:32394) "Method (1) generates preferred IUPAC names", and the numerically multiplied
-    'trianhydride' is method (2): it is no PIN, so the substitutive route names those. The name is offered only when
+     (:32394) "Method (1) generates preferred IUPAC names" (``polyanhydride_method_one``): a dianhydride
+    of the preferred dicarboxylic acid and its two substituted neighbours; the numerically multiplied
+    'trianhydride' is method (2), no PIN, and is not built. The name is offered only when
     its acids read back to ``mol`` (``validation.anhydride_acids``); a name they do not read leaves the molecule to
     the producers after this one. At a wider tier the name is offered as well and the validity gate withdraws it
     (OPSIN reads no name of this class), as it always did: the general engine then names the molecule. The
     substitutive route would name it 'acetic 4-(acetyloxy)-4-oxobutanoic anhydride', a form the isotope placement
     of a labelled molecule cannot decorate when two groups of it are one acyl group (the name of 'diacetic
     butanedioic dianhydride' with both acetyl groups labelled)."""
-    if len(links) != 2:
+    if len(links) == 2:
+        words = _linear_polyanhydride_words(mol, links)
+    elif class_word == "dianhydride":
+        from .polyanhydride_method_one import method_one_words
+        words = method_one_words(mol, links)
+    else:
         return None
-    words = _linear_polyanhydride_words(mol, links)
     if words is None:
         return None
     name = " ".join(words) + " " + class_word

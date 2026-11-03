@@ -186,11 +186,10 @@ class TestSeniorRingSystemField:
         assert isinstance(features.principal_ring, tuple)
 
     def test_select_import_present(self):
-        """Verify that select_principal_ring_system is imported in namer."""
+        """Verify that select_principal_ring_system is called by the phases of ``Orthonym._classify``."""
         import inspect
-        from orthonym.namer import Orthonym
-        source = inspect.getsource(Orthonym._classify)
-        assert "select_principal_ring_system" in source
+        import orthonym.classify_parts as classify_parts
+        assert "select_principal_ring_system" in inspect.getsource(classify_parts)
 
 
 # ---------------------------------------------------------------------------

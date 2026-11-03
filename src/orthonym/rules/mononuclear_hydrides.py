@@ -98,15 +98,15 @@ _HUB_STEMS = {
     # Wave-3 / /: Group-13 B/Ga/In/Tl parent
     # hydrides ([BH3] -> borane, C[Ga](C)C -> trimethylgallane). Stems mirror
     # ions.py::_GROUP13_UIDE_STEMS. B standard bonding number is 3, so BH3 ->
-    # borane (no lambda). Al is DELIBERATELY excluded (it stays on the
-    # organometallics Branch B to protect the trimethylaluminum canary; see
-    # _ORGANYL_HUBS below). B is kept OUT of _ORGANYL_HUBS so a boron oxoacid
+    # borane (no lambda). Al is named on 'alumane' as Ga on 'gallane',
+    # the Blue Book; 'trimethylalumane',:2901). B is kept OUT of _ORGANYL_HUBS so a boron oxoacid
     # (methylboronic acid, boronic acid) is never claimed here — it fails the
     # halogen/organyl guards on its O neighbours and cascades to the boron-acid
     # handler; only bare BH3 (bare path) and the mixed halo+organyl regime
     # (dichloro(methyl)borane) reach a boron name here. Ga/In/Tl ARE organyl
     # hubs (trimethylgallane / dimethylindigane), directly parallel to As/Sb/Bi.
     'B': 'borane',
+    'Al': 'alumane',
     'Ga': 'gallane',
     'In': 'indigane',
     'Tl': 'thallane',
@@ -120,15 +120,14 @@ _HUB_STEMS = {
 # parallel the working As/Sb/Bi hubs exactly). P stays with name_phosphine,
 # chalcogens/iodine with their halide-only / mixed regimes. B and Al are
 # EXCLUDED: B protects the boron-oxoacid handler (bare BH3 uses the bare-hydride
-# path; mixed CH3-BCl2 uses the mixed regime below), and Al stays on the
-# organometallic Branch B to protect the trimethylaluminum canary (ORG-T3-10).
+# path; mixed CH3-BCl2 uses the mixed regime below).
 # 'I' is added for the HYPERVALENT (λ) pure-organyl iodane only — triaryl-λ3-iodane
 #, the Blue Book): c1ccccc1Ic3ccccc3 -> triphenyl-λ3-iodane. The
 # organyl-regime call site below guards it with `not (halogen and lam is None)` so
 # a mono-iodo alkane (CH3-I, standard valence 1, lam None) is NEVER claimed here
 # and stays an `iodo` substituent — only a hypervalent (degree>=2, λ present) iodine
 # hub reaches the organyl regime.
-_ORGANYL_HUBS = frozenset({'As', 'Sb', 'Bi', 'Ga', 'In', 'Tl', 'I'})
+_ORGANYL_HUBS = frozenset({'As', 'Sb', 'Bi', 'Al', 'Ga', 'In', 'Tl', 'I'})
 
 # Halogen substituent prefixes (cited alphanumerically,; the
 # multiplying prefix di/tri/... does NOT count for ordering).
@@ -142,7 +141,7 @@ _HALOGENS = frozenset(_HALO_PREFIX)
 # halo-alkane. BB sanctions halogen prefixes on exactly this element
 # set. Al is excluded (not a hub); P/As/Sb/Bi mixed halo+organyl forms cascade
 # (fail-closed) — they are not in the BB substitutive-halide list.
-_MIXED_HALO_ORGANYL_HUBS = frozenset({'B', 'Ga', 'In', 'Tl',
+_MIXED_HALO_ORGANYL_HUBS = frozenset({'B', 'Al', 'Ga', 'In', 'Tl',
                                       'Si', 'Ge', 'Sn', 'Pb', 'I'})
 
 

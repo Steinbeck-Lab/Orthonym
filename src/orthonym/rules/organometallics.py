@@ -222,6 +222,8 @@ _GROUP14_PRINCIPAL_SUFFIX: Dict[Tuple[int, int], str] = {
 # e.g. phenylboronic acid), NOT 'phenylboranediol' — so B must be EXCLUDED from
 # the principal-group diversion and left to cascade to the boronic-acid handler.
 _GROUP14_SUFFIX_ELEMENTS = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
+# Group 13 metals on their parent hydrides take the suffixes too: 'diethylalumanol' (the Blue Book)
+_GROUP13_HYDRIDE_METALS = frozenset({'Al', 'Ga', 'In', 'Tl'})
 
 # Simple contracted alkoxy prefixes: named -oxy substituents that are
 # NOT complex and take NO enclosing marks (methoxysilanetriol, not
@@ -230,6 +232,42 @@ _GROUP14_SUFFIX_ELEMENTS = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
 # ligand namer's older ``name.endswith('oxy')`` blanket-wrapped these simple
 # alkoxy names too; this whitelist restores (simple alkoxy = no marks).
 _SIMPLE_ALKOXY_PREFIXES = frozenset({'methoxy', 'ethoxy', 'propoxy', 'butoxy'})
+
+
+def _group13_hydride_centre(mol, metal_complex) -> bool:
+    """Whether the Group 13 centre is a neutral atom with three single bonds and no unpaired electron: the
+    substituted mononuclear hydride ('trimethylalumane'). 'C[Al]c1ccccc1' (two bonds) is a radical, not
+    'methyl(phenyl)alumane'; an ion and a centre with a double bond ('hydrido(oxo)aluminium') keep the metal name."""
+    from rdkit import Chem
+    atom = mol.GetAtomWithIdx(metal_complex.metal_atom_indices[0])
+    return (atom.GetFormalCharge() == 0 and atom.GetNumRadicalElectrons() == 0 and atom.GetTotalValence() == 3
+            and all(b.GetBondType() == Chem.BondType.SINGLE for b in atom.GetBonds()))
+
+
+def _naming_system(symbol: str, mol, metal_complex) -> Optional[str]:
+    """The naming system of ``METAL_NAMES`` for this centre: a Group 13 centre that is no derivative of its hydride
+    (``_group13_hydride_centre``: a radical, an ion, a double bond) is named as a metal."""
+    info = METAL_NAMES.get(symbol)
+    if info is None or symbol not in _GROUP13_HYDRIDE_METALS:
+        return info['naming_system'] if info else None
+    return 'hydride_parent' if _group13_hydride_centre(mol, metal_complex) else 'metal_direct'
+
+
+def _takes_hydride_suffixes(symbol: str, naming_system: str) -> bool:
+    """Whether a bare -OH/-NH2/-SH on the centre is a suffix of its parent hydride ('trimethylsilanol',
+    'diethylalumanol')."""
+    return symbol in _GROUP14_SUFFIX_ELEMENTS or (symbol in _GROUP13_HYDRIDE_METALS and naming_system == 'hydride_parent')
+
+
+def _mixed_ligand_prefix(ordered, enclose) -> str:
+    """Distinct ligands in order, (the Blue Book): the first cited ligand takes no marks unless it is
+    compound or has a locant ('ethyl(methyl)(phenyl)phosphane (PIN)',:39171; 'butyl(ethyl)(propyl)amine',:7332),
+    each further one is enclosed."""
+    from ..assembly.naming_utils import has_structural_hyphen, is_complex_substituent
+    first = ordered[0]
+    bare = not (is_complex_substituent(first) or has_structural_hyphen(first) or any(c in first for c in '()[]')
+                or _is_complex_ligand_oxy(first))
+    return (first if bare else enclose(first)) + ''.join(enclose(nm) for nm in ordered[1:])
 # 'hydroxy' ends in 'oxy' too and is a simple prefix of its own, the Blue Book),
 # a ligand of a metal (``_assemble_bonded_metal_name``): never enclosed as the first prefix.
 _SIMPLE_OXY_PREFIXES = _SIMPLE_ALKOXY_PREFIXES | {'hydroxy'}
@@ -897,7 +935,7 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
     symbol = metal.GetSymbol()
     info = METAL_NAMES.get(symbol)
     if (not has_mechanism(symbol, BONDED_NAMES) or info is None
-            or info['naming_system'] != 'metal_direct' or metal.GetIsotope() != 0):
+            or _naming_system(symbol, mol, metal_complex) != 'metal_direct' or metal.GetIsotope() != 0):
         return None
     charge = metal.GetFormalCharge()
     names: List[str] = ['hydrido'] * metal.GetTotalNumHs()
@@ -1089,7 +1127,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         metal_name_info = METAL_NAMES.get(metal_symbol)
         if metal_name_info is None:
             return None
-        naming_system = metal_name_info['naming_system']
+        naming_system = _naming_system(metal_symbol, mol, metal_complex)
 
         # Partition into halide, (Group-14 only) principal-group, and organic
         # ligands.: a bare -OH/-NH2/-SH directly on a Si/Ge/Sn/Pb
@@ -1097,7 +1135,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         # Branch A can emit it as a substitutive suffix (-> trimethylsilanol).
         # The diversion is Group-14-scoped so the metal-direct branch keeps its
         # exact prior behaviour (such ligands stay organic -> None -> cascade).
-        is_group14 = metal_symbol in _GROUP14_SUFFIX_ELEMENTS
+        is_group14 = _takes_hydride_suffixes(metal_symbol, naming_system)
         halide_ligs: List[Any] = []
         pg_ligs: List[Any] = []
         organic_ligs: List[Any] = []
@@ -1353,7 +1391,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                     ligand_prefix = multiplied_component(
                         len(ordered), ordered[0], _enclose_ligand(ordered[0]))
                 else:
-                    ligand_prefix = ''.join(_enclose_ligand(nm) for nm in ordered)
+                    ligand_prefix = _mixed_ligand_prefix(ordered, _enclose_ligand)
                 full_name = f"{ligand_prefix}{metal_name}"
                 ligand_tree_nodes = [
                     NameTreeNode(parent_stem=nm, class_id='organometallic_ligand')

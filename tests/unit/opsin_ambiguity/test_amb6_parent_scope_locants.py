@@ -72,9 +72,10 @@ def test_ethenyl_prefix_cites_its_locants(smiles, locanted):
     assert_clean(smiles)
 
 
+# these two peptides now get their substitutive PIN (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN), which encloses its acylamino prefixes
 @pytest.mark.parametrize("smiles,expected", [
-    ("NCC(=O)N[C@@H](CCC(=O)O)C(=O)NCC(=O)O", "N-(glycylglutamyl)glycine"),
-    ("NCC(=O)N[C@@H](CC(=O)O)C(=O)NCC(=O)O", "N-(glycylaspartyl)glycine"),
+    ("NCC(=O)N[C@@H](CCC(=O)O)C(=O)NCC(=O)O", "(4S)-4-(2-aminoacetamido)-5-[(carboxymethyl)amino]-5-oxopentanoic acid"),
+    ("NCC(=O)N[C@@H](CC(=O)O)C(=O)NCC(=O)O", "(3S)-3-(2-aminoacetamido)-4-[(carboxymethyl)amino]-4-oxobutanoic acid"),
 ])
 def test_peptide_acyl_group_is_enclosed(smiles, expected):
     # Definitions, (the Blue Book): 'glycylglutamyl' is a compound
@@ -86,8 +87,10 @@ def test_peptide_acyl_group_is_enclosed(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("CC(C)[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O", "glycylaspartylvaline"),
-    ("C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O", "glycylaspartylalanine"),
+    # the first two now get their substitutive name (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN)
+    ("CC(C)[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O",
+     "(3S)-3-(2-aminoacetamido)-4-{[(S)-1-carboxy-2-methylpropyl]amino}-4-oxobutanoic acid"),
+    ("C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O", "(3S)-3-(2-aminoacetamido)-4-{[(1S)-1-carboxyethyl]amino}-4-oxobutanoic acid"),
     ("NCC(=O)N[C@@H](CC(=O)O)C(=O)N1CCC[C@@H]1C(=O)O", "glycylaspartyl-D-proline"),
     ("C[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N1CCC[C@@H]1C(=O)O", "alanylglutamyl-D-proline"),
 ])

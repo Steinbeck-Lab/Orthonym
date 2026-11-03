@@ -100,9 +100,17 @@ def acyclic_n_parent(name: str) -> bool:
     itself ('hydrazinyl', (b),:2911) and a hydrazine whose one substituent is an
     ylidene, which can stand on the far nitrogen only ('ethylidenehydrazinyl',:2959), keep the
     conversion. ``n_unit_prefix`` builds the prefix of the units this declines, from the
-    structure."""
+    structure.
+
+    The '-ine' of a retained amino-acid or peptide name ('glycine', 'glycylglycine') is no ring ending either: such
+    a name is no PIN, the Blue Book, "Preferred IUPAC names (PINs) are not identified for the compounds
+    in this Chapter"), and 'glycylglycinyl' is no substituent group of; the group gets its systematic
+    prefix ('{2-[(carboxymethyl)amino]-2-oxoethyl}amino')."""
     name = name.lower()
     if name.endswith('imine'):
+        return True
+    from ..rules.stereochemistry import _peptide_stem_sets
+    if any(name.endswith(term) for term in _peptide_stem_sets()[1]):
         return True
     if not name.endswith('hydrazine') or name == 'hydrazine':
         return False

@@ -842,6 +842,11 @@ def _has_extended_oligo(mol) -> bool:
     return False
 
 
+#: the most heavy atoms of a glycoside cap cites it as one word, 'methyl' in 'methyl alpha-D-
+#: glucopyranoside'): a ceramide cap has about 45; a larger part of the molecule is no capping group to try
+_MAX_CAP_ATOMS = 60
+
+
 def _glycoside_cap_name(mol, o_idx: int, cap_c_idx: int) -> Optional[str]:
     """Name a SIMPLE alkyl/aryl glycoside-capping group (the leading
     substituent word of, e.g. ``methyl`` in ``methyl
@@ -884,6 +889,8 @@ def _glycoside_cap_name(mol, o_idx: int, cap_c_idx: int) -> Optional[str]:
                 continue
             sub_atoms.add(ni)
             stack.append(ni)
+    if len(sub_atoms) > _MAX_CAP_ATOMS:
+        return None     # no simple capping group (a peptide): naming it whole took most of a glycopeptide's time
     from orthonym.assembly.substituent_naming import _located_acyclic_alkyl_name
     located = _located_acyclic_alkyl_name(mol, sub_atoms, cap_c_idx, allow_functional=True)
     if located is not None:

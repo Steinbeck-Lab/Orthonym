@@ -17,7 +17,7 @@ with a check of everything the rewrite can change:
 * The structure: the name ships only when OPSIN reads it to the input's full standard InChIKey.
 
 Scope (fail closed, None otherwise): three fragments, a metal of the ocene table with charge 2+, a bare
-cyclopentadienide and a cyclopentadienide with one substituent on one ring carbon, no other charge; a wider tier
+cyclopentadienide and a cyclopentadienide with its groups on ring carbons (no fused ring), no other charge; a wider tier
 only (the default tier keeps its own answer). The label is systematic_verified: an ocene has no PIN here.
 """
 import re
@@ -31,6 +31,7 @@ from ..data.locant_text import render_locants
 _OCENE_STEMS = {'Fe': 'ferrocen', 'Ru': 'ruthenocen', 'Os': 'osmocen', 'Co': 'cobaltocen', 'Ni': 'nickelocen',
                 'Cr': 'chromocen', 'V': 'vanadocen', 'Mn': 'manganocen'}
 _SURROGATE = 'cyclopentyl'
+_PAIR = {('N', 1): ('O', -1), ('O', -1): ('N', 1)}
 _MULTIPLIER = r'(?:di|tri|tetra|penta|hexa|bis|tris|tetrakis)'
 
 
@@ -57,7 +58,8 @@ def _cp_ring(frag):
 
 
 def _surrogate(smiles: str):
-    """``(ocene stem, surrogate SMILES)`` for an input in scope, else None."""
+    """``(ocene stem, [(cyclopentyl drawing, ring atoms, its SMILES, groups)])`` for an input in scope, one entry per
+    substituted ring, else None."""
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
@@ -68,18 +70,35 @@ def _surrogate(smiles: str):
     if len(metals) != 1 or metals[0].GetAtomWithIdx(0).GetFormalCharge() != 2:
         return None
     rest = [f for f in frags if f is not metals[0]]
-    bare = [f for f in rest if f.GetNumAtoms() == 5 and _cp_ring(f) is not None]
-    if not bare:
+    rings = []
+    for frag in rest:
+        if frag.GetNumAtoms() == 5 and _cp_ring(frag) is not None:
+            continue                    # a bare ring
+        drawn = _saturated(frag)
+        if drawn is None:
+            return None
+        rings.append(drawn)
+    if not rings or len(rings) + sum(1 for f in rest if f.GetNumAtoms() == 5 and _cp_ring(f) is not None) != 2:
         return None
-    sub = rest[1] if rest[0] is bare[0] else rest[0]
+    return _OCENE_STEMS[metals[0].GetAtomWithIdx(0).GetSymbol()], rings
+
+
+def _saturated(sub):
+    """``(cyclopentyl drawing, ring atoms, its SMILES, groups)`` of a substituted cyclopentadienide, else None."""
     ring = _cp_ring(sub)
     if ring is None or sub.GetNumAtoms() <= 5:
         return None
-    if any(a.GetFormalCharge() for a in sub.GetAtoms() if a.GetIdx() not in ring):
+    if any(a.GetFormalCharge() and (a.GetSymbol(), a.GetFormalCharge()) not in _PAIR
+           or a.GetFormalCharge() and not any((nb.GetSymbol(), nb.GetFormalCharge()) == _PAIR[(a.GetSymbol(), a.GetFormalCharge())]
+                                              for nb in a.GetNeighbors())
+           for a in sub.GetAtoms() if a.GetIdx() not in ring):
+        return None                     # a charge of the group is one of a bonded N+/O- pair ('nitro'), or out of scope
+    if sum(a.GetFormalCharge() for a in sub.GetAtoms() if a.GetIdx() not in ring):
         return None
     out = [(i, nb.GetIdx()) for i in ring for nb in sub.GetAtomWithIdx(i).GetNeighbors() if nb.GetIdx() not in ring]
-    if len(out) != 1 or sub.GetBondBetweenAtoms(*out[0]).GetBondType() != Chem.BondType.SINGLE:
-        return None
+    if not out or any(sub.GetBondBetweenAtoms(*o).GetBondType() != Chem.BondType.SINGLE
+                      or sub.GetBondBetweenAtoms(*o).IsInRing() for o in out):
+        return None                     # a ring fused to the cyclopentadienide (an indenide) is another ligand
     if any(a.GetIsotope() or a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in sub.GetAtoms() if a.GetIdx() in ring):
         return None
     rw = Chem.RWMol(sub)
@@ -101,42 +120,56 @@ def _surrogate(smiles: str):
     if sum(1 for r in surrogate.GetRingInfo().AtomRings()
            if len(r) == 5 and all(surrogate.GetAtomWithIdx(i).GetSymbol() == 'C' for i in r)) != 1:
         return None                     # another cyclopentane would make the 'cyclopentyl' token ambiguous
-    return _OCENE_STEMS[metals[0].GetAtomWithIdx(0).GetSymbol()], Chem.MolToSmiles(surrogate)
+    return surrogate, ring, Chem.MolToSmiles(surrogate), len(out)
 
 
-def rewrite_surrogate_prefix(name: str, stem: str) -> Optional[str]:
+def rewrite_surrogate_prefix(name: str, stem: str, groups: int = 1) -> Optional[str]:
     """``name`` with its one 'cyclopentyl' prefix written '(<stem>-1-yl)', or None when the rewrite could change
-    anything but that prefix (see the module docstring). When the cyclopentane is the parent ('cyclopentanecarboxylic
-    acid') the ocene is ('ferrocenecarboxylic acid'): (the Blue Book) "Ocenes are considered as
-    heterocycles", 'ferrocenecarbaldehyde' (:3963); one group on it takes no locant, as on cyclopentane."""
-    parent = re.fullmatch(r"((?:[^()\[\]{}]*[-)\]}])?)cyclopentan(e|(?=ol$)|(?=amine$))(.*)", name)
-    if parent and 'cyclopent' not in parent.group(1) + parent.group(3) and not re.search(r'\d', parent.group(3)):
+    anything but that prefix (see the module docstring); ``groups`` is the number of groups on the ring. When the
+    cyclopentane is the parent ('cyclopentanecarboxylic acid') the ocene is ('ferrocenecarboxylic acid'):
+    (the Blue Book) "Ocenes are considered as heterocycles", 'ferrocenecarbaldehyde' (:3963); its five ring
+    positions are numbered as those of cyclopentane, so the locants stay ('1,2-dimethylferrocene'). A ring with more
+    groups as a prefix is a substituted 'cyclopentyl' whose attachment is position 1 ('[2-(phenylselanyl)ferrocen-
+    1-yl]'), already enclosed. The order of every rewritten name is checked by the spelling layer's check."""
+    parent = re.fullmatch(r"(.*?)cyclopentan(e|(?=-\d)|(?=ol$)|(?=amine$))(.*)", name)
+    if parent and 'cyclopent' not in parent.group(1) + parent.group(3):
         return f"{parent.group(1)}{stem}{parent.group(2)}{parent.group(3)}"
     hits = [m for m in re.finditer(_SURROGATE, name)]
     if len(hits) != 1:
         return None
     i, j = hits[0].start(), hits[0].end()
     before, after = name[:i], name[j:]
-    if (before[-1:].isalpha() and not before.endswith('-')) or re.match(r'(?:id|ium)', after):
+    if re.search('(?:^|[^a-z])' + _MULTIPLIER + '$', before) or re.match(r'(?:id|ium)', after):
         return None                     # 'dicyclopentyl', 'cyclopentylidene', 'cyclopentylium'; the group of a
                                         # compound prefix ('cyclopentylmethyl', 'cyclopentyloxy') is rewritten
     depth = sum(1 if c in '([{' else -1 if c in ')]}' else 0 for c in before)
-    target = stem + 'yl'
-    low, high = sorted((_SURROGATE, target))
-    for w in re.findall(r'[a-z]+', before + ' ' + after):
-        # a compound prefix sorts with its multiplier ('dimethylanilino'), a simple one without it: either decides
-        if low < w < high or low < re.sub('^' + _MULTIPLIER, '', w) < high:
-            #: another prefix would change places with it; at depth 0 the prefixes are cited again in order
-            return _resorted(name, stem) if not depth else None
+    if groups > 1:
+        # the substituted 'cyclopentyl' of a compound prefix: its own prefixes stand before it, its marks exist
+        if not depth or not (before[-1:].isalpha() or before[-1:] in ')]}'):
+            return None
+        return _in_order(f"{before}{stem}-1-yl{after}")
+    if before[-1:].isalpha() and not before.endswith('-'):
+        return None                     # one group only: nothing is cited on the ring
+    if before.endswith('(') and after.startswith(')'):
+        return _in_order(f"{before}{stem}-1-yl{after}")     # its own marks exist: '(cyclopentyl)phosphane'
     if not depth and (resorted := _resorted(name, stem)) is not None:
         return resorted                 # a whole depth-0 prefix, cited in its place among the others
-    if not depth and after[:1].isalpha():
-        return None                     # an unenclosed compound prefix ('1-cyclopentyloxybenzene')
+    if not depth and after[:1].isalpha() and not re.match(_MULTIPLIER + r'\(', after):
+        return None                     # an unenclosed compound prefix ('1-cyclopentyloxybenzene'); a multiplied
+                                        # prefix after it is another prefix ('cyclopentyldi(phenyl)phosphane')
     if not depth and (not before or before.endswith(' ')) and (not after or after.startswith(' ')):
         return f"{before}{stem}-1-yl{after}"   # a word of its own (an ester's organyl group) takes no marks
     if not depth:
-        return f"{before}({stem}-1-yl){after}"
-    return _raise_enclosing_marks(f"{before}({stem}-1-yl){after}", len(before))
+        return _in_order(f"{before}({stem}-1-yl){after}")
+    raised = _raise_enclosing_marks(f"{before}({stem}-1-yl){after}", len(before))
+    return _in_order(raised) if raised else None
+
+
+def _in_order(name: str) -> Optional[str]:
+    """``name`` when its prefixes stand in alphanumerical order, the spelling layer's check: siblings of
+    one level only), else None: an ocenyl prefix that would change places with another is not ours to move."""
+    from ..validation.spelling.checks_marks import alphanumerical_order_check
+    return name if alphanumerical_order_check(None, name) is None else None
 
 
 _LOCANTS = r"(?:\d+[a-z]?'*|[A-Z]\d*'*)(?:,(?:\d+[a-z]?'*|[A-Z]\d*'*))*"
@@ -231,18 +264,31 @@ def ocene_drawing_row(namer, smiles: str) -> Optional[dict]:
     found = _surrogate(smiles)
     if found is None:
         return None
-    stem, surrogate = found
-    row = namer.name_tiered(surrogate)
-    if row.get('tier') == 'abstain' or not row.get('name'):
-        return None
-    name = rewrite_surrogate_prefix(row['name'], stem)
-    if name is None:
-        return None
+    from ..errors import is_failure_name
+    if not is_failure_name(namer._strict_pin_twin_name(smiles)):
+        return None                     # the default tier names it ('decamethylferrocene (PIN)'): its answer stands
+    stem, rings = found
+    if len(rings) == 2:
+        from .ocene_two_rings import two_ring_candidates
+        candidates = two_ring_candidates(namer, stem, [r[:3] for r in rings])
+        row = {}
+    else:
+        _mol, _ring, surrogate, groups = rings[0]
+        row = namer.name_tiered(surrogate)
+        if row.get('tier') == 'abstain' or not row.get('name'):
+            return None
+        candidates = [rewrite_surrogate_prefix(row['name'], stem, groups)]
     from ..validation.opsin_roundtrip import opsin_parse
-    parsed = opsin_parse(name)
-    back = Chem.MolFromSmiles(parsed) if parsed else None
-    if back is None or Chem.MolToInchiKey(back) != Chem.MolToInchiKey(Chem.MolFromSmiles(smiles)):
+    key = Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))
+    for name in filter(None, candidates):
+        parsed = opsin_parse(name)
+        back = Chem.MolFromSmiles(parsed) if parsed else None
+        if back is not None and Chem.MolToInchiKey(back) == key:
+            break
+    else:
         return None
+    if not row:
+        row = namer.name_tiered(rings[0][2])    # the record fields of a run of the engine
     from rdkit.Chem import rdMolDescriptors
     return {**row, 'name': name, 'tier': 'systematic_verified', 'is_pin': False, 'source': 'ocene_drawing',
             'formula': rdMolDescriptors.CalcMolFormula(Chem.MolFromSmiles(smiles)), 'verified': 'opsin',

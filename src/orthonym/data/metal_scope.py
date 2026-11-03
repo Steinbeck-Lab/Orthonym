@@ -192,6 +192,10 @@ GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 ZERO_VALENT_METALS = ("Ir", "Y", "Pt", "Fe", "W", "Zr", "Ti", "V", "Pd", "Hf", "Co", "U", "Ni", "Al", "Cu",
                       "Ru", "Re", "Rh", "Sn", "Mn", "Mo", "Cr", "Rf", "Au", "Pb", "Ac", "Ag", "Fm")
 
+#: the Group 13 metals named on their parent hydrides ('trimethylalumane',, the Blue Book): their cation
+#: drawn beside its anion is joined to it (``CONNECT_ANION``, ``perception.metals``); an ion keeps the metal name
+GROUP_13_HYDRIDE_METALS = ("Al", "Ga", "In", "Tl")
+
 #: every mechanism above: the ones zinc is admitted to
 ALL_MECHANISMS = frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
                             CARBANION_SALTS, ZERO_VALENT})
@@ -238,6 +242,11 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     **{symbol: MetalScope(frozenset({ELEMENT}), frozenset()) for symbol in ELEMENT_ONLY_METALS},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in BONDED_METAL_VALENCES.items()},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in MORE_BONDED_METAL_VALENCES.items()},
+    # the Group 13 metals take the cations of their preselected hydrides too ('acetyl(ethoxy)alumanylium',
+    #, the Blue Book), where no metal name is built for the cation
+    **{symbol: MetalScope(ALL_MECHANISMS | {PARENT_HYDRIDE_IONS}, frozenset(valences))
+       for symbol, valences in {**BONDED_METAL_VALENCES, **MORE_BONDED_METAL_VALENCES}.items()
+       if symbol in GROUP_13_HYDRIDE_METALS},
     "Zn": MetalScope(ALL_MECHANISMS, frozenset({2}), complete=True),
     # Group 14 metals named on their parent hydrides: the lane of 2026-10-30; the atom and the ion alone
     # ('tin', '(119Sn)tin'): lane LONE
