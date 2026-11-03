@@ -1534,12 +1534,20 @@ def get_phosphanyl_prefix(mol, phosphorus_idx: int, exclude_atoms: set = None) -
     # Get carbon neighbors, excluding parent attachment atoms
     neighbors = [n for n in phosphorus.GetNeighbors()
                  if n.GetSymbol() == 'C' and n.GetIdx() not in exclude_atoms]
+    # the hydroxy groups on P: 'dihydroxyphosphanyl (preselected prefix)', the Blue Book);
+    # any other neighbour is not read here
+    others = [n for n in phosphorus.GetNeighbors() if n.GetSymbol() != 'C' and n.GetIdx() not in exclude_atoms]
+    hydroxy = [n for n in others if n.GetSymbol() == 'O' and n.GetDegree() == 1 and n.GetTotalNumHs() == 1
+               and not n.GetFormalCharge()
+               and mol.GetBondBetweenAtoms(phosphorus_idx, n.GetIdx()).GetBondType() == Chem.BondType.SINGLE]
+    if len(hydroxy) != len(others):
+        return None
 
-    if len(neighbors) == 0:
+    if len(neighbors) == 0 and not hydroxy:
         return "phosphanyl"  # Bare -PH2
 
     # Characterize each substituent
-    sub_names = []
+    sub_names = ['hydroxy'] * len(hydroxy)
     for neighbor in neighbors:
         result = _characterize_substituent(mol, neighbor.GetIdx(), {phosphorus_idx})
         if result is None:
@@ -2236,3 +2244,26 @@ def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]
         # preselected anionic prefix (matches rules/ions.py usage).
         return "phosphonato"
     return None
+
+
+def pnictogen_group_prefix(mol, frag_atoms, attach_idx: int) -> Optional[str]:
+    """The prefix of a carbon-free P or As group on a chain: ``name_phosphanyl_substituent`` for P and
+    ``mononuclear_hydrides.name_arsanyl_substituent`` for As ('3-(dihydroxyarsanyl)propanoic acid', as
+    '4-(dihydroxyarsanyl)benzoic acid (PIN) [-COOH is senior to -As(OH)2]', the Blue Book)."""
+    if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'As':
+        from .mononuclear_hydrides import name_arsanyl_substituent
+        return name_arsanyl_substituent(mol, list(frag_atoms), attach_idx)
+    named = name_phosphanyl_substituent(mol, frag_atoms, attach_idx)
+    if named is not None:
+        return named
+    # a carbon-free P branch with hydroxy groups ('3-(dihydroxyphosphanyl)propanoic acid'): the caller has made the
+    # branch a prefix, so its P is not the principal group
+    p = mol.GetAtomWithIdx(attach_idx)
+    if p.GetFormalCharge() or p.GetNumRadicalElectrons() or nonstandard_bonding_number(mol, attach_idx) is not None:
+        return None
+    from ..perception.functional_groups import detect_functional_groups
+    from .seniority import get_principal_group
+    _pg, pg_matches = get_principal_group(mol, detect_functional_groups(mol))
+    if any(attach_idx in match for match in pg_matches or ()):
+        return None     # the P of the principal group ('methanephosphonous acid') is no prefix
+    return get_phosphanyl_prefix(mol, attach_idx, exclude_atoms=set(range(mol.GetNumAtoms())) - set(frag_atoms))

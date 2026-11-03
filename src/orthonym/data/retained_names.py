@@ -407,6 +407,11 @@ RETAINED_NAMES = {
     # -- the Blue Book 'carbamimidothioic acid (PIN)' / '(not
     # isothiourea)'; the Blue Book 'H2N-C(=NH)-SH carbamimidothioic acid (PIN)'.
     "N=C(N)S": "carbamimidothioic acid",
+    # "Cyanic acid" (the Blue Book): NC-SH 'thiocyanic acid (PIN) carbononitridothioic acid' (:30987);
+    # functional replacement by -S-, -Se-, -Te- is expressed by the replacement prefix (:30981)
+    "N#CS": "thiocyanic acid",
+    "N#C[SeH]": "selenocyanic acid",
+    "N#C[TeH]": "tellurocyanic acid",
     # -- the Blue Book "1,2,3-trithiodicarbonic diamide (PIN) (not
     # 'thiuram monosulfide')".
     "NC(=S)SC(N)=S": "1,2,3-trithiodicarbonic diamide",

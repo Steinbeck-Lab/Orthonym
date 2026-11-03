@@ -90,7 +90,7 @@ PIN_ROWS = [
 
 
 def _same_tautomer(name: str, smiles: str) -> bool:
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     m = Chem.MolFromSmiles(parsed) if parsed else None
     return m is not None and Chem.MolToSmiles(m) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
 

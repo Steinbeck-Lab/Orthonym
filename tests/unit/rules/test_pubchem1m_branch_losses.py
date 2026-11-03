@@ -364,7 +364,7 @@ _SLOW_MULTI_DESCRIPTOR_ROWS = {"pc1m_168012462", "peptide_2h5"}
 def test_multi_descriptor_propanoyl_rows_name_rt_exact(smiles):
     res = name_best_effort(smiles)
     name = assert_full_rt(res.get("name"), smiles)
-    back = _independent_parse(name)
+    back = _independent_parse(name, smiles)
     assert _fixed_h_inchi(back) == _fixed_h_inchi(smiles), (name, back)
 
 
@@ -415,7 +415,7 @@ def test_single_descriptor_stereo_placement_keeps_the_unit_licence():
 # SMILES as well.
 
 def _reads_back_to_this_isomer(name, smiles):
-    opsin = _independent_parse(name) if name else None
+    opsin = _independent_parse(name, smiles) if name else None
     got = Chem.MolFromSmiles(opsin) if opsin else None
     want = Chem.MolFromSmiles(smiles)
     return (got is not None

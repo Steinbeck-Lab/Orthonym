@@ -78,6 +78,7 @@ from typing import Any, Dict, List, Optional
 
 from ...data.chain_names import get_chain_prefix, multiplying_prefix
 from ...data.multipliers import multiplier_table
+from ..ester_oxo_prefix import ester_oxo_matches
 from .prefix_claims import reconcile_prefix_claims
 from ...rules.locants import get_bond_locants, get_functional_group_locants
 from ...rules.n_substituted_acids import n_italic_locant_cited, suffix_group, suffix_group_atoms
@@ -1683,13 +1684,13 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                     fg_name, original_count,
                 )
 
+        fg_name, matches = ester_oxo_matches(features, fg_name, matches)    #: an in-chain ester's oxo
         prefix_text = get_prefix(fg_name)
         _raw_prefix = prefix_text
-        #: a COMPOUND FG prefix (e.g. the oxime =N-OH prefix
-        # 'hydroxyimino') takes enclosing marks. Simple FG prefixes
-        # (hydroxy/oxo/amino/chloro/...) are returned bare by enclose_if_compound,
-        # so this is byte-identical except for the compound prefixes this shared
-        # ring/chain path previously emitted UNENCLOSED ('4-hydroxyimino-...').
+        #: a COMPOUND FG prefix (e.g. the oxime =N-OH prefix 'hydroxyimino') takes enclosing marks.
+        # Simple FG prefixes (hydroxy/oxo/amino/chloro/...) are returned bare by enclose_if_compound, so this is
+        # byte-identical except for the compound prefixes this shared ring/chain path previously emitted UNENCLOSED
+        # ('4-hydroxyimino-...').
         if prefix_text:
             prefix_text = enclose_if_compound(prefix_text)
         if prefix_text and matches:

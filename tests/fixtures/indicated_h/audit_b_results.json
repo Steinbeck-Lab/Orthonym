@@ -1987,5 +1987,32 @@
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
     "ring_system": "triazolothiadiazole"
+  },
+  {
+    "smiles": "c1cc2c3c(cccc3c1)SO2",
+    "name": "naphtho[1,8-cd][1,2]oxathiole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "naphtho-peri-5"
+  },
+  {
+    "smiles": "c1cc2c3c(cccc3c1)SN2",
+    "name": "2H-naphtho[1,8-cd][1,2]thiazole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "naphtho-peri-5"
+  },
+  {
+    "smiles": "c1cc2c3c(cccc3c1)SS2",
+    "name": "naphtho[1,8-cd][1,2]dithiole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "naphtho-peri-5"
   }
 ]

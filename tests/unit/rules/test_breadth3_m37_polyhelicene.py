@@ -34,7 +34,7 @@ def test_polyhelicene(smiles, expected):
     row = Orthonym(**emit_tier_flags("pin")).name_tiered(smiles)
     assert row["name"] == expected, row
     assert row["tier"] == "pin_verified", row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 def test_class_numbering_is_the_catalogued_hexahelicene_one():

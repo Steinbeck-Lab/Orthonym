@@ -310,6 +310,11 @@ def twin_opsin_parse(name: str) -> Optional[str]:
     no rule applies, when OPSIN rejects the twin or reads it as ambiguous (:func:`twin_round_trip`).
     The isotope placement search reads its candidates through this."""
     found = twin_of(name) if pin_spellings_on() else None
+    if found is None:
+        # a halogen -uide name has its own twin, at every tier ('(13C)methyl(phenyl)iodanuide', ``uide_twin``)
+        from .uide_twin import uide_twin
+        twin = uide_twin(name)
+        found = (twin, ("uide_lambda",)) if twin else None
     if found is None or ambiguity_messages(found[0]):
         return None
     from .opsin_roundtrip import opsin_parse

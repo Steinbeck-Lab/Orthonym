@@ -25,6 +25,8 @@ from typing import Optional
 
 from rdkit import Chem
 
+from ..data.locant_text import render_locants
+
 #: the metal(2+) -> the ocene stem of the bare sandwich's name ('ferrocene')
 _OCENE_STEMS = {'Fe': 'ferrocen', 'Ru': 'ruthenocen', 'Os': 'osmocen', 'Co': 'cobaltocen', 'Ni': 'nickelocen',
                 'Cr': 'chromocen', 'V': 'vanadocen', 'Mn': 'manganocen'}
@@ -104,7 +106,12 @@ def _surrogate(smiles: str):
 
 def rewrite_surrogate_prefix(name: str, stem: str) -> Optional[str]:
     """``name`` with its one 'cyclopentyl' prefix written '(<stem>-1-yl)', or None when the rewrite could change
-    anything but that prefix (see the module docstring)."""
+    anything but that prefix (see the module docstring). When the cyclopentane is the parent ('cyclopentanecarboxylic
+    acid') the ocene is ('ferrocenecarboxylic acid'): (the Blue Book) "Ocenes are considered as
+    heterocycles", 'ferrocenecarbaldehyde' (:3963); one group on it takes no locant, as on cyclopentane."""
+    parent = re.fullmatch(r"((?:[^()\[\]{}]*[-)\]}])?)cyclopentan(e|(?=ol$)|(?=amine$))(.*)", name)
+    if parent and 'cyclopent' not in parent.group(1) + parent.group(3) and not re.search(r'\d', parent.group(3)):
+        return f"{parent.group(1)}{stem}{parent.group(2)}{parent.group(3)}"
     hits = [m for m in re.finditer(_SURROGATE, name)]
     if len(hits) != 1:
         return None
@@ -119,7 +126,10 @@ def rewrite_surrogate_prefix(name: str, stem: str) -> Optional[str]:
     for w in re.findall(r'[a-z]+', before + ' ' + after):
         # a compound prefix sorts with its multiplier ('dimethylanilino'), a simple one without it: either decides
         if low < w < high or low < re.sub('^' + _MULTIPLIER, '', w) < high:
-            return None                 #: another prefix would change places with it
+            #: another prefix would change places with it; at depth 0 the prefixes are cited again in order
+            return _resorted(name, stem) if not depth else None
+    if not depth and (resorted := _resorted(name, stem)) is not None:
+        return resorted                 # a whole depth-0 prefix, cited in its place among the others
     if not depth and after[:1].isalpha():
         return None                     # an unenclosed compound prefix ('1-cyclopentyloxybenzene')
     if not depth and (not before or before.endswith(' ')) and (not after or after.startswith(' ')):
@@ -127,6 +137,59 @@ def rewrite_surrogate_prefix(name: str, stem: str) -> Optional[str]:
     if not depth:
         return f"{before}({stem}-1-yl){after}"
     return _raise_enclosing_marks(f"{before}({stem}-1-yl){after}", len(before))
+
+
+_LOCANTS = r"(?:\d+[a-z]?'*|[A-Z]\d*'*)(?:,(?:\d+[a-z]?'*|[A-Z]\d*'*))*"
+
+
+def _resorted(name: str, stem: str) -> Optional[str]:
+    """``name`` with its depth-0 prefixes cited again in alphanumerical order after 'cyclopentyl' is written
+    '(<stem>-1-yl)': '3-(2,6-dimethylanilino)-2-(ferrocen-1-yl)-6-methylimidazo[1,2-a]pyridine'. Every depth-0 prefix
+    must carry a locant, the split must give back the name, and the engine's own order (``alpha_sort_key``) must be
+    the order of the name as it came; None otherwise. The numbering is the surrogate's: a tie of (g) that the
+    new order would decide otherwise is not looked at, and the name is never the PIN (see the module text)."""
+    from ..validation.spelling.units import parse_name
+    from .naming_utils import alpha_sort_key
+    lead = re.match(r"\((?:\d+[a-z]?'*[EZRS],?)+\)-", name)      # the stereodescriptors of the whole name
+    if lead:
+        rest = _resorted(name[lead.end():], stem)
+        return lead.group(0) + rest if rest else None
+    try:
+        _s, _encs, parsed = parse_name(name)
+    except Exception:  # noqa: BLE001 -- a name the parser cannot read is not rewritten
+        return None
+    top = next((p for p in parsed if p.unit.encl is None and p.unit.word == 0), None)
+    if top is None or ' ' in name or not top.prefixes or any(not p.locs for p in top.prefixes):
+        return None
+    texts = []
+    for pref in top.prefixes:
+        if pref.kind == 'simple':
+            texts.append(pref.raw)
+        elif pref.kind == 'enclosed' and pref.enc is not None and pref.mult == 1:
+            texts.append(name[pref.enc.start:pref.enc.end + 1])
+        else:
+            return None
+    pos, units = 0, []
+    for pref, text in zip(top.prefixes, texts):
+        found = re.compile(_LOCANTS + '-').match(name, pos)
+        if found is None or found.group(0)[:-1] != render_locants(pref.locs) or not name.startswith(text, found.end()):
+            return None
+        units.append((found.group(0), text))
+        pos = found.end() + len(text)
+        if len(units) < len(top.prefixes):
+            if name[pos:pos + 1] != '-':
+                return None
+            pos += 1
+    parent = name[pos:]     # the parent, with any hydro prefixes, which are not alphabetized ('-3,4-dihydro...')
+    if (not parent or parent[0] in '([' or (parent[0] == '-' and not re.compile('-' + _LOCANTS + '-').match(parent))
+            or sum(1 for _l, t in units if t == _SURROGATE) != 1):
+        return None
+    keys = [alpha_sort_key(t) for _l, t in units]
+    if keys != sorted(keys):
+        return None                     # the order of the name is not the one this key gives: not ours to change
+    units = [(loc, f'({stem}-1-yl)' if t == _SURROGATE else t) for loc, t in units]
+    units.sort(key=lambda u: alpha_sort_key(u[1]))
+    return '-'.join(loc + t for loc, t in units) + parent
 
 
 _LEVEL = {'(': 1, '[': 2, '{': 3}

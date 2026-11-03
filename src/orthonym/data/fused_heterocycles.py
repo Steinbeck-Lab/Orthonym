@@ -1632,6 +1632,33 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 13,
         'iupac_locants': {0: 2, 1: 1, 2: '9a', 3: 9, 4: 8, 5: 7, 6: '6a', 7: 6, 8: 5, 9: 4, 10: '3a', 11: '9b', 12: 3},
     },
+    # naphtho[1,8-cd][1,2]oxathiole, 2H-naphtho[1,8-cd][1,2]thiazole, naphtho[1,8-cd][1,2]dithiole -- a
+    # five-membered ring peri-fused across the 1,8 positions of naphthalene; the fusion atoms 2a,
+    # 5a, 8a, 8b). The parents of the sultone and the sultam the book names by method (1),:
+    # '2H-2λ6-naphtho[1,8-cd][1,2]oxathiole-2,2-dione (PIN)' (the Blue Book) and
+    # '1λ6-naphtho[1,8-cd][1,2]thiazole-1,1(2H)-dione (PIN)' (:33254). Keys and locants from OPSIN 2.9.0
+    # ``-oextendedsmi`` of each name.
+    'c1cc2c3c(cccc3c1)SO2': {
+        'name': 'naphtho[1,8-cd][1,2]oxathiole',
+        'tautomer_locant': None,
+        'ring_system': 'naphtho-peri-5',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 7, 1: 8, 2: '8a', 3: '8b', 4: '2a', 5: 3, 6: 4, 7: 5, 8: '5a', 9: 6, 10: 2, 11: 1},
+    },
+    'c1cc2c3c(cccc3c1)SN2': {
+        'name': '2H-naphtho[1,8-cd][1,2]thiazole',
+        'tautomer_locant': 2,
+        'ring_system': 'naphtho-peri-5',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 4, 1: 3, 2: '2a', 3: '8b', 4: '8a', 5: 8, 6: 7, 7: 6, 8: '5a', 9: 5, 10: 1, 11: 2},
+    },
+    'c1cc2c3c(cccc3c1)SS2': {
+        'name': 'naphtho[1,8-cd][1,2]dithiole',
+        'tautomer_locant': None,
+        'ring_system': 'naphtho-peri-5',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 4, 1: 3, 2: '2a', 3: '8b', 4: '8a', 5: 8, 6: 7, 7: 6, 8: '5a', 9: 5, 10: 1, 11: 2},
+    },
     # phenanthro[4,5-def][1,3,2]dioxaborepine -- the O-B-O seven-membered ring
     # bridges the 4,5 bay positions of phenanthrene.
     'B1Oc2cccc3ccc4cccc(c4c23)O1': {

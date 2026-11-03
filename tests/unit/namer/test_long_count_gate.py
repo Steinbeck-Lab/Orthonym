@@ -84,8 +84,16 @@ def test_every_reader_of_the_outcome_knows_the_reconstruction():
     assert namer._offer_rt_ok(name, "C" * 26) is False                          # another structure never counts
     pv.record_gate_outcome("reconstructed:a-rule-that-does-not-exist", name)
     assert namer._offer_rt_ok(name, smiles) is True                             # the reader decides, not the rule id
+    # a state no reader knows is never trusted: the default tier withdraws the name; a general tier reads the
+    # name again and ships it only on the reconstruction it proves for this structure
     pv.record_gate_outcome("a-state-that-does-not-exist-yet", name)
-    assert is_failure_name(Orthonym(**_emit_tier_flags("best-effort"))._exit_round_trip_check_rt(name, smiles))
+    assert is_failure_name(Orthonym()._exit_round_trip_check_rt(name, smiles))
+    pv.record_gate_outcome("a-state-that-does-not-exist-yet", name)
+    assert Orthonym(**_emit_tier_flags("best-effort"))._exit_round_trip_check_rt(name, smiles) == name
+    assert _outcome(name) == "reconstructed:long_count"
+    pv.record_gate_outcome("a-state-that-does-not-exist-yet", name)
+    other = "C(F)(F)(F)" + "C(F)(F)" * 23 + "C(F)(F)F"
+    assert is_failure_name(Orthonym(**_emit_tier_flags("best-effort"))._exit_round_trip_check_rt(name, other))
 
 
 @pytest.mark.parametrize("tier", ["valid", "complete", "best-effort"])

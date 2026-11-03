@@ -817,6 +817,8 @@ def speculative_fragment_naming():
     depth counters and the three work budgets (they still bound the body, so a
     runaway still stops, but the spend is not charged to the real naming).
     """
+    from ..metrics.abstention import peek_abstention, restore_abstention
+    declined = peek_abstention()       # a decline of the sort key is not the caller's reason
     saved = {attr: getattr(_fragment_guard, attr, _UNSET) for attr in _SPECULATIVE_STATE}
     cache = saved['cache']
     if cache is not _UNSET and cache is not None:
@@ -827,6 +829,7 @@ def speculative_fragment_naming():
     try:
         yield
     finally:
+        restore_abstention(declined)
         for attr, value in saved.items():
             if value is _UNSET:
                 if hasattr(_fragment_guard, attr):

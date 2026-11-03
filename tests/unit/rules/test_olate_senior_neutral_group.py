@@ -84,10 +84,6 @@ PIN_ROWS = [
 #: gives; the first test below reads it back, so that the shape is checked, and the second asserts
 #: that the row is still declined, strictly: building the member turns the row into an error.
 DECLINED_ROWS = [
-    # an ester on a chain: no producer cites 'alkoxy...oxo' for a sulfonic acid, an aminium or an
-    # olate,:31696; '3-ethoxy-3-oxopropan-1-aminium bromide (PIN)',:31709)
-    ("[O-]CCC(=O)OC", "3-methoxy-3-oxopropan-1-olate",
-     "no producer cites an ester as 'alkoxy...oxo' on a chain whose principal group is not an acid"),
     # a lactone is named on a ring parent that has its own suffix
     ("[O-]CC1CCC(=O)O1", "(5-oxooxolan-2-yl)methanolate",
      "the heterocycle producer names the lactone as the suffix 'one'"),
@@ -97,12 +93,6 @@ DECLINED_ROWS = [
     # classify_anion does not know a selenium or tellurium anion (benzeneselenolate abstains too)
     ("[Se-]CCC(=O)O", "2-carboxyethane-1-selenolate",
      "classify_anion does not classify a selenolate"),
-    # the ring writer's phosphorus prefix ignores the hydroxy groups of -P(OH)2 ('4-phosphanylphenol')
-    ("[O-]c1ccc(P(O)O)cc1", "4-(dihydroxyphosphanyl)phenolate",
-     "get_phosphanyl_prefix names -P(OH)2 'phosphanyl', a different molecule"),
-    # the chain writer has no prefix for -As(OH)2
-    ("[O-]CC[As](O)O", "2-(dihydroxyarsanyl)ethan-1-olate",
-     "no producer names -As(OH)2 as a prefix on a chain"),
 ]
 
 TIERS = ["pin", "best-effort"]
@@ -224,3 +214,22 @@ def test_the_pnictogen_oxoacid_prefix(smiles, name):
     ring = {a for r in mol.GetRingInfo().AtomRings() for a in r}
     centre = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() in ("P", "As", "Sb"))
     assert pnictogen_oxoacid_prefix(mol, _bfs_substituent_atoms(mol, centre, ring), centre) == name
+
+
+
+# Named since lane L7 (they were DECLINED_ROWS): the ester beside a senior group as 'alkoxy...oxo',
+# the Blue Book, ``assembly.ester_oxo_prefix``), the -P(OH)2 and -As(OH)2 prefixes ('dihydroxyphosphanyl
+# (preselected prefix)',:36247; ``phosphorus.pnictogen_group_prefix``). A group senior to OH keeps 'olate'.
+NAMED_SINCE_L7 = [
+    ("[O-]CCC(=O)OC", "3-methoxy-3-oxopropan-1-olate"),
+    ("[O-]c1ccc(P(O)O)cc1", "4-(dihydroxyphosphanyl)phenolate"),
+    ("[O-]CC[As](O)O", "2-(dihydroxyarsanyl)ethan-1-olate"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles, expected", NAMED_SINCE_L7, ids=lambda v: v)
+def test_a_former_declined_member_is_named(smiles, expected):
+    from orthonym.cli import _emit_tier_flags
+    row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (expected, "pin_verified"), row

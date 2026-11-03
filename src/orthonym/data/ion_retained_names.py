@@ -44,6 +44,14 @@ RETAINED_ANIONS = {
     'CC(C)(C)[O-]': 'tert-butoxide',
     '[O-]c1ccccc1': 'phenoxide',  # Also called phenolate
 
+    # The anions of cyanic acid and its chalcogen analogues: (the Blue Book) "Cyanic acid is the
+    # retained name for NC-OH", 'thiocyanic acid (PIN)' (:30987), and the prefixes 'thiocyanato', 'selenocyanato',
+    # 'tellurocyanato' (:30981); an acid ending '-ic acid' gives the anion ending '-ate'
+    'N#C[O-]': 'cyanate',
+    'N#C[S-]': 'thiocyanate',
+    'N#C[Se-]': 'selenocyanate',
+    'N#C[Te-]': 'tellurocyanate',
+
     # Carbanions
     # (Plan 184-01): the '[CH3-]' -> 'methanide' entry was SUBSUMED by the
     # systematic emit_parent_hydride_cumulative_suffix primitive (ions.py). The

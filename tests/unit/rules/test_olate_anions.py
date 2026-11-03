@@ -142,3 +142,46 @@ def test_a_neutral_amine_oxide_and_the_neutral_imidic_acid_keep_their_names():
                          ("CC(=N)O", "ethanimidic acid"), ("CN(C)O", "N-hydroxy-N-methylmethanamine")]:
         row = _row(smiles, "pin")
         assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+
+
+# (the Blue Book, under " SALTS OF HYDROXY COMPOUNDS..."): "The traditional names methoxide,
+# ethoxide, propoxide, butoxide, phenoxide, and aminoxide... are retained as preferred IUPAC names and may be
+# substituted in the same way as the corresponding alcohols. The traditional name tert-butoxide... cannot be
+# substituted. The traditional name isopropoxide... is retained for general nomenclature but cannot be substituted."
+# (:28203): partial salts of polyols keep the 'olate' name ('sodium 3-hydroxypropan-1-olate (PIN)').
+RETAINED_ALKOXIDES = [
+    ("[O-]c1ccc(Cl)cc1", "4-chlorophenoxide"),
+    ("[Na+].[O-]c1ccc(Cl)cc1", "sodium 4-chlorophenoxide"),
+    ("O=[N+]([O-])c1ccc([O-])cc1", "4-nitrophenoxide"),
+    ("ClCC[O-]", "2-chloroethoxide"),
+    ("[O-]C(F)(F)F", "trifluoromethoxide"),
+    ("CC(C)C[O-]", "2-methylpropoxide"),
+    ("CC(Cl)CC[O-]", "3-chlorobutoxide"),
+]
+KEEPS_OLATE = [
+    ("OCCC[O-]", "3-hydroxypropan-1-olate"),        #, the book's own PIN (:28205)
+    ("CC(C)[O-]", "propan-2-olate"),               # isopropoxide is not substituted, and is no PIN
+    ("CCCCC[O-]", "pentan-1-olate"),               # no retained word for pentan-1-ol
+    ("[O-]C1CC1", "cyclopropanolate"),              # a ring carbon: no retained word
+    ("[O-]c1ccc2ccccc2c1", "naphthalen-2-olate"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles, name", RETAINED_ALKOXIDES + KEEPS_OLATE, ids=lambda v: v)
+def test_retained_alkoxide_words(smiles, name):
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)
+    assert row["name"] == name, row
+    assert row["tier"] == "pin_verified", row
+
+
+def test_retained_alkoxide_form_reads_the_structure():
+    """The word is replaced only where the structure fits it: a ring carbon or a second hydroxy group keeps 'olate'."""
+    from rdkit import Chem
+    from orthonym.rules.retained_alkoxides import retained_alkoxide_form
+    assert retained_alkoxide_form(Chem.MolFromSmiles("[O-]c1ccc(Cl)cc1"), "4-chlorophenolate") == "4-chlorophenoxide"
+    assert retained_alkoxide_form(Chem.MolFromSmiles("OCCC[O-]"), "3-hydroxypropan-1-olate") is None
+    assert retained_alkoxide_form(Chem.MolFromSmiles("[O-]C1CCC1"), "cyclobutan-1-olate") is None
+    assert retained_alkoxide_form(Chem.MolFromSmiles("Oc1ccc([O-])cc1"), "4-hydroxyphenolate") is None

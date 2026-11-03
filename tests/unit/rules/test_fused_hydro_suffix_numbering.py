@@ -57,4 +57,4 @@ def test_suffix_locant_before_hydro_locants(smiles, name, tier):
     row = _row(smiles, tier)
     assert row.get("name") == name and row["tier"] == "pin_verified", (row.get("name"), row["tier"])
     assert name_is_rt_exact(name, smiles)
-    assert _fixed_h(_independent_parse(name)) == _fixed_h(smiles)
+    assert _fixed_h(_independent_parse(name, smiles)) == _fixed_h(smiles)

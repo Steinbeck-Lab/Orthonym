@@ -343,3 +343,49 @@ def test_parity_with_legacy(monkeypatch):
             continue
         rules = [f.rule for f in check_pin_spelling(mol, legacy, strict=True)]
         assert "P-14.4" in rules, (smiles, name, legacy, rules)
+
+
+#: the principal amine NHR or NR2 hangs on the chain carbon, its nitrogen is no skeletal atom,:23348:
+#: "none of the heteroatoms constitute all or part of the principal characteristic group"); the N-prefixes as in
+#: '4-ethoxy-N,N,N-trimethyl-3,5,8-trioxa-4-phosphadecan-10-aminium (PIN)' (:23379)
+N_SUBSTITUTED = [
+    ("COCCOCCOCCOCCN(C)C", "N,N-dimethyl-2,5,8,11-tetraoxatridecan-13-amine"),
+    ("COCCOCCOCCOCCNC", "N-methyl-2,5,8,11-tetraoxatridecan-13-amine"),
+    ("CCOCCOCCOCCOCCN(CC)C", "N-ethyl-N-methyl-3,6,9,12-tetraoxatetradecan-1-amine"),
+    ("CN(C)CCOCCOCCOCCOC", "N,N-dimethyl-2,5,8,11-tetraoxatridecan-13-amine"),
+    ("COCCOCCOCCOCCNC(C)C", "N-(propan-2-yl)-2,5,8,11-tetraoxatridecan-13-amine"),
+]
+
+
+@pytest.mark.parametrize("smiles, name", N_SUBSTITUTED, ids=[s for s, _ in N_SUBSTITUTED])
+def test_n_substituted_amine_names(smiles, name):
+    assert name_a_chain(_mol(smiles)) == name
+    assert a_chain_applies(_mol(smiles)), smiles
+
+
+@pytest.mark.parametrize("smiles, why", [
+    ("COCCOCCOCCOC(C)CN(C)C", "methyl on the chain and on N: mixed locants not built"),
+    ("COCCOCCOCCOCCN(C)C1CCCCC1", "a ring on N"),
+    ("COCCOCCOCCOCCN(C)CCOC", "the second part on N carries a heteroatom"),
+], ids=lambda value: value)
+def test_n_substituted_amine_declines(smiles, why):
+    assert name_a_chain(_mol(smiles)) is None, why
+
+
+def test_with_a_senior_group_the_nitrogen_stays_a_skeletal_atom():
+    """With -ol principal the nitrogen is no part of the principal group, so it is a heterounit of the chain, as in
+    '1-amino-13-oxa-3,6,9-triazahenicosan-11-ol [PIN]' (:23369)."""
+    assert name_a_chain(_mol("OCCOCCOCCOCCN(C)C")) == "2-methyl-5,8,11-trioxa-2-azatridecan-13-ol"
+
+
+@pytest.mark.opsin_gate
+def test_n_substituted_amine_end_to_end():
+    """The substitutive name '2-{2-[2-(2-methoxyethoxy)ethoxy]ethoxy}-N,N-dimethylethan-1-amine' used to carry the PIN
+    label; makes the 'a' name the PIN, and the check now reads the substitutive name as a failure."""
+    smiles = "COCCOCCOCCOCCN(C)C"
+    row = Orthonym().name_tiered(smiles)
+    assert row["name"] == "N,N-dimethyl-2,5,8,11-tetraoxatridecan-13-amine", row
+    assert row["tier"] == "pin_verified", row
+    failure = check_pin_spelling(_mol(smiles), "2-{2-[2-(2-methoxyethoxy)ethoxy]ethoxy}-N,N-dimethylethan-1-amine")
+    assert failure, failure
+    assert_full_rt(row["name"], smiles)

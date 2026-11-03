@@ -62,10 +62,9 @@ class TestION01PhenolateAnions:
         assert result in ('phenolate', 'phenoxide'), f'Got: {result}'
 
     def test_substituted_phenolate(self):
-        """4-Methylphenolate (para-cresol anion)."""
-        result = name_compound('[O-]c1ccc(C)cc1')
-        # Should contain olate or oxide
-        assert 'ol' in result.lower(), f'Got: {result}'
+        """4-Methylphenoxide (para-cresol anion): phenoxide is the retained PIN, substituted as phenol is
+        , the Blue Book)."""
+        assert name_compound('[O-]c1ccc(C)cc1') == '4-methylphenoxide'
 
 
 class TestION01CarbanionAnions:

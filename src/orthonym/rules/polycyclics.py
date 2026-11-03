@@ -1041,13 +1041,36 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
                 nb.GetIdx() for nb in start_atom.GetNeighbors()
                 if nb.GetIdx() not in core_atoms
             ]
+            if _core_has_carboxy(mol, core_atoms):
+                # (the Blue Book): a carboxylic acid is senior to a sulfonic acid, which is then the
+                # prefix 'sulfo' ('2-sulfonaphthalene-1-carboxylic acid')
+                return {'name': 'sulfo', 'atoms': _sulfo_atoms}
             return {'name': 'sulfonic acid', 'atoms': _sulfo_atoms,
                     'is_suffix': True, 'suffix_type': 'sulfonic_acid'}
         # A sulfide / sulfinyl / sulfonyl group is prefix-only ('methylsulfanyl',
         # 'methanesulfonyl'); anything else stays fail-closed.
         return _identify_pah_prefix_only_chain(mol, start_idx, _frag_atoms)
 
+    # P and As groups ('dihydroxyphosphanyl', 'dimethylphosphanyl', 'dihydroxyarsanyl'), as on benzene
+    if symbol in ('P', 'As') and start_atom.GetFormalCharge() == 0:
+        from .phosphorus import pnictogen_group_prefix
+        _pn = pnictogen_group_prefix(mol, list(_frag_atoms), start_idx)
+        return {'name': _pn, 'atoms': list(_frag_atoms), 'is_complex': True} if _pn else None
+
     return None
+
+
+def _core_has_carboxy(mol, core_atoms) -> bool:
+    """A -COOH on a carbon of the ring system."""
+    for idx in core_atoms:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() in core_atoms or nb.GetSymbol() != 'C':
+                continue
+            oxygens = [(b.GetBondTypeAsDouble(), o.GetTotalNumHs()) for b in nb.GetBonds()
+                       for o in (b.GetOtherAtom(nb),) if o.GetSymbol() == 'O' and o.GetDegree() == 1]
+            if sorted(oxygens) == [(1.0, 1), (2.0, 0)] and nb.GetDegree() == 3:
+                return True
+    return False
 
 
 def _identify_pah_alkyl_group(mol, start_idx: int, core_atoms: Set[int]) -> Optional[Dict]:

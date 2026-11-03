@@ -207,3 +207,14 @@ def test_integration_label():
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(BUTOXY_PEG_ACETATE)
     assert (row["name"], row["tier"]) == (pin, "pin_verified") and not row["spelling_failures"], row
     assert name_compound(BUTOXY_PEG_ACETATE, emit_tier="pin") == pin
+
+
+def test_an_a_chain_on_the_nitrogen_makes_the_parent():
+    """ (the Blue Book): with an 'a' chain on the nitrogen of the principal amine the parent is that
+    chain; an 'a' block only in an N-prefix of a substitutive parent is not the PIN (review finding, lane L7)."""
+    mol = Chem.MolFromSmiles("COCCOCCOCCOCCN(C)CCOCCOCCOCCOC")
+    assert sc.a_chain_amine_parent_check(
+        mol, "2-{2-[2-(2-methoxyethoxy)ethoxy]ethoxy}-N-methyl-N-(2,5,8,11-tetraoxatridecan-13-yl)ethan-1-amine")
+    assert sc.a_chain_amine_parent_check(
+        mol, "N-methyl-N-(2,5,8,11-tetraoxatridecan-13-yl)-2,5,8,11-tetraoxatridecan-13-amine") is None
+    assert sc.a_chain_amine_parent_check(Chem.MolFromSmiles("COCCOCCN(C)C"), "2-(2-methoxyethoxy)-N,N-dimethylethan-1-amine") is None

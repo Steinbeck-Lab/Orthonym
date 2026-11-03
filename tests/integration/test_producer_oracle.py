@@ -124,6 +124,24 @@ class _Oracle:
             return w
         wrap(Orthonym, "_strict_pin_twin_name", twin)
 
+        # a row named through another drawing of the input is built by the run of that drawing; the
+        # rewrite of the drawing's name into the input's name is a step
+        import orthonym.assembly.halogen_drawing as halogen_drawing
+        import orthonym.assembly.ocene_drawing as ocene_drawing
+
+        def drawing(orig):
+            def w(namer_, smiles, *a, **k):
+                seen = set(oracle.rows)
+                row = orig(namer_, smiles, *a, **k)
+                runs = [v for key, v in oracle.rows.items() if key not in seen]
+                if row is not None and runs:
+                    built, events = runs[-1]
+                    oracle.rows[id(row)] = (row, events + [("step", "drawing", built["name"], row["name"], True)])
+                return row
+            return w
+        wrap(halogen_drawing, "iodine_drawing_row", drawing)
+        wrap(ocene_drawing, "ocene_drawing_row", drawing)
+
         # the 53 classes: the handler of each entry of the dispatch table
         for entry in DISPATCH_TABLE.values():
             orig_handler = entry.handler

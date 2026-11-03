@@ -263,12 +263,12 @@ def test_wrong_charge_site_name_never_ships(smiles, old_name):
     from orthonym.cli import _emit_tier_flags
     from tests.support.rt_assert import _independent_parse
     jar_or_skip()
-    assert _fixed_h(_independent_parse(old_name)) != _fixed_h(smiles)
+    assert _fixed_h(_independent_parse(old_name, smiles)) != _fixed_h(smiles)
     for kw in ({}, _emit_tier_flags("best-effort")):
         r = Orthonym(style="pin", **kw).name_tiered(smiles)
         assert r["name"] != old_name, r
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    parsed = _independent_parse(be["name"])
+    parsed = _independent_parse(be["name"], smiles)
     assert parsed and _std_key(parsed) == _std_key(smiles) and _fixed_h(parsed) == _fixed_h(smiles), be
 
 

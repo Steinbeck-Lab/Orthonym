@@ -8503,9 +8503,9 @@ def _assemble_polyamine_name(
             rendered = p.text
         c_prefix_entries.append((rendered_prefix_citation_key(p.text, marker=1, locants=p.locants), rendered))
 
-    all_entries = n_prefix_entries + c_prefix_entries
+    from .composition_primitives import merged_n_and_c_entries, prefixes_after_front_stereo
+    all_entries = merged_n_and_c_entries(sub_tags, n_prefix_entries, _gen_prefixes, c_prefix_entries, features)
     all_entries.sort(key=lambda e: e[0])
-    from .composition_primitives import prefixes_after_front_stereo
     return prefixes_after_front_stereo("-".join(rendered for _k, rendered in all_entries), base_name)
 
 
@@ -10539,8 +10539,8 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             )
             if (_p_attach is not None
                     and mol.GetAtomWithIdx(_p_attach).GetSymbol() == 'P'):
-                from ..rules.phosphorus import name_phosphanyl_substituent
-                _ph = name_phosphanyl_substituent(
+                from ..rules.phosphorus import pnictogen_group_prefix     # hydroxy on P too ('hydroxyphosphanyl')
+                _ph = pnictogen_group_prefix(
                     mol, list(sub_info.frag_atoms), _p_attach)
                 if _ph:
                     substituent_groups[_ph].append(sub_info.locant)

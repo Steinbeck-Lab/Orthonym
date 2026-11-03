@@ -137,7 +137,7 @@ def test_old_wrong_site_name_is_a_different_molecule(smiles, old):
     """The proof: OPSIN reads the old name to the input's full InChIKey (the
     key is protonation-blind), but the protonation-site check refuses it."""
     from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(old)
+    parsed = _independent_parse(old, smiles)
     assert parsed and _key(parsed) == _key(smiles)
     assert not name_is_rt_exact(old, smiles)
 

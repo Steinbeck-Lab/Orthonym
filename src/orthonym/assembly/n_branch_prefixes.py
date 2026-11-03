@@ -51,3 +51,18 @@ def n_branch_last_resort_prefix(mol: Any, atom: Any, attach_atom: int, sub_set: 
         # the outer mark of the returned '(...amino)' is re-chosen by format_substituent_prefix (TRIAGE g3 C10c).
         prefix = apply_enclosing_marks(prefix, -1)
     return f"({prefix}amino)"
+
+
+def hetero_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int) -> Optional[str]:
+    """The prefix of a branch rooted at O, S or N for the functional-group namer of the wider tiers: an
+    ``-NH-SO2-R`` branch is the method (1) '{R}sulfonamido' prefix, the Blue Book), as at the PIN
+    tier ('[(1E)-2-phenylethene-1-sulfonamido]acetate', not '{[...sulfonyl]amino}'); any other branch is named by
+    ``substituent_naming._located_fg_hetero_root``."""
+    from .substituent_naming import _located_fg_hetero_root, sulfonamido_prefix_from_n_branch
+    atom = mol.GetAtomWithIdx(attach_idx)
+    if atom.GetSymbol() == 'N':
+        parent = {nb.GetIdx() for nb in atom.GetNeighbors()} - set(sub_atoms)
+        sulfonamido = sulfonamido_prefix_from_n_branch(mol, attach_idx, sub_atoms, parent)
+        if sulfonamido:
+            return sulfonamido
+    return _located_fg_hetero_root(mol, sub_atoms, attach_idx)

@@ -60,7 +60,7 @@ class TestAromaticIsocyanatePin:
 
     @pytest.mark.parametrize("smiles,expected", ARYL)
     def test_aryl_name_reads_back_to_the_input(self, smiles, expected):
-        parsed = _independent_parse(expected)
+        parsed = _independent_parse(expected, smiles)
         assert parsed is not None, f"OPSIN rejects {expected!r}"
         assert _key(parsed) == _key(smiles), (expected, parsed)
 

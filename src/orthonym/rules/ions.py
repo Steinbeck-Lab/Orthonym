@@ -476,8 +476,8 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
         # Carbocation -> ylium (carbenium ion)
         return 'ylium'
 
-    elif element in ('O', 'S', 'P', 'Se'):
-        # Oxonium, sulfonium, phosphonium, selenonium
+    elif element in ('O', 'S', 'P', 'Se', 'As', 'Te'):
+        # Oxonium, sulfonium, phosphonium, selenonium, arsanium, tellanium: 'tetraphenylarsanium')
         return 'onium'
 
     return 'unknown'

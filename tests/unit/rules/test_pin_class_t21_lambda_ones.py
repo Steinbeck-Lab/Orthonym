@@ -64,8 +64,6 @@ PIN_ROWS_MORE = [
 # Not built: the additive name is recorded as not the PIN, so the PIN tier declines it and best-effort keeps it.
 DECLINED_ROWS = [
     "O=S1(=O)C=Cc2ccccc12",              # 1-benzothiophene 1,1-dioxide
-    "O=S1(=O)c2ccccc2-c2ccccc21",        # dibenzo[b,d]thiophene 5,5-dioxide
-    "O=S1c2ccccc2-c2ccccc21",            # dibenzo[b,d]thiophene 5-oxide
     # selenium and tellurium: words the ring heterone for -SO- and -SO2- (:29436,:29444); the heterones of Se and
     # Te are named by analogy gives them for acyclic heterones), so the name is no PIN
     "O=[Se]1CCNCC1",                     # 1λ4-selenomorpholin-1-one at best-effort
@@ -81,7 +79,15 @@ NOT_TAKEN_ROWS = [
 ]
 
 
-@pytest.mark.parametrize("smiles,pin", PIN_ROWS + PIN_ROWS_MORE)
+# the heterone on the catalogue parent, as '5H-λ6-thianthrene-5,5-dione (PIN) thianthrene 5,5-dioxide',
+# the Blue Book); ``rules/catalogue_heterones``
+CATALOGUE_HETERONE_ROWS = [
+    ("O=S1(=O)c2ccccc2-c2ccccc21", "5H-5λ6-dibenzo[b,d]thiophene-5,5-dione"),
+    ("O=S1c2ccccc2-c2ccccc21", "5H-5λ4-dibenzo[b,d]thiophen-5-one"),
+]
+
+
+@pytest.mark.parametrize("smiles,pin", PIN_ROWS + PIN_ROWS_MORE + CATALOGUE_HETERONE_ROWS)
 def test_pin_at_both_tiers(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
 

@@ -79,7 +79,8 @@ RERUN_BUILT = frozenset({
     # 32693) 'acetamide (PIN)' can be substituted; (:32849) "names
     # expressing N-substitution by a phenyl group on an amide are preferred IUPAC
     # names", 'N-phenylacetamide (PIN)' (:32859); pin_verified.
-    "C=C1C[C@@H](O)CC(C)(C)[C@@H]1/C=C/C1=CC(=O)OC1",
+    # (lane L7, item 10) 'C=C1C[C@@H](O)CC(C)(C)[C@@H]1/C=C/C1=CC(=O)OC1' left: its 'methylidene' prefix is no
+    # ylidene prefix with an E/Z of its own, and the re-run certificate now certifies it (assembly.pin_rerun)
     # '2-[(4-methoxy-3,5-dimethylpyridin-2-yl)methanesulfinyl]-1H-1,3-benzimidazol-6-ol' left this list: a CH2
     # between a ring and the sulfur of a sulfinyl group is the parent of that group, not the ring's methyl
     #; rules.parent_selection.single_carbon_hosts_suffix), so the strict first run spells the

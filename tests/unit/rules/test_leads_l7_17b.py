@@ -77,7 +77,7 @@ class TestPerUnitDescriptors:
 
     @pytest.mark.parametrize("smiles,name,key", UNIFORM)
     def test_name_reads_back_to_the_input(self, smiles, name, key):
-        parsed = _independent_parse(name)
+        parsed = _independent_parse(name, smiles)
         assert parsed is not None, f"OPSIN rejects {name!r}"
         assert _key(parsed) == _key(smiles), (name, parsed)
         if key:

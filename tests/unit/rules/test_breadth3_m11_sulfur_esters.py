@@ -73,7 +73,7 @@ def _assert_named(smiles, expected, tiers):
            else Orthonym().name_tiered(smiles))
     assert row["name"] == expected, row
     assert row["tier"] in tiers, row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", [

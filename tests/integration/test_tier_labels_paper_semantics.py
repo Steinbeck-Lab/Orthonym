@@ -65,7 +65,7 @@ def test_verified_general_engine_von_baeyer_name_is_systematic_verified():
     assert row["is_pin"] is False, row
     assert row["opsin"] == "verified" and row["verified"] == "opsin", row
     # independent OPSIN read-back (not through the engine), full InChIKey
-    assert _key(_independent_parse(row["name"])) == _key(CASE)
+    assert _key(_independent_parse(row["name"], CASE)) == _key(CASE)
 
 
 # ---------------------------------------------------------------------------

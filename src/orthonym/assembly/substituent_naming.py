@@ -9109,11 +9109,11 @@ def _name_substituent_fragment_uncached(
         try:
             _asym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
             if _asym in ('O', 'S', 'N'):
-                _fg_name = _located_fg_hetero_root(mol, list(sub_atoms), attach_idx)
+                from .n_branch_prefixes import hetero_root_prefix   #: '{R}sulfonamido' first
+                _fg_name = hetero_root_prefix(mol, list(sub_atoms), attach_idx)
             else:
-                # bugfix: request `with_pos=True` in the SAME call that
-                # builds `_fg_name`, and hand the resulting (name, k, pos)
-                # triple to `_add_substituent_stereo` as `located`. This chain
+                # bugfix: request `with_pos=True` in the SAME call that builds `_fg_name`, and
+                # hand the resulting (name, k, pos) triple to `_add_substituent_stereo` as `located`. This chain
                 # is the ONLY deriver that can locate a stereocentre sitting on
                 # an FG-shaped chain (the strict, non-FG deriver
                 # `_add_substituent_stereo` falls back to declines it, which

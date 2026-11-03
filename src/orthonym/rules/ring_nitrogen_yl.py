@@ -83,3 +83,11 @@ def _ring_group(mol, atom_idx: int):
                 seen.add(other)
                 stack.append(other)
     return seen
+
+
+def large_substituent_in_scope(mol, start_idx: int, sub_atoms, ring_atoms) -> bool:
+    """A substituent of more than ten atoms that the benzene collector still names: a ring-nitrogen '-yl' group
+    (``ring_nitrogen_yl``) or an 'a' chain ('4-(2,5,8,11-tetraoxatridecan-13-yl)benzoic acid',."""
+    from .replacement_chain_prefix import replacement_chain_prefix
+    return (ring_yl_in_scope(mol, start_idx, sub_atoms) or ring_yl_branch_in_scope(mol, sub_atoms, ring_atoms)
+            or replacement_chain_prefix(mol, list(sub_atoms), start_idx) is not None)

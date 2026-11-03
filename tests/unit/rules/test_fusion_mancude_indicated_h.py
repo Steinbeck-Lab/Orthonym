@@ -70,7 +70,7 @@ def test_fused_name_denotes_the_input_tautomer(smiles, expected):
     """The emitted name parses back to the input on canonical SMILES, which
     distinguishes tautomers that share one standard InChIKey."""
     name = name_compound(smiles)
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed is not None, f"OPSIN could not parse {name!r}"
     assert _canon(parsed) == _canon(smiles), (
         f"{name!r} parses to {parsed!r}, not the input tautomer {smiles!r}")

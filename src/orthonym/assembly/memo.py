@@ -257,6 +257,9 @@ def shareable_entries(scopes, into=None) -> dict:
         for key, value in scope.items():
             if isinstance(key, tuple) and key and key[0] in _SHAREABLE_NAMESPACES:
                 out[key] = value
+            elif (isinstance(key, tuple) and len(key) == 2 and key[0] == _ABSTENTION_KEY
+                  and isinstance(key[1], tuple) and key[1] and key[1][0] in _SHAREABLE_NAMESPACES):
+                out[key] = value        # the abstention record a hit on that entry replays
         side.update({k: v for k, v in scope.get(_SIDE_KEY, {}).items() if k[0] in _SHAREABLE_NAMESPACES})
     return out
 
@@ -440,7 +443,22 @@ def cache_or_compute(namespace, key, compute_fn, compared=None):
         return val
     # mode == "on"
     if ck in cache:
+        # a value whose computation recorded an abstention replays that one record, so a decline served from the
+        # memo reports the reason its computation found (one record per key: bounded)
+        record = cache.get((_ABSTENTION_KEY, ck), _NO_RECORD)
+        if record is not _NO_RECORD:
+            from ..metrics.abstention import restore_abstention
+            restore_abstention(record)
         return cache[ck]
+    from ..metrics.abstention import peek_abstention
+    before = peek_abstention()
     val = compute_fn()
     cache[ck] = val
+    after = peek_abstention()
+    if after is not before:
+        cache[(_ABSTENTION_KEY, ck)] = after
     return val
+
+
+_ABSTENTION_KEY = "__abstention__"
+_NO_RECORD = object()

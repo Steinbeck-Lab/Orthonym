@@ -85,7 +85,7 @@ class TestGuard1NoCrossFire:
         CC(C)(C)[O-] is NOT used here because tert-butoxide is a RETAINED PIN
         (BB, lines 28180/41017: "tert-butoxide... is also retained
         as a preferred IUPAC name"), so it never exercises the systematic path."""
-        assert _rc("CCC(C)C[O-]") == "2-methylbutan-1-olate"
+        assert _rc("CCC(C)C[O-]") == "2-methylbutoxide"
 
     def test_tert_butoxide_is_retained_pin(self):
         """BB (lines 28180/41017): tert-butoxide is retained AS A

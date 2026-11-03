@@ -42,7 +42,8 @@ from .opsin_ambiguity import ambiguity_messages
 UIDE_TWIN_RULE = "uide_lambda"
 
 #: a halogen -uide name: its prefixes (one string, no space) and the parent token without its 'uide'
-_HALOGEN_UIDE = re.compile(r"(?P<prefixes>\S+?)(?P<stem>iodan|broman|chloran)uide")
+#: the cation words of a salt come first ("sodium diphenyliodanuide"); the twin keeps them
+_HALOGEN_UIDE = re.compile(r"(?P<cations>(?:[a-z0-9()+-]+ )*)(?P<prefixes>\S+?)(?P<stem>iodan|broman|chloran)uide")
 #: the element of each parent token
 _STEM_ELEMENT = {"iodan": "I", "broman": "Br", "chloran": "Cl"}
 
@@ -88,7 +89,7 @@ def uide_twin(name: str) -> Optional[str]:
         return None
     from ..rules.ions import _UIDE_STD_VALENCE
     bonding_number = _UIDE_STD_VALENCE[_STEM_ELEMENT[found["stem"]]] + 2
-    return f"{found['prefixes']}-{LAMBDA}{bonding_number}-{found['stem']}ide"
+    return f"{found['cations']}{found['prefixes']}-{LAMBDA}{bonding_number}-{found['stem']}ide"
 
 
 def uide_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:

@@ -57,7 +57,7 @@ QUICK_START = [
 @pytest.mark.parametrize("smiles,name", QUICK_START, ids=[n for _, n in QUICK_START])
 def test_quick_start_example_prints_its_name(smiles, name):
     assert name_compound(smiles) == name
-    assert _key(_independent_parse(name)) == _key(smiles)
+    assert _key(_independent_parse(name, smiles)) == _key(smiles)
 
 
 def test_round_trip_picture_caffeine():
@@ -92,7 +92,7 @@ def test_specimen_row(smiles, tier, name, label):
     row = _row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == label and row["verified"] == "opsin", row
-    assert _key(_independent_parse(name)) == _key(smiles)
+    assert _key(_independent_parse(name, smiles)) == _key(smiles)
 
 
 # README gallery ("What it names"): the seven cards and the tier each one draws
@@ -116,7 +116,7 @@ def test_gallery_card(smiles, tier, name, label):
     row = _row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == label, row
-    assert _key(_independent_parse(name)) == _key(smiles)
+    assert _key(_independent_parse(name, smiles)) == _key(smiles)
 
 
 def test_specimen_xenon_difluoride_declines():
@@ -153,7 +153,7 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
             assert row["name"] not in (carve["name"], diol["name"]), row
             if row["name"]:
                 assert row["verified"] == "opsin", row
-                assert _key(_independent_parse(row["name"])) == _key(s), row
+                assert _key(_independent_parse(row["name"], s)) == _key(s), row
 
 
 def test_default_tier_twin_checked_pin_spelling_is_read_back_through_its_twin():

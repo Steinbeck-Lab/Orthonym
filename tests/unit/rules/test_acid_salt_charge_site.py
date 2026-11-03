@@ -73,7 +73,7 @@ def test_method_1_keeps_the_anion_site(smiles, name):
     from tests.support.rt_assert import _independent_parse
     r = _pin(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
 
 
@@ -91,7 +91,7 @@ def test_method_2_for_an_open_hydron_site(smiles, name):
     from tests.support.rt_assert import _independent_parse
     r = _pin(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and _key(parsed) == _key(smiles)
 
 
@@ -121,7 +121,7 @@ def test_bare_hydron_on_one_oxoacid_centre(smiles, name):
     from tests.support.rt_assert import _independent_parse
     r = _pin(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and _key(parsed) == _key(smiles)
 
 
@@ -142,7 +142,7 @@ def test_diphosphonate_acid_salt_keeps_a_salt_name():
     smiles = "[Na+].[Na+].OP(=O)([O-])CP(=O)([O-])O"
     r = _pin(smiles)
     assert r["name"] == "disodium dihydrogen methylenebis(phosphonate)", r
-    assert _key(_independent_parse(r["name"])) == _key(smiles)
+    assert _key(_independent_parse(r["name"], smiles)) == _key(smiles)
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert be["name"] == r["name"], be
 
@@ -162,7 +162,7 @@ def test_linked_phosphonic_acids_are_multiplied(smiles, name):
     from tests.support.rt_assert import _independent_parse
     r = _pin(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and _key(parsed) == _key(smiles)
 
 
@@ -192,7 +192,7 @@ def test_method_2_where_method_1_has_no_parent(smiles, name):
     from tests.support.rt_assert import _independent_parse
     r = declined_pin_row(smiles)
     assert r["name"] == name and r["tier"] == "systematic_verified", r
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and _fixed_h(parsed) == _fixed_h(smiles)
 
 
@@ -249,5 +249,5 @@ def test_best_effort_keeps_the_salt_form(smiles):
     from tests.support.rt_assert import _independent_parse
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert be["name"].startswith("disodium ") and "sodium(1+)" not in be["name"], be
-    parsed = _independent_parse(be["name"])
+    parsed = _independent_parse(be["name"], smiles)
     assert parsed and _fixed_h(parsed) == _fixed_h(smiles)

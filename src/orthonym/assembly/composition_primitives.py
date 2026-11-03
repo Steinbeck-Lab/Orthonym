@@ -988,3 +988,46 @@ __all__ = [
     "is_ring_parent_name",
     "_MONONUCLEAR_STEMS",
 ]
+
+
+def merged_n_and_c_entries(sub_tags, n_entries, c_prefixes, c_entries, features=None) -> list:
+    """The prefix entries of a polyamine with one entry per simple prefix name: the N-locants of an identical simple
+    prefix on the nitrogens come first in the one multiplied prefix, then the numerical locants of its carbon ones
+    ('N1,N4,2-trimethylbutane-1,4-diamine').: identical prefixes are one multiplied prefix with all their
+    locants; the book cites the N-locant first ('N,4-dimethyl-N-(3-methylphenyl)benzamide', the Blue Book;
+    'N,2-dimethylpropanamide',:21624). ``n_entries`` follow the order of ``sub_tags``; ``c_entries`` that of
+    ``c_prefixes`` (``NameFragment``). A compound or enclosed name is not merged. The merge needs N-locants that the
+    other orientation of the principal chain of ``features`` gives again ('N1,N4'): where reversing it moves an N-locant
+    ('N2' <-> 'N4' on pentane-2,4-diamine) the book's choice between the two numberings, 'N4,2-dimethylpentane-2,4-
+    diamine (PIN)' (the Blue Book), is not built here, and the entries stay as they were (below the PIN)."""
+    from .naming_utils import alpha_sort_key_with_locants, multiplied_component
+    from ..data.chain_names import multiplying_prefix
+    from ..data.locant_text import render_locants
+    chain_length = len(getattr(features, "principal_chain", None) or ())
+    n_names = list(sub_tags)
+    merged_n, out_c = set(), []
+    for frag, entry in zip(c_prefixes, c_entries):
+        base, count = getattr(frag, "text_without_locants", None), len(getattr(frag, "locants", None) or ())
+        if base and count > 1:
+            mult = multiplying_prefix(count)
+            base = base[len(mult):] if mult and base.startswith(mult) else None
+        if (not base or not count or base not in sub_tags or base in merged_n or not base.isalpha()
+                or not _n_locants_survive_reversal(sub_tags[base], chain_length)):
+            out_c.append(entry)
+            continue
+        tags = sorted(sub_tags[base], key=lambda t: (int(t.replace("'", "")[1:] or 0), t.count("'"), t))
+        locants = list(tags) + [str(loc) for loc in sorted(frag.locants)]
+        rendered = f"{render_locants(locants)}-{multiplied_component(len(locants), base, base)}"
+        merged_n.add(base)
+        out_c.append((alpha_sort_key_with_locants(base, (0, ())), rendered))
+    kept_n = [entry for name, entry in zip(n_names, n_entries) if name not in merged_n]
+    return kept_n + out_c
+
+
+def _n_locants_survive_reversal(tags, chain_length: int) -> bool:
+    """True when the N-locants ``tags`` ('N1', 'N4') are the same set on the reversed chain of ``chain_length``."""
+    try:
+        nums = sorted(int(t.replace("'", "")[1:]) for t in tags)
+    except ValueError:
+        return False
+    return bool(chain_length) and nums == sorted(chain_length + 1 - n for n in nums)

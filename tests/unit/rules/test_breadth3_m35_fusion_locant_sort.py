@@ -41,4 +41,4 @@ def test_fused_ketone_with_fusion_locant_prefixes_names(smiles, expected):
     row = Orthonym().name_tiered(smiles)
     assert row["name"] == expected, row
     assert row["tier"] == "pin_verified", row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)

@@ -83,3 +83,20 @@ def test_a_chain_ending_in_a_hydroxy_group_needs_its_a_name():
     from orthonym.validation.spelling.checks_skeletal_chain import a_substituent_chain_applies
     assert a_substituent_chain_applies(Chem.MolFromSmiles("OCCOCCOCCOCCOCCOC1CCCCC1"))
     assert not a_substituent_chain_applies(Chem.MolFromSmiles("OCCOCCOC1CCCCC1"))
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles, name", [
+    ("COCCOCCOCCOCCc1ccc(C(=O)O)cc1", "4-(2,5,8,11-tetraoxatridecan-13-yl)benzoic acid"),
+    ("COCCOCCOCCOCCc1ccc(O)cc1", "4-(2,5,8,11-tetraoxatridecan-13-yl)phenol"),
+    ("COCCOCCOCCOCCOCCc1ccccc1C(N)=O", "2-(2,5,8,11,14-pentaoxahexadecan-16-yl)benzamide"),
+], ids=lambda v: v)
+def test_a_chain_bonded_by_carbon_to_a_benzene_parent(smiles, name):
+    """ (the Blue Book): the 'a' chain on a benzene carbon is the prefix
+    '...-tetraoxatridecan-13-yl', the free valence follows the fixed numbering); the benzene collector
+    passes it beside its ten-atom limit (``ring_nitrogen_yl.large_substituent_in_scope``)."""
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)
+    assert row["name"] == name, row
+    assert row["tier"] == "pin_verified", row

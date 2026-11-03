@@ -202,8 +202,8 @@ def _acyl_group(mol, comp) -> bool:
 
 def _kind(mol, path, host, root):
     """What hangs from the path atom ``host`` at ``root`` (the neighbour that is not on the path): one of
-    'halogen', 'OH', '=O', 'SH', 'NH2', 'alkyl' (carbon and halogen atoms only), 'acyl', or None for anything
-    else. The leaves stand on a path carbon, an acyl group on an end atom of the path."""
+    'halogen', 'OH', '=O', 'SH', 'NH2', 'alkyl' (carbon and halogen atoms only), 'NHR' (an NHR or NR2 amine with
+    saturated carbon parts), 'acyl', or None for anything else. The leaves stand on a path carbon, an acyl group on an end atom of the path."""
     path_set = set(path)
     comp = _component(mol, root, path_set)
     bond = mol.GetBondBetweenAtoms(host, root)
@@ -224,6 +224,14 @@ def _kind(mol, path, host, root):
     atoms = [mol.GetAtomWithIdx(i) for i in comp]
     if all(_clean(a) and a.GetSymbol() in ({"C"} | _HALOGEN) for a in atoms):
         return "alkyl"
+    # the principal amine NHR or NR2 on a path carbon: the nitrogen and saturated carbons only, every bond of the
+    # nitrogen single to a carbon ('4-ethoxy-N,N,N-trimethyl-3,5,8-trioxa-4-phosphadecan-10-aminium (PIN)',:23379)
+    if (on_carbon and symbol == "N" and _clean(first)
+            and all(n.GetSymbol() == "C" for n in first.GetNeighbors())
+            and all(b.GetBondType() == _SINGLE for b in first.GetBonds())
+            and all(_clean(a) and a.GetSymbol() == "C" for a in atoms if a.GetIdx() != root)
+            and all(b.GetBondType() == _SINGLE for i in comp for b in mol.GetAtomWithIdx(i).GetBonds())):
+        return "NHR"
     if host in (path[0], path[-1]) and _acyl_group(mol, comp):
         return "acyl"
     return None
@@ -234,6 +242,11 @@ def _n_policy_ok(mol, path, hung) -> bool:
     group hangs on the chain), or, for a polyamine, when the two NH2 groups sit one on each end atom and no
     chain nitrogen carries a substituent,:26324; ':26400')."""
     nitrogens = [i for i in path if mol.GetAtomWithIdx(i).GetSymbol() == "N"]
+    if any(kind == "NHR" for _host, kind in hung):
+        # the substituted amine is the principal group only without a senior group or another amine
+        return not nitrogens and all(kind not in _SENIOR and kind not in ("NH2", "NHR")
+                                     for _host, kind in hung if kind != "NHR") and \
+            sum(1 for _host, kind in hung if kind == "NHR") == 1
     if not nitrogens or any(kind in _SENIOR for _host, kind in hung):
         return True
     amino_hosts = sorted(host for host, kind in hung if kind == "NH2")
@@ -358,3 +371,43 @@ def a_chain_name_check(mol, name) -> Optional[SpellingFailure]:
         RULE, "skeletal replacement 'a' name required: the acyclic chain has four or more heterounits, none "
               "of them part of the principal characteristic group (P-51.4.1.1), and the name has no 'a' prefix "
               "block on an acyclic stem")
+
+
+def _principal_amine_with_a_branch(mol) -> bool:
+    """A neutral acyclic amine whose one nitrogen (single bonds to carbons only, no OH or SH in the molecule) carries
+    a branch that is an 'a' chain: four or more separate O or S atoms on a carbon path from the nitrogen's carbon."""
+    if mol is None or mol.GetRingInfo().NumRings() or len(Chem.GetMolFrags(mol)) != 1:
+        return False
+    if any(a.GetFormalCharge() or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return False
+    nitrogens = [a for a in mol.GetAtoms() if a.GetSymbol() == "N"]
+    if len(nitrogens) != 1 or any(n.GetSymbol() != "C" for n in nitrogens[0].GetNeighbors()):
+        return False
+    if any(a.GetSymbol() in ("O", "S") and a.GetDegree() == 1 for a in mol.GetAtoms()):
+        return False
+    n_idx = nitrogens[0].GetIdx()
+    for nb in nitrogens[0].GetNeighbors():
+        branch, stack = set(), [nb.GetIdx()]
+        while stack:
+            a = stack.pop()
+            if a in branch or a == n_idx:
+                continue
+            branch.add(a)
+            stack.extend(x.GetIdx() for x in mol.GetAtomWithIdx(a).GetNeighbors())
+        if sum(1 for i in branch if mol.GetAtomWithIdx(i).GetSymbol() in ("O", "S")) >= 4:
+            return True
+    return False
+
+
+_A_AMINE_PARENT = re.compile(_A_NAME.pattern + r"an-\d+-amine$")
+
+
+@register(RULE)
+def a_chain_amine_parent_check(mol, name) -> Optional[SpellingFailure]:
+    """A failure when the principal amine of ``mol`` has an 'a' chain on its nitrogen and the parent of ``name`` is
+    not an 'a' chain: makes the 'a' chain the parent ('N-methyl-N-(2,5,8,11-tetraoxatridecan-13-yl)-
+    2,5,8,11-tetraoxatridecan-13-amine'); an 'a' block only inside a prefix of a substitutive parent is not the PIN."""
+    if not name or not _principal_amine_with_a_branch(mol) or _A_AMINE_PARENT.search(name):
+        return None
+    return SpellingFailure(
+        RULE, "the parent of a principal amine with an 'a' chain on its nitrogen is that 'a' chain (P-51.4.1.1)")

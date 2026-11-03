@@ -70,6 +70,7 @@ from .ions import (
     classify_cation,
 )
 from .azaniumyl_zwitterions import fully_ionised_azaniumyl_zwitterion
+from .retained_alkoxides import retained_alkoxide_or
 from .ester_zwitterions import phosphodiester_zwitterion_name
 from .olate_anions import olate_anion_name, olate_on_nitrogen_must_read_back
 from .ring_position_kinds import one_kind_of_substitutable_position
@@ -4002,11 +4003,11 @@ def route_charged(mol, style: str = 'pin') -> str:
                         return rederived
         return naive
 
-    ionized = olate_on_nitrogen_must_read_back(mol, apply_ion_suffix_to_name(
+    ionized = retained_alkoxide_or(mol, olate_on_nitrogen_must_read_back(mol, apply_ion_suffix_to_name(
         neutral_name, total_charge,
         allowed_suffixes=allowed_suffixes,
         cation_class=cation_class,
-    ))
+    )))  # (the Blue Book): '4-chlorophenoxide'
     if ionized:
         #: an -iminide name inherits the neutral imine's locants
         # (butan-1-iminide, P,P,P-trimethyl-...); the =N- anion removes the N-H, so

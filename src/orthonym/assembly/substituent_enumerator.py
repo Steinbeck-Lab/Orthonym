@@ -2827,8 +2827,8 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             except Exception:
                 pass
             try:
-                from ..rules.phosphorus import name_phosphanyl_substituent
-                _ph = name_phosphanyl_substituent(
+                from ..rules.phosphorus import pnictogen_group_prefix     # hydroxy on P too ('hydroxyphosphanyl')
+                _ph = pnictogen_group_prefix(
                     mol, list(frag_atoms_set), attach_idx
                 )
                 if _ph:

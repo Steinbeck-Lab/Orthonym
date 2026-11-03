@@ -30,7 +30,7 @@ pytestmark = pytest.mark.opsin_gate
 def test_polyazane_prefix_at_both_tiers(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
     fixed = lambda s: inchi.MolToInchi(Chem.MolFromSmiles(s), options="/FixedH")
-    assert fixed(_independent_parse(pin)) == fixed(smiles)
+    assert fixed(_independent_parse(pin, smiles)) == fixed(smiles)
 
 
 @pytest.mark.parametrize("hydride", ["triazene", "triazane", "tetraazane"])

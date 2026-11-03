@@ -25,7 +25,7 @@ ROWS = [
 @pytest.mark.parametrize("smiles,name", ROWS)
 def test_retained_key_is_the_structure_of_the_name(smiles, name):
     assert get_retained_name(Chem.CanonSmiles(smiles)) == name
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and Chem.CanonSmiles(parsed) == Chem.CanonSmiles(smiles)
 
 

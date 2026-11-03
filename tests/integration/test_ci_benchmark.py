@@ -149,7 +149,7 @@ class _TierRow:
         # halves independently: (1) the name without its stereodescriptors reads back, by
         # a fresh OPSIN call, to the input's constitution (first InChIKey block);
         flat = re.sub(r"\((?:\d+[RSEZ],?)+\)-", "", name)
-        opsin_smi = _independent_parse(flat)
+        opsin_smi = _independent_parse(flat, smiles)
         assert opsin_smi and (
             _full_inchikey(opsin_smi).split("-")[0]
             == _full_inchikey(smiles).split("-")[0]

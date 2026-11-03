@@ -310,19 +310,28 @@ _ORGANOMETALLIC_BRANCH_SMI = "CCC1=CC[C-]=C1C.CCC1=CC[C-]=C1C.CC(=[Ti+2])C.[Cl-]
 
 
 class TestConfidenceSurface:
-    @pytest.mark.xfail(strict=True, reason=(
-        "Known reporting defect (roadmap, 2026-10-23): since the junior namings of the clean-name preference "
-        "start from the memo entries of an earlier naming (assembly.memo seeded scopes), a value served from "
-        "the memo makes none of the abstention records its computation made, so this declined organometallic "
-        "reports OTHER instead of BRANCH_UNNAMEABLE. No name changes. A replay of every record on every hit "
-        "(b0011f713) was reverted: it grew test workers past 24 GB. Fix: replay only for seeded entries, bounded."))
-    def test_confidence_dict_carries_abstention_on_failure(self):
-        meta = Orthonym(
-            general_fallback=True, general_fallback_unverified=True,
-            allow_aromatic_general=True).name_with_confidence(
-                _ORGANOMETALLIC_BRANCH_SMI)
-        assert is_failure_name(meta["name"])
-        assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
+    def test_a_memo_hit_replays_the_abstention_its_computation_recorded(self):
+        """The reporting defect of 2026-10-23: a value served from the memo made none of the abstention records its
+        computation made, so a decline served from a seeded entry reported OTHER. The memo keeps the one record a
+        computation left (``assembly.memo.cache_or_compute``, bounded: one record per key) and replays it on a hit.
+        (The organometallic witness of the old strict xfail is named since lane L7.)"""
+        from orthonym.assembly.memo import cache_or_compute, pop_scope, push_scope
+        from orthonym.metrics.abstention import clear_abstention, peek_abstention, record_abstention
+
+        def compute():
+            record_abstention(AbstentionCode.BRANCH_UNNAMEABLE, "witness")
+            return None
+
+        token = push_scope()
+        try:
+            clear_abstention()
+            assert cache_or_compute("test_ns", ("k",), compute) is None
+            clear_abstention()
+            assert cache_or_compute("test_ns", ("k",), lambda: pytest.fail("served from the memo")) is None
+            assert peek_abstention().code is AbstentionCode.BRANCH_UNNAMEABLE
+        finally:
+            pop_scope(token)
+            clear_abstention()
 
     def test_confidence_dict_carries_abstention_on_failure_ring_witness(self):
         # A ring-fallback witness (``TestEndToEndCodes._RING_FALLBACK_SMI``; the former one, PubChem CID 10887849, no

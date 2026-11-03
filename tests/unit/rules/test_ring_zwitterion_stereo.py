@@ -100,7 +100,7 @@ def _stereo_aware(smiles, parsed, partial=False):
 
 def _exact(name, smiles):
     from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     return (bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
             and _stereo_aware(smiles, parsed))
 
@@ -201,7 +201,7 @@ def test_l_proline_zwitterion_is_the_ring_azanium_carboxylate():
     from orthonym.cli import _emit_tier_flags
     r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert r["name"] == "(2S)-pyrrolidin-1-ium-2-carboxylate" and r["tier"] == "pin_verified", r
-    assert _key(_independent_parse("(2S)-pyrrolidin-1-ium-2-carboxylate")) == _key(smiles)
+    assert _key(_independent_parse("(2S)-pyrrolidin-1-ium-2-carboxylate", smiles)) == _key(smiles)
 
 
 def test_the_emitter_cites_the_descriptors_in_its_own_numbering():
@@ -338,7 +338,7 @@ def test_a_pseudoasymmetric_ring_takes_r_at_the_lower_locant(smiles, name):
     labels = sorted(a.GetProp("_CIPCode") for a in mol.GetAtoms() if a.HasProp("_CIPCode"))
     assert labels == sorted(re.findall(r"\d([RSrs])", name.split(")-")[0])), (labels, name)
     reduced = re.sub(r",\d[rs]", "", name)
-    parsed = _independent_parse(reduced)
+    parsed = _independent_parse(reduced, smiles)
     assert parsed and _stereo_aware(smiles, parsed, partial=True), (reduced, parsed)
 
 

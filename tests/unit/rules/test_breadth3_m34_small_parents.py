@@ -35,7 +35,7 @@ def _assert_named(smiles, expected, tiers=("pin_verified",)):
     row = Orthonym().name_tiered(smiles)
     assert row["name"] == expected, row
     assert row["tier"] in tiers, row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 def test_henicosa_multiplier_in_an_ester_alkyl():

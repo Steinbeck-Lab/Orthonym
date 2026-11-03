@@ -281,7 +281,9 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
 
     # and: the heterone (the sultone and the sultam among them)
     # takes precedence over the additive '...dioxide' form.
-    heterone = _name_ring_heterone(mol) or _mancude_thiophene_heterone(mol) or _fused_ring_heterone(mol)
+    from .catalogue_heterones import catalogue_heterone_name
+    heterone = (_name_ring_heterone(mol) or _mancude_thiophene_heterone(mol) or _fused_ring_heterone(mol)
+                or catalogue_heterone_name(mol))
     if heterone is not None:
         return heterone
 

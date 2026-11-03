@@ -312,7 +312,7 @@ class TestDenyByDefault:
             # the licence correctly fires inside the enclosing marks while the
             # anion is expressed on the parent. Per-scope evaluation, working.
             ("FC(F)(F)C(F)(F)c1ccc([O-])cc1",
-             "4-(pentafluoroethyl)phenolate",
+             "4-(pentafluoroethyl)phenoxide",
              "charge outside the scope must not veto a licence inside it"),
         ],
     )

@@ -914,6 +914,15 @@ def multiplicative_candidate(mol) -> bool:
         repeated = {k: v for k, v in groups.items() if len(v) >= 2}
         if not repeated:
             return False
+        # (the Blue Book): an ionic centre outside the repeated units is senior to every neutral class, so
+        # the parent holds it and the units are its substituents ('bis(4-hydroxyphenyl)iodanium'); a nitro or N-oxide
+        # pair (N+ beside O-) is no centre
+        in_units = set().union(*(sy for v in repeated.values() for sy in v))
+        if Chem.GetFormalCharge(mol) and any(
+                a.GetFormalCharge() and a.GetIdx() not in in_units
+                and not any(n.GetFormalCharge() == -a.GetFormalCharge() for n in a.GetNeighbors())
+                for a in mol.GetAtoms()):
+            return False
         fgs = detect_functional_groups(mol)
         pg, pg_matches = get_principal_group(mol, fgs)
         if pg:

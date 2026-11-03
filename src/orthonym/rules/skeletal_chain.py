@@ -25,7 +25,13 @@ legacy path in ``skeletal_replacement`` and then the substitutive namers see the
 * a chain nitrogen is the principal amine, not a skeletal atom, when no OH or SH group is on the chain, unless the
   amine groups are exactly two NH2, one on each end atom of the chain, and every chain nitrogen has two neighbours
    Polyamines,:26324, ``3,6,9,12-tetraazatetradecane-1,14-diamine (PIN)``,:26400); any other such chain
-  is left to the substitutive namers.
+  is left to the substitutive namers;
+* the one nitrogen of a molecule without OH, SH or NH2 groups, bonded by single bonds to carbons only, whose other
+  neighbours carry alkyl parts of the kinds above, is the principal amine NHR or NR2 on the chain carbon: the suffix
+  ``-amine`` with ``N``-prefixes, never a skeletal atom: none of the chain heteroatoms is part of the
+  principal characteristic group; ``4-ethoxy-N,N,N-trimethyl-3,5,8-trioxa-4-phosphadecan-10-aminium (PIN)``,
+  :23379). An alkyl name used both on the chain and on the nitrogen declines (the order of the mixed locants is not
+  built).
 
 The principal chain is chosen by ``### **** SENIORITY ORDER FOR PARENT STRUCTURES``,:18875, the
 greater number of principal groups, which comes before the criteria of chains) and then ``## **** SENIORITY OF
@@ -80,10 +86,11 @@ _TRIPLE = Chem.BondType.TRIPLE
 class _Pendant:
     """A part of the molecule off the chain, attached by one single bond to the chain atom ``attach`` (atom index).
     ``kind`` is ``"sub"`` for a prefix (``text`` is its name) or ``"leaf"`` for an OH, SH or NH2 on the chain
-    (``text`` is ``"O"``, ``"S"`` or ``"N"``)."""
+    (``text`` is ``"O"``, ``"S"`` or ``"N"``); ``n_prefixes`` are the alkyl names on the nitrogen of an NHR or NR2."""
     attach: int
     kind: str
     text: str
+    n_prefixes: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -107,6 +114,7 @@ class _Numbered:
     suffix: str
     suffix_locants: Tuple[int, ...]
     prefixes: Tuple[Tuple[int, str], ...]
+    n_prefixes: Tuple[str, ...] = ()
 
 
 # --- the molecule ----------------------------------------------------------------------------------------------
@@ -120,9 +128,26 @@ def _leaf(atom) -> bool:
     return atom.GetSymbol() in _SUFFIX and atom.GetDegree() == 1 and atom.GetNeighbors()[0].GetSymbol() == "C"
 
 
+def _amine_nitrogen(mol: Chem.Mol) -> Optional[int]:
+    """The index of the principal amine NHR or NR2 (see the module text), or None: the one nitrogen of a molecule
+    without OH, SH or NH2 groups, of two or three neighbours, all carbons bonded by single bonds. Whether its other
+    neighbours carry alkyl parts is read by ``_pendant``."""
+    if any(_leaf(a) for a in mol.GetAtoms()):
+        return None
+    nitrogens = [a for a in mol.GetAtoms() if a.GetSymbol() == "N"]
+    if len(nitrogens) != 1:
+        return None
+    atom = nitrogens[0]
+    if atom.GetDegree() not in (2, 3) or any(n.GetSymbol() != "C" for n in atom.GetNeighbors()):
+        return None
+    return atom.GetIdx() if all(b.GetBondType() == _SINGLE for b in atom.GetBonds()) else None
+
+
 def _chain_hetero_count(mol: Chem.Mol) -> int:
-    """The atoms of E that the chain must hold: all of them but the OH, SH and NH2 groups."""
-    return sum(1 for a in mol.GetAtoms() if a.GetSymbol() in _E and not _leaf(a))
+    """The atoms of E that the chain must hold: all of them but the OH, SH and NH2 groups and the principal amine
+    NHR or NR2."""
+    amine = _amine_nitrogen(mol)
+    return sum(1 for a in mol.GetAtoms() if a.GetSymbol() in _E and not _leaf(a) and a.GetIdx() != amine)
 
 
 def _in_scope(mol: Optional[Chem.Mol]) -> bool:
@@ -193,6 +218,24 @@ def _pendant(mol: Chem.Mol, attach: int, root: int, chain: set) -> Optional[_Pen
                 seen.add(nb.GetIdx())
                 part.append(nb.GetIdx())
     symbol = mol.GetAtomWithIdx(root).GetSymbol()
+    if len(part) > 1 and root == _amine_nitrogen(mol):
+        if mol.GetAtomWithIdx(attach).GetSymbol() != "C":
+            return None
+        names = []
+        for nb in mol.GetAtomWithIdx(root).GetNeighbors():
+            if nb.GetIdx() == attach:
+                continue
+            branch, seen = [nb.GetIdx()], {nb.GetIdx(), root}
+            for idx in branch:
+                for far in mol.GetAtomWithIdx(idx).GetNeighbors():
+                    if far.GetIdx() not in seen:
+                        seen.add(far.GetIdx())
+                        branch.append(far.GetIdx())
+            name = _alkyl_name(mol, nb.GetIdx(), branch)
+            if name is None:
+                return None
+            names.append(name)
+        return _Pendant(attach, "leaf", "N", tuple(sorted(names)))
     if len(part) == 1 and (symbol in _HALOGEN_PREFIX or symbol in _SUFFIX):
         if mol.GetAtomWithIdx(attach).GetSymbol() != "C":
             return None
@@ -293,6 +336,8 @@ def _candidates(mol: Optional[Chem.Mol]) -> List[_Candidate]:
 def _molecule_principal_kind(mol: Chem.Mol) -> Optional[str]:
     """The kind of the most senior OH, SH or NH2 group of the whole molecule,:18162), or None."""
     kinds = {a.GetSymbol() for a in mol.GetAtoms() if _leaf(a)}
+    if _amine_nitrogen(mol) is not None:
+        kinds.add("N")
     return next((kind for kind in _SUFFIX if kind in kinds), None)
 
 
@@ -302,8 +347,9 @@ def _rank(mol: Chem.Mol, cand: _Candidate) -> tuple:
     number of each heteroatom in the order O, S, Se, Te, N, P, Si, Ge, B (c,:21002)."""
     members = set(cand.chain)
     kind = _molecule_principal_kind(mol)
+    amine = _amine_nitrogen(mol)
     groups = sum(1 for idx in cand.chain for nb in mol.GetAtomWithIdx(idx).GetNeighbors()
-                 if nb.GetIdx() not in members and nb.GetSymbol() == kind and _leaf(nb))
+                 if nb.GetIdx() not in members and nb.GetSymbol() == kind and (_leaf(nb) or nb.GetIdx() == amine))
     hetero = [s for s in (mol.GetAtomWithIdx(i).GetSymbol() for i in cand.chain) if s in _E]
     return (groups, len(hetero), len(cand.chain)) + tuple(hetero.count(el) for el in _E_ORDER)
 
@@ -329,7 +375,8 @@ def _number(mol: Chem.Mol, cand: _Candidate, chain: Tuple[int, ...]) -> _Numbere
     suffix = tuple(sorted(locant[p.attach] for p in cand.pendants if p.kind == "leaf" and p.text == kind))
     prefixes = tuple(sorted((locant[p.attach], p.text if p.kind == "sub" else _SUFFIX[p.text][1])
                             for p in cand.pendants if p.kind == "sub" or p.text != kind))
-    return _Numbered(hetero, enes, ynes, _SUFFIX[kind][0] if kind else "", suffix, prefixes)
+    n_prefixes = tuple(name for p in cand.pendants for name in p.n_prefixes)
+    return _Numbered(hetero, enes, ynes, _SUFFIX[kind][0] if kind else "", suffix, prefixes, n_prefixes)
 
 
 def _key(num: _Numbered) -> tuple:
@@ -348,12 +395,19 @@ def _key(num: _Numbered) -> tuple:
     )
 
 
-def _text(length: int, num: _Numbered) -> str:
-    """``<prefixes>-<'a' prefixes><parent>``,:23352), the prefixes in alphanumerical order; the parent
-    carries the suffix groups (``tetradecane-1,14-diol``,,:23405)."""
-    by_name: Dict[str, List[int]] = {}
+def _text(length: int, num: _Numbered) -> Optional[str]:
+    """``<prefixes>-<'a' prefixes><parent>``,:23352), the prefixes in alphanumerical order, the
+    ``N``-prefixes of the amine among them (``N,N-dimethyl``); the parent carries the suffix groups
+    (``tetradecane-1,14-diol``,,:23405). None when an alkyl name is both on the chain and on N."""
+    by_name: Dict[str, list] = {}
     for loc, name in num.prefixes:
         by_name.setdefault(name, []).append(loc)
+    if any(name in by_name for name in num.n_prefixes):
+        return None
+    n_by_name: Dict[str, list] = {}
+    for name in num.n_prefixes:
+        n_by_name.setdefault(name, []).append("N")
+    by_name.update(n_by_name)
     parent = _build_replacement_name(
         length, list(num.hetero), (num.suffix, num.suffix_locants[0]) if num.suffix else None,
         ene_locants=list(num.enes), yne_locants=list(num.ynes), suffix_locants=list(num.suffix_locants) or None)

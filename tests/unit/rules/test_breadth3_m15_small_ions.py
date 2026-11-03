@@ -82,7 +82,7 @@ def _assert_named(smiles, expected, tiers):
     row = _pin_row(smiles)
     assert row["name"] == expected, row
     assert row["tier"] in tiers, row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 # --- 1. geminal suffixes on a chain,, -----------------
@@ -274,7 +274,7 @@ def test_element_ion_salt_keeps_its_name_at_best_effort(smiles, expected, tier):
     for row in (name_best_effort(smiles), _pin_row(smiles)):
         assert row["name"] == expected, row
         assert row["tier"] == tier, row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -286,7 +286,7 @@ def test_bare_ion_names_unchanged_at_best_effort(smiles, expected):
     from tests.support.rt_assert import name_best_effort
     row = name_best_effort(smiles)
     assert row["name"] == expected, row
-    assert _key(_independent_parse(expected)) == _key(smiles)
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 # --- 3. diazonium: the suffix decides the parent, ------------------
@@ -331,7 +331,7 @@ def test_diazonium_dev_set_witness_names_at_best_effort():
     assert row["name"] == ("(1E)-2-[(2-ethoxy-2-oxoethyl)amino]-2-hydroxyethene-"
                            "1-diazonium"), row
     assert row["tier"] == "pin_unverified", row
-    assert _key(_independent_parse(row["name"])) == _key(smi)
+    assert _key(_independent_parse(row["name"], smi)) == _key(smi)
 
 
 # --- 4. one systematic benzene suffix beside a prefix cites its locant ---------------

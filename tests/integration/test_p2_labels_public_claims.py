@@ -105,7 +105,7 @@ def test_a_certified_pin_keeps_pin_verified():
     row = _row(caffeine, "pin")
     assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
     assert row["verified"] == "opsin", row
-    assert _key(_independent_parse(row["name"])) == _key(caffeine)
+    assert _key(_independent_parse(row["name"], caffeine)) == _key(caffeine)
 
 
 def test_a_pin_verified_label_means_an_opsin_read_back_or_the_list_identity():
@@ -119,7 +119,7 @@ def test_a_pin_verified_label_means_an_opsin_read_back_or_the_list_identity():
         if row["tier"] == "pin_verified":
             assert row["verified"] in ("opsin", "opsin_twin", "identity"), row
             if row["verified"] == "opsin":
-                assert _key(_independent_parse(row["name"])) == _key(smiles), row
+                assert _key(_independent_parse(row["name"], smiles)) == _key(smiles), row
             elif row["verified"] == "opsin_twin":
                 twin, _rules = twin_of(row["name"])
                 assert _independent_parse(row["name"], smiles) is None, row

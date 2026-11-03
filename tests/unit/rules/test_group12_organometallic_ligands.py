@@ -72,7 +72,7 @@ def _canon(smiles):
 
 
 def _assert_reads_back_exactly(name, smiles):
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     assert parsed and _canon(parsed) == _canon(smiles), (
         f"{name!r} reads back as {parsed!r}, not as the drawn {smiles}")
     assert name_is_rt_exact(name, smiles), f"{name!r}: no full-key round trip"

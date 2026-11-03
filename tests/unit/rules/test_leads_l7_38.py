@@ -57,7 +57,7 @@ class TestMacrolactoneEneConnectingA:
     @pytest.mark.parametrize("smiles,expected", MULTIPLIED_ENE + CONTROLS)
     def test_name_reads_back_to_the_input(self, smiles, expected):
         # a fresh OPSIN 2.9.0 parse, not the engine's validity oracle
-        parsed = _independent_parse(expected)
+        parsed = _independent_parse(expected, smiles)
         assert parsed is not None, f"OPSIN rejects {expected!r}"
         assert _key(parsed) == _key(smiles), (expected, parsed)
 

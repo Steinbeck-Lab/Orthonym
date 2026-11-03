@@ -380,6 +380,16 @@ _BELOW_PIN_NOTE = ("orthonym: note: the default returns the PIN when it can, els
                    "the PIN; --provenance shows the tier and the check of each name, --emit-tier pin gives PIN only")
 
 
+def _below_pin_note(row: dict) -> str:
+    """The note, with the first reason a check gave for the name not being the PIN when there is one
+    ('...:...)'), so a reader sees why without --provenance."""
+    failures = row.get("spelling_failures") or []
+    if not failures:
+        return _BELOW_PIN_NOTE
+    first = failures[0]
+    return f"{_BELOW_PIN_NOTE}; first reason: {first.get('rule')} {first.get('detail')}".rstrip()
+
+
 def _is_below_pin(tier: Optional[str]) -> bool:
     """Whether a returned name earned a tier below ``pin_verified`` (None: no name)."""
     return tier is not None and tier not in ("pin_verified", "abstain")
@@ -909,7 +919,7 @@ def _print_tier_row(parsed, name_kwargs: dict, emit_tier: str, emit_tier_given: 
     if reason is not None:
         print(reason, file=sys.stderr)
     if not emit_tier_given and _is_below_pin(row.get("tier")):
-        print(_BELOW_PIN_NOTE, file=sys.stderr)
+        print(_below_pin_note(row), file=sys.stderr)
     return 0
 
 

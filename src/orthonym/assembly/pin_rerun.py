@@ -26,6 +26,7 @@ This module holds the three pieces of that path that do not belong in ``namer.py
 """
 from __future__ import annotations
 
+import re
 from typing import Callable, Optional
 
 from rdkit import Chem
@@ -204,9 +205,10 @@ def rerun_name_certified(mol, name: str) -> bool:
         return False
     # the blind panel of step C found one non-PIN among the certified names, an exocyclic double bond whose E/Z
     # descriptor sat inside the ylidene prefix instead of at the front with the parent locant
-    # "Specification by stereodescriptors 'E' and 'Z'", the Blue Book-48281); by the plan's stop rule the class
-    # of that row, a name with an ylidene prefix, is not certified
-    if "ylidene" in name:
+    # "Specification by stereodescriptors 'E' and 'Z'", the Blue Book-48281); that class, an ylidene prefix that
+    # opens with an E/Z descriptor of its own ('[(1E,2S)-2-methylcyclohexylidene]'), is not certified. Method (a)
+    # cites the bond at the front ('(2Z)-2-[...cyclohexylidene]propanal') and is
+    if "ylidene" in name and _ez_inside_an_ylidene_prefix(name):
         return False
     try:
         if rerun_class_guard(mol, name) is not None:
@@ -217,3 +219,30 @@ def rerun_name_certified(mol, name: str) -> bool:
                 and report.count(FAIL) == 0 and report.count(ABSTAIN) == 0)
     except Exception:
         return False
+
+
+_LEADING_STEREO = re.compile(r"\((?:\d+[a-z]?'*[EZRS]|[EZ]),?(?:(?:\d+[a-z]?'*[EZRS]),?)*\)-")
+
+
+def _ez_inside_an_ylidene_prefix(name: str) -> bool:
+    """True when an enclosed prefix whose own word (its nested marks left out) ends in 'ylidene' opens with a
+    stereodescriptor set that holds E or Z: method (b) of, the bond's descriptor inside the prefix."""
+    stack, pairs = [], []
+    for i, c in enumerate(name):
+        if c in "([{":
+            stack.append(i)
+        elif c in ")]}" and stack:
+            pairs.append((stack.pop(), i))
+    for start, end in pairs:
+        content = name[start + 1:end]
+        lead = _LEADING_STEREO.match(content)
+        if lead is None or not re.search(r"[EZ]", lead.group(0)):
+            continue
+        own, depth = [], 0
+        for c in content[lead.end():]:
+            depth += 1 if c in "([{" else -1 if c in ")]}" else 0
+            if depth == 0 and c not in ")]}":
+                own.append(c)
+        if "".join(own).endswith("ylidene"):
+            return True
+    return False

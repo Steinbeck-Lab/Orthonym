@@ -29,7 +29,7 @@ def _independent_rt_exact(name: str, smiles: str) -> bool:
     from tests.support.jars import jar_or_skip
     from tests.support.rt_assert import _independent_parse
     jar_or_skip()
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     if not parsed:
         return False
     a, b = Chem.MolFromSmiles(smiles), Chem.MolFromSmiles(parsed)

@@ -81,7 +81,7 @@ def _fixed_h(smi):
 
 def _exact(name, smiles):
     from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name)
+    parsed = _independent_parse(name, smiles)
     return bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
 
 

@@ -82,7 +82,7 @@ def test_no_structure_or_no_name_is_never_certified():
     assert rerun_name_certified(_mol("CCO"), "") is False
 
 
-def test_an_ylidene_name_is_never_certified():
+def test_an_ylidene_prefix_with_its_own_ez_is_never_certified():
     """The blind panel of step C: '2-[(1Z,2R,3S,4S)-...cyclohexylidene]propanal' cites the E/Z descriptor of the
     exocyclic double bond inside the prefix; (the Blue Book-48281) puts it at the front with the
     parent locant, '(2Z)-2-[...cyclohexylidene]propanal'. The class of that row is not certified."""
@@ -90,6 +90,10 @@ def test_an_ylidene_name_is_never_certified():
     name = ("2-[(1Z,2R,3S,4S)-4-hydroxy-2-(3-hydroxypropyl)-3,4-dimethyl-3-{(3E,5E)-4-methyl-6-[(1R,3S)-2,2,3-"
             "trimethyl-6-methylidenecyclohexyl]hexa-3,5-dien-1-yl}cyclohexylidene]propanal")
     assert rerun_name_certified(_mol(smiles), name) is False
+    # method (a) cites the bond at the front with the parent locant: that name is certified
+    method_a = ("(2Z)-2-[(2R,3S,4S)-4-hydroxy-2-(3-hydroxypropyl)-3,4-dimethyl-3-{(3E,5E)-4-methyl-6-[(1R,3S)-2,2,3-"
+                "trimethyl-6-methylidenecyclohexyl]hexa-3,5-dien-1-yl}cyclohexylidene]propanal")
+    assert rerun_name_certified(_mol(smiles), method_a) is True
 
 
 def test_a_name_with_an_abstaining_check_is_never_certified():
@@ -108,3 +112,16 @@ def test_a_fully_decided_name_is_certified():
     smiles = "CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O"
     name = "S-(2-acetamidoethyl) (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"
     assert rerun_name_certified(_mol(smiles), name) is True
+
+
+@pytest.mark.parametrize("name, inside", [
+    ("2-[(1E,2S)-2-methylcyclohexylidene]propanal", True),       # method (b): the bond's E/Z inside the prefix
+    ("2-[(E)-cyclooctylidene]propanal", True),
+    ("(2E)-2-[(2S)-2-methylcyclohexylidene]propanal", False),    # method (a), (the Blue Book)
+    ("2-cyclohexylidenepropanal", False),
+    # the E/Z of a chain inside the ylidene prefix is that chain's own
+    ("(2Z)-2-[(2R,3S,4S)-4-hydroxy-3-{(3E,5E)-4-methylhexa-3,5-dien-1-yl}cyclohexylidene]propanal", False),
+], ids=lambda v: str(v))
+def test_only_an_ylidene_prefix_that_opens_with_its_own_ez_is_not_certified(name, inside):
+    from orthonym.assembly.pin_rerun import _ez_inside_an_ylidene_prefix
+    assert _ez_inside_an_ylidene_prefix(name) is inside

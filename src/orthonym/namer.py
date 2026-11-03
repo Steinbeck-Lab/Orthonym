@@ -8815,7 +8815,7 @@ class Orthonym:
                     if resolved != _pv.GATE_OUTCOME_SELF01:
                         _record_gate_outcome(_pv.GATE_OUTCOME_FULL_KEY_VERIFIED, name)
                     return name
-                return self._withdraw_at_exit(name, smiles, "exit_full_key_round_trip")
+                return name if twin_gate_ships(name, smiles, True) else self._withdraw_at_exit(name, smiles, "exit_full_key_round_trip")
 
             def _passes_default_tier(outcome: str) -> bool:
                 return (outcome in (_pv.GATE_OUTCOME_SELF01,

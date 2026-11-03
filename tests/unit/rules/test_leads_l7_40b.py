@@ -79,7 +79,7 @@ class TestLOmissionLicenceIsPerPeptide:
     @pytest.mark.parametrize("smiles,expected", NON_TABLE + TABLE_10_4)
     def test_name_reads_back_to_the_input(self, smiles, expected):
         # a fresh OPSIN 2.9.0 parse, not the engine's validity oracle
-        parsed = _independent_parse(expected)
+        parsed = _independent_parse(expected, smiles)
         assert parsed is not None, f"OPSIN rejects {expected!r}"
         assert _key(parsed) == _key(smiles), (expected, parsed)
 
@@ -92,7 +92,7 @@ class TestLOmissionLicenceIsPerPeptide:
     @pytest.mark.parametrize("smiles,expected", CAPPED_NON_TABLE)
     def test_capped_peptide_with_a_non_table_residue_cites_the_L(self, smiles, expected):
         assert name_peptide(Chem.MolFromSmiles(smiles)) == expected
-        parsed = _independent_parse(expected)
+        parsed = _independent_parse(expected, smiles)
         assert parsed is not None and _key(parsed) == _key(smiles), (expected, parsed)
 
     def test_bb_example_spelling(self):

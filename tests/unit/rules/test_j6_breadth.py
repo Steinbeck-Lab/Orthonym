@@ -156,7 +156,7 @@ def test_fusion_pin_name(smiles, expected):
     assert r["name"] == expected, r
     assert r["tier"] == "pin_verified", r
     assert name_is_rt_exact(expected, smiles), expected
-    parsed = _independent_parse(expected)
+    parsed = _independent_parse(expected, smiles)
     assert parsed and (Chem.MolToSmiles(Chem.MolFromSmiles(parsed))
                        == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))), parsed
 

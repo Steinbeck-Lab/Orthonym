@@ -80,7 +80,13 @@ def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
 # exactly this principal-group class (acid-principal partial (thio)esters whose
 # carbonyl is a chain member). v1 scope; extensible. Every default split is
 # per-candidate OPSIN-RT gated in split_composite_fg (fail-closed).
-_SPLIT_DEFAULT_PGS = frozenset({"carboxylic_acid"})
+#: "Esters cited as prefixes" (the Blue Book): an ester beside a group that has priority for citation
+#: as the principal group is the 'alkoxy... oxo' pair on the chain ('3-ethoxy-N,N,N-trimethyl-3-oxopropan-1-aminium
+#: bromide (PIN)',:31708). The acids are senior to esters; a hydroxy compound or an amine is the principal group beside
+#: an ester only as the neutral form of an anion or a cation the charged route names (its forced principal group).
+_SPLIT_DEFAULT_PGS = frozenset({"carboxylic_acid", "sulfonic_acid", "sulfinic_acid",
+                                "primary_alcohol", "secondary_alcohol", "tertiary_alcohol", "alcohol", "phenol",
+                                "thiol", "primary_amine", "secondary_amine", "tertiary_amine"})
 
 
 # Functional groups that can be detected but have no seniority
@@ -4483,12 +4489,12 @@ def _generate_alkyl_prefixes_for_polyfunctional(
             if carbon_count == 0:
                 _p_attach = next(
                     (si for si in sub_atoms
-                     if mol.GetAtomWithIdx(si).GetSymbol() == 'P'),
+                     if mol.GetAtomWithIdx(si).GetSymbol() in ('P', 'As')),
                     None,
                 )
                 if _p_attach is not None:
-                    from ..rules.phosphorus import name_phosphanyl_substituent
-                    _ph = name_phosphanyl_substituent(
+                    from ..rules.phosphorus import pnictogen_group_prefix
+                    _ph = pnictogen_group_prefix(
                         mol, list(sub_atoms), _p_attach)
                     if _ph:
                         substituent_groups[_ph].append(position)

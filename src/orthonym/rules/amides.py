@@ -994,8 +994,9 @@ def name_chain_diamide(
     # the Blue Book) or a chain double or triple bond ('but-2-enediamide')
     # is left to the general path, which cites it; naming the bare saturated
     # parent here dropped it.
-    if any(atom.GetAtomicNum() > 1 and atom.GetIdx() not in covered
-           for atom in mol.GetAtoms()):
+    from .diamide_chain_prefixes import chain_carbon_prefixes, merged_prefix_parts
+    c_prefixes = chain_carbon_prefixes(mol, chain, covered, atom_to_locant)    # '2-chloro-N1,N4-dimethyl...'
+    if c_prefixes is None:
         return None
     _chain_set = set(chain)
     for _bond in mol.GetBonds():
@@ -1015,6 +1016,7 @@ def name_chain_diamide(
             eff = (chain_len + 1 - locant) if reverse else locant
             for _ in names:
                 out.append(eff)
+        out += [(chain_len + 1 - loc) if reverse else loc for loc, _n in c_prefixes]
         return sorted(out)
 
     def _tiers(reverse: bool):
@@ -1034,6 +1036,7 @@ def name_chain_diamide(
                        for a in chain})
         cited = [(((chain_len + 1 - locant) if reverse else locant), name)
                  for locant, names in per_end for name in names]
+        cited += [(((chain_len + 1 - loc) if reverse else loc), name) for loc, name in c_prefixes]
         return (_n_locants_for(reverse), sorted((alpha_sort_key(name), eff) for eff, name in cited),
                 isotope_locant_key(mol, eff_of), numbering_cip_key((), cited))
 
@@ -1052,7 +1055,8 @@ def name_chain_diamide(
         return None
     parent_name = f"{stem}anediamide"
 
-    if not placed:
+    c_placed = [(((chain_len + 1 - loc) if reverse else loc), name) for loc, name in c_prefixes]
+    if not placed and not c_placed:
         # Symmetric unsubstituted diamide (e.g. butanediamide) — plain parent.
         return parent_name
 
@@ -1080,6 +1084,9 @@ def name_chain_diamide(
                       f"{multiplied_component(len(locants), name, display_name)}")
         parts.append((alpha_sort_key_rs(name), prefix))     # R before S: (the Blue Book)
 
+    if c_placed:
+        _by_name = {name: prefix for (_k, prefix), name in zip(parts, groups)}
+        return "-".join(merged_prefix_parts(groups, c_placed, lambda n, _l: _by_name[n], alpha_sort_key_rs)) + parent_name
     parts.sort(key=lambda p: p[0])
     n_prefix_string = "-".join(p[1] for p in parts)
 
