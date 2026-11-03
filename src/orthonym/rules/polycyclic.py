@@ -40,6 +40,7 @@ from ..perception.molcache import atoms_of, bonds_of, cached_by_key
 from ..data.chain_names import multiplying_prefix
 from .locants import compound_aware_multibond_set  # (1)/(2), shared w/ bicyclo.py
 from . import main_ring_paths  # the bounded main-ring path search (its LEVEL_* knobs are read live)
+from . import main_ring_cycles  # the longest-cycle main-ring search of a system of many rings
 from .main_ring_paths import RingGraph, enumerate_paths, longest_bridge, uses_bound
 from . import main_ring_pairs  # the pair searches of the main-ring search (its PAIR_SCAN_MAX_PATHS is read live)
 from .main_ring_pairs import best_disjoint_pair, interior_masks, offered_multiatom_pairs
@@ -1755,6 +1756,17 @@ class VonBaeyerAnalyzer:
         pairs = _MainRingPairs(mol, ring_atoms, adj_list, spend_perf_work, _rank_key,
                                getattr(self, "_allow_multiatom_bridge", True), perf_units_headroom)
         bridgehead_pairs = list(combinations(sorted(bridgeheads), 2))
+        if pairs.graph.rings >= main_ring_cycles.CYCLE_FIRST_MIN_RINGS:
+            # Many rings: the main ring as a longest cycle (``main_ring_cycles``), not the pair loop
+            offers = main_ring_cycles.main_bicycles(adj, ring_atoms, _ranks.__getitem__, spend_perf_work,
+                                                    getattr(self, "_allow_multiatom_bridge", True))
+            if not offers:
+                # Not one biconnected ring system: the fallback below lists paths without a bound
+                from ..errors import unsupported_ring_system
+                raise unsupported_ring_system()
+            for ring, bh1, bh2, branch1, branch2, bridge in offers:
+                best.consider(ring, bh1, bh2, branch1, branch2, bridge)
+            bridgehead_pairs = []
         for done, (bh1, bh2) in enumerate(bridgehead_pairs):
             # Common neighbours (potential 1-atom main bridge atoms), and the direct bond
             # (0-atom main bridge): Cases 1-3 of _MainRingPairs
@@ -2075,6 +2087,13 @@ class VonBaeyerAnalyzer:
     #: cap the incumbent numbering is kept (never a partial ranking, which would
     #: be order-dependent).
     _MAX_LOCANT_CANDIDATES = 64
+    #: The cap for a ring system of ``main_ring_cycles.CYCLE_FIRST_MIN_RINGS`` rings or more. Its
+    #: main ring is a longest cycle and every tied cycle is a candidate, not one per bridgehead pair
+    #: as in the path search, so a cage of 16 rings and 25 atoms holds 28 decompositions and 113
+    #: numberings where the path search held 14 decompositions under the cap of 64. The candidates
+    #: of such a system are analysed in about a millisecond each (113 in 0.1 s), and the cap keeps
+    #: the ranking of the systems that hold a few hundred.
+    _MAX_LOCANT_CANDIDATES_MANY_RINGS = 1024
 
     #: Cap on the automorphisms of a cage's skeleton enumerated to complete the numberings of a
     #: descriptor (``_numberings_by_automorphism``); a skeleton with more is not completed.
@@ -2292,7 +2311,10 @@ class VonBaeyerAnalyzer:
             return incumbent
         if not candidates:
             return incumbent
-        if len(candidates) > self._MAX_LOCANT_CANDIDATES:
+        cap = (self._MAX_LOCANT_CANDIDATES_MANY_RINGS
+               if self._get_ring_count(mol, ring_atoms) >= main_ring_cycles.CYCLE_FIRST_MIN_RINGS
+               else self._MAX_LOCANT_CANDIDATES)
+        if len(candidates) > cap:
             incumbent.numbering_certified = False       # no criterion ranked the numberings
             return incumbent
 
@@ -2308,7 +2330,7 @@ class VonBaeyerAnalyzer:
                 if k not in seen:
                     seen.add(k)
                     expanded.append((cand_ring, cand_bhp))
-        if len(expanded) > self._MAX_LOCANT_CANDIDATES:
+        if len(expanded) > cap:
             incumbent.numbering_certified = False       # no criterion ranked the numberings
             return incumbent
 

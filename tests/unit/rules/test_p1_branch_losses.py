@@ -474,8 +474,11 @@ CHEBI_18872 = (
 # The prefixes of the ring then take the (g) numbering (:3307): the aryl-propyl prefix, cited first, has
 # locant 1 ('1-{...}-3-methylbenzene', was '3-[...]-1-methylbenzene'). change-asserted-value: the quotes, and
 # ``assert_full_rt`` below reads the name back to the input's full InChIKey; HEAD has the old name.
+# The glycyl group is '2-aminoacetamido' (was '(aminoacetyl)amino', changed by the peptide PINs of 62e2f800bb):
+# "Substituents of the types -NH-CO-R and -NH-SO2-R" (the Blue Book), "Method (1) generates
+# preferred IUPAC names" ('4-formamidobenzoic acid (PIN)', not '4-(formylamino)benzoic acid').
 CHEBI_18872_NAME = (
-    "1-{(2S)-2-[(2-{[(2S)-2-({(2S)-2-[(aminoacetyl)amino]-2-cyclohexyl-1-oxoethyl}amino)-1-ox"
+    "1-{(2S)-2-[(2-{[(2S)-2-{[(2S)-2-(2-aminoacetamido)-2-cyclohexyl-1-oxoethyl]amino}-1-ox"
     "opropyl]amino}-1-oxoethyl)amino]-3-{[(5S,8S,14S,17R)-18-amino-1-{(2S)-2-[(3S,9S,12S,13R)"
     "-3-(4-aminobutyl)-12-carboxy-13-hydroxy-9-(3-hydroxy-3-oxopropyl)-1,4,7,10-tetraoxo-2,5,"
     "8,11-tetraazatetradecan-1-yl]pyrrolidin-1-yl}-5-(3-amino-3-oxopropyl)-8-(3-hydroxy-3-oxo"
