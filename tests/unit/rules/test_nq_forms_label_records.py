@@ -143,7 +143,7 @@ def test_an_unlicensed_a_chain_is_recorded_by_the_chain_writer():
     frag = {0} | set(range(5, m.GetNumAtoms()))
     with mechanical_forms():
         res, rec = _records(lambda: terminal_fragment_name(m, frag, 0))
-    assert res.name == ("11-amino-3,7-disulfanylidene-2,8,12-trioxa-4,5,6-trithia-"
+    assert res.name == ("11-amino-3,7-bis(sulfanylidene)-2,8,12-trioxa-4,5,6-trithia-"
                         "10-azadodec-11-en-1-yl")
     assert "2,8,12-trioxa-4,5,6-trithia-10-azadodec" in rec
     m2 = Chem.MolFromSmiles("CCOCc1ccccc1")

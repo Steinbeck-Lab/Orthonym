@@ -38,15 +38,15 @@ def _row(smiles, tier):
 
 @pytest.mark.parametrize("smiles,expected", [
     # the lead row: four ether oxygens in an unbranched chain between two acyl chlorides
-    ("ClC(=O)COCCOCCOCCOCC(=O)Cl", "3,6,9,12-tetraoxatetradecanedioyl dichloride"),
+    ("ClC(=O)COCCOCCOCCOCC(=O)Cl", "3,6,9,12-tetraoxatetradecane-1,14-dioyl dichloride"),
     ("COCCOCCOCCOCC(=O)Cl", "2,5,8,11-tetraoxatridecan-13-oyl chloride"),
     ("CCOCCOCCOCCOCCC(=O)Cl", "3,6,9,12-tetraoxapentadecan-15-oyl chloride"),
     #: "in alphabetical order" ('butanedioyl bromide chloride (PIN)',:31454)
-    ("BrC(=O)COCCOCCOCCOCC(=O)Cl", "3,6,9,12-tetraoxatetradecanedioyl bromide chloride"),
-    ("FC(=O)COCCOCCOCCOCC(=O)F", "3,6,9,12-tetraoxatetradecanedioyl difluoride"),
+    ("BrC(=O)COCCOCCOCCOCC(=O)Cl", "3,6,9,12-tetraoxatetradecane-1,14-dioyl bromide chloride"),
+    ("FC(=O)COCCOCCOCCOCC(=O)F", "3,6,9,12-tetraoxatetradecane-1,14-dioyl difluoride"),
     #: the pseudohalides, 'butanedioyl isocyanide isothiocyanate (PIN)' (:31470) in the same order
-    ("O=C=NC(=O)COCCOCCOCCOCC(=O)N=C=O", "3,6,9,12-tetraoxatetradecanedioyl diisocyanate"),
-    ("S=C=NC(=O)COCCOCCOCCOCC(=O)N=C=O", "3,6,9,12-tetraoxatetradecanedioyl isocyanate isothiocyanate"),
+    ("O=C=NC(=O)COCCOCCOCCOCC(=O)N=C=O", "3,6,9,12-tetraoxatetradecane-1,14-dioyl diisocyanate"),
+    ("S=C=NC(=O)COCCOCCOCCOCC(=O)N=C=O", "3,6,9,12-tetraoxatetradecane-1,14-dioyl isocyanate isothiocyanate"),
     ("COCCOCCOCCOCC(=O)N=[N+]=[N-]", "2,5,8,11-tetraoxatridecan-13-oyl azide"),
 ])
 def test_four_heterounits_in_an_acyl_halide_chain_are_named_by_replacement(smiles, expected):
@@ -65,7 +65,7 @@ def test_three_heterounits_keep_the_substitutive_name():
 def test_the_acid_and_the_acyl_halide_of_one_chain_are_named_alike():
     acid = _row("OC(=O)COCCOCCOCCOCC(=O)O", "pin")["name"]
     halide = _row("ClC(=O)COCCOCCOCCOCC(=O)Cl", "pin")["name"]
-    assert acid == "3,6,9,12-tetraoxatetradecanedioic acid"
+    assert acid == "3,6,9,12-tetraoxatetradecane-1,14-dioic acid"   #:29860,:6496
     assert halide == acid.replace("ic acid", "yl dichloride")
 
 
@@ -253,4 +253,4 @@ def test_pseudohalide_words_whose_alphabetical_and_seniority_orders_differ_are_n
     assert "isocyanate isocyanide" in prov._UNCERTIFIED_PIN_NAMES.get()
     prov.clear_provenance()
     assert opsin_roundtrip_check("N#CC(=O)COCCOCCOCCOCC(=O)N=C=O",
-                                 "3,6,9,12-tetraoxatetradecanedioyl cyanide isocyanate")["passed"]
+                                 "3,6,9,12-tetraoxatetradecane-1,14-dioyl cyanide isocyanate")["passed"]

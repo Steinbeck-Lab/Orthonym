@@ -3019,6 +3019,10 @@ CATENATION_AMBIGUOUS_PREFIXES = frozenset({
     "stibanyl",   # distibanyl (distibane
     "azanyl",     # diazanyl = hydrazinyl -NH-NH2
     "oxidanyl",   # dioxidanyl -OOH
+    # the ylidene forms collide the same way ('disulfanylidene' reads as =S-SH, from disulfane): the book multiplies
+    # them with 'bis', '5,7-bis(sulfanylidene)-...-dione (PIN)' (the Blue Book), '3,5-bis(sulfanylidene)-...
+    # pentathianonan-9-oic acid (PIN)' (:36957); 'disulfanylidene' occurs nowhere in the book
+    "sulfanylidene", "selanylidene", "tellanylidene",
     # The catenated-chain prefixes themselves are ALSO ambiguous when multiplied:
     # two -S-S-H groups are 'bis(disulfanyl)', because 'didisulfanyl' would read as
     # a catenation ('di' + 'disulfanyl' = a 4-sulfur -SSSS- chain). BB

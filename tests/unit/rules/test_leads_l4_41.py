@@ -150,7 +150,7 @@ NEEDS_NAMER_SKIP = pytest.mark.xfail(
 # which is not built yet, so both ship below the PIN at best-effort
 # (tests/unit/rules/test_amino_acid_systematic_pin.py).
 KEEP_PIN_ROWS = [
-    pytest.param("O=C(O)CSCCSCCCSCCSCC(=O)O", "3,6,10,13-tetrathiapentadecanedioic acid",
+    pytest.param("O=C(O)CSCCSCCCSCCSCC(=O)O", "3,6,10,13-tetrathiapentadecane-1,15-dioic acid",  #:29874
                  marks=NEEDS_NAMER_SKIP, id="tetrathia-diacid-skeletal-replacement"),
     # (:23348): six ether oxygens in an unbranched chain, none in the principal group (-ol);
     # (:23405): the two -ol groups are suffixes of the 'a' name, as the diacid of:23212

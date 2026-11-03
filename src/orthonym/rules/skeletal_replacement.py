@@ -912,7 +912,7 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         suffix = ('ol', pos_by_idx[terminal_oh_info['carbon_idx']] + 1)
     elif acid_mode:
         if len(suffix_groups) == 2:
-            suffix = ('dioyl' if class_words else 'dioic acid', None)
+            suffix = ('dioyl' if class_words else 'dioic acid', tuple(sorted(pos_by_idx[c] + 1 for c in acid_carbons)))
         else:
             suffix = ('oyl' if class_words else 'oic acid',
                       pos_by_idx[next(iter(acid_carbons))] + 1)
@@ -1625,19 +1625,21 @@ def _build_replacement_name(
                           else get_suffix_multiplier_prefix(len(suffix_locants), suffix_name))
             return replacement_prefix + format_suffix_with_locants(
                 chain_prefix, 'an', suffix_name, suffix_locants, multiplier)
-        # acid suffixes on the fixed heterochain numbering:
-        # "3,6,9,12-tetraoxatetradecanedioic acid" (terminal diacid — no
-        # locants needed) / "3,6,9,12-tetraoxapentadecan-15-oic acid"
-        # — the heteroatoms own the low locants).
+        # acid suffixes on the fixed heterochain numbering, every suffix with its locant:
+        # Systematic names (the Blue Book) "No locants are necessary to denote the positions of the
+        # carboxylic acid groups in a hydrocarbon chain; locants are used when hydrocarbon chains are modified by
+        # skeletal replacement, as shown in " ('3,6,10,13-tetrathiapentadecane-1,15-dioic acid (PIN)',
+        #:29874; '3,6,9,12-tetraoxatetradecane-1,14-dioic acid [PIN',:23212) / "3,6,9,12-tetraoxapentadecan-15-oic
+        # acid" — the heteroatoms own the low locants).
         if suffix_name == 'dioic acid':
-            return f'{replacement_prefix}{chain_prefix}anedioic acid'
+            return f'{replacement_prefix}{chain_prefix}ane-{render_locants(suffix_locant)}-dioic acid'
         if suffix_name == 'oic acid':
             return (f'{replacement_prefix}{chain_prefix}an'
                     f'-{suffix_locant}-oic acid')
         # / (the Blue Book,:31460): the acyl group of
         # the acid followed by the class word(s) of the acyl halide / pseudohalide.
         if suffix_name == 'dioyl':
-            return f'{replacement_prefix}{chain_prefix}anedioyl {acyl_class}'
+            return f'{replacement_prefix}{chain_prefix}ane-{render_locants(suffix_locant)}-dioyl {acyl_class}'
         if suffix_name == 'oyl':
             return (f'{replacement_prefix}{chain_prefix}an'
                     f'-{suffix_locant}-oyl {acyl_class}')

@@ -1939,8 +1939,17 @@ def name_carbonic_frn_family(mol):
             frags.append(f"{mult}{infix}")
         else:
             frags.append(f"{render_locants(locs)}-{mult}{infix}")
-    prefix = "-".join(frags)
-    return f"{prefix}{_CARB_MULT[n]}carbonic acid"
+    return _labelled_if_undesignated(f"{'-'.join(frags)}{_CARB_MULT[n]}carbonic acid", acid_cs, terminals, order)
+
+
+def _labelled_if_undesignated(name, acid_cs, terminals, order):
+    """``name``, labelled below the PIN when a carbon is drawn C(=S)-OH (or Se, Te): the PIN cites the letter
+    locants, '1,3-dithiodicarbonic O1,O3-acid (PIN)' against '1,3-dithiodicarbonic acid (PIN; the location of the
+    sulfur atoms is unknown)', the Blue Book-31085), and that spelling is not built."""
+    if any(acid_cs[c][0] in ("S", "Se", "Te") and any(k == "oh" for k, _ in terminals[c]) for c in order):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name, rule="P-65.2.3.1.2.2", detail="the chalcogen letter locants are not cited")
+    return name
 
 
 # --- PIN class program Task 13: carbonic- and cyanic-acid functional classes ---

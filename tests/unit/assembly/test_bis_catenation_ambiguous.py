@@ -37,6 +37,7 @@ class TestP351Multiplier:
         assert CATENATION_AMBIGUOUS_PREFIXES == frozenset({
             "sulfanyl", "selanyl", "tellanyl", "phosphanyl",
             "arsanyl", "stibanyl", "azanyl", "oxidanyl",
+            "sulfanylidene", "selanylidene", "tellanylidene",     # 'bis(sulfanylidene)' (the Blue Book)
             "disulfanyl", "diselanyl", "ditellanyl",
             "trisulfanyl", "triselanyl", "tritellanyl",
             "diazenyl", "diazanyl", "disilanyl", "digermanyl", "distannanyl",

@@ -363,11 +363,13 @@ BB_SIMPLE_CHARACTERISTIC_GROUP = [
     "hydroxy", "oxo", "amino", "carboxy",
     "carbamoyl", "sulfamoyl", "hydroperoxy", "hydrazinyl",
     "sulfo", "sulfino", "isocyano", "isocyanato", "guanidino",
-    "carbamimidoyl", "sulfanylidene", "selanylidene", "thioxo",
+    "carbamimidoyl", "thioxo",
     "hydrazinylidene", "phosphono", "phosphino", "borono",
     # 'diazenyl' is no longer here: (e) (the Blue Book) "before names
     # beginning with a multiplicative prefix 'di'" -- 'bis(diazenyl) (preselected
     # prefix...) (not didiazenyl)' (:7194); it is in CATENATION_AMBIGUOUS_PREFIXES.
+    # 'sulfanylidene' and 'selanylidene' are no longer here either: the book prints '5,7-bis(sulfanylidene)-...
+    # -dione (PIN)' (:32555) and '3,5-bis(sulfanylidene)-...-9-oic acid (PIN)' (:36957), and no 'disulfanylidene'.
 ]
 
 # ---------------------------------------------------------------------------

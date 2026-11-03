@@ -529,9 +529,8 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
     # -> 'oxalyl dicyanide'). The pseudohalide contributes its own carbon, so the
     # real-halide-only ``_combined`` list is empty and the diacyl-halide path
     # below cannot see it; handle same-type acyl di-pseudohalides here.
-    if (pg in ("acyl_azide", "acyl_cyanide", "acyl_isocyanate", "acyl_isothiocyanate")
-            and num_halide_groups == 2):
-        _dps = _name_diacyl_pseudohalide(mol, features, pg, halide_word)
+    if pg in _PSEUDOHALIDE_CLASSES:
+        _dps = _name_diacyl_pseudohalide(mol, _acyl_pseudohalide_ends(mol, features))
         if _dps is not None:
             return _dps
 
@@ -865,10 +864,25 @@ def _name_diacyl_halide_combined(mol, combined, chain, chain_length) -> Optional
     return f"{prefix}anedioyl {halide_part}"
 
 
-def _name_diacyl_pseudohalide(mol, features, pg, class_word) -> Optional[str]:
+_PSEUDOHALIDE_CLASSES = ("acyl_azide", "acyl_cyanide", "acyl_isocyanate", "acyl_isothiocyanate")
+# the acyl isocyanide -CO-NC has no class of its own in perception (its N=C is a prefix group elsewhere)
+_ACYL_ISOCYANIDE = Chem.MolFromSmarts('[CX3](=[OX1])[NX2+]#[CX1-]')
+
+
+def _acyl_pseudohalide_ends(mol, features) -> List[tuple]:
+    """``(match, class word)`` of every acyl pseudohalide group of ``mol``: the perceived classes and -CO-NC."""
+    ends = [(m, HALIDE_WORDS[ft]) for ft in _PSEUDOHALIDE_CLASSES
+            for m in features.functional_groups.get(ft, []) or []]
+    ends += [(m, "isocyanide") for m in mol.GetSubstructMatches(_ACYL_ISOCYANIDE)]
+    return ends
+
+
+def _name_diacyl_pseudohalide(mol, ends) -> Optional[str]:
     """ / (the Blue Book): a diacyl DIpseudohalide with
     an acyl pseudohalide (cyanide / azide / isocyanate) at BOTH ends of a bare
     diacyl backbone -> 'oxalyl di<class>' (C2) or '{chain}dioyl di<class>'.
+    Two different pseudohalides are two class words in alphabetical order: (the Blue Book)
+    'butanedioyl isocyanide isothiocyanate (PIN)' (:31470), as the halides of (:31454).
 
     NC-CO-CO-CN -> 'oxalyl dicyanide (PIN)'. The real-halide-only ``_combined``
     list used by ``_name_diacyl_halide_combined`` is EMPTY for a pseudohalide (its
@@ -877,7 +891,7 @@ def _name_diacyl_pseudohalide(mol, features, pg, class_word) -> Optional[str]:
     only. Fail-closed by total heavy-atom accounting on the exact skeleton (two
     carbonyl C, each with one =O and one pseudohalide group, joined by a bare
     unbranched all-carbon backbone), so any extra decoration falls through."""
-    matches = features.functional_groups.get(pg, [])
+    matches = [m for m, _w in ends]
     if len(matches) != 2:
         return None
     carbonyl_cs = []
@@ -937,14 +951,15 @@ def _name_diacyl_pseudohalide(mol, features, pg, class_word) -> Optional[str]:
         if at.GetSymbol() != 'C' or at.IsInRing():
             return None
     chain_length = len(backbone)
-    mult = get_multiplier_prefix(2, class_word)
+    from .skeletal_replacement import _acyl_class_words
+    class_part = _acyl_class_words([w for _m, w in ends])      # one home for the order and its unprinted pairs
     if chain_length == 2:
         #: 'oxalyl' is the retained PIN acyl of ethanedioyl.
-        return f"oxalyl {mult}{class_word}"
+        return f"oxalyl {class_part}"
     prefix = get_chain_prefix(chain_length)
     if not prefix:
         return None
-    return f"{prefix}anedioyl {mult}{class_word}"
+    return f"{prefix}anedioyl {class_part}"
 
 
 def _count_acyl_chain(mol, carbonyl_c: int, consumed: set) -> int:

@@ -1403,5 +1403,73 @@ def select_principal_ring_system_with_groups(features) -> Tuple[int, ...]:
         # parent and the sugar a glycosyloxy prefix,, which this rule does not overrule
         if richer and not _is_monosaccharide_ring(features.mol, richer):
             return tuple(sorted(richer))
+    if senior and len(features.ring_systems) >= 2:
+        lower = _tied_cycloalkane_with_lower_locants(features.mol, features.ring_systems, senior, groups)
+        if lower is not None:
+            return lower
     return senior
+
+
+def _cycloalkane_ring(mol, system) -> Optional[List[int]]:
+    """The atoms of ``system`` in ring order when it is one saturated all-carbon monocycle, else None."""
+    rings = [r for r in mol.GetRingInfo().AtomRings() if set(r) == set(system)]
+    if len(rings) != 1 or len(system) != len(rings[0]):
+        return None
+    ring = list(rings[0])
+    if any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 or mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring):
+        return None
+    if any(mol.GetBondBetweenAtoms(ring[i], ring[(i + 1) % len(ring)]).GetBondTypeAsDouble() != 1.0
+           for i in range(len(ring))):
+        return None
+    return ring
+
+
+def _cycloalkane_parent_key(mol, ring, group_atoms) -> tuple:
+    """``(suffix locants, prefix locants)`` of the cycloalkane ``ring`` as the parent, the lowest over its
+    numberings: the principal characteristic groups first, then every other substituent bond."""
+    members = set(ring)
+    suffix, prefix = [], []
+    for pos, a in enumerate(ring):
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() in members:
+                continue
+            (suffix if (a in group_atoms or nb.GetIdx() in group_atoms) else prefix).append(pos)
+    n = len(ring)
+    best = None
+    for start in range(n):
+        for step in (1, -1):
+            loc = {(start + step * k) % n: k + 1 for k in range(n)}
+            key = (tuple(sorted(loc[p] for p in suffix)), tuple(sorted(loc[p] for p in prefix)))
+            if best is None or key < best:
+                best = key
+    return best
+
+
+def _tied_cycloalkane_with_lower_locants(mol, ring_systems, senior, group_atoms) -> Optional[Tuple[int, ...]]:
+    """Two or more identical saturated carbocyclic monocycles that each carry the same number of principal
+    characteristic groups and substituent bonds tie on every criterion before: the parent is the ring whose
+    prefixes take the lower locants. ``## ****`` (the Blue Book) "The preferred IUPAC name is based on
+    the senior parent structure that has the lower locant or set of locants for substituents cited as prefixes";
+    '2-[(4-carboxycyclohexyl)methyl]cyclohexane-1-carboxylic acid (PIN) [not 4-[(2-carboxycyclohexyl)methyl]...;
+    the substituent locant '2' is lower than '4' (see, ]' (:23328-23330). None when the senior
+    ring is not such a ring, no other ring ties with it, or the lowest key is shared."""
+    group_atoms = {a for match in (group_atoms or ()) for a in (match if isinstance(match, (tuple, list, set, frozenset))
+                                                              else (match,))}
+    ring = _cycloalkane_ring(mol, senior)
+    if ring is None:
+        return None
+
+    def _shape(r):
+        key = _cycloalkane_parent_key(mol, r, group_atoms)
+        return len(r), len(key[0]), len(key[1])
+
+    candidates = [r for r in (_cycloalkane_ring(mol, sy) for sy in ring_systems) if r is not None]
+    tied = [r for r in candidates if _shape(r) == _shape(ring)]
+    if len(tied) < 2:
+        return None
+    keys = [_cycloalkane_parent_key(mol, r, group_atoms) for r in tied]
+    best = min(keys)
+    if keys.count(best) != 1:
+        return None
+    return tuple(sorted(tied[keys.index(best)]))
 

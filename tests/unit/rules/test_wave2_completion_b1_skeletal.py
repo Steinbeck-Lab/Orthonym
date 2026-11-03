@@ -9,7 +9,7 @@ Covers (all expected names OPSIN-RT verified against the evidence SMILES):
   * 'a'-prefix citation in ELEMENT SENIORITY order
                   (3-phospha-2,5,7-trisilaoctane, 8-thia-2,4,6-trisiladecane).
   * -oic/-dioic acid suffixes on the fixed heterochain numbering
-                  (3,6,9,12-tetraoxatetradecanedioic acid BB verbatim;
+                  (3,6,9,12-tetraoxatetradecane-1,14-dioic acid, BB:23212,;
                   3,6,9,12-tetraoxapentadecan-15-oic acid — the acid
                   carbon takes the HIGH locant).
   * heteroatom chain terminators (2-oxa-4-thia-1,5-disilapentane).
@@ -77,7 +77,7 @@ class TestCitationSeniorityOrder:
 class TestHeterochainAcidSuffix:
     def test_diacid_bb_verbatim(self):
         assert (name_compound("OC(=O)COCCOCCOCCOCC(=O)O")
-                == "3,6,9,12-tetraoxatetradecanedioic acid")
+                == "3,6,9,12-tetraoxatetradecane-1,14-dioic acid")   #:29860 (:23212 with locants)
 
     def test_monoacid_high_locant_p59_2_2(self):
         # The fixed heteroatom numbering owns the LOW locants; the acid

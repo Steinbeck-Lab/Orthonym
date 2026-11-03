@@ -48,12 +48,32 @@ def _is_hydroxylamine(features: Any) -> bool:
     CON -> O-methylhydroxylamine, NOT the prefix 'aminooxy...' which applies only
     when a senior parent is present), OR when the molecule is an N,O-disubstituted
     hydroxylamine, whose PIN is an O-substituted AMINE."""
+    mol = getattr(features, "mol", None)
+    if mol is not None and _has_azonous_acid_nitrogen(mol):
+        return False
     if getattr(features, "principal_group", None) == "hydroxylamine":
         return True
     if _is_pure_aminooxy_hydroxylamine(features):
         return True
     mol = getattr(features, "mol", None)
     return mol is not None and no_disub_hydroxylamine_core(mol) is not None
+
+
+def _has_azonous_acid_nitrogen(mol) -> bool:
+    """A neutral nitrogen bearing two acidic chalcogen groups (-OH and another -OH, -SH, -SeH or -TeH): an azonous
+    acid derivative, ``## **** Mononuclear noncarbon oxoacids modified by functional replacement
+    nomenclature`` (the Blue Book) "As long as there is at least one -OH group left in an oxoacid having a
+    retained name, the acid modified by functional replacement is classified as an acid"; 'CH3-N(OH)(SH)
+    methylazonothious acid (PIN)' (:35604). That class is not built, so no hydroxylamine name is offered for it."""
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'N' or atom.GetFormalCharge():
+            continue
+        acidic = [nb for nb in atom.GetNeighbors()
+                  if nb.GetSymbol() in ('O', 'S', 'Se', 'Te') and nb.GetDegree() == 1 and nb.GetTotalNumHs() == 1
+                  and not nb.GetFormalCharge()]
+        if len(acidic) >= 2 and any(nb.GetSymbol() == 'O' for nb in acidic):
+            return True
+    return False
 
 
 def no_disub_hydroxylamine_core(mol) -> Optional[Tuple[int, int]]:
