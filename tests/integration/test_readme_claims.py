@@ -257,6 +257,6 @@ def test_default_tier_poly_anhydride_is_read_back_through_its_acids():
     assert _hydrolysed_keys(smiles) == sorted(acids)                  # the acids it cites are the input's
     for tier in ("valid", "best-effort"):                             # a wider tier ships a name OPSIN reads
         wide = _row(smiles, tier)
-        assert wide["name"] == "1,4-bis(acetyloxy)-1,4-dioxobutane", wide
+        assert wide["name"] == "acetic 4-(acetyloxy)-4-oxobutanoic anhydride", wide
         assert wide["verified"] == "opsin" and wide["tier"] != "pin_verified", wide
         assert _key(_independent_parse(wide["name"], smiles)) == _key(smiles), wide

@@ -544,9 +544,9 @@ CI_BENCHMARK = [
     pytest.param(
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"
         "(CCC(=O)O)C(=O)N[C@@H](CC(C)C)C(=O)O)C(C)C",
-        # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN; the default tier declines this one
-        _declined_at_default("(4S)-5-{[(S)-1-carboxy-3-methylbutyl]amino}-4-{(2S)-2-[(2S)-3-methyl-2-"
-                             "octanamidobutanamido]-3-phenylpropanamido}-5-oxopentanoic acid"),
+        # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN ((1S)::44624)
+        _ships("(4S)-5-{[(1S)-1-carboxy-3-methylbutyl]amino}-4-{(2S)-2-[(2S)-3-methyl-2-"
+               "octanamidobutanamido]-3-phenylpropanamido}-5-oxopentanoic acid"),
         marks=_GATE,
     ),
     pytest.param(

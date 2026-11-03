@@ -89,7 +89,7 @@ def test_peptide_acyl_group_is_enclosed(smiles, expected):
 @pytest.mark.parametrize("smiles,expected", [
     # the first two now get their substitutive name (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN)
     ("CC(C)[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O",
-     "(3S)-3-(2-aminoacetamido)-4-{[(S)-1-carboxy-2-methylpropyl]amino}-4-oxobutanoic acid"),
+     "(3S)-3-(2-aminoacetamido)-4-{[(1S)-1-carboxy-2-methylpropyl]amino}-4-oxobutanoic acid"),
     ("C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O", "(3S)-3-(2-aminoacetamido)-4-{[(1S)-1-carboxyethyl]amino}-4-oxobutanoic acid"),
     ("NCC(=O)N[C@@H](CC(=O)O)C(=O)N1CCC[C@@H]1C(=O)O", "glycylaspartyl-D-proline"),
     ("C[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N1CCC[C@@H]1C(=O)O", "alanylglutamyl-D-proline"),

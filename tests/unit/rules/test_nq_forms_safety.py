@@ -80,9 +80,10 @@ def test_a_failing_book_spelling_never_costs_the_name(monkeypatch, tier):
     assert name_is_rt_exact(plain, CF3_THIOUREA)
 
 
-#: nilotinib now has its PIN and no longer reaches the terminal-fragment writer; this acid
-#: with an N-aryl carbamoyl group does, at the valid tier (traced: ``_same_reach_name`` runs)
-WITNESS = "OC(=O)c1ccc(cc1)C(=O)Nc1cccc(c1)C(F)(F)F"
+#: nilotinib now has its PIN and no longer reaches the terminal-fragment writer, nor do the ring acids with an N-aryl
+#: carbamoyl group (the ring handlers name them, '4-{[3-(trifluoromethyl)phenyl]carbamoyl}benzoic acid'); this acid
+#: with a glycinamide linker does, at the valid tier (traced: ``_same_reach_name`` runs)
+WITNESS = "OC(=O)c1ccc(cc1)C(=O)NCC(=O)Nc1cccc(c1)C(F)(F)F"
 
 
 @pytest.mark.opsin_gate

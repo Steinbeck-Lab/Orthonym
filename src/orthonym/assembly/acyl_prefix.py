@@ -84,3 +84,53 @@ def is_acylsulfanyl(mol, sub_atoms, attach_idx) -> bool:
         return True
     except Exception:
         return False
+
+
+def one_carbon_acyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
+    """Roadmap N5e: a one-carbon chain carrying =O and one more group is an acyl group (2),
+    the Blue Book) -- 'carbamoyl', '(R)carbamoyl', '<ring>-1-carbonyl', 'methoxycarbonyl', 'benzoyl' -- never
+    '{[R]amino}(oxo)methyl': (:32920) "method (2) ['carbamoyl'] for rings and ring systems"
+    ,:32922-:32928). The book's prefix (``book_prefixes.acyl_group_prefix``), or None."""
+    from .book_prefixes import acyl_group_prefix, book_forms_enabled
+    from .substituent_naming import name_substituent_fragment
+    if not book_forms_enabled():
+        return None
+    parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors() if nb.GetIdx() not in sub_set]
+    if len(parents) != 1:
+        return None
+
+    def _part(atoms, root):
+        boundary = [nb.GetIdx() for nb in mol.GetAtomWithIdx(root).GetNeighbors() if nb.GetIdx() not in atoms]
+        try:
+            nm = name_substituent_fragment(mol, sorted(atoms), root, boundary)
+        except Exception:  # noqa: BLE001
+            return None
+        return None if (not nm or nm == 'substituent') else nm
+    return acyl_group_prefix(mol, attach_idx, parents[0], set(sub_set), _part)
+
+
+def _free_valence_at_one(mol, attach_idx: int, name: str) -> bool:
+    """True when ``name`` is an alkyl-type prefix ('1-carboxy-2-methylpropyl', no free-valence locant) of an acyclic
+    group attached at ``attach_idx``: (1) (the Blue Book) the free valence of such a prefix is at
+    position 1, so a stereocentre at the attachment has the locant 1, which (:44624) cites
+    ('[(1R)-1-chloropropyl]benzene (PIN)',:44668)."""
+    import re
+    if mol.GetAtomWithIdx(attach_idx).IsInRing() or mol.GetAtomWithIdx(attach_idx).GetSymbol() != 'C':
+        return False
+    return bool(re.search(r"(?:meth|eth|prop|but|pent|hex|hept|oct|non|dec)yl$", name)) and not re.search(
+        r"-\d+-yl$", name) and re.match(r"1-", name.lstrip("([{")) is not None
+
+
+def demoted_n_carbamoyl(suffix_name, locants, n_substituents, n_hydroxy, prefix_forms):
+    """The prefix of a demoted ring carboxamide whose nitrogen carries substituents (or the N-hydroxy of a hydroxamic
+    acid), as the benzene handler builds it: (the Blue Book) 'carbamoyl' for rings, the
+    N-substituents without the italic N ('5-methyl-2-[methyl(phenyl)carbamoyl]benzoic acid (PIN)',:32957). One
+    group only; None for any other N-substituted suffix (the caller declines); a group whose nitrogen carries nothing
+    takes its plain prefix form from ``prefix_forms``."""
+    if not n_substituents.get(suffix_name) and suffix_name not in n_hydroxy:
+        return prefix_forms.get(suffix_name)
+    if suffix_name != 'carboxamide' or len(locants) != 1:
+        return None
+    from ..rules.benzene import _build_n_substituted_sulfamoyl_prefix
+    names = list(n_substituents.get(suffix_name) or []) + (['hydroxy'] if suffix_name in n_hydroxy else [])
+    return _build_n_substituted_sulfamoyl_prefix(names, 'carbamoyl')

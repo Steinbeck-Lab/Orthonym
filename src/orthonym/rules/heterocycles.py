@@ -26,6 +26,7 @@ import re
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
+from ..assembly.acyl_prefix import demoted_n_carbamoyl
 from ..data.locant_text import render_locants
 from .azole_numbering import indicated_locants, numbering_starts, pyrrole_type_atoms
 from .pyrrole_type import is_pyrrole_type
@@ -4986,9 +4987,8 @@ def name_substituted_heterocycle(
     for _sfx_name, _sfx_locs in suffix_fg.items():
         if _sfx_name == _chosen_suffix_early:
             continue
-        _sfx_prefix = _SUFFIX_TO_PREFIX.get(_sfx_name)
-        if (_sfx_prefix is None or suffix_n_substituents.get(_sfx_name)
-                or _sfx_name in suffix_n_hydroxy):
+        _sfx_prefix = demoted_n_carbamoyl(_sfx_name, _sfx_locs, suffix_n_substituents, suffix_n_hydroxy, _SUFFIX_TO_PREFIX)
+        if _sfx_prefix is None:
             return None
         c_groups.setdefault(_sfx_prefix, []).extend(_sfx_locs)
     _suffix_n_entries = _suffix_nitrogen_prefix_entries(

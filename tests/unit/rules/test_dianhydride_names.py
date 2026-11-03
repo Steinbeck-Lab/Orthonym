@@ -376,11 +376,14 @@ def test_a_carbonyl_cited_through_a_prefix_gets_no_dianhydride_name(smiles, wron
 
 @pytest.mark.parametrize("smiles,main_name", ISOTOPE_ROWS)
 def test_best_effort_names_the_labelled_dianhydride_as_main_did(smiles, main_name):
-    """The substitutive 'acetic 4-(acetyloxy)-4-oxobutanoic anhydride' cannot take two labelled acetyl groups (one
-    is the class word, the other a prefix), and the best-effort tier lost the row once it was built there: the
-    dianhydride name is offered at the wider tiers too and withdrawn by the gate, so the general engine names it."""
+    """A wider tier spells the anhydride OPSIN reads (``validation.twin_spellings.pin_spellings_on``): the anhydride
+    of one class word, which now carries both labelled acetyl groups ('(2H3)acetic 4-[(2H3)acetyloxy]-4-oxobutanoic
+    anhydride') and reads back to the full key, isotopes included; the general engine's name was the one before."""
     row = name_best_effort(smiles)
-    assert row["name"] == main_name, row
+    if row["name"] != main_name:        # the thioanhydride has no such name: the general engine's stays
+        assert row["name"].startswith("(2H3)acetic ") and row["name"].endswith(" anhydride"), row
+        assert row["tier"] == "systematic_verified", row
+    assert_full_rt(row["name"], smiles)
     assert_full_rt(main_name, smiles)
     default = default_tier_row(smiles)
     assert is_failure_name(default["name"]) or default["name"] == main_name, default

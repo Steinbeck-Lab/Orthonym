@@ -126,15 +126,16 @@ def _has_principal_group(mol) -> bool:
 
 
 def carbon_component(mol, sub_set, start: int) -> set:
-    """The carbons of ``sub_set`` joined to ``start`` through carbons only (all of them when ``start`` is no carbon): a
-    carboxy group behind a heteroatom (the -NH-CH2-COOH of an amide branch) is its branch's, whose own prefix names it
-    ('2-[(carboxymethyl)amino]-2-oxoethyl')."""
+    """The atoms of ``sub_set`` joined to ``start`` through no nitrogen (all of them when ``start`` is no carbon): a
+    carboxy group behind a nitrogen (the -NH-CH2-COOH of an amide branch) is its branch's, whose own prefix names it
+    ('2-[(carboxymethyl)amino]-2-oxoethyl'); one behind an ester or ether oxygen stays on the chain's carbon, as
+    before that rule (the acyloxy branch of a glycerophospholipid)."""
     if mol.GetAtomWithIdx(start).GetSymbol() != 'C':
         return {i for i in sub_set if mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
     seen, stack = {start}, [start]
     while stack:
         for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
-            if nb.GetIdx() in sub_set and nb.GetIdx() not in seen and nb.GetSymbol() == 'C':
+            if nb.GetIdx() in sub_set and nb.GetIdx() not in seen and nb.GetSymbol() != 'N':
                 seen.add(nb.GetIdx())
                 stack.append(nb.GetIdx())
     return seen

@@ -4484,17 +4484,13 @@ def _assemble_benzene_with_suffix(
                 from .amidine_stereo import amidine_prefix_descriptor
                 if n_prefix:
                     prefix_form = f"{amidine_prefix_descriptor(mol)}{n_prefix}{prefix_form}"
-        #: a demoted N-substituted sulfonamide is the
-        # '{N-substituents}sulfamoyl' substituent prefix, the N-substituents cited
-        # WITHOUT the italic N -- BB '2-(dimethylsulfamoyl)benzene-1-sulfonic acid'
-        # (PIN,:32982), 'phenylsulfamoyl' (:32985). The bare 'sulfamoyl' would DROP
-        # them (a wrong constitution). Build it; fail closed on a shape the builder
-        # does not cover (distinct N-substituents -> the nested 'ethyl(methyl)-'
-        # form). The caller re-anchors the whole name gate-independently, so a
-        # fragment-namer mis-spelling of an N-substituent fails closed, never ships.
-        if sfx_name == 'sulfonamide' and n_substituents_map.get('sulfonamide'):
-            prefix_form = _build_n_substituted_sulfamoyl_prefix(
-                n_substituents_map['sulfonamide'])
+        #,: a demoted N-substituted sulfonamide or carboxamide is the
+        # '{N-substituents}sulfamoyl' / '...carbamoyl' prefix (N-substituents without the italic N: BB:32982
+        # 'dimethylsulfamoyl',:32957 '[methyl(phenyl)carbamoyl]'); the bare word would DROP them. One group only (the
+        # map keeps the N-substituents of one group per suffix); the caller re-anchors the whole name.
+        if sfx_name in ('sulfonamide', 'carboxamide') and n_substituents_map.get(sfx_name):
+            prefix_form = (_build_n_substituted_sulfamoyl_prefix(n_substituents_map[sfx_name], _AMIDE_PREFIX_WORD[sfx_name])
+                           if len(sfx_locants) == 1 else None)
             if not prefix_form:
                 return None
         if prefix_form:
@@ -5307,32 +5303,24 @@ def _reanchor_name_to_mol(mol, name: Optional[str]) -> Optional[str]:
         return None
 
 
-def _build_n_substituted_sulfamoyl_prefix(
-    n_substituents: List[str],
-) -> Optional[str]:
-    """: the '{N-substituents}sulfamoyl' substituent prefix.
+_AMIDE_PREFIX_WORD = {'sulfonamide': 'sulfamoyl', 'carboxamide': 'carbamoyl'}
 
-    The N-substituents are cited WITHOUT the italic N (the Blue Book
-    ``dimethylsulfamoyl``,:32985 ``phenylsulfamoyl``). CONSERVATIVE: only the
-    single-substituent (``methylsulfamoyl``, ``phenylsulfamoyl``) and
-    identical-multiplied (``dimethylsulfamoyl``) cases are built. DISTINCT
-    N-substituents need the nested ``ethyl(methyl)sulfamoyl`` form, which is not
-    built -> return None (fail closed). The caller re-anchors the whole name, so a
-    fragment-namer mis-spelling is caught regardless.
+
+def _build_n_substituted_sulfamoyl_prefix(
+    n_substituents: List[str], word: str = 'sulfamoyl',
+) -> Optional[str]:
+    """: the '{N-substituents}sulfamoyl' substituent prefix, and its carboxamide analogue
+    '{N-substituents}carbamoyl'. The N-substituents are cited WITHOUT the italic N (the Blue Book
+    ``dimethylsulfamoyl``,:32985 ``phenylsulfamoyl``,:32957 ``[methyl(phenyl)carbamoyl]``), through the ONE
+    N-prefix assembler (``composer._assemble_decorated_amino_prefix``, with ``word`` as its head). One or two
+    N-substituents; None otherwise. The caller re-anchors the whole name, so a fragment-namer mis-spelling is
+    caught regardless.
     """
     names = [n for n in (n_substituents or []) if n]
     if not names or len(names) > 2:
         return None
-    if len(set(names)) != 1:
-        return None  # distinct N-substituents: nested form not built
-    base = names[0]
-    if len(names) == 2:
-        from ..assembly.naming_utils import multiplied_component as _mc
-        base = _mc(2, base, base)
-    # A substituted substituent -> enclosed per ('(methylsulfamoyl)',
-    # '(dimethylsulfamoyl)'). Pre-enclose here; the downstream formatter leaves an
-    # already-bracketed name alone, so there is no double-enclosing.
-    return f"({base}sulfamoyl)"
+    from ..assembly.composer import _assemble_decorated_amino_prefix
+    return _assemble_decorated_amino_prefix([(n, False) for n in names], head=word)
 
 
 def _name_substituted_benzenesulfonamide(

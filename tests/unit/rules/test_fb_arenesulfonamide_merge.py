@@ -118,12 +118,10 @@ def test_risk7_n_substituted_sulfamoyl_prefix(smiles, expected):
     assert name_compound(smiles) == expected
 
 
-def test_distinct_n_substituents_sulfamoyl_fails_closed():
-    """Distinct N-substituents need the nested `ethyl(methyl)sulfamoyl` form, which
-    is not built -> fail closed (abstains), never a wrong molecule."""
-    from orthonym.errors import is_failure_name
-    out = name_compound("OC(=O)c1ccc(S(=O)(=O)N(C)CC)cc1")
-    assert not out or is_failure_name(out)
+def test_distinct_n_substituents_sulfamoyl_is_the_nested_form():
+    """Distinct N-substituents take the nested form of the ONE N-prefix assembler, first cited bare and the second
+    enclosed, the Blue Book), as the book's '[methyl(phenyl)carbamoyl]' (:32957)."""
+    assert name_compound("OC(=O)c1ccc(S(=O)(=O)N(C)CC)cc1") == "4-[ethyl(methyl)sulfamoyl]benzoic acid"
 
 
 # The PRIMARY sulfonamide demotion (`4-sulfamoylbenzoic acid`) must survive: it has

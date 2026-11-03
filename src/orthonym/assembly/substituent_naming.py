@@ -34,7 +34,7 @@ from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
-from .acyl_prefix import acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl
+from .acyl_prefix import _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl, one_carbon_acyl_prefix
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
@@ -3538,7 +3538,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             pos_out.update(pos)
         from .prefix_derivation import built
         _whole = (acyl_prefix_text(mol, attach_idx, sub_set, prefix_on, groups, backbone)
-                  or f"{joined}{stem}yl")
+                  or (single_position and one_carbon_acyl_prefix(mol, attach_idx, sub_set)) or f"{joined}{stem}yl")
         # properfix a performance pass : a ONE-CARBON core bearing an ylidene-type
         # chalcogen decoration (oxo/sulfanylidene/selanylidene/tellanylidene)
         # alongside at least one more substituent is an ACYL-group carbon
@@ -3553,8 +3553,8 @@ def _name_polyfunctional_acyclic_substituent_impl(
         # sibling writer (``universal_substituent._book_spelling``,
         # ``book_prefixes._acyl_group_prefix``); this is the SAME fact at
         # THIS writer (traced: this exact fragment reaches here, not those).
-        if single_position and {'oxo', 'sulfanylidene', 'selanylidene',
-                                 'tellanylidene'} & set(groups):
+        if single_position and _whole == f"{joined}{stem}yl" and {'oxo', 'sulfanylidene', 'selanylidene',
+                                                                 'tellanylidene'} & set(groups):
             from ..metrics.provenance import record_non_pin_fragment
             record_non_pin_fragment(_whole)
         # Lane L2 (R2): the chain carries the prefixes it joined (c),:7035),
@@ -7048,22 +7048,9 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
         # group (2), the Blue Book) -- 'carbamoyl', '(R)carbamoyl',
         # '<ring>-1-carbonyl', 'methoxycarbonyl', 'benzoyl' -- never the hyphen-joined
         # '{[R]amino}-oxomethyl',:32922-:32928).
-        from .book_prefixes import acyl_group_prefix, book_forms_enabled
-        if book_forms_enabled():
-            _parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
-                        if nb.GetIdx() not in sub_set]
-            if len(_parents) == 1:
-                def _part(atoms, root):
-                    boundary = [nb.GetIdx() for nb in mol.GetAtomWithIdx(root).GetNeighbors()
-                                if nb.GetIdx() not in atoms]
-                    try:
-                        nm = name_substituent_fragment(mol, sorted(atoms), root, boundary)
-                    except Exception:  # noqa: BLE001
-                        return None
-                    return None if (not nm or nm == 'substituent') else nm
-                _acyl = acyl_group_prefix(mol, attach_idx, _parents[0], sub_set, _part)
-                if _acyl:
-                    return (_acyl, 1, chain_pos) if with_pos else (_acyl, 1)
+        _acyl = one_carbon_acyl_prefix(mol, attach_idx, sub_set)
+        if _acyl:
+            return (_acyl, 1, chain_pos) if with_pos else (_acyl, 1)
 
     from collections import defaultdict
 
@@ -7738,10 +7725,9 @@ def _add_substituent_stereo_text(mol, sub_atoms, name, attach_idx=None, located=
                 mol, sub_atoms, attach_idx, ring_name=name)
             if _ring_d is not None:
                 return f"{_ring_d}-{name}"
-        # Otherwise: a single stereocenter on a parent-hydride-style substituent
-        # (or any case where a structure-derived located form is not available)
-        # takes the bare "(R)-"/"(S)-" (no locant) per the unique-position
-        # rule. Per a missing locant is never fabricated.
+        # Otherwise: the locant 1 of an alkyl prefix's free valence, else the bare "(R)-"/"(S)-" (never a guess).
+        if s_idx == attach_idx and _free_valence_at_one(mol, attach_idx, name):
+            return f"(1{cip})-{name}"
         bare = f"({cip})-{name}"
         if any(ch.isdigit() for ch in name):
             # A substituent name that carries locants numbers its own chain, and

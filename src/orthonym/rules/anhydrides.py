@@ -591,6 +591,9 @@ def _offered_poly_anhydride(mol, links, class_word: str) -> Optional[str]:
     substitutive route would name it 'acetic 4-(acetyloxy)-4-oxobutanoic anhydride', a form the isotope placement
     of a labelled molecule cannot decorate when two groups of it are one acyl group (the name of 'diacetic
     butanedioic dianhydride' with both acetyl groups labelled)."""
+    from ..validation.twin_spellings import pin_spellings_on
+    if not pin_spellings_on():
+        return None     # a wider tier spells the form OPSIN reads: the anhydride of one class word, labelled below the PIN
     if len(links) == 2:
         words = _linear_polyanhydride_words(mol, links)
     elif class_word == "dianhydride":

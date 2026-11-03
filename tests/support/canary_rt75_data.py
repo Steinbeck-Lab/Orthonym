@@ -2461,7 +2461,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
-        "(4S)-5-{[(S)-1-carboxy-2-methylpropyl]amino}-4-[(2S)-2,5-diamino-5-oxopentanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-glutaminyl-L-glutamyl-L-valine' (known-defect name 'glutaminylglutamylvaline')
+        "(4S)-5-{[(1S)-1-carboxy-2-methylpropyl]amino}-4-[(2S)-2,5-diamino-5-oxopentanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-glutaminyl-L-glutamyl-L-valine' (known-defect name 'glutaminylglutamylvaline')
     ),
     (
         "Fc1ccc(Br)cc1",  # aromatic,small
@@ -2759,7 +2759,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
-        "(4S)-5-{[(S)-1-carboxy-3-methylbutyl]amino}-4-[(2S)-2,4-diamino-4-oxobutanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-asparaginyl-L-glutamyl-L-leucine' (known-defect name 'asparaginylglutamylleucine')
+        "(4S)-5-{[(1S)-1-carboxy-3-methylbutyl]amino}-4-[(2S)-2,4-diamino-4-oxobutanamido]-5-oxopentanoic acid",  # L8 item 22 the Blue Book gives no PIN to the peptide name;:32920 amino + oxo on a terminal chain atom; OPSIN 2.9.0 full InChIKey exact, fresh java run outside the engine); was 'L-asparaginyl-L-glutamyl-L-leucine' (known-defect name 'asparaginylglutamylleucine')
     ),
     (
         "CC(C)CC1C(=O)N2CC(C)CC2C(=O)NC(C(C)C)C(=O)OC(C(C)C)C(=O)N2NCCCC2C(=O)N2NCC(O)CC2C(=O)N1C",  # heterocycle,fused-ring,polyfunctional,large
