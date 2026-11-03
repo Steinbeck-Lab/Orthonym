@@ -628,3 +628,11 @@ class StrictRingPolicy:
         if len({tuple(numbering[a] for a in stereo) for numbering in winners}) > 1:
             return None
         return winners[0]
+
+
+def acid_is_principal(mol) -> bool:
+    """True when the principal characteristic group of ``mol`` ranks above the amides (an acid, anhydride, ester or
+    acid halide,: an amide of the molecule is then a prefix."""
+    from ..rules.seniority import SENIORITY_ORDER, seniority_index
+    pg = principal_group(mol)[0]
+    return pg in SENIORITY_ORDER and seniority_index(pg) < seniority_index('primary_amide')

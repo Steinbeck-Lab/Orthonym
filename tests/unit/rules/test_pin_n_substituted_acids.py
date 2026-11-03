@@ -257,8 +257,15 @@ def test_hydroxamic_acids_of_one_chain_are_a_diamide(smiles, name):
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
+def test_a_hydroxamic_acid_under_a_senior_acid_is_hydroxyamino_and_oxo():
+    """ (the Blue Book) names a hydroxamic acid as an N-hydroxy amide; at the end of a chain an amide
+    prefix is 'amino' + 'oxo', method (1) (:32924), and "amino groups may be substituted in the normal
+    way" (:32927)."""
+    row = Orthonym().name_tiered("ONC(=O)CCC(=O)O")
+    assert (row["name"], row["tier"]) == ("4-(hydroxyamino)-4-oxobutanoic acid", "pin_verified"), row
+
+
 @pytest.mark.parametrize("smiles", [
-    "ONC(=O)CCC(=O)O",                # under a senior acid
     "ONC(=O)N",                       # a carbonic acid derivative
     "CC(=NCCO)O",                     # a group on the N that has a group of its own
     "CC(=NOC)O",                      # an alkoxy on the N

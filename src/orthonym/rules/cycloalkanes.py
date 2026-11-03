@@ -892,12 +892,6 @@ def get_substituent_name(mol, sub_atoms: List[int], ring_atoms: set = None) -> O
     Returns:
         Substituent name (e.g., 'methyl', 'ethyl', 'isopropyl') or None
     """
-    # Count carbons
-    carbon_count = sum(
-        1 for idx in sub_atoms
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-    )
-
     # Check for heteroatoms
     has_heteroatom = any(
         mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
@@ -917,5 +911,5 @@ def get_substituent_name(mol, sub_atoms: List[int], ring_atoms: set = None) -> O
         )
         if rec_name:
             return rec_name
-
-    return _get_alkyl_name(carbon_count)
+    from ..assembly.straight_alkyl import straight_alkyl_name  # the count names a straight chain only
+    return straight_alkyl_name(mol, sub_atoms)

@@ -2799,7 +2799,7 @@ def _name_substituent(mol, sub_atoms: List[int],
     Returns:
         Substituent name (prefix form, e.g., "chloro", "methyl")
     """
-    from ..assembly.naming_utils import get_alkyl_name
+    from ..assembly.straight_alkyl import straight_alkyl_name  # the count names a straight chain only
 
     # A branch that holds rings (a branched assembly, ``rules.branched_assembly``) is a compound
     # prefix: the substituent namer reads its rings, the routes below read atom counts.
@@ -2814,7 +2814,6 @@ def _name_substituent(mol, sub_atoms: List[int],
     # different molecule. Shared primitive, same three-way contract as the two
     # general chokepoints; a single bond defers and changes nothing.
     from ..assembly.substituent_enumerator import carbon_free_valence_prefix
-    from ..data.chain_names import get_chain_prefix
 
     _fv = carbon_free_valence_prefix(mol, sub_atoms, attachment_atom)
     if _fv.prefix is not None:
@@ -2859,11 +2858,7 @@ def _name_substituent(mol, sub_atoms: List[int],
                 )
                 if rec_name:
                     return rec_name
-            try:
-                return get_alkyl_name(n_carbons)
-            except (ValueError, KeyError):
-                prefix = get_chain_prefix(n_carbons)
-                return f"{prefix}yl"
+            return straight_alkyl_name(mol, sub_atoms)
 
     # Check for alkoxy groups (O + alkyl chain)
     if sub_atoms:

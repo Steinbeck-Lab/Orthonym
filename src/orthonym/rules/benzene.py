@@ -42,7 +42,8 @@ from .hydroximic_acids import (
     BENZENE_SUFFIX_NAMES, DEMOTED_PREFIX, IMIDIC_DEMOTED_PREFIX, UNHANDLED, acid_suffix_extra, claims_benzene_group,
     name_imidic_on_benzene,
 )
-from ..assembly.strict_ring_prefix import ketone_or_book_acyl_group as _thioacyl  # -C(=S)-R, then any -C(=O)-R
+from ..assembly.straight_alkyl import straight_alkyl_name
+from ..assembly.strict_ring_prefix import acid_is_principal as _below_acid, ketone_or_book_acyl_group as _thioacyl  # -C(=S)-R, then any -C(=O)-R
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
 from .ring_nitrogen_yl import large_substituent_in_scope, n_in_substituent_ring
@@ -782,9 +783,9 @@ def _identify_suffix_fg_on_benzene(
                     'n_substituents': n_subs,
                 }
 
-        # Tertiary amide: C(=O)(NR2)
+        # Tertiary amide: C(=O)(NR2); on a ring N a 'hidden amide',:33127), the acyl prefix under a senior acid
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['tert_amide']):
-            if match[0] == start_idx:
+            if match[0] == start_idx and not (mol.GetAtomWithIdx(match[2]).IsInRing() and _below_acid(mol)):
                 n_subs = _detect_n_substituents(mol, match, ring_atoms)
                 return {
                     'name': 'carboxamide', 'suffix_name': 'carboxamide',
@@ -1074,12 +1075,12 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...],
     is named whole by the amide N-substituent namer of rules.amides, so a ring
     amide and a benzamide name their N-substituents the same way.
 
-    A branch this function does not name is left out of the list, as before:
-    one that is not carbon-rooted, that loops back into the parent ring or the
-    carbonyl carbon, that holds a stereocentre (the namer cites no descriptor
-    inside the prefix;,:44643, cites it at the front of the prefix,
-    'N-[(3R)-piperidin-3-yl]benzamide (PIN)', which the amide producers of
-    rules.amides build), that sits in a molecule whose PIN may be a linear
+    A hydrocarbon branch cites its descriptors at the front of its prefix,
+    :44643, 'N-[(1R)-1-phenylethyl]', ``cite_n_substituent_stereo``). A branch this
+    function does not name is left out: one that is not carbon-rooted, that loops back
+    into the parent ring or the carbonyl carbon, a ring-bearing one with a stereocentre
+    ('N-[(3R)-piperidin-3-yl]benzamide (PIN)' is built by the amide producers of
+    rules.amides), that sits in a molecule whose PIN may be a linear
     phane name (2), ``linear_phane_screen``) or that joins two
     identical ring systems by a bond (a ring assembly,:15542, which is
     then the parent,:19461: 'N-(pyridin-2-yl)[1,1'-biphenyl]-4-
@@ -1097,7 +1098,7 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...],
         Sorted list of N-substituent prefix names ( for none named).
     """
     from ..assembly.substituent_naming import name_substituent_fragment
-
+    from ..assembly.n_substituent_stereo import cite_n_substituent_stereo
     c_idx = amide_match[0]
     c_atom = mol.GetAtomWithIdx(c_idx)
 
@@ -1126,12 +1127,9 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...],
                 mol, alkyl_atoms, nbr_idx, list(blocked)
             )
             if rec_name:
+                names.append(cite_n_substituent_stereo(mol, alkyl_atoms, nbr_idx, rec_name))
+            elif (rec_name := straight_alkyl_name(mol, alkyl_atoms)):
                 names.append(rec_name)
-            else:
-                try:
-                    names.append(get_alkyl_name(carbon_count))
-                except (ValueError, KeyError):
-                    pass
             continue
         rec_name = _ring_bearing_n_substituent(mol, nbr_idx, blocked, ring_atoms, c_idx)
         if rec_name:
@@ -2202,10 +2200,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 mol, alkyl_atoms, neighbors[0].GetIdx(), list(ring_atoms | {n_idx})
             )
             if alkyl_name is None:
-                try:
-                    alkyl_name = get_alkyl_name(carbon_count)
-                except (ValueError, KeyError):
-                    alkyl_name = None
+                alkyl_name = straight_alkyl_name(mol, alkyl_atoms)
             if alkyl_name:
                 # (the Blue Book) retained preferred prefix. Cited BARE:
                 # the unsubstituted prefix carries no locant of its own, so no
@@ -2313,8 +2308,8 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
     # too, even when the parent is right).
     #
     # The anilino ring is detected STRUCTURALLY, never from the branch's name: the
-    # N,N-dialkyl path below falls back to get_alkyl_name(carbon_count) when the
-    # universal namer declines, which named a 4-methylphenyl ring 'heptyl' — a
+    # N,N-dialkyl path below fell back to get_alkyl_name(carbon_count) when the
+    # universal namer declined (now ``straight_alkyl_name``): a 4-methylphenyl ring was 'heptyl' — a
     # different molecule. Fails closed (falls through to the legacy path) whenever
     # the branch atoms are not exactly N + one bare benzene + one nameable branch.
     if h_count == 0 and len(neighbors) == 2 and all(
@@ -2387,11 +2382,9 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 aname = name_substituent_fragment(
                     mol, alkyl_atoms, cn.GetIdx(), list(ring_atoms | {n_idx})
                 )
+                aname = aname or straight_alkyl_name(mol, alkyl_atoms)
                 if aname is None:
-                    try:
-                        aname = get_alkyl_name(carbon_count)
-                    except (ValueError, KeyError):
-                        break
+                    break
                 alkyl_names_list.append(aname)
                 all_sub_atoms.extend(alkyl_atoms)
             else:
@@ -2644,10 +2637,7 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     mol, alkyl_atoms, c_atom.GetIdx(), list(ring_atoms | {o_idx})
                 )
                 if alkyl_name is None:
-                    try:
-                        alkyl_name = get_alkyl_name(carbon_count)
-                    except (ValueError, KeyError):
-                        alkyl_name = None
+                    alkyl_name = straight_alkyl_name(mol, alkyl_atoms)
                 if alkyl_name:
                     # morphology via composed_alkoxy_prefix: retained
                     # set contracts (butyl->butoxy), C5+ and rings keep the whole
@@ -3033,10 +3023,7 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 list(ring_atoms | {s_idx} | {o.GetIdx() for o in o_double_neighbors})
             )
             if alkyl_name is None:
-                try:
-                    alkyl_name = get_alkyl_name(carbon_count)
-                except (ValueError, KeyError):
-                    alkyl_name = None
+                alkyl_name = straight_alkyl_name(mol, alkyl_atoms)
         if alkyl_name:
             o_atom_idxs = [o.GetIdx() for o in o_double_neighbors]
             all_sub_atoms = [s_idx] + o_atom_idxs + alkyl_atoms
@@ -3065,10 +3052,7 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 mol, alkyl_atoms, c_neighbors[0].GetIdx(), list(ring_atoms | {s_idx})
             )
             if alkyl_name is None:
-                try:
-                    alkyl_name = get_alkyl_name(carbon_count)
-                except (ValueError, KeyError):
-                    alkyl_name = None
+                alkyl_name = straight_alkyl_name(mol, alkyl_atoms)
             if alkyl_name:
                 # a compound R ('4-methylphenyl') is enclosed inside '{R}sulfanyl'
                 from ..assembly.naming_utils import enclose_if_compound
@@ -3233,7 +3217,7 @@ def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]
     Get the name for an alkyl substituent.
 
     Uses name_substituent_fragment for branched/complex substituents,
-    falls back to get_alkyl_name(carbon_count) for linear alkyls.
+    falls back to the carbon-count name of a straight chain (``straight_alkyl_name``).
 
     Args:
         mol: RDKit Mol object
@@ -3253,11 +3237,8 @@ def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]
         if recursive_name:
             return recursive_name
 
-    # Fallback: simple carbon-count naming
-    try:
-        return get_alkyl_name(carbon_count)
-    except (ValueError, KeyError):
-        return None
+    # Fallback: the carbon-count name of a straight chain (assembly.straight_alkyl)
+    return straight_alkyl_name(mol, sub_atoms or ())
 
 
 def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:

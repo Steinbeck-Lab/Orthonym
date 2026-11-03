@@ -139,6 +139,7 @@ from .substituent_enumerator import (
     extract_ring_substituents,
 )
 from .n_substituent_stereo import cite_n_substituent_stereo
+from .straight_alkyl import straight_alkyl_name
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment, retained_benzyl
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -12511,14 +12512,9 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
             # Classify and name via the unified pipeline
             name = classify_and_name_fragment(mol, sub_info, ring_set, features)
         if name is None:
-            # Fallback: try simple carbon-count alkyl naming
-            carbon_count = sum(1 for idx in sub_info.frag_atoms if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
-            if carbon_count > 0:
-                from .naming_utils import get_alkyl_name
-                try:
-                    name = get_alkyl_name(carbon_count)
-                except (ValueError, KeyError):
-                    pass
+            # A carbon count names an unbranched saturated chain bound by its end, nothing else (it gave 'heptyl' for
+            # a phenylcarbamoyl branch,; another branch is left unnamed and the candidate fails its read-back
+            name = straight_alkyl_name(mol, sub_info.frag_atoms)
             if name is None:
                 logger.debug(
                     "ring_substituent_fragment_unnameable substituent_skip: reason=unnameable_ring_fragment locant=%d",

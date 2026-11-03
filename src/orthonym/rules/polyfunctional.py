@@ -3110,7 +3110,7 @@ _CHAIN_END_HYDRAZONO_CHALCOGEN_ACID_FGS = frozenset({
     'hydrazonothioic_acid', 'hydrazonoselenoic_acid', 'hydrazonotelluroic_acid',
 })
 _CHAIN_END_ACID_DERIVATIVE_FGS = (
-    frozenset({'imidic_acid', 'hydrazide'}) | _CHAIN_END_CHALCOGEN_ACID_FGS
+    frozenset({'imidic_acid', 'hydrazide', 'hydroxamic_acid'}) | _CHAIN_END_CHALCOGEN_ACID_FGS
     | _CHAIN_END_IMIDO_CHALCOGEN_ACID_FGS | _CHAIN_END_HYDRAZONO_CHALCOGEN_ACID_FGS)
 
 
@@ -3175,6 +3175,9 @@ def _chain_end_acid_derivative_prefixes(mol, fg_name, matches, chain_set,
                 return None
             _pair = (_yl, 'hydrazinylidene')
             _used = (_m[1], _m[2], _m[3])
+        elif fg_name == 'hydroxamic_acid':
+            # (C, =O, NH, OH) -> 'hydroxyamino' + 'oxo': method (1), for chains (BB 32927)
+            _pair, _used = ('hydroxyamino', 'oxo'), (_m[1], _m[2], _m[3])
         elif fg_name == 'hydrazide':
             if len(_m) < 4:
                 return None

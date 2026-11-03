@@ -1106,7 +1106,7 @@ PREFIX_FORMS = {
     "secondary_phosphine": None,
     "primary_phosphine": None,
     #: New FG prefix forms
-    "hydroxamic_acid": "N-hydroxyamido",  # IUPAC
+    "hydroxamic_acid": "hydroxycarbamoyl",  # method (2), the Blue Book (not "N-hydroxyamido")
     "cyanate": "cyanato",                 # IUPAC
     "thiocyanate": "thiocyanato",         # IUPAC
     "azo": "diazenyl",                    # IUPAC

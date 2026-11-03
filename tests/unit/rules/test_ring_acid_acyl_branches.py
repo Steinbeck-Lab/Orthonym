@@ -72,3 +72,32 @@ def test_a_branch_with_the_principal_group_gets_no_substitutive_name():
     name = _row("OC(=O)c1cccc(c1)C(=O)c1ccc(cc1)C(=O)O")["name"]
     assert "carboxybenzoyl" not in name
 
+
+
+@pytest.mark.parametrize("smiles,name", [
+    # "'Hidden' amides" (the Blue Book): an acyl group on a ring nitrogen is a pseudoketone, not an
+    # amide, so the group is the acyl prefix of 'pyrrolidine-1-carboxylic acid (PIN)',:29892),
+    # 'pyrrolidine-1-carbonyl',:30624); the amide reader named the two ring bonds of the nitrogen as
+    # two N-substituents ('4-[(butan-1-yl)(butan-4-yl)carbamoyl]benzoic acid', another molecule)
+    ("OC(=O)c1ccc(cc1)C(=O)N1CCCC1", "4-(pyrrolidine-1-carbonyl)benzoic acid"),
+    ("OC(=O)c1ccc(cc1)C(=O)N1CCOCC1", "4-(morpholine-4-carbonyl)benzoic acid"),
+    ("OC(=O)c1ccc(cc1)C(=O)N1CCC(C)CC1", "4-(4-methylpiperidine-1-carbonyl)benzoic acid"),
+    ("OC(=O)c1ccc(cc1)C(=O)N1CCc2ccccc21", "4-(2,3-dihydro-1H-indole-1-carbonyl)benzoic acid"),
+    # (:32920) method (2), 'carbamoyl' on rings (:32927), with its N-hydroxy (the seniority table gave
+    # the prefix 'N-hydroxyamido', which no reader parses)
+    ("OC(=O)C1CCC(CC1)C(=O)NO", "4-(hydroxycarbamoyl)cyclohexane-1-carboxylic acid"),
+    ("OC(=O)CC(CC(=O)O)C(=O)NO", "3-(hydroxycarbamoyl)pentanedioic acid"),   # a nonterminal chain atom, method (2)
+    # method (1) at the end of a chain, 'amino' and 'oxo' (:32924): 'hydroxycarbamoyl' there would add a carbon
+    ("OC(=O)CCCC(=O)NO", "5-(hydroxyamino)-5-oxopentanoic acid"),
+    ("CCOC(=O)CCC(=O)NO", "ethyl 4-(hydroxyamino)-4-oxobutanoate"),
+    # "NAMING OF STEREOISOMERS" (:44639,:44643): descriptors that relate to a substituent group "are cited at
+    # the front of the corresponding prefix", with the locant of the stereogenic unit (the descriptor stood in front
+    # of the whole name: '(1S)-4-[(1-phenylethyl)carbamoyl]benzoic acid')
+    ("OC(=O)c1ccc(cc1)C(=O)N[C@@H](C)c1ccccc1", "4-{[(1S)-1-phenylethyl]carbamoyl}benzoic acid"),
+    ("c1ccc(cc1)C(=O)N[C@@H](C)c1ccccc1", "N-[(1S)-1-phenylethyl]benzamide"),
+    ("Cc1ccc(cc1)C(=O)N[C@@H](C)c1ccccc1", "4-methyl-N-[(1S)-1-phenylethyl]benzamide"),
+])
+def test_ring_n_acyl_hydroxycarbamoyl_and_prefix_stereo(smiles, name):
+    row = _row(smiles)
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+    assert_full_rt(row["name"], smiles)
