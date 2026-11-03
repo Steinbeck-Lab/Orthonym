@@ -404,7 +404,9 @@ def test_rescue_memo_hit_keeps_the_producer_label():
     emission rule switched off, and the best-effort tier names the molecule with a name
     of its own that reads back exactly (tests/support/default_tier.py)."""
     from tests.support.default_tier import declined_pin_row
-    smiles = ("[2H]C1=C(C(=C(C(=C1[2H])[2H])NC(=O)C2=C(N(C(=C2C3=CC=CC=C3)C4=CC=C(C=C4)F)"
+    # the thioamide of the labelled anilide: the amide itself now takes the PIN-tier acyl prefix
+    # '4-[(2H5)phenylcarbamoyl]' (strict_ring_prefix.strict_acyl_branch_name), so it is no longer declined
+    smiles = ("[2H]C1=C(C(=C(C(=C1[2H])[2H])NC(=S)C2=C(N(C(=C2C3=CC=CC=C3)C4=CC=C(C=C4)F)"
               "CCC5CC(OC(O5)(C)C)CC(=O)OC(C)(C)C)C(C)C)[2H])[2H]")
     res = declined_pin_row(smiles, best_effort_same=False)
     assert_full_rt(res.get("name"), smiles)

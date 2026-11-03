@@ -2279,7 +2279,8 @@ def name_ring_system_substituent(mol, frag_atoms, attach_idx: int, *args, **kwar
     phane = phane_prefix(mol, frag_atoms, attach_idx)
     if phane is not None:
         return phane
-    name = mark_decorated_assembly(
+    from ..assembly.acyl_prefix import book_acyl_name     # an acyl branch: the book's acyl prefix, every tier
+    name = book_acyl_name(mol, frag_atoms, attach_idx) or mark_decorated_assembly(
         mol, frag_atoms, _name_ring_system_substituent(mol, frag_atoms, attach_idx, *args, **kwargs))
     return _recorded_as_substituted(mol, frag_atoms, attach_idx, name)
 

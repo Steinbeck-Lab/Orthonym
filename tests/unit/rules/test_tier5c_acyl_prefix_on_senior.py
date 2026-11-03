@@ -33,6 +33,9 @@ from orthonym import name_compound
         ("CC(=O)c1ccc(C#N)cc1", "4-acetylbenzonitrile"),
         ("CC(=O)c1ccc(C=O)cc1", "4-acetylbenzaldehyde"),
         ("CC(=O)c1ccc(C(=O)O)cc1C", "4-acetyl-3-methylbenzoic acid"),
+        # a substituted aryl acyl: "Acyl groups" (the Blue Book), "benzoyl (preferred prefix)
+        # (full substitution, see "; was fail-closed (deferred) here
+        ("OC(=O)c1ccc(C(=O)c2ccc(C)cc2)cc1", "4-(4-methylbenzoyl)benzoic acid"),
     ],
 )
 def test_tier5c_acyl_prefix_on_senior_parent(smiles, expected):
@@ -50,8 +53,6 @@ def _validity_gate_on(monkeypatch):
 @pytest.mark.parametrize(
     "smiles,why",
     [
-        ("OC(=O)c1ccc(C(=O)c2ccc(C)cc2)cc1",
-         "substituted-aryl acyl (4-methylbenzoyl) — fail closed, deferred"),
         ("CC(=O)c1ccc(S(=O)(=O)O)cc1",
          "S-suffix gate excluded: the sulfo assembly drops locants with an "
          "acyl prefix — stays on the HEAD fail-closed path"),

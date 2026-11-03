@@ -12512,10 +12512,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
             name = classify_and_name_fragment(mol, sub_info, ring_set, features)
         if name is None:
             # Fallback: try simple carbon-count alkyl naming
-            carbon_count = sum(
-                1 for idx in sub_info.frag_atoms
-                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-            )
+            carbon_count = sum(1 for idx in sub_info.frag_atoms if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
             if carbon_count > 0:
                 from .naming_utils import get_alkyl_name
                 try:
@@ -12625,7 +12622,8 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.); R before S whatever the locants (:22603,:45465)
     prefixes.sort(key=lambda f: rendered_prefix_citation_key(f.text))
 
-    return prefixes, frozenset(handled_ring_fg_atoms)
+    from .strict_ring_prefix import acyl_carbonyl_atoms
+    return prefixes, frozenset(handled_ring_fg_atoms) | acyl_carbonyl_atoms(mol, sub_infos)
 
 
 # a phase Plan-02-01: _generate_stereodescriptors lifted to handlers/_handler_shared.py per internal notes +.

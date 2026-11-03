@@ -109,6 +109,39 @@ def one_carbon_acyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
     return acyl_group_prefix(mol, attach_idx, parents[0], set(sub_set), _part)
 
 
+def ring_acyl_branch_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]:
+    """The acyl prefix of a branch whose head is an acyclic carbon bearing =O ('benzoyl', '3-(trifluoromethyl)benzoyl',
+    'phenylcarbamoyl'; ``strict_ring_prefix.acyl_branch_head``), through:func:`one_carbon_acyl_prefix`,
+    ; None for any other branch."""
+    from .strict_ring_prefix import acyl_branch_head
+    head = acyl_branch_head(mol, sub_atoms, attach_idx)
+    return None if head is None else one_carbon_acyl_prefix(mol, head, set(sub_atoms) | {head})
+
+
+def book_acyl_name(mol, sub_atoms, attach_idx: int) -> Optional[str]:
+    """The ring chokepoint's acyl prefix of a branch whose carbonyl carries a ring directly or through one N or O
+    ('benzoyl', '2,3-dihydro-1H-indole-1-carbonyl', 'phenylcarbamoyl', 'phenoxycarbonyl'), by
+    :func:`ring_acyl_branch_prefix`; None for any other branch (a chain acyl group keeps the chokepoint's own name)
+    and for the writer's general form 'R(oxo)methyl'. PIN tier only (``at_pin_tier``): at the wider tiers the
+    chokepoint's own name stands, as the parent and spelling choices that follow are tuned to it (the writer's name
+    there moved ten best-effort names, some to worse spellings, on the eval sets)."""
+    from ..rules.pin_vocabulary import at_pin_tier
+    from .strict_ring_prefix import acyl_branch_head
+    if not at_pin_tier():
+        return None
+    sub_set = set(sub_atoms)
+    head = acyl_branch_head(mol, sub_set, attach_idx)
+    if head is None:
+        return None
+    nbrs = [n for n in mol.GetAtomWithIdx(head).GetNeighbors() if n.GetIdx() in sub_set and n.GetAtomicNum() != 8
+            or n.GetIdx() in sub_set and mol.GetBondBetweenAtoms(head, n.GetIdx()).GetBondTypeAsDouble() == 1]
+    if not any(n.IsInRing() or (n.GetAtomicNum() in (7, 8) and any(
+            m.IsInRing() for m in n.GetNeighbors() if m.GetIdx() != head)) for n in nbrs):
+        return None
+    name = ring_acyl_branch_prefix(mol, sub_set, attach_idx)
+    return None if name is None or name.rstrip(')]}').endswith('(oxo)methyl') else name
+
+
 def _free_valence_at_one(mol, attach_idx: int, name: str) -> bool:
     """True when ``name`` is an alkyl-type prefix ('1-carboxy-2-methylpropyl', no free-valence locant) of an acyclic
     group attached at ``attach_idx``: (1) (the Blue Book) the free valence of such a prefix is at

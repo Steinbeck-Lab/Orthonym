@@ -42,7 +42,7 @@ from .hydroximic_acids import (
     BENZENE_SUFFIX_NAMES, DEMOTED_PREFIX, IMIDIC_DEMOTED_PREFIX, UNHANDLED, acid_suffix_extra, claims_benzene_group,
     name_imidic_on_benzene,
 )
-from .benzene_acid_suffixes import identify_chalcogen_acyl_group as _thioacyl  #: -C(=S)-R prefix
+from ..assembly.strict_ring_prefix import ketone_or_book_acyl_group as _thioacyl  # -C(=S)-R, then any -C(=O)-R
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
 from .ring_nitrogen_yl import large_substituent_in_scope, n_in_substituent_ring

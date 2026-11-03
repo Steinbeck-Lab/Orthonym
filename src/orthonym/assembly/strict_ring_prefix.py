@@ -131,6 +131,8 @@ def strict_ring_substituent_name(mol, frag_atoms, attach_idx) -> Optional[str]:
     from . import substituent_enumerator as se
     fset = set(frag_atoms)
     ring_info = mol.GetRingInfo()
+    if attach_idx in fset and ring_info.NumAtomRings(attach_idx) == 0:
+        return strict_acyl_branch_name(mol, fset, attach_idx)
     if attach_idx not in fset or ring_info.NumAtomRings(attach_idx) == 0:
         return None
     if not single_attachment(mol, fset, attach_idx):
@@ -164,6 +166,90 @@ def strict_ring_substituent_name(mol, frag_atoms, attach_idx) -> Optional[str]:
     if non_pin_vocabulary(name, label_forms=False) is not None:
         return None
     return name
+
+
+def strict_acyl_branch_name(mol, fset, attach_idx) -> Optional[str]:
+    """The acyl prefix of a ring-bearing branch attached through an acyclic carbonyl carbon ('benzoyl',
+    '3-(trifluoromethyl)benzoyl', 'phenylcarbamoyl', 'phenoxycarbonyl'), built by the book's acyl writer
+    (``acyl_prefix.ring_acyl_branch_prefix``): names the acyl group of a ring acid by its acid name
+    ('benzoyl' from the retained 'benzoic acid',, substitution allowed), (method (1),
+    :32922) an amide branch '(R)carbamoyl'. Its ring part is named by the side-group namer, at the PIN tier through
+    this module's strict producer, so a part a breadth producer had to build is still recorded and labels the name.
+    None when the branch holds an instance of the principal characteristic group, is charged or has another
+    attachment."""
+    if not single_attachment(mol, fset, attach_idx) or charged_core(mol, fset):
+        return None
+    pg, pg_matches = principal_group(mol)
+    if principal_group_in_fragment(pg_matches, fset, attach_idx):
+        return None
+    from .acyl_prefix import ring_acyl_branch_prefix
+    name = ring_acyl_branch_prefix(mol, fset, attach_idx)
+    if name is None:
+        return None
+    from ..rules.pin_vocabulary import non_pin_vocabulary
+    return None if non_pin_vocabulary(name, label_forms=False) is not None else name
+
+
+def acyl_branch_head(mol, frag_atoms, attach_idx) -> Optional[int]:
+    """The head of a branch (``attach_idx`` when it is in the branch, else the one branch atom bonded to it) when it
+    is an acyclic, uncharged carbon bearing =O: an acyl branch ('benzoyl', 'phenylcarbamoyl'); else None."""
+    fset = set(frag_atoms)
+    if attach_idx is None:
+        return None
+    heads = [attach_idx] if attach_idx in fset else [
+        nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors() if nb.GetIdx() in fset]
+    if len(heads) != 1:
+        return None
+    head = mol.GetAtomWithIdx(heads[0])
+    if head.GetAtomicNum() != 6 or head.IsInRing() or head.GetFormalCharge() or not any(
+            b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(head).GetAtomicNum() == 8
+            for b in head.GetBonds()):
+        return None
+    # The carbonyl is bonded to a carbon of the parent: an acyl substituent. On an N or O of the parent it is part
+    # of an amide, imide or ester, which can be the principal characteristic group or decide the parent (the
+    # sulfonyl carboxamide of class 11 is named on the carboxamide), so it is not named here.
+    outside = [nb for nb in head.GetNeighbors() if nb.GetIdx() not in fset]
+    if len(outside) != 1 or outside[0].GetAtomicNum() != 6:
+        return None
+    return heads[0]
+
+
+def acyl_carbonyl_atoms(mol, sub_infos) -> Set[int]:
+    """The carbonyl carbon and =O of every acyl branch of a ring parent (``sub_infos`` of ``extract_ring_substituents``).
+    The branch's acyl prefix ('benzoyl') cites its carbonyl, so the ketone match that spans the ring atom and that
+    carbon is not cited a second time as an 'oxo' of the ring ('2-benzoyl-2-oxocyclohexane-1-carboxylic acid' for
+    '2-benzoylcyclohexane-1-carboxylic acid')."""
+    out: Set[int] = set()
+    for info in sub_infos:
+        head = acyl_branch_head(mol, info.frag_atoms, info.attach_mol_idx)
+        if head is None:
+            continue
+        out.add(head)
+        out.update(b.GetOtherAtomIdx(head) for b in mol.GetAtomWithIdx(head).GetBonds()
+                   if b.GetBondType() == Chem.BondType.DOUBLE and mol.GetAtomWithIdx(b.GetOtherAtomIdx(head))
+                   .GetAtomicNum() == 8)
+    return out
+
+
+def ketone_or_book_acyl_group(mol, start_idx, ring_atoms):
+    """``benzene_acid_suffixes.identify_chalcogen_acyl_group`` (-C(=S)-R,, then any other ketone-acyl
+    branch -C(=O)-R of a benzene ring by the book's acyl writer (``acyl_prefix.ring_acyl_branch_prefix``): the acyl
+    name of the acid R-COOH, a substituted 'benzoyl',: '4-[3-(trifluoromethyl)benzoyl]benzoic
+    acid'), '<ring>-carbonyl' ('naphthalene-2-carbonyl'). None when the branch holds an instance of the principal
+    characteristic group (the multiplicative name is the PIN then: '4,4'-carbonyldibenzoic acid (PIN; multiplicative
+    name)', not '4-(4-carboxybenzoyl)benzoic acid', the Blue Book) or the writer has no name."""
+    from ..rules.benzene import _bfs_substituent_atoms
+    from ..rules.benzene_acid_suffixes import identify_chalcogen_acyl_group
+    from .acyl_prefix import ring_acyl_branch_prefix
+    found = identify_chalcogen_acyl_group(mol, start_idx, ring_atoms)
+    if found:
+        return found
+    atoms = set(_bfs_substituent_atoms(mol, start_idx, ring_atoms))
+    if acyl_branch_head(mol, atoms, start_idx) is None or principal_group_in_fragment(
+            principal_group(mol)[1], atoms, start_idx):
+        return None
+    name = ring_acyl_branch_prefix(mol, atoms, start_idx)
+    return {'name': name, 'atoms': sorted(atoms)} if name else None
 
 
 # ---------------------------------------------------------------------------
