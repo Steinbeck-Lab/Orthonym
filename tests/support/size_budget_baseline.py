@@ -156,6 +156,6 @@ FILES = {
     "src/orthonym/rules/fused_rings.py": 5710,
     "src/orthonym/rules/heterocycles.py": 5770,
     "src/orthonym/rules/ions.py": 7676,
-    "src/orthonym/rules/multiplicative.py": 5250,
+    "src/orthonym/rules/multiplicative.py": 5249,
     "src/orthonym/rules/spiro.py": 7001,
 }

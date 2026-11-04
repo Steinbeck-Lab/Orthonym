@@ -466,6 +466,25 @@ def _tied(chain):
     return chain
 
 
+def _oriented_chain(chain, reverse_needed) -> tuple:
+    """``chain`` as a tuple, reversed when ``reverse_needed(chain)``: the chain read in its lowest-locant direction."""
+    return tuple(reversed(chain)) if reverse_needed(chain) else tuple(chain)
+
+
+def _memo_by_oriented_chain(key_of, reverse_needed):
+    """``key_of`` of a chain read in its lowest-locant direction (:func:`_oriented_chain`), computed once per
+    oriented chain: a chain and its mirror that read alike have one key reads the prefixes in that
+    direction only). The memo lives as long as the returned function: one ``find_principal_chain`` call."""
+    memo: Dict[tuple, tuple] = {}
+
+    def keyed(chain):
+        oriented = _oriented_chain(chain, reverse_needed)
+        if oriented not in memo:
+            memo[oriented] = key_of(list(oriented))
+        return memo[oriented]
+    return keyed
+
+
 def _min_noting_tie(mol, top, key):
     """``min(top, key=key)``, noting the tie (:func:`_tied`) when ``top`` holds chains that differ in
     structure: the molecule has no ring, so the selector counts every prefix and its last key decides."""
@@ -972,7 +991,7 @@ def find_principal_chain(
                 fg_locants_score, bond_locants_score, double_bond_locants_score,
                 sub_count, sub_locants_score)
 
-    def _p45_alpha_key(chain: List[int]) -> tuple:
+    def _p45_alpha_key_of(oriented: List[int]) -> tuple:
         """DD5 / /: deterministic candidate
         comparator for chains that TIE on every chain_score term.
 
@@ -991,13 +1010,11 @@ def find_principal_chain(
             name_substituent_for_ordering,
         )
 
-        #: orient via the SAME full cascade `_compute_sub_locant_score` uses
-        # (PCG -> multiple-bonds -> double-bonds -> substituents), not just the PCG,
-        # so the citation-order tie-break is read in one consistent orientation; and
-        # use the chain-enumeration boundary `combined_exclude` (chain set + the
-        # non-principal FG terminal carbons removed from enumeration) so the named
-        # substituent fragment matches what the real enumerator sees.
-        oriented = list(reversed(chain)) if _cascade_reverse(chain) else chain
+        #: `oriented` is the chain read via the SAME full cascade `_compute_sub_locant_score` uses
+        # (PCG -> multiple-bonds -> double-bonds -> substituents), not just the PCG, so the citation-order
+        # tie-break is read in one consistent orientation (`_cascade_reverse`, applied by the memo below); and
+        # use the chain-enumeration boundary `combined_exclude` (chain set + the non-principal FG terminal
+        # carbons removed from enumeration) so the named substituent fragment matches what the real enumerator sees.
         cset = set(oriented)
         # ring_prefixes mode: each branch is named whole (a ring bonded to the
         # chain, or a branch that reaches one, is one prefix: '(3-nitrophenyl)methyl',
@@ -1071,6 +1088,8 @@ def find_principal_chain(
         return (sorted(sub_locants),
                 tuple(loc for _a, loc in entries),
                 tuple(a for a, _loc in entries))
+
+    _p45_alpha_key = _memo_by_oriented_chain(_p45_alpha_key_of, _cascade_reverse)
 
     def _lambda_direct_key(chain: List[int]) -> tuple:
         """ (BB 22172-22182): among chains tying on every term,

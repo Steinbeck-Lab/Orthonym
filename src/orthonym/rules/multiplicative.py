@@ -31,6 +31,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
 )
 from ..perception.molcache import atoms_of, canon_smiles
 from .bridge_arms import arm_sizes_differ
+from .linked_phosphonic_surrogate import name_sulfonic_surrogate
 from .multiplicative_general import name_general_multiplicative
 from .multiplied_class_word_units import ACYL_UNIT_SUFFIXES, multiply_class_word_unit
 from .multiplicative_arms import find_arm_pcg
@@ -1364,9 +1365,7 @@ def _linked_phosphonic_acids_name(mol, matches) -> Optional[str]:
     surrogate = rw.GetMol()
     try:
         Chem.SanitizeMol(surrogate)
-        from ..namer import Orthonym
-        acid = Orthonym(style='pin', _disable_opsin_validity_gate=True).name(
-            Chem.MolToSmiles(surrogate))
+        acid = name_sulfonic_surrogate(surrogate)
     except Exception:
         return None
     mm = _SULFONIC_SUFFIX_RE.match(acid or '')

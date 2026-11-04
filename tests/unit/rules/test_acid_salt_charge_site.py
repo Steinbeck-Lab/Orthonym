@@ -251,3 +251,48 @@ def test_best_effort_keeps_the_salt_form(smiles):
     assert be["name"].startswith("disodium ") and "sodium(1+)" not in be["name"], be
     parsed = _independent_parse(be["name"], smiles)
     assert parsed and _fixed_h(parsed) == _fixed_h(smiles)
+
+
+# --- the surrogate of a linked phosphonic acid is named only when a sulfonic acid can be its parent -------------
+# "SENIORITY ORDER FOR CLASSES", Table 4.1 (the Blue Book): "7a 'Suffix' acids in the order carboxylic
+# (not including carbonic or polycarbonic acids...), sulfonic, sulfinic,...": a surrogate that also carries a
+# carboxy group is a carboxylic acid and its name does not end in 'sulfonic acid' (``_SULFONIC_SUFFIX_RE``), so
+# the multiplicative name of the phosphonic acids is not built.
+
+def _surrogate_namings(monkeypatch, smiles):
+    from rdkit import Chem
+    from orthonym import namer
+    from orthonym.rules import multiplicative
+    calls = []
+    orig = namer.Orthonym.name
+
+    def spy(self, smi, *args, **kwargs):
+        calls.append(smi)
+        return orig(self, smi, *args, **kwargs)
+    monkeypatch.setattr(namer.Orthonym, "name", spy)
+    mol = Chem.MolFromSmiles(smiles)
+    matches = mol.GetSubstructMatches(multiplicative._PHOSPHONIC_ACID_SMARTS)
+    return multiplicative._linked_phosphonic_acids_name(mol, matches), calls
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("OP(=O)(O)CP(=O)(O)O", "methylenebis(phosphonic acid)"),
+    ("OP(=O)(O)c1ccc(P(=O)(O)O)cc1", "(1,4-phenylene)bis(phosphonic acid)"),
+])
+def test_linked_phosphonic_acids_still_name_their_surrogate(monkeypatch, smiles, name):
+    jar_or_skip()
+    result, calls = _surrogate_namings(monkeypatch, smiles)
+    assert result == name
+    assert calls and "S(=O)(=O)O" in calls[0]       # the sulfonic acid surrogate was named
+
+
+@pytest.mark.parametrize("smiles", [
+    # DTPA with a bisphosphonate arm: the surrogate is a polycarboxylic acid
+    "C(CNC(=O)CN(CCN(CCN(CC(=O)O)CC(=O)O)CC(=O)O)CC(=O)O)C(O)(P(=O)(O)O)P(=O)(O)O",
+    "OP(=O)(O)C(CC(=O)O)P(=O)(O)O",
+])
+def test_a_carboxylic_acid_surrogate_is_not_named(monkeypatch, smiles):
+    jar_or_skip()
+    result, calls = _surrogate_namings(monkeypatch, smiles)
+    assert result is None
+    assert calls == []

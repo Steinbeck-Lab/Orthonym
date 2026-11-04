@@ -3651,6 +3651,45 @@ def name_c_substituted_sugar(mol, canonical_smiles: str) -> Optional[str]:
                                  lambda: _name_c_substituted_sugar_impl(mol, canonical_smiles))
 
 
+_SUGAR_CATALOG_CONSTITUTIONS = None
+
+
+def _sugar_catalog_constitutions() -> frozenset:
+    """The constitutions (canonical SMILES without stereo or isotopes) of every ``lookup_sugar`` entry."""
+    global _SUGAR_CATALOG_CONSTITUTIONS
+    if _SUGAR_CATALOG_CONSTITUTIONS is None:
+        found = set(_NON_STEREO_SUGAR_FALLBACK)
+        for key in ALL_SUGAR_NAMES:
+            entry = Chem.MolFromSmiles(key)
+            if entry is not None:
+                found.add(Chem.MolToSmiles(entry, isomericSmiles=False))
+        _SUGAR_CATALOG_CONSTITUTIONS = frozenset(found)
+    return _SUGAR_CATALOG_CONSTITUTIONS
+
+
+def _c_sugar_parent_can_be_a_sugar(parent) -> bool:
+    """Necessary condition of a C-substituted sugar name "Substitution at a nonterminal carbon atom":
+    "The compound is named as a C-substituted monosaccharide"): some stereoisomer of the rebuilt ``parent`` is a sugar to ``lookup_sugar`` (a catalogued constitution) or to
+    ``recognize_sugar_skeleton`` (one ring, a clean sugar ring, one ring oxygen, one anomeric carbon). Neither
+    reads stereo, and enumeration keeps the constitution, so False means no isomer is a sugar. An unreadable
+    parent is not decided (True)."""
+    try:
+        flat = Chem.MolFromSmiles(Chem.MolToSmiles(parent, isomericSmiles=False))
+        if flat is None or Chem.MolToSmiles(flat) in _sugar_catalog_constitutions():
+            return True
+        rings = flat.GetRingInfo()
+        if rings.NumRings() != 1 or not _is_clean_sugar_ring(flat, rings.AtomRings()[0]):
+            return False
+        ring = rings.AtomRings()[0]
+        ring_oxygens = [i for i in ring if flat.GetAtomWithIdx(i).GetSymbol() == "O"]
+        if len(ring_oxygens) != 1:
+            return False
+        anomeric = _locate_anomeric_carbon(flat, ring, ring_oxygens[0])
+        return anomeric is not None and anomeric in set(ring)
+    except Exception:
+        return True
+
+
 def _name_c_substituted_sugar_impl(mol, canonical_smiles: str) -> Optional[str]:
     """C-substituted monosaccharide (BB /.3.2).
 
@@ -3719,6 +3758,8 @@ def _name_c_substituted_sugar_impl(mol, canonical_smiles: str) -> Optional[str]:
         Chem.SanitizeMol(rw)
     except Exception:
         return None
+    if not _c_sugar_parent_can_be_a_sugar(rw):
+        return None  # no isomer of the parent is a sugar: ``parent_infos`` would stay empty
     from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
     parent_infos = set()
     for iso in EnumerateStereoisomers(

@@ -148,3 +148,51 @@ def test_deterministic_across_randomized_smiles():
             rm = Chem.RenumberAtoms(mol, idx)
             names.add(name_compound(Chem.MolToSmiles(rm, canonical=False)))
         assert len(names) == 1, (smi, names)
+
+
+# --- the tie key is computed once per oriented chain (speed lever 3) ---------------------------------------
+# "the lower locant or set of locants for substituents cited as prefixes... in their order of citation in
+# the name" (the Blue Book) and decide between chains that tie on every term; the key reads the
+# chain in its PCG-/substituent-lowest orientation only, so a chain and its mirror that read alike have one key.
+
+def _name_substituent_calls(monkeypatch, smi):
+    import orthonym.assembly.substituent_enumerator as se
+    from orthonym.perception.chains import _P45_TIE
+    calls = []
+    orig = se.name_substituent
+
+    def spy(mol, frag, ni, *args, **kwargs):
+        calls.append(orig(mol, frag, ni, *args, **kwargs))
+        return calls[-1]
+    monkeypatch.setattr(se, "name_substituent", spy)
+    mol, fgs, pg = _prep(smi)
+    _P45_TIE.set(False)
+    find_principal_chain(mol, fgs, pg)
+    return calls, _P45_TIE.get()
+
+
+def test_a_chain_tied_with_its_mirror_names_each_prefix_once(monkeypatch):
+    """1-chloro-2-methylbutane: the two candidates are one chain read from either end, so its prefixes are
+    named once for the pair (twice before the memo), and no tie between different chains is noted."""
+    calls, tied = _name_substituent_calls(monkeypatch, "CCC(C)CCl")
+    assert sorted(calls) == ["chloro", "methyl"]
+    assert not tied
+    assert name_compound("CCC(C)CCl") == "1-chloro-2-methylbutane"
+
+
+def test_a_genuine_tie_still_names_both_arms_once_per_chain(monkeypatch):
+    """The Br arm and the Cl arm are different chains: each is named once, its mirror is not named again, and the
+    tie between the two chains is still noted (the amine parent tie, ``chains.amine_parent_tie``, reads it)."""
+    calls, tied = _name_substituent_calls(monkeypatch, "OCC(CCBr)CCCl")
+    assert {"2-bromoethyl", "2-chloroethyl"} <= set(calls)
+    assert len(calls) == 4
+    assert tied
+    assert name_compound("OCC(CCBr)CCCl") == "2-(2-bromoethyl)-4-chlorobutan-1-ol"
+
+
+def test_the_two_ends_of_a_palindromic_chain_are_still_compared(monkeypatch):
+    """1-bromo-3-chloropropane reads alike from both ends, so its two candidates are two oriented chains: both are
+    keyed and the alphanumerical order of the prefixes decides, as before."""
+    calls, _tied = _name_substituent_calls(monkeypatch, "BrCCCCl")
+    assert len(calls) == 4
+    assert name_compound("BrCCCCl") == "1-bromo-3-chloropropane"
