@@ -150,7 +150,15 @@ class TestCTerminalAmide:
     def test_leucinamide_cterm(self):
         result = _dt_name_compound(self.ILE_TO_LEU_NH2)
         assert not is_failure_name(result), result
-        assert result.endswith("leucinamide"), result
+        # change-asserted-value (lane/l15 task A4): was ``result.endswith("leucinamide")``, the retained peptide name
+        # (labelled below the PIN tier: Decision A part 2 below). Primary source: "Substituents of the
+        # types -NH-CO-R and -NH-SO2-R" (the Blue Book): "(1) substitutively, by using a prefix formed by
+        # changing the final letter 'e' in the complete name of the amide to 'o'" and "Method (1) generates preferred
+        # IUPAC names" (:32998): every inner residue is '...amido' and the C-terminal residue the amide
+        # '4-methylpentanamide' of its own substitutive name. Independent check: ``_full_rt`` reads the name back with
+        # OPSIN to the input's full InChIKey. Mutation: the test fails at the lane start, which names
+        # the retained '...leucinamide'. The Phe witness above keeps its retained name (A4's route does not reach it).
+        assert result.endswith("-4-methylpentanamide") and "leucin" not in result, result
         assert _full_rt(self.ILE_TO_LEU_NH2, result), result
 
     def test_simple_hand_built_alanylglycinamide(self):

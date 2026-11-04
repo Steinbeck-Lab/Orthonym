@@ -3351,7 +3351,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         # central atom into a chain, the Blue Book: a chain is not
         # terminated by O), the decoration composer below is offered first; the writer's
         # own name stands when the composer declines or the writer names no 'a' chain.
-        from ..rules.terminal_fragment import terminal_fragment_name
+        from ..rules.terminal_fragment import ring_assembly_branch_name, terminal_fragment_name
         _tf = terminal_fragment_name(mol, frag_atoms_set, attach_idx)
         if _tf is not None:
             from ..rules.oxoacid_group_prefix import (
@@ -3364,7 +3364,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                     from .book_prefixes import note_book_form
                     note_book_form('ps')
                     return _chain
-            return _tf.name
+            return ring_assembly_branch_name(mol, frag_atoms_set, attach_idx) or _tf.name
         # ---- C4 : decorated acyclic-chain substituent -----------------
         # LAST resort for a chain-rooted multi-functional fragment the narrow
         # tiers, the ring composer, the descriptive fallback and the terminal
@@ -3750,12 +3750,13 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
     """ / free-valence numbering of a SIMPLE monocyclic
     ring ``core``. Returns ``{atom_idx: locant}`` for the winning numbering, or
     ``None`` for anything that is not a simple monocycle (fused / spiro /
-    bridged atom, broken cycle). Key order (lowest wins): heteroatom locant set
+    bridged atom, broken cycle). Key order (lowest wins): the senior heteroatom at 1, heteroatom locant set
     -> heteroatom element-seniority locants -> indicated-H locant -> free
     valence locant -> decoration-carrier locant set. This mirrors the validated
     numbering of ``ring_substituents._decorated_heteroaryl_substituent_name``.
     """
     from ..rules.ring_substituents import _HETEROATOM_SENIORITY
+    from .ring_prefix_numbering import senior_heteroatom_at_one
     core = list(core)
     n = len(core)
     core_set = set(core)
@@ -3813,8 +3814,8 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
             a2p = {order[(start + direction * p) % n]: p + 1 for p in range(n)}
             het_locs = tuple(sorted(a2p[i] for i in het))
             sen_locs = tuple(a2p[i] for i in sorted(
-                het, key=lambda a: (_HETEROATOM_SENIORITY.get(
-                    mol.GetAtomWithIdx(a).GetSymbol(), 99), a2p[a])))
+                het, key=lambda a: (_HETEROATOM_SENIORITY.get(mol.GetAtomWithIdx(a).GetSymbol(), 99), a2p[a])))
+            first_ok = senior_heteroatom_at_one(mol, het, order[start], lambda a: _HETEROATOM_SENIORITY.get(mol.GetAtomWithIdx(a).GetSymbol(), 99))
             ih_loc = a2p[ih_atom] if ih_atom is not None else 0
             fv_loc = a2p[attach_idx]
 
@@ -3833,8 +3834,7 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
             # methylidenecyclohexyl' {2,4,6,6}. ``deco_carriers`` holds one entry
             # per decoration; a set of carriers dropped the repeat.
             deco_locs = tuple(sorted(a2p[c] for c in deco_carriers))
-            key = (het_locs, sen_locs, ih_loc, fv_loc, multi_locs, double_locs,
-                   deco_locs)
+            key = (first_ok, het_locs, sen_locs, ih_loc, fv_loc, multi_locs, double_locs, deco_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best = a2p
@@ -4268,15 +4268,15 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     result = f"{body}{sep}{core_tail}"
     if ' ' in result or result == 'substituent':
         return None
-    # Composite ring-substituent stereo: cite the ring's CIP descriptors
-    # at the FRONT of the prefix, on THIS numbering (pos; free valence = locant 1).
-    # collect_stereodescriptors only cites atoms/bonds whose locants are in pos, so
-    # a boundary bond (an exocyclic ylidene attachment) is left to the caller.
-    # Adds only descriptors the token lacks -> can only make a stereo-bearing
-    # decorated ring MORE correct (a stereo-stripped token was a wrong molecule the
-    # RT gate suppressed); backstops a wrong label.
+    # Composite ring-substituent stereo: cite the ring's CIP descriptors at the FRONT of the
+    # prefix, on THIS numbering (pos; free valence = locant 1; a fusion atom its lettered locant). Only
+    # atoms/bonds whose locants are in pos are cited, so a boundary bond (an exocyclic ylidene attachment)
+    # is left to the caller. Adds only descriptors the token lacks -> can only make a stereo-bearing decorated
+    # ring MORE correct (a stereo-stripped token was a wrong molecule the RT gate suppressed); backstops.
     from .prefix_derivation import substituted_prefix
-    return substituted_prefix(result, lambda tok: _prepend_ring_substituent_stereo(mol, pos, tok, frag_set))
+    from .ring_prefix_numbering import with_fusion_locants
+    return substituted_prefix(result, lambda tok: _prepend_ring_substituent_stereo(
+        mol, with_fusion_locants(mol, core, attach_idx, deco_carriers, pos), tok, frag_set))
 
 
 def _prepend_ring_substituent_stereo(mol, pos, token, frag_set=None):

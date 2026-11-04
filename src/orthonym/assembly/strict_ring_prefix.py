@@ -105,6 +105,24 @@ def general_tier_ring_prefix(mol, frag_atoms, attach_idx, wider):
     return name
 
 
+def ring_prefix_after_chokepoint(mol, frag_atoms, attach_idx, mancude, wider):
+    """The ring-yl prefix of a ring-bearing fragment the ring chokepoint declined (Step 1c of the substituent namer).
+
+    ``mancude`` is the chokepoint's breadth switch as the caller set it (best-effort only), ``wider`` the call with
+    the composition switch. Where the switch was off the default tier's promotion producer is asked first
+    (``pin_tier_ring_prefix``). The strict producer is then asked at every wider tier (valid, complete, best-effort),
+    as a general-tier ring is in ``composer`` (``general_tier_ring_prefix``). A fused parent keeps its ring-bearing
+    branch ('4-methylpiperazin-1-yl', '4-methoxyoxan-4-yl') that way: with no name for the branch the fused assembly
+    fails closed and the von Baeyer name wins, where "Five-membered ring requirement" (the Blue Book,
+    :23710) prefers the fusion name when it is allowed. The strict name is the PIN by construction (module docstring),
+    so it carries no general-tier label; the wider producer is not asked a second time."""
+    from ..rules.pin_vocabulary import at_pin_tier
+    name = None if mancude else pin_tier_ring_prefix(mol, frag_atoms, attach_idx, wider)
+    if name is None and not at_pin_tier():
+        name = general_tier_ring_prefix(mol, frag_atoms, attach_idx, lambda: None)
+    return name
+
+
 def _cached_strict_name(mol, frag_atoms, attach_idx):
     if not _KINDS:
         return None
@@ -305,7 +323,7 @@ def unspecified_carbohydrate(mol) -> bool:
     Blue Book names carbohydrates by their configuration ff.) and no rule read for this
     producer makes the systematic oxane name of a sugar of unknown configuration the PIN, so no prefix of
     such a molecule is promoted (the molecule stays with the first run)."""
-    centres = dict(Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False))
+    centres = dict(Chem.FindMolChiralCenters(Chem.Mol(mol), includeUnassigned=True, useLegacyImplementation=False))  # a copy: it relabels
     return any(centres.get(a) == '?' for ring in _sugar_rings(mol) for a in ring)
 
 

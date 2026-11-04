@@ -3362,6 +3362,19 @@ def _acid_linked_poly_branch(mol, sub_atoms, features, check_fg_link: bool,
         acyl_carbon=acyl_carbon)
 
 
+def _fg_loop_named_branch(sub_set, fg_set, fg_proven) -> bool:
+    """True when the branch *sub_set* lies inside the functional-group match *fg_set* and the FG-prefix loop
+    EMITTED a prefix for it (``fg_proven``: the atoms of the matches the loop named; None = no record kept).
+
+     (the Blue Book), under "Guanidine and its derivatives": "In the presence of a
+    characteristic group having seniority over guanidine (see item 11 in, the following prefixes are used":
+    'carbamimidoylamino (preferred prefix)'. A branch inside a guard match was skipped as "named by the FG loop" even
+    when the loop emitted nothing for it (the guanidine of arginine has no FG prefix), so nobody named it and the
+    name lost its atoms ('...-3-phenylpropanamido}pentanoic acid'). The walk may skip a branch only when the loop
+    named it, as it does for a thioether, ether or ester (``fg_prefix_atoms``)."""
+    return sub_set.issubset(fg_set) and (fg_proven is None or sub_set <= fg_proven)
+
+
 def _branch_holds_oxoacid_group(mol, sub_atoms) -> bool:
     """True when a substituent branch holds a P/S oxoacid group (a phosphate / sulfate ester,
     a phosphonate,...).
@@ -3563,7 +3576,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                     _fg_set = set(_fg_m)
                     if not _fg_set:
                         continue
-                    if _sub_set.issubset(_fg_set):
+                    if _fg_loop_named_branch(_sub_set, _fg_set, _fg_proven):
                         _skip_fg_branch = True
                         break
                     # W2F-P6: when the urea/thiourea DISTAL N is

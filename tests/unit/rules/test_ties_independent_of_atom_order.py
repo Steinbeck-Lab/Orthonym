@@ -18,7 +18,15 @@ pytestmark = pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,other_spelling,expected", [
     pytest.param('CC1=C(N=C(C=C1CC2=CN=C(C=C2)/C(=C/N)/C=NC)C(=O)NC3CCOCC3)N4C=CC=N4',
                  'c1(/C(C=NC)=C/N)ncc(Cc2c(C)c(-n3cccn3)nc(C(=O)NC3CCOCC3)c2)cc1',
-                 '4-[(6-{(1Z)-2-amino-1-[(methylimino)methyl]ethen-1-yl}pyridin-3-yl)methyl]-3-methyl-6-[(oxan-4-yl)carbamoyl]-2-(1H-pyrazol-1-yl)pyridine',
+                 # change-asserted-value (lane/l15 task A2 follow-up): was '...-3-methyl-6-[(oxan-4-yl)carbamoyl]-2-(1H-pyrazol-1-yl)
+                 # pyridine', the carboxamide cited as a prefix. Primary source: (the Blue Book) "The senior parent
+                 # structure has the maximum number of substituents corresponding to the principal characteristic group (suffix)
+                 #... in accord with the seniority of classes ": the amide is the suffix of the pyridine parent,
+                 # 'pyridine-2-carboxamide', its nitrogen substituent the italic locant N. Independent check:
+                 # ``name_is_rt_exact`` below reads the name back with OPSIN to the input's full InChIKey. Mutation: the test
+                 # fails at the lane start, which names the carbamoyl prefix. Cause of the change: the located
+                 # FG assembler no longer names the '(methylimino)' branch of the other pyridine as a single-bond prefix.
+                 '4-[(6-{(1Z)-2-amino-1-[(methylimino)methyl]ethen-1-yl}pyridin-3-yl)methyl]-5-methyl-N-(oxan-4-yl)-6-(1H-pyrazol-1-yl)pyridine-2-carboxamide',
                  id='ring_tie_cid_162462495'),
     pytest.param('C1=[N+](NN=N1)N=[N+]=[N-]',
                  'N([n+]1[nH]nnc1)=[N+]=[N-]',

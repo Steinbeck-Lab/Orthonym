@@ -219,11 +219,25 @@ def test_the_default_tier_ships_the_pin_the_promotion_rerun_builds(namers, _id, 
     assert RULE not in [f.rule for f in check_pin_spelling(mol, pin)]
 
 
-@pytest.mark.parametrize("_id,smiles,split,pin,_why", ENGINE_SPLIT, ids=ENGINE_IDS)
+@pytest.mark.parametrize("_id,smiles,split,pin,_why", DECLINED_SPLIT, ids=DECLINED_IDS)
 def test_best_effort_keeps_the_round_tripped_name_as_a_verified_non_pin(namers, _id, smiles, split, pin, _why):
     row = namers["best-effort"].name_tiered(smiles)
     assert (row["name"], row["tier"], row["is_pin"]) == (split, "systematic_verified", False), row
     assert RULE in [f["rule"] for f in row.get("spelling_failures") or []], row
+
+
+@pytest.mark.parametrize("_id,smiles,split,pin,_why", [r for r in ENGINE_SPLIT if r[0] in RERUN_NAMED],
+                         ids=sorted(RERUN_NAMED))
+def test_best_effort_cites_the_assembly_of_a_prefix_as_the_pin_tier_does(namers, _id, smiles, split, pin, _why):
+    """ "Substituent prefixes derived from ring assemblies" (the Blue Book): "Names of substituent groups
+    derived from ring assemblies are written in two ways:... (2) names denoted by locants are placed in brackets",
+    with '[2,2'-bipyridin]-5-yl (preferred prefix)' (:16130). The branch of this row holds an assembly of two identical
+    rings, so best-effort cites it ('4-([2,2'-bithiophen]-5-yl)-...', task A3 of lane/l15) where it kept the ring-by-ring
+    split name 'a verified non-PIN'; the name is the PIN tier's and OPSIN reads it back to the input."""
+    row = namers["best-effort"].name_tiered(smiles)
+    assert (row["name"], row["tier"], row["is_pin"]) == (pin, "pin_verified", True), row
+    assert not row.get("spelling_failures"), row
+    assert_full_rt(row["name"], smiles)
 
 
 @pytest.mark.parametrize("smiles,name", CONTROLS[:4])

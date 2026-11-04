@@ -171,7 +171,10 @@ def test_dihydro_pyrrolopyrrole_is_not_named_bare():
 
 
 @pytest.mark.parametrize("smi", [
-    # '...[methyl(3-methyl-1,2-dioxobutyl)amino]...' (PIN acyl: 3-methyl-2-oxobutanoyl)
+    # '...[methyl(3-methyl-1,2-dioxobutyl)amino]...' (PIN acyl: 3-methyl-2-oxobutanoyl). Task A9 gave its tertiary acyl
+    # nitrogen the amido prefix, which made the other amide the parent; the two amide chains tie on four carbons and
+    # picks the parent with the more prefixes (the tertiary amide), so that name was not the PIN and the prefix
+    # builder declines for this class (test_l15_a9_n_acyl_amido.py).
     "CC(C)C(=O)C(=O)N(C)[C@H](C(=O)NCCc1c[nH]c2ccccc12)C(C)C",
     # '2,5-bis[(aminoamino)oxomethyl]bicyclo[2.2.1]heptane' (the carbohydrazide)
     "C1[C@@H]2C[C@@H]([C@H]1C[C@@H]2C(=O)NN)C(=O)NN",

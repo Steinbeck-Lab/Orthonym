@@ -82,6 +82,44 @@ def stereo_atoms(mol, core) -> List[int]:
     return sorted(atoms)
 
 
+def fusion_atom_locants(mol, core, attach_idx, carriers, pos) -> Dict[int, str]:
+    """``{atom: lettered locant}`` of the fusion atoms of the fusion name of a fused core
+    (``rules.fused_forms.fused_system_form``), on the numbering ``pos`` (the form's numbering composed with an
+    automorphism of the core, as the ties of (g) are resolved above), or ``{}``.
+
+    ``pos`` holds the numbered atoms only; the fusion atoms of a fused ring ('3a', '7a' of indene) have no entry
+    in it, so the descriptors of their stereocentres were never cited. "Numbering of peripheral
+    skeletal atoms" (the Blue Book): "Each fusion carbon atom is given the same number as the immediately
+    preceding nonfusion skeletal atom, modified by a Roman letter 'a', 'b', 'c', 'd', etc.";
+    (:44624) cites every stereogenic unit. Every automorphism that reproduces ``pos`` must give the same letters,
+    else ``{}``."""
+    from ..rules.fused_forms import fused_system_form
+    try:
+        form = fused_system_form(mol, sorted(core), attach_idx, list(carriers))
+    except Exception:  # noqa: BLE001 - a producer that raises is a decline
+        return {}
+    if form is None:
+        return {}
+    lettered = [a for a in sorted(core) if isinstance(form.numbering.get(a), str)]
+    found = {tuple(form.numbering[aut[a]] for a in lettered)
+             for aut in core_automorphisms(mol, core, attach_idx)
+             if all(form.numbering.get(aut[a]) == loc for a, loc in pos.items())}
+    if len(found) != 1 or not all(isinstance(loc, str) for loc in next(iter(found))):
+        return {}
+    return dict(zip(lettered, next(iter(found))))
+
+
+def with_fusion_locants(mol, core, attach_idx, carriers, pos):
+    """``pos`` with the lettered locants of the stereogenic fusion atoms of a fused ring core, for the descriptors of
+    the prefix: the centres at '3a' and '7a' of ``(1R,2S,3aR,7aS)-...octahydro-1H-inden-1-yl`` were left out of its
+    descriptors. ``pos`` itself when no stereocentre of the core lacks a locant."""
+    missing = [a for a in core if a not in pos and mol.GetAtomWithIdx(a).HasProp('_CIPCode')]
+    if not missing:
+        return pos
+    letters = fusion_atom_locants(mol, core, attach_idx, carriers, pos)
+    return {**pos, **{a: letters[a] for a in missing if a in letters}}
+
+
 def citation_key(name):
     """The order in which the groups of a ring prefix are cited: (alphanumerical order) and then, for
     groups that tie on it because leaves the descriptors out (``(6R)-...`` and ``(6S)-...``), R before S
@@ -139,3 +177,15 @@ def prefix_order_numbering(mol, core, attach_idx, pos, named):
         best = min(keys)
         winners = [numbering for numbering, key in zip(winners, keys) if key == best]
     return pos if pos in winners else winners[0]
+
+
+def senior_heteroatom_at_one(mol, hetero, first_atom, rank) -> int:
+    """0 when the numbering of a heteromonocycle that starts at ``first_atom`` gives the locant 1 to a heteroatom of the
+    most senior element of its ring (``rank`` maps an atom index to its rank in the seniority sequence of the 'a'
+    prefixes: lower is senior), else 1; 0 for a ring with no heteroatom. (the Blue Book): "The locant
+    '1' is given to a heteroatom that occurs first in the seniority sequence used for citation of the skeletal
+    replacement ('a') prefixes. The numbering is then chosen to give lowest locants to heteroatoms considered as a set
+    in ascending numerical order": the oxygen of '1,3,4-oxadiazol-2-yl' is 1, not the nitrogen of the lower set
+    {1,2,4}."""
+    return 0 if not hetero or (first_atom in hetero and rank(first_atom) == min(rank(a) for a in hetero)) else 1
+

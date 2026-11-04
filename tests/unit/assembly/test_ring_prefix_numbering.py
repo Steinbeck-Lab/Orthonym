@@ -101,3 +101,29 @@ def test_a_numbering_that_the_automorphisms_do_not_tie_is_not_offered():
     flipped = {a: (len(core) + 2 - p if p > 1 else 1) for a, p in pos.items()}
     (winner2,) = g_winners(mol, core, 0, flipped, named)
     assert winner2 == winner
+
+
+@pytest.mark.parametrize("smiles, letters", [
+    # indane, free valence at C-1 (next to 7a): the two fusion centres are 3a and 7a
+    ("OC[C@H]1CC[C@H]2CCCC[C@@H]12", {"3a", "7a"}),
+    # decalin, free valence at C-1: the fusion centres are 4a and 8a
+    ("OC[C@H]1CCC[C@H]2CCCC[C@@H]12", {"4a", "8a"}),
+])
+def test_the_stereogenic_fusion_atoms_of_a_fused_core_take_their_lettered_locants(smiles, letters):
+    """ "Numbering of peripheral skeletal atoms" (the Blue Book): "Each fusion carbon atom is given
+    the same number as the immediately preceding nonfusion skeletal atom, modified by a Roman letter 'a', 'b', 'c',
+    'd', etc."; (:44624) cites each stereogenic unit. The numbering of a fused core holds the numbered
+    atoms only, so the descriptors of the ring-fusion centres were left out of the prefix."""
+    from orthonym.assembly.ring_prefix_numbering import with_fusion_locants
+    from orthonym.perception.stereo import assign_stereochemistry
+    from orthonym.rules.ring_substituents import polycyclic_core_numbering
+    mol = Chem.MolFromSmiles(smiles)
+    assign_stereochemistry(mol)
+    core = tuple(a.GetIdx() for a in mol.GetAtoms() if a.IsInRing())
+    attach = next(a.GetIdx() for a in mol.GetAtoms() if a.IsInRing() and a.HasProp("_CIPCode")
+                  and any(not n.IsInRing() for n in a.GetNeighbors()))
+    pos, _tail = polycyclic_core_numbering(mol, core, attach, [], allow_mancude=True)
+    cited = with_fusion_locants(mol, core, attach, [], pos)
+    assert {loc for a, loc in cited.items() if a not in pos} == letters
+    assert all(cited[a] == loc for a, loc in pos.items())      # the numbered atoms keep theirs
+    assert with_fusion_locants(mol, core, attach, [], cited) is cited   # nothing is missing a second time

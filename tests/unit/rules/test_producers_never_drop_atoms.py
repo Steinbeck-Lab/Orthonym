@@ -266,6 +266,14 @@ N_SUBSTITUTED_ACYLAMINO_PIN = {
     "CC(=O)N(C)C(C)C(=O)O": "2-(N-methylacetamido)propanoic acid",
     "CC(C)CC(N(C)C(=O)C)C(=O)O": "4-methyl-2-(N-methylacetamido)pentanoic acid",
     "CC(=O)N(C)CCC(=O)O": "3-(N-methylacetamido)propanoic acid",
+    # task A9 (change-asserted-value; these three were declined with 'the strict amido builder spells only an unbranched
+    # saturated acyl'): a branched, a ring and an unsaturated acyl are the amide name of the whole group with its final
+    # 'e' changed to 'o', the Blue Book, "Method (1) generates preferred IUPAC names"; the book's
+    # own amide names 'N-methylprop-2-enamide (PIN)',:32726). OPSIN reads each back to the input's full InChIKey
+    # (name_is_rt_exact below, a fresh parse); with the decorated-acyl builder removed the three decline again.
+    "CC(C)C(=O)N(C)CC(=O)O": "(N,2-dimethylpropanamido)acetic acid",
+    "O=C(c1ccccc1)N(C)CC(=O)O": "(N-methylbenzamido)acetic acid",
+    "C=CC(=O)N(C)CC(=O)O": "(N-methylprop-2-enamido)acetic acid",
 }
 
 
@@ -279,22 +287,6 @@ def test_default_tier_ships_the_method_1_pin_for_an_n_substituted_acylamino(smil
     assert row["is_pin"] is True and row["name"] == expected, row
     assert "(acetyl)" not in row["name"]          # never the method-(2) acylamino spelling
     assert name_is_rt_exact(expected, smiles)
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", [
-    "CC(C)C(=O)N(C)CC(=O)O",      # branched acyl
-    "O=C(c1ccccc1)N(C)CC(=O)O",   # ring acyl
-    "C=CC(=O)N(C)CC(=O)O",        # unsaturated acyl
-])
-def test_default_tier_declines_an_n_substituted_acyl_it_cannot_spell_as_method_1(smiles):
-    """The strict amido builder spells only an unbranched saturated acyl; for the rest the
-    default tier declines (NO_VERIFIED_PIN) and best-effort names the molecule exactly."""
-    from tests.support.default_tier import assert_default_tier_declines
-    from tests.support.rt_assert import name_best_effort
-    assert_default_tier_declines(smiles)
-    be = name_best_effort(smiles)
-    assert not is_failure_name(be["name"]) and name_is_rt_exact(be["name"], smiles), be
 
 
 # ---------------------------------------------------------------------------

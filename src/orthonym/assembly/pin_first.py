@@ -34,6 +34,35 @@ def note_pin_tier_asked() -> None:
         watch[0] = True
 
 
+def note_final_floor_name(final_floor: bool, smiles: str) -> None:
+    """The late recovery of a wider tier names the whole molecule with the last-resort floor of the best-effort
+    engine (``t4_coverage._final_floor_candidate``, every rung of the engine having declined): ``final_floor`` is True.
+    The floor spells an azanium cation on the ring that carries the least ('1-{[...azaniumyl...]amino}-2,3-dimethyl-
+    cyclohexane'), where the PIN tier names the cation SENIORITY ORDER FOR CLASSES, Table 4.1: cations, class 6,
+    are senior to amides, class 11; Cationic centers on characteristic groups: "the largest neutral parent
+    possible is used"). Asks the PIN tier, as:func:`note_pin_tier_asked`, in the naming of the whole molecule, when
+    the molecule carries a nitrogen cation (:func:`has_nitrogen_cation`, the class this was built for; any other
+    final-floor name keeps the wider tier's name) and the tier is valid or complete: at best-effort the ask has no
+    target (the main path's PIN promotion gives the PIN there) and doubled the time of the rows it fired on."""
+    from rdkit import Chem
+    from ..metrics.provenance import best_effort_ctx, best_effort_request_ctx, wider_tier_ctx
+    from .fragment_naming import is_top_level_naming
+    if not (final_floor and wider_tier_ctx.get() and not best_effort_ctx.get() and not best_effort_request_ctx.get()
+            and is_top_level_naming()):
+        return
+    if has_nitrogen_cation(Chem.MolFromSmiles(smiles)):
+        note_pin_tier_asked()
+
+
+def has_nitrogen_cation(mol) -> bool:
+    """True when ``mol`` has a nitrogen atom with a formal positive charge that no atom of opposite charge is bonded to:
+    an azanium, ammonium or pyridinium centre. A nitro group, an N-oxide, an azide or a diazo group draws its
+    nitrogen charge-separated, and the molecule is no cation."""
+    return mol is not None and any(
+        a.GetAtomicNum() == 7 and a.GetFormalCharge() > 0 and not any(nb.GetFormalCharge() < 0 for nb in a.GetNeighbors())
+        for a in mol.GetAtoms())
+
+
 def _applies(namer) -> bool:
     from ..namer import _BOOK_RETRY_OWNED
     from ..tiers import verification_active

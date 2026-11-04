@@ -264,7 +264,15 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CCCCC[C@H](O)/C=C/[C@H]1CCC(=O)[C@@H]1C/C=C\\CCCC(=O)O', None),
     ('CCCCC[C@H](O)/C=C/[C@@H]1[C@@H](C/C=C\\CCCC(=O)O)[C@H](O)C[C@H]1O', None),
     # j7 (TRIAGE g3 C05): the substitutive PIN, was the retained 'tyrosylvalylarginine'.
-    ('CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-methylbutanamido}-5-(carbamimidoylamino)pentanoic acid'),
+    # change-asserted-value (lane/l15 task A4): was '...-5-(carbamimidoylamino)pentanoic acid', the prefix of the drawing
+    # H2N-C(=NH)-NH-; this row draws the guanidine as (H2N)2C=N-. Primary source: (the Blue Book)
+    # "In the presence of a characteristic group having seniority over guanidine (see item 11 in, the following
+    # prefixes are used": 'carbamimidoylamino (preferred prefix)' for H2N-C(=NH)-NH- and '(diaminomethylidene)amino
+    # (preferred prefix)' for (H2N)2C=N-, with '4-[(diaminomethylidene)amino]butanoic acid (PIN)' for
+    # (H2N)2C=N-CH2-CH2-CH2-COOH (:34282); the row at:233 above, drawn the same way, already had it. Independent check:
+    # ``assert_full_rt`` in ``test_l15_wider_tier_pins.py::test_the_guanidine_drawing_decides_the_prefix`` reads the name
+    # back with OPSIN to the input's full InChIKey. Mutation: fails at the lane start.
+    ('CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-methylbutanamido}-5-[(diaminomethylidene)amino]pentanoic acid'),
     # wp7 change-asserted-value (m08): 'dimethyl' keys at 'methyl', before 'oxo':3448); a primed
     # locant is a locant:3442), not text that sorts before letters. OPSIN full-InChIKey exact.
     # quick-wins F-Q1: von Baeyer superscripts as low as possible, the Blue Book);

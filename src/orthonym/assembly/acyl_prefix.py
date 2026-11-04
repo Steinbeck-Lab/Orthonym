@@ -86,6 +86,51 @@ def is_acylsulfanyl(mol, sub_atoms, attach_idx) -> bool:
         return False
 
 
+def is_carboacyl_head(mol, frag_atoms, attach_idx) -> bool:
+    """True when the attachment atom is the carbonyl carbon of a chain carboacyl branch R-CO- (R an acyclic carbon):
+    a carbon outside every ring that carries one terminal =O and exactly one other carbon of the fragment, which is
+    not a ring atom. A ring carbon there is an aroyl or cycloalkanecarbonyl head, which the located-FG writer
+    already spells as the acyl name ('benzoyl', 'cyclohexanecarbonyl')."""
+    from rdkit import Chem
+    try:
+        sub_set = set(frag_atoms)
+        head = mol.GetAtomWithIdx(attach_idx)
+        if attach_idx not in sub_set or head.GetSymbol() != 'C' or head.IsInRing():
+            return False
+        oxo = [b for b in head.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE
+               and b.GetOtherAtom(head).GetSymbol() == 'O' and b.GetOtherAtom(head).GetDegree() == 1]
+        chain = [x for x in head.GetNeighbors() if x.GetIdx() in sub_set and x.GetSymbol() == 'C']
+        return len(oxo) == 1 and len(chain) == 1 and not chain[0].IsInRing()
+    except Exception:
+        return False
+
+
+def _head_on_nitrogen(mol, sub_atoms, attach_idx) -> bool:
+    """True when the carbonyl carbon at ``attach_idx`` is bound to a nitrogen outside the fragment (an acyl on N)."""
+    sub_set = set(sub_atoms)
+    return any(nb.GetAtomicNum() == 7 and nb.GetIdx() not in sub_set for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors())
+
+
+def tier_fg_engages(mol, sub_atoms, attach_idx, best_effort, pin) -> bool:
+    """Whether Tier FG (the located FG assembly) names the fragment: best-effort or the PIN carve-outs, from an
+    attachment atom of the fragment. A ring-bearing chain carboacyl branch is not assembled as '2-R-1-oxoethyl': the
+    cascade declines it and the caller spells the acyl group "Definitions and name formation",
+    the Blue Book: "Compound substitutive names for acyclic acyl groups, such as '1-oxopropyl'... are included
+    for use in general nomenclature"; the acyl name is the preferred prefix, "CH3-CO– acetyl (preferred
+    prefix) ethanoyl 1-oxoethyl",:30442). The head of an acyl on a nitrogen is not declined: that group is the amido
+    prefix of (``n_acyl_amido``), which is built before this one is asked; where it cannot name the group
+    (the PIN tier's amide handler names no amide of a three-carbon N-substituent beside a ring-bearing acyl) nothing spells the acyl, and it floats as 'N-<acyl>' on a
+    parent that has no nitrogen suffix, so the general '[1-oxo-2-R-ethyl](R')amino' name stands."""
+    if not (best_effort or pin) or attach_idx is None or attach_idx not in set(sub_atoms):
+        return False
+    try:
+        return not (best_effort and is_carboacyl_head(mol, sub_atoms, attach_idx)
+                    and any(mol.GetAtomWithIdx(a).IsInRing() for a in sub_atoms)
+                    and not _head_on_nitrogen(mol, sub_atoms, attach_idx))
+    except Exception:
+        return True
+
+
 def one_carbon_acyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
     """Roadmap N5e: a one-carbon chain carrying =O and one more group is an acyl group (2),
     the Blue Book) -- 'carbamoyl', '(R)carbamoyl', '<ring>-1-carbonyl', 'methoxycarbonyl', 'benzoyl' -- never

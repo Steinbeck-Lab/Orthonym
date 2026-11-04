@@ -456,6 +456,45 @@ def terminal_fragment_name(
         return None
 
 
+def _chain_runs_from_attachment(mol, frag_atoms, attach_idx: int) -> bool:
+    """True when the attachment atom ends the acyclic carbon chain of the fragment: at most one of its neighbours in the
+    fragment is an acyclic carbon. The decorated-chain composer counts its chain from the free valence, which is the
+    principal chain of "THE PRINCIPAL SUBSTITUENT CHAIN" (b), "the greater number of skeletal atoms, i.e., the
+    longest chain" (the Blue Book), only for such an atom: an attachment atom inside the chain ('-CH(CH3)-CH(OH)-')
+    makes the composer's chain the shorter one ('1-methylbut-3-yn-1-yl' for the 'pent-4-yn-2-yl' of the book)."""
+    atom = mol.GetAtomWithIdx(attach_idx)
+    return sum(1 for nb in atom.GetNeighbors()
+               if nb.GetIdx() in frag_atoms and nb.GetAtomicNum() == 6 and not nb.IsInRing()) <= 1
+
+
+def ring_assembly_branch_name(mol, frag_atoms, attach_idx: int) -> Optional[str]:
+    """The decorated-chain composer's name of a fragment that holds a ring assembly, when the name cites the assembly,
+    else ``None``.
+
+     "Substituent prefixes derived from ring assemblies" (the Blue Book): the prefix of an assembly is
+    '[2,2'-bipyridin]-5-yl (preferred prefix)' (:16130), whose locants "must be cited in preferred IUPAC names"
+    ,:15567). This writer spells the rings one by one ('5-(thiophen-2-yl)thiophen-2-yl'), so a branch that
+    holds an assembly is offered to the composer first. A composer name that cites no assembly (the composer's chain
+    core runs from the free valence, so it can be the shorter chain) is no gain: the writer's own name stands. So does
+    the writer's name where the attachment atom lies inside the chain (:func:`_chain_runs_from_attachment`) and at the
+    PIN tier, which keeps its own route. Never raises."""
+    from .pin_vocabulary import at_pin_tier
+    if at_pin_tier():
+        return None
+    try:
+        from .ring_assemblies import fragment_holds_ring_assembly
+        if not (_chain_runs_from_attachment(mol, frag_atoms, attach_idx)
+                and fragment_holds_ring_assembly(mol, frag_atoms)):
+            return None
+        from ..assembly.substituent_enumerator import _recursive_chain_fragment_substituent_name
+        from ..validation.spelling.checks_assembly import count_assembly_texts
+        name = _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx, allow_mancude=True)
+        return name if name is not None and count_assembly_texts(name) else None
+    except Exception:                                   # noqa: BLE001
+        logger.exception("terminal_fragment: unexpected error in the assembly branch route; refusing")
+        return None
+
+
 def _same_reach_name(mol, frag_atoms, attach_idx: int) -> Optional[TerminalFragmentName]:
     """Roadmap N5, same reach: the book spellings re-spell a fragment this writer names
     with its mechanical spellings; they never make it name a fragment it declines.
@@ -1027,10 +1066,25 @@ def _book_retained_fragment(mol, frag: Set[int], attach_idx: int
 _CHAIN_ELEMENTS = frozenset({"C", "N", "O", "F", "Cl", "Br", "I"})
 
 
-def _plain_chain_group(mol, frag: Set[int]) -> bool:
+def _trusted_chain_link(atom) -> bool:
+    """True for a chain-linking oxygen of an ether or an ester (both neighbours carbon) and for a chain-linking
+    nitrogen of an amide (carbon neighbours, one of them a carbonyl carbon): the groups the principal-chain deriver
+    names whole ('1-methoxypropan-2-yl', '1-{acetyl[2-(acetyloxy)ethyl]amino}propan-2-yl'). An amine nitrogen with a
+    plain alkyl group is not one of them ('1-(aminomethyl)propan-2-yl' for '-CH2-NH-CH3')."""
+    nbs = list(atom.GetNeighbors())
+    if any(nb.GetSymbol() != "C" for nb in nbs):
+        return False
+    if atom.GetSymbol() == "O":
+        return True
+    return any(b.GetBondTypeAsDouble() == 2.0 and b.GetOtherAtom(nb).GetSymbol() == "O"
+               for nb in nbs for b in nb.GetBonds())
+
+
+def _plain_chain_group(mol, frag: Set[int], trusted_links: bool = False) -> bool:
     """True when ``frag`` holds only C, N, O and halogen atoms, has no bond outside a ring but a
     single bond or the double bond of an oxo group (a terminal =O), and links no two atoms by a
-    nitrogen or oxygen of its own unless one of them is a ring atom. The deriver cites a double
+    nitrogen or oxygen of its own unless one of them is a ring atom (or, with ``trusted_links``, the
+    link is one of ``_trusted_chain_link``). The deriver cites a double
     bond it does not read ('=N-OH' as 'hydroxyamino', '=S' as 'sulfanyl') in the single-bond
     spelling of the branch, and names a chain-linking '-NH-CH3' branch '(aminomethyl)': another
     molecule. The groups it is trusted with carry their heteroatoms as oxo, hydroxy, amino and
@@ -1041,7 +1095,8 @@ def _plain_chain_group(mol, frag: Set[int]) -> bool:
         atom = mol.GetAtomWithIdx(a)
         inside = [n for n in atom.GetNeighbors() if n.GetIdx() in frag]
         if (atom.GetSymbol() in ("N", "O") and not atom.IsInRing() and len(inside) >= 2
-                and not any(n.IsInRing() for n in inside)):
+                and not any(n.IsInRing() for n in inside)
+                and not (trusted_links and _trusted_chain_link(atom))):
             return False
     for b in mol.GetBonds():
         i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
@@ -1083,9 +1138,13 @@ def _book_principal_chain_fragment(mol, frag: Set[int], attach_idx: int
     recommended as approved prefixes" (:16398): 'butan-2-yl (preferred prefix) 1-methylpropyl'.
     The chain, its numbering and the citation of its prefixes are the shared deriver's
     (``substituent_naming._located_acyclic_alkyl_name``, (b)-(m)); this writer only
-    takes its name for a single-bond group whose attachment is an acyclic carbon. ``None``
-    where the deriver declines (an unsaturated chain, a branch it cannot name): the backbone
-    walk then names the group as before."""
+    takes its name for a single-bond group whose attachment is an acyclic carbon. The groups
+    that link their chain by an ether or ester oxygen or an amide nitrogen are its own too
+    (``_trusted_chain_link``): the alcohol group of a polyester is '1-{butanoyl[2-(butanoyloxy)
+    ethyl]amino}-3-butoxypropan-2-yl', the Blue Book, the alcoholic
+    component by "seniority of rings, ring systems, and chains"), not the two carbons of
+    '2-{...amino}-1-(butoxymethyl)ethyl'. ``None`` where the deriver declines (an unsaturated
+    chain, a branch it cannot name): the backbone walk then names the group as before."""
     from ..assembly.book_prefixes import note_book_form
     from ..assembly.substituent_naming import (
         BRANCH_FALLBACK, _add_substituent_stereo, _located_acyclic_alkyl_name)
@@ -1096,7 +1155,7 @@ def _book_principal_chain_fragment(mol, frag: Set[int], attach_idx: int
                if nb.GetIdx() not in frag and nb.GetAtomicNum() > 1]
     if (root.GetSymbol() != "C" or root.IsInRing() or len(parents) != 1 or mol.GetBondBetweenAtoms(
             attach_idx, parents[0]).GetBondType() != Chem.BondType.SINGLE
-            or not _plain_chain_group(mol, frag)):
+            or not _plain_chain_group(mol, frag, trusted_links=True)):
         return None
     atoms = sorted(frag)
     # a branch the strict namer declines ('N(CH3)C6H5', 'NH-pyridin-2-yl') is named by this

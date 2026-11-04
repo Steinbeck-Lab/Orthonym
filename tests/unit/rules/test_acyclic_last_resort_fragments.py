@@ -43,7 +43,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
-    "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
@@ -135,8 +134,15 @@ def test_fragments_are_distinct():
 # - N-acyl on an amine inside a sulfate/sulfonate ester: the amide is cited as
 # the '-amido' prefix, (the Blue Book) "Method (1)
 # generates preferred IUPAC names." (:32998), '2-(N-methylpropanamido)benzene-
-# 1-sulfonic acid (PIN)'. No producer builds it on the anion-ester path yet, so
-# the shipped N-acyl float stays below pin_verified (decision A part 1).
+# 1-sulfonic acid (PIN)'. Task A9 of lane/l15 builds the prefix of a TERTIARY
+# acyl nitrogen on any parent (``assembly.n_acyl_amido``): the methacrylamido
+# sulfonate is named at the PIN tier (change-asserted-value: it was in
+# _PIN_NOT_BUILT and declined at the default tier, an N-acyl float below
+# pin_verified; independent check: ``name_is_rt_exact`` below, OPSIN 2.9.0 to the
+# input's full InChIKey; mutation: the row fails at the lane start, which declines
+# it). A SECONDARY acyl nitrogen on a sulfate ester ('2-tetradecanamidoethyl
+# sulfate') has no producer on the anion-ester path yet, so its shipped N-acyl
+# float stays below pin_verified (decision A part 1).
 # - the compound alkyloxy prefix inside 'methyl' takes its own marks,
 # (:7232), '(benzyloxy)carbonyl (preferred prefix)' (:18116).
 _PIN_BUILT = {
@@ -146,14 +152,16 @@ _PIN_BUILT = {
     # tier, the amide as the '-amido' prefix,:32998, "Method (1)
     # generates preferred IUPAC names"); OPSIN 2.9.0 full InChIKey and FixedH exact.
     "CC(C(C)S(=O)(=O)[O-])NC(=O)C=C": "3-(prop-2-enamido)butane-2-sulfonate",
-}
-_PIN_NOT_BUILT = {
-    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]": "2-tetradecanamidoethyl sulfate",
+    # lane/l15 task A9: the tertiary acyl nitrogen is the N-substituted amido prefix
     "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C":
         "2-{N-[3-(decyloxy)propyl]-2-methylprop-2-enamido}ethane-1-sulfonate",
 }
+_PIN_NOT_BUILT = {
+    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]": "2-tetradecanamidoethyl sulfate",
+}
 # The rows that named atom-complete before the rest (g6 C15).
-_NAMED_EARLIER = {"CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC"} | set(_PIN_NOT_BUILT)
+_NAMED_EARLIER = ({"CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC", "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C"}
+                  | set(_PIN_NOT_BUILT))
 _LAST_RESORT_ROWS = [s for s in FRAGMENTS if s not in _NAMED_EARLIER]
 # 2026-09-30 (pre-existing 26): six of the eight remaining rows name atom-complete
 # now. With the gate on, `Orthonym(general_fallback=True)` names each one, and the

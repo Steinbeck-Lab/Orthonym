@@ -34,7 +34,8 @@ from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
-from .acyl_prefix import _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl, one_carbon_acyl_prefix
+from .acyl_prefix import (
+    _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl, one_carbon_acyl_prefix, tier_fg_engages)
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
@@ -5044,7 +5045,9 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
       * N carries EXACTLY two non-parent heavy branches -- the acyl C (a clean
         C=O) and one other substituent R';
       * the acyl side names via ``linear_acyl_amido_prefix`` (an unbranched
-        saturated acyclic all-carbon acyl -> formamido/acetamido/{stem}anamido);
+        saturated acyclic all-carbon acyl -> formamido/acetamido/{stem}anamido), or
+        for any other acyl the group is named as a whole amide and read back
+        (``n_acyl_amido.decorated_n_acyl_amido_prefix``: '2-chloro-N-methylacetamido');
       * R' names via the recursive substituent namer;
       * the fragment is EXACTLY {N} + acyl-subtree + R'-subtree (nothing dropped).
 
@@ -5085,8 +5088,9 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
         )
 
     acyl_candidates = [b for b in branches if _is_acyl_c(b)]
-    if len(acyl_candidates) != 1:
-        return None  # 0 (no acyl) or 2 (an imide -N(C=O)(C=O)) -> not this class
+    from .n_acyl_amido import decorated_n_acyl_amido_prefix, parent_amide_is_senior
+    if len(acyl_candidates) != 1 or not parent_amide_is_senior(mol, acyl_candidates[0], sub_set):
+        return None  # 0 (no acyl), 2 (an imide), or an amide parent the group ties -> not this class
     acyl_c = acyl_candidates[0]
     r_prime = next(b for b in branches if b != acyl_c)
 
@@ -5133,8 +5137,8 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
         return None
 
     amido_core = linear_acyl_amido_prefix(mol, acyl_c, n_idx, {n_idx} | acyl_sub)
-    if not amido_core:
-        return None  # branched / unsaturated / ring / hetero acyl -> fail closed
+    if not amido_core:  # a decorated acyl: the amide name of the whole group, read back (n_acyl_amido)
+        return decorated_n_acyl_amido_prefix(mol, sub_set) if rp_atom.GetAtomicNum() == 6 else None
 
     # Name R' AND enclose it with the SAME machinery the amide-SUFFIX path uses
     # (`_name_n_substituent` + `format_n_substitution`): it applies the
@@ -5386,6 +5390,24 @@ def _substitutive_peptide_acid_name_fresh(frag_smi: str) -> Optional[str]:
     return name
 
 
+def amido_prefix_from_acid_name(frag_smi: str, acid_name: str) -> Tuple[Optional[str], str]:
+    """``(amido prefix or None, the acid name it was read from)`` for the acid fragment *frag_smi*, named *acid_name*.
+
+     "Substituents of the types –NH-CO-R and –NH-SO2-R" (the Blue Book), method (1): "changing the
+    final letter 'e' in the complete name of the amide to 'o'" (:32995); "Method (1) generates preferred IUPAC names"
+    (:32998). A peptide acid fragment comes back as its retained Chapter name ('prolylalanine'), which has no
+    '-oic acid' to turn into '-amido', so every tripeptide fell back to the non-PIN retained name. Name the acid
+    substitutively (PEPTIDE class excluded, as routing.dispatch_table._handle_peptide does): '...propanamido'. The whole
+    name is still full-InChIKey re-verified by the caller. The shared step of both acyl-branch writers
+    (:func:`acyl_amido_prefix_from_branch` and the composer's ``_recursive_acyl_amido``)."""
+    amido = acid_name_to_amido_prefix(acid_name)
+    if not amido and _is_retained_peptide_name(acid_name):
+        alt = _substitutive_peptide_acid_name(frag_smi)
+        if alt:
+            return acid_name_to_amido_prefix(alt), alt
+    return amido, acid_name
+
+
 def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
                                   sub_atoms,
                                   verify_acid: bool = False) -> Optional[str]:
@@ -5456,17 +5478,7 @@ def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
         acid_name = name_fragment_recursively(frag_smi)
         if not acid_name:
             return None
-        amido = acid_name_to_amido_prefix(acid_name)
-        if not amido and _is_retained_peptide_name(acid_name):
-            # A peptide acid fragment comes back as its retained Chapter name ('prolylalanine'),
-            # which has no '-oic acid' to turn into '-amido', so every tripeptide fell back to the
-            # non-PIN retained name. Name the acid substitutively (PEPTIDE class excluded, as
-            # routing.dispatch_table._handle_peptide does): '...propanamido' method (1),
-            # the Blue Book). The whole name is still full-InChIKey re-verified by the caller.
-            alt = _substitutive_peptide_acid_name(frag_smi)
-            if alt:
-                acid_name = alt
-                amido = acid_name_to_amido_prefix(alt)
+        amido, acid_name = amido_prefix_from_acid_name(frag_smi, acid_name)
         if not amido:  # an acyl holding a second COOH (Asp, Glu): 'carboxy' on the amide chain
             from .acyl_amido_polyacid import polyacid_acyl_amido_prefix
             return polyacid_acyl_amido_prefix(mol, n_idx, carbonyl_c, sub_set, verify_acid)
@@ -7071,6 +7083,8 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
                         groups['oxo'].append(chain_pos[c]); continue
                     if sym == 'N':
                         groups['imino'].append(chain_pos[c]); continue
+                if bond.GetBondTypeAsDouble() != 1.0 and nbr.GetDegree() > 1:
+                    return None  # a hetero-ylidene branch ('=N-OH') is no single-bond prefix: 'hydroxyimino', not '(hydroxyamino)'
                 # collect the whole off-chain branch
                 frag = []
                 seen = set(chain_set_c)
@@ -8940,12 +8954,12 @@ def _name_substituent_fragment_uncached(
                     allow_enumerator_fallback=False,
                     allow_mancude=_ring_mancude,
                 )
-                if not _ring_nm and not _ring_mancude:
+                if not _ring_nm:
                     # Breadth Job 1 (M01) + PB lane R: the ring chokepoint's composition
-                    # branches at the PIN tier (``assembly.strict_ring_prefix``).
-                    from .strict_ring_prefix import pin_tier_ring_prefix
-                    _ring_nm = pin_tier_ring_prefix(
-                        mol, sorted(sub_atoms), attach_idx,
+                    # branches at the PIN tier; the strict producer also at a wider tier.
+                    from .strict_ring_prefix import ring_prefix_after_chokepoint
+                    _ring_nm = ring_prefix_after_chokepoint(
+                        mol, sorted(sub_atoms), attach_idx, _ring_mancude,
                         lambda: name_ring_system_substituent(
                             mol, sorted(sub_atoms), attach_idx,
                             allow_enumerator_fallback=False,
@@ -9089,7 +9103,7 @@ def _name_substituent_fragment_uncached(
     # method (2) form '(carbamoylmethyl)' (:32941); and the 'acylsulfanyl' prefix.
     _fg_pin = (not _fg_best_effort and attach_idx is not None and (_is_chain_carboxamide(
         mol, sub_atoms, attach_idx) or is_acylsulfanyl(mol, sub_atoms, attach_idx)))
-    if (_fg_best_effort or _fg_pin) and attach_idx is not None and attach_idx in set(sub_atoms):
+    if tier_fg_engages(mol, sub_atoms, attach_idx, _fg_best_effort, _fg_pin):
         _fg_name = None
         _fg_located = None
         try:

@@ -42,8 +42,14 @@ ROWS = [
     # '(diaminomethylidene)amino (preferred prefix)', (the Blue Book;
     # '4-[(diaminomethylidene)amino]butanoic acid (PIN)',:34282): the group is a compound prefix,
     # enclosed, so the enclosing marks of the name nest one level deeper
+    # change-asserted-value (lane/l15): was '({(2S)-2-[...]-2-(...)-1-oxoethyl}amino)acetic acid', the acylamino
+    # spelling of method (2). Primary source: "Substituents of the types -NH-CO-R and -NH-SO2-R"
+    # (the Blue Book): "(1) substitutively, by using a prefix formed by changing the final letter 'e' in the
+    # complete name of the amide to 'o'" and "Method (1) generates preferred IUPAC names" (:32998); the PIN tier names
+    # the row with the same string (pin_verified). Independent check: assert_full_rt reads the name back with OPSIN to
+    # the input's full InChIKey. Mutation: the test fails at the lane start, which spelled '1-oxoethyl'.
     ("CCc1c(O)cc([C@H](N=C(N)N)C(=O)NCC(=O)O)cc1O",
-     "({(2S)-2-[(diaminomethylidene)amino]-2-(4-ethyl-3,5-dihydroxyphenyl)-1-oxoethyl}amino)acetic acid"),
+     "{(2S)-2-[(diaminomethylidene)amino]-2-(4-ethyl-3,5-dihydroxyphenyl)acetamido}acetic acid"),
     ("CC(C)N1C(CC2=C1C=C(C=C2)C(F)(F)F)CC(=O)O",
      "[1-(propan-2-yl)-6-(trifluoromethyl)-2,3-dihydro-1H-indol-2-yl]acetic acid"),
     # two prefixes: the first bare, the later one enclosed,:7312)

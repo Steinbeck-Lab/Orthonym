@@ -60,6 +60,21 @@ def test_unspecified_carbohydrate(smiles, expected):
     assert srp.unspecified_carbohydrate(Chem.MolFromSmiles(smiles)) is expected
 
 
+def test_unspecified_carbohydrate_leaves_the_cip_labels_of_the_molecule_alone():
+    """The guard reads the stereo centres of the molecule it is given and gives them back as they were: it ran at every
+    wider tier with the strict producer, and RDKit's new CIP labeller (``useLegacyImplementation=False``) overwrote the
+    engine's '_CIPCode' of a phosphorus centre (S to R), so a name cited the other P configuration, failed its round trip,
+    and a ring-prefix route of the witness lost to a name that cites the pyrimidinedione as a prefix."""
+    from orthonym.perception.stereo import assign_stereochemistry
+
+    mol = Chem.MolFromSmiles("Cc1cn([C@H]2CC(O[P@]3O[C@](C)(c4ccccc4)[C@@H]4CCCN43)[C@@H](CO)O2)c(=O)[nH]c1=O")
+    assign_stereochemistry(mol)
+    before = {a.GetIdx(): a.GetProp("_CIPCode") for a in mol.GetAtoms() if a.HasProp("_CIPCode")}
+    assert before, "the engine labels the centres"
+    srp.unspecified_carbohydrate(mol)
+    assert {a.GetIdx(): a.GetProp("_CIPCode") for a in mol.GetAtoms() if a.HasProp("_CIPCode")} == before
+
+
 @pytest.mark.parametrize("smiles,parent,attach", [
     ("CC1=CCC(C(C)CC=O)CC1", 5, 4),              # a cyclohexene
     ("OC(=O)CC1CCCCC1=O", 3, 4),                 # a cyclohexanone

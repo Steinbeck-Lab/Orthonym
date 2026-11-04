@@ -45,10 +45,13 @@ class BridgedParent:
         """ / (:16872,:16880) and (:14642): hydro prefixes,
         indicated hydrogen, bridge prefixes, fused parent. (a) (:6938): a hyphen
         separates the bridge prefix from a parent name that begins with a locant
-        ('2H,7H-4a,7-ethano-1-benzopyran',:14648)."""
+        ('2H,7H-4a,7-ethano-1-benzopyran',:14648); (d) (:6960) "to separate italic letters from
+        Roman letters" separates it from the italic designator of 's-indacene',:11404):
+        '1,4-methano-s-indacene', as the book prints '...cyclopenta[cd]-s-indacene (PIN)' (:14505)."""
+        from ...assembly.naming_utils import begins_with_italic_designator
         base = self.base[:-1] if elide and self.base.endswith("e") else self.base
         head = [p for p in (self.hydro, self.indicated_hydrogen) if p]
-        joint = "-" if self.bridges and base[:1].isdigit() else ""
+        joint = "-" if self.bridges and (base[:1].isdigit() or begins_with_italic_designator(base)) else ""
         stem = f"{self.bridges}{joint}{base}"
         if not self.bridges and not self.indicated_hydrogen and self.hydro:
             # (the Blue Book): hydro prefixes stand "immediately at the front of
@@ -58,7 +61,6 @@ class BridgedParent:
             # 'hydro[' and never 'hydro-['); one that begins with a locant needs it, and so does the italic
             # designator of 's-indacene' ("to separate italic letters from Roman letters", (d),:6960):
             # '1,2,3,5,6,7-hexahydro-s-indacene'
-            from ...assembly.naming_utils import begins_with_italic_designator
             return self.hydro + ("-" if stem[:1].isdigit() or begins_with_italic_designator(stem)
                                  else "") + stem
         return "-".join(head + [stem])

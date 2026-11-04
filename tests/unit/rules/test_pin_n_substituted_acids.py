@@ -239,11 +239,19 @@ def test_the_acid_group_is_perceived_only_where_it_is_the_principal_group():
 @pytest.mark.parametrize("smiles,name", [
     ("OC(=O)CCC(=NC)S", "4-(methylimino)-4-sulfanylbutanoic acid"),
     ("OC(=O)CCC(=NC)O", "4-hydroxy-4-(methylimino)butanoic acid"),
-    ("OC(=O)c1ccc(C(=NC)O)cc1", "1-carboxy-4-[hydroxy(methylimino)methyl]benzene"),
+    # change-asserted-value (lane/l15 task A2 follow-up): was "1-carboxy-4-[hydroxy(methylimino)methyl]benzene", the acid
+    # cited as a prefix. Primary source: (the Blue Book) "The senior parent structure has the maximum
+    # number of substituents corresponding to the principal characteristic group (suffix)... in accord with the
+    # seniority of classes ": the carboxylic acid is the suffix of 'benzoic acid'. Independent check: the full
+    # InChIKey read-back below. Mutation: the row fails at the lane start, which names the carboxy prefix.
+    # The group's own name is unchanged: the imidic acid stays the prefix '[hydroxy(methylimino)methyl]'.
+    ("OC(=O)c1ccc(C(=NC)O)cc1", "4-[hydroxy(methylimino)methyl]benzoic acid"),
 ])
 def test_a_demoted_group_keeps_the_name_it_had(smiles, name):
     """Demote, never delete: the senior acid's name is the one before this change, at the tier it was."""
+    from tests.support.rt_assert import assert_full_rt
     assert name_breadth(smiles).get("name") == name
+    assert_full_rt(name, smiles)
 
 
 @pytest.mark.parametrize("smiles,name", [

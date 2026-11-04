@@ -11325,9 +11325,9 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                         # completeness gate holds and no atom is dropped.
                         if set(sub_atoms) == _af2 | {idx}:
                             from .substituent_naming import (
-                                acid_name_to_amido_prefix,
+                                acid_name_to_amido_prefix, amido_prefix_from_acid_name,
                             )
-                            _amido = acid_name_to_amido_prefix(_an)
+                            _amido = amido_prefix_from_acid_name(_fs, _an)[0]
                             if _amido is None:
                                 _sys = name_fragment_recursively(
                                     _fs, style='systematic')

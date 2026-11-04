@@ -2364,6 +2364,11 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 },
             }
 
+    if h_count == 0 and len(neighbors) == 2:  # (the Blue Book,:33040): -N(R')-CO-R is '(N-methylpropanamido)'
+        from ..assembly.n_acyl_amido import tertiary_acyl_amido_group
+        if (_acyl_n := tertiary_acyl_amido_group(mol, n_idx, ring_atoms)) is not None:
+            return _acyl_n
+
     # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors -> '(dimethylamino)',
     # '[ethyl(methyl)amino]' (no italic N locants on an amino prefix).
     if h_count == 0 and len(neighbors) == 2 and not n_in_substituent_ring(mol, n_idx, ring_atoms):

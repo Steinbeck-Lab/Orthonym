@@ -201,8 +201,19 @@ THIAZOLE_ROW = ("C[C@H](NS(=O)(=O)O)[C@H](NC(=O)/C(=N\\OC(C)(C)C(=O)O)c1csc(N)n1
 def test_clean_engine_name_outranks_a_floor_stand_in():
     res = name_best_effort(THIAZOLE_ROW)
     name = assert_full_rt(res.get("name"), THIAZOLE_ROW)
-    assert "1,3-thiazole" in name, name
+    # change-asserted-value (lane/l15 task A2): was ``"1,3-thiazole" in name``, the clean engine's name on the
+    # thiazole parent '2-amino-4-[...]-1,3-thiazole', which cites both carboxylic acids as prefixes. Primary source:
+    # "Maximum number of substituents corresponding to the principal characteristic group"
+    # (the Blue Book): "The senior parent structure has the maximum number of substituents corresponding to the
+    # principal characteristic group (suffix)... in accord with the seniority of classes ": the hexanoic acid is
+    # the parent, its acid group the suffix, and the thiazole ring a '(2-amino-1,3-thiazol-4-yl)' prefix. Independent
+    # check: ``assert_full_rt`` reads the name back with OPSIN to the input's full InChIKey. Mutation: the test fails
+    # at the lane start, which names the thiazole parent. The test still pins the floor stand-in out.
+    assert name == ("(2S)-2-amino-6-({[(1S,2S)-1-({[(1Z)-(2-amino-1,3-thiazol-4-yl){[(1-hydroxy-2-methyl-1-oxopropan-2-yl)"
+                    "oxy]imino}methyl](oxo)methyl}amino)-2-(sulfoamino)propyl](oxo)methyl}amino)hexanoic acid"), name
     assert "azacyclopenta" not in name, name
+    # the string keeps non-PIN spellings ('(oxo)methyl}amino', '1-hydroxy-2-methyl-1-oxopropan-2-yl'): not a PIN
+    assert res["tier"] == "systematic_verified", res
 
 
 def test_acyclic_floor_stand_in_keeps_its_principal_chain():

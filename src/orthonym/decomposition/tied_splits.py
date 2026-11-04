@@ -15,10 +15,16 @@ RELATED TO ALPHANUMERICAL ORDER OF NAMES":22234):
 1. The acid component of the split: "Systems composed of rings and chains" (1) "Within
    the same class, a ring or ring system has seniority over a chain" (:19336); then "The
    principal chain has the greater number of skeletal atoms [criterion (b) in ]" (:20938).
-2. "The senior ring or ring system has the lowest locants for points of attachment
+2. "Polyester names formed by using substitutive nomenclature, and/or multiplicative
+   nomenclature, and functional class nomenclature" (:31858): "seniority of rings, ring systems, and chains; number
+   and location of substituents; and alphanumerical order is applied in forming the alcoholic component"
+   (``rules.ester_seniority``): the acid component by substituents, then the alcohol component by ring before chain,
+   the longest chain through the attachment carbon (b)) and substituents ('2-{2-[(acetyloxy)methyl]phenyl}ethyl
+   acetate', the ethyl chain senior to the methyl chain).
+3. "The senior ring or ring system has the lowest locants for points of attachment
    (if a substituent group)" (:21354, ``pyridin-2-yl`` before ``pyridin-3-yl``): the alkyl
    component, when the two names cite the same skeleton.
-3. "The preferred IUPAC name is the name that is earlier in alphanumerical order...
+4. "The preferred IUPAC name is the name that is earlier in alphanumerical order...
    Alphabetic letters are considered first in the order that they appear in the name... Then, if
    still there is a choice, numerical locants are considered in the order of their appearance in
    the name", then (:22603) the order of the descriptors R and S.
@@ -34,6 +40,8 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
+
+from ..rules.ester_seniority import ester_seniority_key
 
 #: the most tied splits that are named
 MAX_TIED_SPLITS = 6
@@ -129,7 +137,7 @@ def choose_split(mol, group: List[Dict], best: Dict, style: str, name_split, ade
         if named and exhausted():
             break
         named[bond["bond_idx"]] = name_split(mol, bond, style)
-    scored = [((_parent_key(mol, b), name_order_key(named[b["bond_idx"]])), b)
+    scored = [((_parent_key(mol, b), ester_seniority_key(mol, b["match"]), name_order_key(named[b["bond_idx"]])), b)
               for b in group
               if named.get(b["bond_idx"]) and adequate(named[b["bond_idx"]], mol, b)]
     if not scored:

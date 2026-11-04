@@ -17,7 +17,8 @@ rebuild a mono-acid from the acyl subgraph, name it, `oic acid->amido` /
 `carboxylic acid->carboxamido` (+ retained acetamido/formamido), render the
 N-substituent as an `N-` prefix. We reuse the strict `linear_acyl_amido_prefix`
 for the acyl core (which already proves atom coverage) + the recursive substituent
-namer for R'. Fail closed (None) on a branched/unsaturated/ring/hetero acyl or an
+namer for R'. A decorated acyl (a branch, a ring, an unsaturation, a halogen) is the amide name of the whole group
+(task A9, n_acyl_amido). Fail closed (None) on a hetero acyl, a group with a second acylated nitrogen or an
 unnameable R' -> those keep abstaining, never a wrong or atom-dropped name.
 """
 from rdkit import Chem
@@ -56,20 +57,30 @@ def test_helper_n_ethylacetamido():
 
 # ---- helper-level fail-closed (no wrong / atom-dropped emission) ------------
 
-def test_helper_branched_acyl_fails_closed():
-    # isobutyryl acyl (branched) -> linear_acyl_amido_prefix refuses -> None
+# lane/l15 task A9 (change-asserted-value): the two acyls the linear builder declines (a branched and an
+# unsaturated one) were asserted `None`; the builder now takes the complete name of the amide of the group
+# (`n_acyl_amido.decorated_n_acyl_amido_prefix`) and these are its prefixes. Artifacts: (1) "Substituents
+# of the types -NH-CO-R and -NH-SO2-R" (the Blue Book), "(1) substitutively, by using a prefix formed by changing
+# the final letter 'e' in the complete name of the amide to 'o'", and the book's own amide name
+# 'N-methylprop-2-enamide (PIN)' (:32726); (2) OPSIN reads '3-(N,2-dimethylpropanamido)propanoic acid' and
+# '3-(N-methylprop-2-enamido)propanoic acid' back to the input's full InChIKey (a fresh parse, tests/unit/
+# test_l15_a9_n_acyl_amido.py::assert_full_rt); (3) mutation: with the fall-through to the decorated builder removed
+# these two tests fail again. Wrong if: the amide name of the group were not the book's (it is the namer's own).
+
+def test_helper_branched_acyl_is_the_n_substituted_amido():
+    # isobutyryl acyl (branched): N and C-2 cite the one methyl multiplied, 'N,2-dimethylpropanamide'
     m = _frag("OC(=O)CCN(C)C(=O)C(C)C")
     n = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == "N")
     frag = set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4}
-    assert n_substituted_acyl_amido_prefix(m, n, frag, {0, 1, 2, 3, 4}) is None
+    assert n_substituted_acyl_amido_prefix(m, n, frag, {0, 1, 2, 3, 4}) == "N,2-dimethylpropanamido"
 
 
-def test_helper_unsaturated_acyl_fails_closed():
-    # acryloyl acyl (unsaturated) -> refused
+def test_helper_unsaturated_acyl_is_the_n_substituted_amido():
+    # acryloyl acyl (unsaturated): 'N-methylprop-2-enamide (PIN)' (:32726)
     m = _frag("OC(=O)CCN(C)C(=O)C=C")
     n = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == "N")
     frag = set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4}
-    assert n_substituted_acyl_amido_prefix(m, n, frag, {0, 1, 2, 3, 4}) is None
+    assert n_substituted_acyl_amido_prefix(m, n, frag, {0, 1, 2, 3, 4}) == "N-methylprop-2-enamido"
 
 
 def test_helper_ring_n_fails_closed():

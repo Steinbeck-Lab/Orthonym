@@ -1215,6 +1215,32 @@ def detect_ring_assembly(
     }
 
 
+def fragment_holds_ring_assembly(mol, frag_atoms) -> bool:
+    """True when ring systems of ``frag_atoms`` form a ring assembly. "DEFINITIONS" (the Blue Book): "Two
+    or more cyclic systems... that are directly joined to each other by single or double bonds are called 'ring
+    assemblies' when the number of such direct ring junctions is one less than the number of cyclic systems
+    involved"; they "are composed of identical cyclic systems". A fragment may hold a ring that no direct bond joins
+    to the others, so each group of directly joined systems goes to ``detect_ring_assembly`` on its own."""
+    from ..perception.rings import get_ring_systems
+    frag = set(frag_atoms)
+    systems = [sy for sy in get_ring_systems(mol) if sy <= frag]
+    if len(systems) < 2:
+        return False
+    group = list(range(len(systems)))
+
+    def root(i):
+        while group[i] != i:
+            i = group[i]
+        return i
+
+    for _a1, _a2, s1, s2 in _find_inter_system_bonds(mol, systems):
+        group[root(s1)] = root(s2)
+    joined: Dict[int, List[Set[int]]] = {}
+    for i, system in enumerate(systems):
+        joined.setdefault(root(i), []).append(system)
+    return any(len(members) > 1 and detect_ring_assembly(mol, members) is not None for members in joined.values())
+
+
 # ---------------------------------------------------------------------------
 # /: a ring assembly of identical skeletons that differ in hydrogenation
 # ---------------------------------------------------------------------------

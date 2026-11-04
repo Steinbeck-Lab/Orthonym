@@ -1481,6 +1481,33 @@ def _chain_carbonyl_oxygens(mol, acid_atoms, chain_set) -> set:
     return found
 
 
+def _ring_substituents_unnamed(mol, ring_atoms, acid_set, exclude) -> bool:
+    """True iff heavy atoms of the acid side sit outside the ring, the ester group and the exocyclic esters named
+    beside it (``exclude``): when the prefix pipeline named none of them, the ring acid word leaves them out ('methyl
+    benzoate' for a benzoate with a 3-methoxy-3-oxopropyl chain at the PIN tier, where an ester is no prefix). The
+    chain acid declines in that case; a ring acid word that drops atoms names another molecule: the
+    ester group is cited as a prefix only beside a group senior to it, and that prefix is then named whole)."""
+    return any(mol.GetAtomWithIdx(a).GetAtomicNum() > 1 and a not in exclude and a not in ring_atoms
+               for a in acid_set)
+
+
+def _carbonyl_oxygen_off_chain(mol, carbonyl_o_set, chain_set) -> bool:
+    """True iff one =O of ``carbonyl_o_set`` belongs to a carbonyl carbon off the principal chain ``chain_set``: another
+    ester, an amide, a ring acid, or a formyl or acyl branch on the acid side. The acid word leaves that =O out, so it
+    names another molecule and the prefix pipeline would name the group without it ('4-(methoxymethyl)phenyl' for a
+    methyl benzoate group); decline. Where the carbonyl belongs to an ester, Esters cited as prefixes: an
+    ester is cited as a prefix only "when another group is present that has priority for citation as the principal
+    group", so with a ring ester beside it this chain ester is not the parent: a ring is senior to a
+    chain)."""
+    for o in carbonyl_o_set:
+        oxygen = mol.GetAtomWithIdx(o)
+        for bond in oxygen.GetBonds():
+            carbon = bond.GetOtherAtom(oxygen)
+            if bond.GetBondTypeAsDouble() == 2.0 and carbon.GetSymbol() == 'C' and carbon.GetIdx() not in chain_set:
+                return True
+    return False
+
+
 def _is_ring_ketone_carbon(mol, idx, chain_set) -> bool:
     """A ring carbon off ``chain_set`` whose other neighbours are all carbon (a ketone, no acyl group)."""
     atom = mol.GetAtomWithIdx(idx)
@@ -1533,6 +1560,8 @@ def _build_ester_acid_word(
             # hydroxy, etc.). Check for ANY non-chain, non-carbonyl-O atom.
             chain_set = set(acid_principal_chain)
             carbonyl_o_set = _chain_carbonyl_oxygens(mol, acid_atoms, chain_set)
+            if _carbonyl_oxygen_off_chain(mol, carbonyl_o_set, chain_set):
+                return None
             non_chain_atoms = acid_set - chain_set - carbonyl_o_set
             has_acid_branches = bool(non_chain_atoms)
 
@@ -1716,6 +1745,8 @@ def _build_ester_acid_word(
             except Exception as exc:
                 logger.debug("Ester ring-acid prefix discovery failed: %s", exc)
                 acid_prefix_str = ""
+            if not acid_prefix_str and _ring_substituents_unnamed(mol, ring_atoms_in_acid, acid_set, exclude):
+                return None     # the ring acid word would drop them (as for a chain acid, above)
 
             if extra_ester_groups:
                 extra_str = _format_prefix_groups(dict(extra_ester_groups))

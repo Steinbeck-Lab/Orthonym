@@ -78,6 +78,7 @@ _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
 
 from .assembly.composer import assemble_name
 from .assembly.spelling_offer import name_tiered_with_offer as _name_tiered_with_offer
+from .assembly.pin_first import note_final_floor_name as _note_final_floor
 from .tiers import is_wider, tier_label_of
 from .assembly.default_tier_offer import confidence_scope, default_tier_engine, default_tier_name_scope, is_offered, list_name_yields
 from .assembly.offer_pool import (
@@ -6626,8 +6627,8 @@ class Orthonym:
             rec is not None and origin.get("floor_substitute"))
         # P1: the name is the final rung's universal floor (every engine rung
         # declined), see ``_prefer_clean_over_floor_substitute``.
-        self._last_recovery_final_floor = bool(
-            rec is not None and origin.get("final_floor"))
+        self._last_recovery_final_floor = bool(rec is not None and origin.get("final_floor"))
+        _note_final_floor(self._last_recovery_final_floor, smiles)   # a final-floor cation name asks the PIN tier (pin_first)
         return rec
 
     def _engine_recovery_spelling(self, smiles: str) -> Optional[str]:
@@ -10055,7 +10056,8 @@ class Orthonym:
 
         # Store ester match(es) if principal group is ester
         if pg_name == "ester" and pg_atoms:
-            features.ester_match = pg_atoms[0]  # First ester match (backward compat)
+            from .rules.ester_seniority import senior_ester
+            features.ester_match = senior_ester(features.mol, pg_atoms)   # "Polyester names formed by using substitutive nomenclature,...": the senior ester
             features.all_ester_matches = pg_atoms  # All ester matches
 
         # Detect polyfunctional compounds (multiple distinct FGs)
