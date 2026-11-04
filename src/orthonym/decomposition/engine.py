@@ -1587,10 +1587,14 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
                 if pf["side"] == "acid" and _name_sugar_fragment(pf["smiles"]):
                     return bond  # Sugar bond takes priority
 
-    # Sort: first by type priority, then by balance (smaller = better)
+    # Sort: first by type priority, then among esters by the seniority of the ester the name is built on
+    # "Polyester names formed by using substitutive nomenclature, and/or multiplicative
+    # nomenclature, and functional class nomenclature", the Blue Book; ring before chain), then by
+    # balance (smaller = better)
+    from .tied_splits import ester_split_rank
     best = min(
         bonds,
-        key=lambda b: (_BOND_TYPE_PRIORITY.get(b["type"], 99), _balance_score(b)),
+        key=lambda b: (_BOND_TYPE_PRIORITY.get(b["type"], 99), ester_split_rank(mol, b), _balance_score(b)),
     )
 
     # (Diacylamines): (R-CO)2NH is named as the N-acyl derivative of the

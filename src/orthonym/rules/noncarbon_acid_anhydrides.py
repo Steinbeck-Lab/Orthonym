@@ -65,13 +65,14 @@ def _borinic_acid_name(mol, ester_o: int, e_idx: int) -> Optional[str]:
     return f"{block}borinic acid" if block else None
 
 
-def mixed_noncarbon_anhydride(mol, ester_o: int, e_idx: int, acid_name: str) -> Optional[str]:
-    """'<acid> <acid> anhydride' for R-CO-O-E (or R-SO2-O-E...) with E the acid centre of a monobasic noncarbon
-    oxoacid, else None. ``acid_name`` is the name of the acyl side as a free acid ('acetic acid')."""
+def is_monobasic_noncarbon_acid_centre(mol, ester_o: int, e_idx: int) -> bool:
+    """Whether the E of R-CO-O-E is the acid centre of a monobasic noncarbon oxoacid of this rule: P, As, Sb or an
+    acyclic B, neutral, bearing besides the bridging oxygen only carbon and at most one terminal =O. Such a pseudoester
+    is named as an anhydride, whatever the number of its acyl groups,:32049)."""
     e = mol.GetAtomWithIdx(e_idx)
     if (e.GetSymbol() not in _E_ELEMENTS or e.IsInRing() or e.GetFormalCharge() != 0
             or e.GetNumRadicalElectrons() != 0 or e.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED):
-        return None
+        return False
     oxo = 0
     for nb in e.GetNeighbors():
         if nb.GetIdx() == ester_o:
@@ -80,8 +81,15 @@ def mixed_noncarbon_anhydride(mol, ester_o: int, e_idx: int, acid_name: str) -> 
         if nb.GetSymbol() == "O" and nb.GetDegree() == 1 and bond.GetBondTypeAsDouble() == 2.0:
             oxo += 1
         elif not (nb.GetSymbol() == "C" and bond.GetBondTypeAsDouble() == 1.0):
-            return None      # a second oxygen, a halogen, nitrogen: not the monobasic acids of this rule
-    if oxo > 1 or not acid_name.endswith(_ACID):
+            return False     # a second oxygen, a halogen, nitrogen: not the monobasic acids of this rule
+    return oxo <= 1
+
+
+def mixed_noncarbon_anhydride(mol, ester_o: int, e_idx: int, acid_name: str) -> Optional[str]:
+    """'<acid> <acid> anhydride' for R-CO-O-E (or R-SO2-O-E...) with E the acid centre of a monobasic noncarbon
+    oxoacid, else None. ``acid_name`` is the name of the acyl side as a free acid ('acetic acid')."""
+    e = mol.GetAtomWithIdx(e_idx)
+    if not is_monobasic_noncarbon_acid_centre(mol, ester_o, e_idx) or not acid_name.endswith(_ACID):
         return None
     # one acyl-oxygen group in the molecule: a dibasic acyl side ('oxalic acid' with both groups joined to E) is no
     # '<acid> <acid> anhydride' of this rule and keeps the ester name

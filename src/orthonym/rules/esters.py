@@ -2057,7 +2057,23 @@ def find_ester_match(mol) -> Optional[tuple]:
     return None
 
 
-def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
+def _noncarbon_ester_cut(mol, acid_center: int) -> Optional[Tuple[int, int]]:
+    """``(ester oxygen, O-side organyl atom)`` of an acid centre: the single-bonded oxygen
+    whose OTHER heavy neighbour is the organyl, else None."""
+    for nb in mol.GetAtomWithIdx(acid_center).GetNeighbors():
+        if nb.GetAtomicNum() != 8:
+            continue
+        bond = mol.GetBondBetweenAtoms(acid_center, nb.GetIdx())
+        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
+            continue
+        others = [x for x in nb.GetNeighbors()
+                  if x.GetIdx() != acid_center and x.GetAtomicNum() > 1]
+        if len(others) == 1:
+            return nb.GetIdx(), others[0].GetIdx()
+    return None
+
+
+def name_noncarbon_ester(mol, match: tuple, siblings: tuple = ()) -> Optional[str]:
     """Name an ester whose acid OR alcohol component is not the ordinary
     carbon-on-oxygen carboxylic ester / /:
 
@@ -2079,42 +2095,65 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
 
     ``match[0]`` = acid center; the ester oxygen is the single-bonded O on the
     acid center whose OTHER heavy neighbour is the organyl.
-    """
-    acid_center = match[0]
-    center_atom = mol.GetAtomWithIdx(acid_center)
 
-    ester_o = None
-    organyl = None
-    for nb in center_atom.GetNeighbors():
-        if nb.GetAtomicNum() != 8:
-            continue
-        bond = mol.GetBondBetweenAtoms(acid_center, nb.GetIdx())
-        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
-            continue
-        others = [x for x in nb.GetNeighbors()
-                  if x.GetIdx() != acid_center and x.GetAtomicNum() > 1]
-        if len(others) == 1:
-            ester_o = nb.GetIdx()
-            organyl = others[0].GetIdx()
-            break
-    if ester_o is None or organyl is None:
+    ``siblings``: the other ester groups of the molecule. "Fully esterified acids
+    derived from a single acid" (the Blue Book, "This rule applies equally to carboxylic,
+    sulfonic, sulfinic, etc. acids"): when every group is cut, the acid is one polyacid and the
+    organyl is one name, the organyl is multiplied in front of the anion ('bis(tributylstannyl)
+    butanedioate'). Otherwise one group is cut and the others stay prefixes, the group of the
+    lowest canonical rank, so that the atom order of the input does not decide which.
+    """
+    group = list({m[0]: m for m in (match, *siblings)}.values())
+    if len(group) > 1:
+        ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+        group.sort(key=lambda m: ranks[m[0]])
+        name = _name_noncarbon_ester_cuts(mol, group)
+        if name:
+            return name
+        if _one_organyl_bears_identical_groups(mol, group, ranks):
+            return None
+    return _name_noncarbon_ester_cuts(mol, group[:1])
+
+
+def _one_organyl_bears_identical_groups(mol, group: list, ranks: list) -> bool:
+    """Whether the first group of ``group`` has an identical sibling (the same canonical rank of the acid centre)
+    on the same organyl atom: one multivalent organyl esterified by one acid. "Polyesters formed
+    from a single 'alcoholic' component" (the Blue Book): "When anions are identical functional class
+    multiplicative nomenclature is used", 'ethane-1,2-diyl diacetate'; the one-cut name with the other groups as
+    '(acyloxy)' prefixes is no name of this rule, and the caller falls through to the other producers."""
+    first = _noncarbon_ester_cut(mol, group[0][0])
+    return first is not None and any(
+        ranks[m[0]] == ranks[group[0][0]] and (_noncarbon_ester_cut(mol, m[0]) or (None, None))[1] == first[1]
+        for m in group[1:])
+
+
+def _name_noncarbon_ester_cuts(mol, group: list) -> Optional[str]:
+    """'<organyl(s)> <acid>ate' with the ester bond of every acid centre of ``group`` severed
+    (``name_noncarbon_ester``); a group of several needs one organyl name and an acid whose name
+    carries every acid group as a suffix."""
+    cuts = [_noncarbon_ester_cut(mol, m[0]) for m in group]
+    if any(c is None for c in cuts):
         return None
 
-    # --- Build the neutral free acid by severing the ester O -> organyl bond. ---
+    # --- Build the neutral free acid by severing the ester O -> organyl bonds. ---
     try:
         rw = Chem.RWMol(mol)
-        rw.RemoveBond(ester_o, organyl)
+        for ester_o, organyl in cuts:
+            rw.RemoveBond(ester_o, organyl)
+            # a bracket '[O]' of the input spelling has no implicit hydrogen to take back
+            rw.GetAtomWithIdx(ester_o).SetNoImplicit(False)
         m2 = rw.GetMol()
         Chem.SanitizeMol(m2)
     except (ValueError, RuntimeError):
         return None
+    acid_center = group[0][0]
     acid_frag = next((f for f in Chem.GetMolFrags(m2) if acid_center in f), None)
-    if acid_frag is None:
+    if acid_frag is None or any(m[0] not in acid_frag for m in group):
         return None
     # Cyclic ester (sultone/sultine/lactone-like): severing the ester bond leaves
     # the organyl STILL bonded to the acid center via the ring — the two-component
     # 'organyl acylate' form does not apply. Fail-closed.
-    if organyl in acid_frag:
+    if any(organyl in acid_frag for _, organyl in cuts):
         return None
     try:
         acid_smi = Chem.MolFragmentToSmiles(
@@ -2131,27 +2170,39 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
             or "unknown" in acid_name.lower()
             or "not supported" in acid_name.lower()):
         return None
+    count = len(group)
     # (:32049): anhydrides come before esters in the seniority of classes
-    from .noncarbon_acid_anhydrides import mixed_noncarbon_anhydride
-    anhydride = mixed_noncarbon_anhydride(mol, ester_o, organyl, acid_name)
-    if anhydride:
-        return anhydride
+    from .noncarbon_acid_anhydrides import is_monobasic_noncarbon_acid_centre, mixed_noncarbon_anhydride
+    if count == 1:
+        anhydride = mixed_noncarbon_anhydride(mol, *cuts[0], acid_name)
+        if anhydride:
+            return anhydride
+    else:
+        # a group of an anhydride-forming E is no fully esterified acid: the caller cuts one group, as for one
+        multiplier = multiplier_table(20).get(count)
+        if (multiplier is None or any(is_monobasic_noncarbon_acid_centre(mol, *cut) for cut in cuts)
+                or not re.search(rf"{multiplier}(?:oic|carboxylic|sulfonic|sulfinic) acid$", acid_name)):
+            return None
     anion = _acid_name_to_ate(acid_name)
     if anion is None:
         return None
 
     # --- Name the O-side organyl as a substituent group. ---
     from ..assembly.substituent_enumerator import name_substituent
-    organyl_atoms = _bfs_fragment(mol, organyl, exclude_atom=ester_o)
-    if not organyl_atoms:
-        return None
-    try:
-        organyl_name = name_substituent(mol, organyl_atoms, organyl)
-    except Exception:
-        return None
+    organyl_names = set()
+    for ester_o, organyl in cuts:
+        organyl_atoms = _bfs_fragment(mol, organyl, exclude_atom=ester_o)
+        if not organyl_atoms:
+            return None
+        try:
+            organyl_names.add(name_substituent(mol, organyl_atoms, organyl))
+        except Exception:
+            return None
+    organyl_name = organyl_names.pop() if len(organyl_names) == 1 else None
     if not organyl_name:
         return None
-
+    if count > 1:
+        organyl_name = _multiplied_organyl(count, organyl_name)
     return f"{organyl_name} {anion}"
 
 

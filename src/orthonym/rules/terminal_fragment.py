@@ -1082,7 +1082,8 @@ def _trusted_chain_link(atom) -> bool:
 
 def _plain_chain_group(mol, frag: Set[int], trusted_links: bool = False) -> bool:
     """True when ``frag`` holds only C, N, O and halogen atoms, has no bond outside a ring but a
-    single bond or the double bond of an oxo group (a terminal =O), and links no two atoms by a
+    single bond, the double bond of an oxo group (a terminal =O) or a multiple bond between two
+    acyclic carbon atoms (the unsaturation of a chain), and links no two atoms by a
     nitrogen or oxygen of its own unless one of them is a ring atom (or, with ``trusted_links``, the
     link is one of ``_trusted_chain_link``). The deriver cites a double
     bond it does not read ('=N-OH' as 'hydroxyamino', '=S' as 'sulfanyl') in the single-bond
@@ -1105,6 +1106,8 @@ def _plain_chain_group(mol, frag: Set[int], trusted_links: bool = False) -> bool
         if b.GetBondType() == Chem.BondType.SINGLE:
             continue
         ends = (mol.GetAtomWithIdx(i), mol.GetAtomWithIdx(j))
+        if all(e.GetSymbol() == "C" and not e.IsInRing() for e in ends):
+            continue    # the unsaturation of the chain (d)); the deriver declines one its chain leaves out
         if not (b.GetBondType() == Chem.BondType.DOUBLE and any(
                 e.GetSymbol() == "O" and e.GetDegree() == 1 for e in ends)):
             return False
@@ -1143,8 +1146,8 @@ def _book_principal_chain_fragment(mol, frag: Set[int], attach_idx: int
     (``_trusted_chain_link``): the alcohol group of a polyester is '1-{butanoyl[2-(butanoyloxy)
     ethyl]amino}-3-butoxypropan-2-yl', the Blue Book, the alcoholic
     component by "seniority of rings, ring systems, and chains"), not the two carbons of
-    '2-{...amino}-1-(butoxymethyl)ethyl'. ``None`` where the deriver declines (an unsaturated
-    chain, a branch it cannot name): the backbone walk then names the group as before."""
+    '2-{...amino}-1-(butoxymethyl)ethyl'. ``None`` where the deriver declines (a chain that
+    starts at the free valence and is unsaturated, a branch it cannot name): the backbone walk then names the group as before."""
     from ..assembly.book_prefixes import note_book_form
     from ..assembly.substituent_naming import (
         BRANCH_FALLBACK, _add_substituent_stereo, _located_acyclic_alkyl_name)

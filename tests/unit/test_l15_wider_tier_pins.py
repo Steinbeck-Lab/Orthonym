@@ -285,6 +285,10 @@ def test_a_branch_attached_inside_its_chain_is_not_named_from_the_free_valence(s
         assert row["name"] == pin_name, row
     elif tier == "pin":
         assert row["tier"] == "abstain", row
+    elif row["name"] == pin_name:
+        # the book's chain, labelled below the PIN for the ring assembly's own spelling
+        assert row["tier"] == "pin_unverified", row
+        assert_full_rt(row["name"], smiles)
     else:
         assert (row["name"], row["tier"]) == (earlier_name, "systematic_verified"), row
         assert_full_rt(row["name"], smiles)

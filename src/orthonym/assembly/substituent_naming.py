@@ -6830,21 +6830,15 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
         # numbering and branch machinery as the strict alkyl path, so a fragment
         # rooted at an arbitrary attachment atom is named as a proper substituent
         # (not string-surgered from a molecule name). 0-wrong is preserved by the
-        # top-level /OPSIN gate. Defer (return None) on a charged atom or a
-        # C=C/C#C in the carbon skeleton (chain unsaturation not handled here yet).
+        # top-level /OPSIN gate. Defer (return None) on a charged atom. A C=C/C#C of the
+        # carbon skeleton is the chain's own unsaturation (d)), cited in the name by
+        # ``_located_fg_assemble``, which declines one that the picked chain does not hold.
         for idx in sub_set:
             atom = mol.GetAtomWithIdx(idx)
             if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
                 return None
             if atom.GetSymbol() != 'C' or ring_info.NumAtomRings(idx) > 0:
                 continue
-            cc_unsat = any(
-                b.GetBondTypeAsDouble() > 1.0
-                and b.GetOtherAtom(atom).GetSymbol() == 'C'
-                and b.GetOtherAtom(atom).GetIdx() in sub_set
-                for b in atom.GetBonds())
-            if cc_unsat:
-                return None
             # A nitrile carbon (C#N) is not a chain carbon: the group is the
             # 'cyano' prefix, the Blue Book), named as a branch.
             # Counting it into the chain wrote the -C#N as a chain end bearing
@@ -7054,13 +7048,14 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
         return None
     k = chain.index(attach_idx) + 1
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
-
+    from .chain_unsaturation import chain_multiple_bonds
     if chain_len == 1:
         # Roadmap N5e: a one-carbon chain carrying =O and one more group is an acyl
-        # group (2), the Blue Book) -- 'carbamoyl', '(R)carbamoyl',
-        # '<ring>-1-carbonyl', 'methoxycarbonyl', 'benzoyl' -- never the hyphen-joined
-        # '{[R]amino}-oxomethyl',:32922-:32928).
-        _acyl = one_carbon_acyl_prefix(mol, attach_idx, sub_set)
+        # group (2), the Blue Book) -- 'carbamoyl', '(R)carbamoyl', 'benzoyl' --
+        # never the hyphen-joined '{[R]amino}-oxomethyl',:32922-:32928); not of a
+        # group with a multiple bond outside its chain (declined below): the acyl writers spell it
+        _acyl = (one_carbon_acyl_prefix(mol, attach_idx, sub_set)
+                 if chain_multiple_bonds(mol, chain, carbon_set, k) is not None else None)
         if _acyl:
             return (_acyl, 1, chain_pos) if with_pos else (_acyl, 1)
 
@@ -7126,6 +7121,9 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
     chain, branch_groups = picked
     k = chain.index(attach_idx) + 1
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+    multiple = chain_multiple_bonds(mol, chain, carbon_set, k)
+    if multiple is None:
+        return None
 
     from .composer import _format_prefix_groups
     if chain_len == 1 and branch_groups:
@@ -7175,7 +7173,9 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
     else:
         prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
     try:
-        if k == 1:
+        if multiple[0] or multiple[1]:
+            name = f"{prefix}{_build_alkenyl_name(chain_len, k, *multiple)}"
+        elif k == 1:
             base = get_alkyl_name(chain_len)
             name = f"{prefix}{base}"
         else:

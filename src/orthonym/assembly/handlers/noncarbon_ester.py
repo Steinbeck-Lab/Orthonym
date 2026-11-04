@@ -41,7 +41,7 @@ def name_noncarbon_ester_handler(
     from ...rules.esters import name_noncarbon_ester
     from ..candidate_pool import get_current_pool
 
-    name = name_noncarbon_ester(features.mol, matches[0])
+    name = name_noncarbon_ester(features.mol, matches[0], tuple(matches[1:]))
     if not name:
         return None
 

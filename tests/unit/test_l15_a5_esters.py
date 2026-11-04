@@ -23,8 +23,12 @@ _TIERS = ["valid", "complete", "best-effort"]
 _DIESTER = "COC(=O)CCc1ccc(cc1)C(=O)OC"
 _ROW16 = ("COC(=O)[C@H](C)CNC(=O)[C@H](Cc1ccc(OC)c(Cl)c1)NC(=O)/C=C/C[C@H](OC(=O)[C@@H](O)CC(C)C)"
           "[C@H](C)[C@H]1O[C@@H]1c1ccccc1")
-_ROW16_PIN = ("(1S,3E)-5-{[(2S)-3-(3-chloro-4-methoxyphenyl)-1-{[(2R)-3-methoxy-2-methyl-3-oxopropyl]amino}-1-oxopropan-2-yl]"
-              "amino}-5-oxo-1-{(1S)-1-[(2R,3R)-3-phenyloxiran-2-yl]ethyl}pent-3-en-1-yl (2S)-2-hydroxy-4-methylpentanoate")
+# The alcohol group runs through its free valence: "THE PRINCIPAL SUBSTITUENT CHAIN" (the Blue Book), (b)
+# "the greater number of skeletal atoms, i.e., the longest chain", before (d) the multiple bonds (:22639). The chain
+# through the attachment carbon has seven atoms (hept-5-en-3-yl); the five atoms of the chain counted from the free
+# valence ('...-5-oxo-1-{1-[...oxiranyl]ethyl}pent-3-en-1-yl', this row's earlier name) are the shorter chain.
+_ROW16_PIN = ("(2S,3S,5E)-7-{[(2S)-3-(3-chloro-4-methoxyphenyl)-1-{[(2R)-3-methoxy-2-methyl-3-oxopropyl]amino}-1-oxopropan-2-yl]"
+              "amino}-7-oxo-2-[(2R,3R)-3-phenyloxiran-2-yl]hept-5-en-3-yl (2S)-2-hydroxy-4-methylpentanoate")
 
 _PIN_CASES = [
     (_DIESTER, "methyl 4-(3-methoxy-3-oxopropyl)benzoate"),

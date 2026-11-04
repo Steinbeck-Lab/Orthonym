@@ -1,7 +1,8 @@
 """Which of several equally ranked ester splits the decomposition names the molecule from.
 
-``engine._select_best_bond`` ranks the cleavable bonds by type and by how evenly the split halves
-the molecule. Two ester bonds can tie on both (the two acetates of a diacetate, the two
+``engine._select_best_bond`` ranks the cleavable bonds by type, an ester among them by its seniority
+(``ester_split_rank``: criteria 1 and 2 below), and then by how evenly the split halves the molecule.
+Two ester bonds can tie on all three (the two acetates of a diacetate, the two
 but-2-enoates of a piperazine bis-enoate, the five acetates of a polyol), and the first of them in
 the atom order of the input was cleaved. Every such bond gives a name of the molecule, and the
 names differ: ``…-2-methylpiperazin-1-yl}…`` against ``…-3-methylpiperazin-1-yl}…``, ``…-en-1-yl
@@ -76,6 +77,15 @@ def _parent_key(mol, bond: Dict) -> Tuple[int, int]:
     return (0, 0) if chain == 0 else (1, -chain)
 
 
+def ester_split_rank(mol, bond: Dict) -> tuple:
+    """The seniority of the ester split ``bond`` (the smaller is the senior): the acid component, ring before chain and
+    the longer chain,, then the polyester criteria of ``rules.ester_seniority``
+    ; ```` for a bond that is no ester. It is the first two criteria of ``choose_split``."""
+    if bond.get("type") != "ester" or "match" not in bond or "acid_atom" not in bond:
+        return ()
+    return (_parent_key(mol, bond), ester_seniority_key(mol, bond["match"]))
+
+
 def attachment_locant(name: str) -> int:
     """The locant of the free valence of the alkyl word of an ester name (0 when it is not cited)."""
     found = _ATTACHMENT_RE.search(name.split(" ", 1)[0])
@@ -137,7 +147,7 @@ def choose_split(mol, group: List[Dict], best: Dict, style: str, name_split, ade
         if named and exhausted():
             break
         named[bond["bond_idx"]] = name_split(mol, bond, style)
-    scored = [((_parent_key(mol, b), ester_seniority_key(mol, b["match"]), name_order_key(named[b["bond_idx"]])), b)
+    scored = [((*ester_split_rank(mol, b), name_order_key(named[b["bond_idx"]])), b)
               for b in group
               if named.get(b["bond_idx"]) and adequate(named[b["bond_idx"]], mol, b)]
     if not scored:

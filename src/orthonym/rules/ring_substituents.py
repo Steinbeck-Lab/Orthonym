@@ -944,18 +944,18 @@ def _decorated_heteroaryl_substituent_name(
     deco_atoms = [ra for ra, _ in decorations]
     best_key = None
     best_pos = None
+    from ..assembly.ring_prefix_numbering import senior_heteroatom_at_one
+    rank = lambda a: _HETEROATOM_SENIORITY.get(mol.GetAtomWithIdx(a).GetSymbol(), 99)
     for start in range(n):
         for direction in (1, -1):
             atom_to_pos = {order[(start + direction * p) % n]: p + 1
                            for p in range(n)}
+            # (the Blue Book): the senior element takes locant 1, then the lowest set.
+            first_ok = senior_heteroatom_at_one(mol, het_atoms, order[start], rank)
             het_locs = tuple(sorted(atom_to_pos[i] for i in het_atoms))
             seniority_locs = tuple(
                 atom_to_pos[i] for i in sorted(
-                    het_atoms,
-                    key=lambda a: (_HETEROATOM_SENIORITY.get(
-                        mol.GetAtomWithIdx(a).GetSymbol(), 99), atom_to_pos[a]),
-                )
-            )
+                    het_atoms, key=lambda a: (rank(a), atom_to_pos[a])))
             ih_loc = (atom_to_pos[indicated_h_atom]
                       if indicated_h_atom is not None else 0)
             fv_loc = atom_to_pos[attachment_atom]
@@ -974,7 +974,7 @@ def _decorated_heteroaryl_substituent_name(
                 for ra, nm in sorted(decorations,
                                      key=lambda t: atom_to_pos[t[0]])
             )
-            key = (het_locs, seniority_locs, ih_loc, fv_loc, deco_locs,
+            key = (first_ok, het_locs, seniority_locs, ih_loc, fv_loc, deco_locs,
                    deco_named)
             if best_key is None or key < best_key:
                 best_key = key
