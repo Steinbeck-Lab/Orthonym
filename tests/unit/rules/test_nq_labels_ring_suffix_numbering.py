@@ -19,19 +19,24 @@ pytestmark = pytest.mark.opsin_gate
 ISOTOPE_ROW = ("[2H]C1=C(C(=C(C(=C1[2H])[2H])NC(=O)C2=C(N(C(=C2C3=CC=CC=C3)C4=CC=C(C=C4)F)"
                "CCC5CC(OC(O5)(C)C)CC(=O)OC(C)(C)C)C(C)C)[2H])[2H]")
 
+# "All preferred IUPAC names for esters are named by functional class nomenclature": both rows are
+# now named as the ester (``assembly.ester_prefix_probe``); they were '1-{2-[6-(2-tert-butoxy-2-oxoethyl)-...]ethyl}-
+#...-1H-pyrrole-3-carboxamide' and '1-(2-tert-butoxy-2-oxoethyl)-4-chloro-...-1H-pyrrole-3-carbaldehyde', ring names
+# citing the ester as a prefix. The pyrrole's own suffix and prefixes keep the lowest locants inside the ester's
+# acid part. The first is the PIN tier's own name (pin_verified); the PIN tier declines the second.
 ROWS = [
     (ISOTOPE_ROW,
-     "1-{2-[6-(2-tert-butoxy-2-oxoethyl)-2,2-dimethyl-1,3-dioxan-4-yl]ethyl}-5-(4-fluorophenyl)-"
-     "N-(2H5)phenyl-4-phenyl-2-(propan-2-yl)-1H-pyrrole-3-carboxamide"),
+     "tert-butyl [6-(2-{2-(4-fluorophenyl)-3-phenyl-4-[(2H5)phenylcarbamoyl]-5-(propan-2-yl)-1H-pyrrol-1-yl}ethyl)-"
+     "2,2-dimethyl-1,3-dioxan-4-yl]acetate", "pin_verified"),
     ("CC(C)c1c(Cl)c(C=O)c(-c2ccccc2)n1CC(=O)OC(C)(C)C",
-     "1-(2-tert-butoxy-2-oxoethyl)-4-chloro-2-phenyl-5-(propan-2-yl)-1H-pyrrole-3-carbaldehyde"),
+     "tert-butyl [4-chloro-3-formyl-2-phenyl-5-(propan-2-yl)-1H-pyrrol-1-yl]acetate", "systematic_verified"),
 ]
 
 
-@pytest.mark.parametrize("smiles,expected", ROWS)
-def test_the_cited_suffix_takes_the_lowest_locant(smiles, expected):
+@pytest.mark.parametrize("smiles,expected,tier", ROWS)
+def test_the_cited_suffix_takes_the_lowest_locant(smiles, expected, tier):
     row = name_best_effort(smiles)
-    assert row["name"] == expected and row["tier"] == "pin_unverified", row
+    assert row["name"] == expected and row["tier"] == tier, row
     assert_full_rt(expected, smiles)
 
 

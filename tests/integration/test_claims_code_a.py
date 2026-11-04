@@ -111,7 +111,10 @@ def test_wrong_locants_are_recomposed_to_the_round_tripping_name():
     row = _pin_row(CHLORO)
     assert row["name"] == CHLORO_RIGHT, row
     assert _independent_full_key(row["name"]) == _key(CHLORO)
-    assert row["gate_outcome"] == pv.GATE_OUTCOME_STEREO_RECOMPOSED, row
+    # The ester producer now numbers the alkyl's descriptors on the chain of its prefix;
+    # ``rules.esters._acyclic_chain_through``), so it builds CHLORO_RIGHT itself and the gate has nothing to
+    # recompose here; the gate's repair of a producer's wrong descriptors is the subject of the tests below.
+    assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01, row
     assert row["tier"] == "pin_verified" and row["verified"] == "opsin", row
 
 

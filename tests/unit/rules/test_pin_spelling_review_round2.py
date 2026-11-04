@@ -262,12 +262,11 @@ LABEL_ON_ONE_MEMBER_ROWS = [
      "9H-carbazol-3-amine", "pin_unverified"),
     ("[2H]C1=C(C(=C(C(=C1[2H])[2H])NC(=O)C2=C(N(C(=C2C3=CC=CC=C3)C4=CC=C(C=C4)F)"
      "CCC5CC(OC(O5)(C)C)CC(=O)OC(C)(C)C)C(C)C)[2H])[2H]",
-     # the carboxamide suffix the heterocycle name cites takes the lowest locant, 3
-     # (c), the Blue Book, "principal characteristic groups and free valences
-     # (suffixes)"); it was 4
-     "1-{2-[6-(2-tert-butoxy-2-oxoethyl)-2,2-dimethyl-1,3-dioxan-4-yl]ethyl}-5-"
-     "(4-fluorophenyl)-N-(2H5)phenyl-4-phenyl-2-(propan-2-yl)-1H-"
-     "pyrrole-3-carboxamide", "pin_unverified"),
+     # the ester is the parent, "All preferred IUPAC names for esters are named by functional
+     # class nomenclature"), the PIN tier's own name; it was '1-{2-[6-(2-tert-butoxy-2-oxoethyl)-...]ethyl}-
+     #...-N-(2H5)phenyl-...-1H-pyrrole-3-carboxamide' (pin_unverified)
+     "tert-butyl [6-(2-{2-(4-fluorophenyl)-3-phenyl-4-[(2H5)phenylcarbamoyl]-5-(propan-2-yl)-1H-pyrrol-1-yl}"
+     "ethyl)-2,2-dimethyl-1,3-dioxan-4-yl]acetate", "pin_verified"),
     # roadmap N5b/N5d (name-quality lane L2): the carbazole takes its fusion name and
     # the phenyl group its prefix ('9-(2H5)phenyl-N,N-diphenyl-9-(9-phenyl-9H-carbazol-
     # 2-yl)-9H-fluoren-3-amine'), so the name keeps no part the label guard records as

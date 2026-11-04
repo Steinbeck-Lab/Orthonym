@@ -506,39 +506,60 @@ def default_tier_name_scope(fn):
     directly."""
     @functools.wraps(fn)
     def _wrapper(self, *args, **kwargs):
-        from ..namer import _BOOK_RETRY_OWNED
-        from .fragment_naming import name_scope_depth
-        if (not getattr(self, "_general_fallback", False) or getattr(self, "style", None) != "pin"
-                or _BOOK_RETRY_OWNED.get() or name_scope_depth() > 0):
-            return fn(self, *args, **kwargs)
-        from ..errors import OrthonymLimitError, is_failure_name
-        from .fragment_naming import hang_budget_trips
-        from .memo import recording_scopes, scope_entries, seeded_scopes
-        clear_held()
-        trips = hang_budget_trips()
-        with recording_scopes() as passes:
-            try:
-                produced = fn(self, *args, **kwargs)
-            except OrthonymLimitError as exc:
-                produced, limit = None, exc
-            else:
-                limit = None
-        if produced and not is_failure_name(produced):
-            return produced
-        if hang_budget_trips() != trips:
-            passes = []                     # a naming that ran out of a hang budget hands on nothing
-        from ..metrics.abstention import peek_abstention, restore_abstention
-        declined = peek_abstention()
-        with seeded_scopes(scope_entries(passes)):  # the offers start with what the naming computed
-            offered = _offered_name(self, args, kwargs)
-        if offered is None:
-            # an offer is a naming of its own and clears the slot; served from the seeded entries it does not
-            # record the reason again, and the reason the caller reads is the naming's
-            restore_abstention(declined)
-            if limit is not None:
-                raise limit
-        return produced if offered is None else offered
+        from .pin_first import pin_tier_checked      # the PIN tier's name for a molecule named in a lower class
+        return pin_tier_checked(self, args[0] if args else kwargs.get("smiles"),
+                                lambda: _offer_scope_body(fn, self, args, kwargs), lambda row: row["name"])
     return _wrapper
+
+
+def confidence_scope(fn):
+    """The decorator of ``Orthonym.name_with_confidence``: a Mol is named as RDKit's SMILES of it (``orthonym.input_mol``),
+    and a molecule a producer named in a lower class than the PIN tier may gets the PIN tier's record when its row is a
+    PIN read back directly (``pin_first``), as ``name`` and ``name_tiered`` do."""
+    @functools.wraps(fn)
+    def _wrapper(self, smiles):
+        from ..input_mol import handles, smiles_for
+        from .pin_first import pin_tier_checked, pin_tier_confidence
+        if not isinstance(smiles, str) and handles(smiles):
+            smiles = smiles_for(smiles)
+        return pin_tier_checked(self, smiles, lambda: fn(self, smiles), lambda row: pin_tier_confidence(self, smiles, row))
+    return _wrapper
+
+
+def _offer_scope_body(fn, self, args, kwargs):
+    """The body of:func:`default_tier_name_scope`."""
+    from ..namer import _BOOK_RETRY_OWNED
+    from .fragment_naming import name_scope_depth
+    if (not getattr(self, "_general_fallback", False) or getattr(self, "style", None) != "pin"
+            or _BOOK_RETRY_OWNED.get() or name_scope_depth() > 0):
+        return fn(self, *args, **kwargs)
+    from ..errors import OrthonymLimitError, is_failure_name
+    from .fragment_naming import hang_budget_trips
+    from .memo import recording_scopes, scope_entries, seeded_scopes
+    clear_held()
+    trips = hang_budget_trips()
+    with recording_scopes() as passes:
+        try:
+            produced = fn(self, *args, **kwargs)
+        except OrthonymLimitError as exc:
+            produced, limit = None, exc
+        else:
+            limit = None
+    if produced and not is_failure_name(produced):
+        return produced
+    if hang_budget_trips() != trips:
+        passes = []                     # a naming that ran out of a hang budget hands on nothing
+    from ..metrics.abstention import peek_abstention, restore_abstention
+    declined = peek_abstention()
+    with seeded_scopes(scope_entries(passes)):  # the offers start with what the naming computed
+        offered = _offered_name(self, args, kwargs)
+    if offered is None:
+        # an offer is a naming of its own and clears the slot; served from the seeded entries it does not
+        # record the reason again, and the reason the caller reads is the naming's
+        restore_abstention(declined)
+        if limit is not None:
+            raise limit
+    return produced if offered is None else offered
 
 
 def _offered_name(namer, args, kwargs) -> Optional[str]:

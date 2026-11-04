@@ -1991,9 +1991,11 @@ def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
     cage_atoms = [a.GetIdx() for a in sub.GetAtoms() if a.IsInRing()]
     if attach_sub not in cage_atoms:
         return None
+    from .ring_yl_forms import free_valence_stand_in
+    sub, fv_group = free_valence_stand_in(sub, attach_sub)      # the free valence before 'ene'
     try:
         cage = analyze_cage_universal(
-            sub, cage_atoms=set(cage_atoms), allow_mancude=True)
+            sub, cage_atoms=set(cage_atoms), allow_mancude=True, substituent_atoms=fv_group)
     except Exception:
         cage = None
     if cage is None:
@@ -3061,16 +3063,15 @@ def _compound_ring_on_chain_substituent(
             is_complex_substituent,
         )
         if connective == 'oxy':
-            #: the retained contraction 'phenoxy' for a BARE phenyl
-            # ring-yl; every other ring-yl (retained or systematic) uses the
-            # general uncontracted '{ring-yl}oxy' form, enclosed
-            # as a unit only if the ring-yl itself left un-self-enclosed marks
-            # inside the concatenation (mirrors
-            # ``_name_ether_substituted_chain``'s O-branch, the established
-            # convention for this exact shape elsewhere in the codebase).
-            if ring_name == 'phenyl':
-                group = 'phenoxy'
-            else:
+            #: the retained contraction 'phenoxy', fully substitutable
+            # (``rules.ring_yl_forms.phenoxy_form``); every other ring-yl (retained or
+            # systematic) uses the general uncontracted '{ring-yl}oxy' form, enclosed
+            # as a unit only if the ring-yl itself left un-self-enclosed marks inside
+            # the concatenation (mirrors ``_name_ether_substituted_chain``'s O-branch,
+            # the established convention for this exact shape elsewhere in the codebase).
+            from .ring_yl_forms import phenoxy_form
+            group = phenoxy_form(ring_name)
+            if group is None:
                 # The enclosing mark is chosen by the nesting order
                 # ("Multiple types of enclosing marks", the Blue Book-7446,
                 # '{[({})]}'): a ring-yl that already holds marks ('(2R,

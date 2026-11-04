@@ -79,7 +79,7 @@ _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
 from .assembly.composer import assemble_name
 from .assembly.spelling_offer import name_tiered_with_offer as _name_tiered_with_offer
 from .tiers import is_wider, tier_label_of
-from .assembly.default_tier_offer import default_tier_engine, default_tier_name_scope, is_offered, list_name_yields
+from .assembly.default_tier_offer import confidence_scope, default_tier_engine, default_tier_name_scope, is_offered, list_name_yields
 from .assembly.offer_pool import (
     ABSTAIN,
     BEST_EFFORT,
@@ -8897,6 +8897,7 @@ class Orthonym:
         return result
 
     @halogen_drawing_scope
+    @confidence_scope
     def name_with_confidence(self, smiles: Union[str, Chem.Mol]) -> dict:
         """Name one molecule and return a coverage score with it.
 
@@ -8934,9 +8935,6 @@ class Orthonym:
         >>> Orthonym.name_with_confidence("CCO")["name"]
         'ethanol'
         """
-        if not isinstance(smiles, str) and _input_mol.handles(smiles):
-            # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
-            smiles = _input_mol.smiles_for(smiles)
         # Lone-pair centre written first: the standard spelling of the input is named
         # when RDKit reads a lone-pair centre of it unlike the standard reading
         # (_lone_pair_standard_spelling); the atom-to-locant map is then re-keyed to

@@ -1462,6 +1462,32 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     return f"{alkyl_name} {acylate_name}"
 
 
+def _chain_carbonyl_oxygens(mol, acid_atoms, chain_set) -> set:
+    """The =O atoms of ``acid_atoms`` the acid word accounts for itself (not prefixes): every =O but that of a ring
+    ketone off the principal chain ``chain_set``. A ring ketone belongs to its ring's substituent prefix ('7-[2-(3-
+    hydroxyoctyl)-5-oxocyclopentyl]heptanoate'): left out of it, the prefix named a different molecule ('7-[2-(3-
+    hydroxyoctyl)cyclopentyl]heptanoate'). The =O of a ring ester or acid stays out as before: the chain acid is then no
+    parent, a ring is senior to a chain: 'methyl 4-(3-methoxy-3-oxopropyl)benzoate')."""
+    found = set()
+    for idx in acid_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'O':
+            continue
+        for bond in atom.GetBonds():
+            if bond.GetBondTypeAsDouble() == 2.0:
+                if not _is_ring_ketone_carbon(mol, bond.GetOtherAtomIdx(idx), chain_set):
+                    found.add(idx)
+                break
+    return found
+
+
+def _is_ring_ketone_carbon(mol, idx, chain_set) -> bool:
+    """A ring carbon off ``chain_set`` whose other neighbours are all carbon (a ketone, no acyl group)."""
+    atom = mol.GetAtomWithIdx(idx)
+    return (idx not in chain_set and atom.GetSymbol() == 'C' and atom.IsInRing()
+            and sum(1 for n in atom.GetNeighbors() if n.GetSymbol() != 'C') == 1)
+
+
 def _build_ester_acid_word(
     mol, ester_match: tuple, acid_atoms: List[int], alkyl_atoms: List[int],
 ) -> Optional[str]:
@@ -1506,14 +1532,7 @@ def _build_ester_acid_word(
             # Branches can be carbon-based (alkyl) OR heteroatom-based (halogens,
             # hydroxy, etc.). Check for ANY non-chain, non-carbonyl-O atom.
             chain_set = set(acid_principal_chain)
-            carbonyl_o_set = set()
-            for idx in acid_atoms:
-                atom = mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'O':
-                    for bond in atom.GetBonds():
-                        if bond.GetBondTypeAsDouble() == 2.0:
-                            carbonyl_o_set.add(idx)
-                            break
+            carbonyl_o_set = _chain_carbonyl_oxygens(mol, acid_atoms, chain_set)
             non_chain_atoms = acid_set - chain_set - carbonyl_o_set
             has_acid_branches = bool(non_chain_atoms)
 
@@ -1900,6 +1919,15 @@ def _collect_alkyl_fragment_stereo(mol, alkyl_atoms: List[int],
     if len(carbon_atoms) <= 1:
         return []
 
+    # An acyclic attachment carbon is numbered on the chain of the alkyl prefix: the longest chain of
+    # acyclic carbons through it, 'butan-2-yl'), not a longest path through a ring of a substituent
+    # of it ('(1R,2S)-7-chloro-1-(3,5-dihydroxyphenyl)-2-methylundecyl', not '(7R,8S)-...').
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumAtomRings(anchor_c) == 0:
+        chain = _acyclic_chain_through(mol, anchor_c, [c for c in carbon_atoms if ring_info.NumAtomRings(c) == 0])
+        if chain:
+            return collect_stereodescriptors(mol, {a: i + 1 for i, a in enumerate(chain)})
+
     # Build adjacency for carbons within alkyl fragment
     adj: dict = {c: [] for c in carbon_atoms}
     for c in carbon_atoms:
@@ -1946,6 +1974,39 @@ def _collect_alkyl_fragment_stereo(mol, alkyl_atoms: List[int],
         atom_to_locant[atom_idx] = i + 1  # 1-based
 
     return collect_stereodescriptors(mol, atom_to_locant)
+
+
+def _acyclic_chain_through(mol, anchor: int, carbons: List[int]) -> list:
+    """The longest chain of ``carbons`` (acyclic) that holds ``anchor``, numbered so that ``anchor`` has the lowest
+    locant; ```` when that is not one chain in one direction (two arms of one length, or two longest paths in an arm:
+    the choice then needs the further criteria of, which the caller's general numbering makes)."""
+    allowed = set(carbons)
+    arms = []
+    for start in sorted(n.GetIdx() for n in mol.GetAtomWithIdx(anchor).GetNeighbors() if n.GetIdx() in allowed):
+        parent, depth, order = {start: anchor}, {start: 1}, [start]
+        for node in order:                                   # breadth-first: the acyclic carbons form a tree
+            for nb in mol.GetAtomWithIdx(node).GetNeighbors():
+                j = nb.GetIdx()
+                if j in allowed and j not in parent and j != anchor:
+                    parent[j], depth[j] = node, depth[node] + 1
+                    order.append(j)
+        deepest = max(depth.values())
+        ends = [a for a in order if depth[a] == deepest]
+        if len(ends) > 1:
+            return []
+        arm, node = [], ends[0]
+        while node != anchor:
+            arm.append(node)
+            node = parent[node]
+        arms.append(list(reversed(arm)))
+    arms.sort(key=len, reverse=True)
+    if not arms or (len(arms) > 2 and len(arms[1]) == len(arms[2])):
+        return []
+    if len(arms) == 1:
+        return [anchor] + arms[0]
+    if len(arms[0]) == len(arms[1]):
+        return []                                            # the anchor in the middle: two directions
+    return list(reversed(arms[1])) + [anchor] + arms[0]     # the shorter arm first: the anchor's locant is lowest
 
 
 def find_ester_match(mol) -> Optional[tuple]:

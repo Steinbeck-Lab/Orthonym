@@ -236,10 +236,72 @@ def _junior_ring_parent_is_not_a_pin(handler):
     def wrapped(features: Any, mol: Any = None, style: str = "pin") -> Optional[NamingResult]:
         result = handler(features, mol, style)
         if result is not None and result.name:
+            _note_principal_group_off_every_ring(features)
             from ...rules.ring_selection import record_junior_ring_parent
             record_junior_ring_parent(features, result.name)
         return result
     return wrapped
+
+
+def _note_principal_group_off_every_ring(features: Any) -> None:
+    """A wider tier names the whole molecule and its principal characteristic group sits on no ring: a ring parent can
+    cite it only as a prefix, and the PIN tier names such a molecule on the parent that carries the group
+    by a route after this cascade ('4-([2,2'-bithiophen]-5-yl)-2-hydroxybut-3-yn-1-yl acetate', where the wider tier's
+    split spelled '2-hydroxy-4-[5-(thiophen-2-yl)thiophen-2-yl]but-3-yn-1-yl acetate'). Noted for ``assembly.pin_first``,
+    as:func:`_note_parent_without_the_principal_group`."""
+    from ...metrics.provenance import wider_tier_ctx
+    from ..fragment_naming import is_top_level_naming
+    pg, pg_atoms = getattr(features, 'principal_group', None), getattr(features, 'principal_group_atoms', None)
+    if pg is None or not pg_atoms or not wider_tier_ctx.get() or not is_top_level_naming():
+        return
+    from ...rules.parent_selection import is_principal_group_on_ring
+    mol = features.mol
+    rings = {a for ring in mol.GetRingInfo().AtomRings() for a in ring}
+    if rings and not is_principal_group_on_ring(mol, rings, pg_atoms, pg):
+        from ..pin_first import note_pin_tier_asked
+        note_pin_tier_asked()
+
+
+def _record_ester_cited_as_prefix() -> None:
+    """The cascade's name cites the molecule's principal ester as a prefix: labelled below the PIN
+    (``record_general_ring_prefix``); in the probe of the decomposition engine at a wider tier the record is the
+    probe's (``assembly.ester_prefix_probe``), and the naming that ships the name records the label itself."""
+    from ...metrics.provenance import record_general_ring_prefix, wider_tier_ctx
+    from ..ester_prefix_probe import probe_watched, record_principal_ester_prefix
+    if wider_tier_ctx.get() and probe_watched():
+        record_principal_ester_prefix()
+        return
+    record_general_ring_prefix()
+    if wider_tier_ctx.get():
+        from ..fragment_naming import is_top_level_naming
+        from ..pin_first import note_pin_tier_asked
+        if is_top_level_naming():
+            note_pin_tier_asked()                   # the PIN tier names the ester ('methyl 4-(...)benzoate')
+
+
+def _note_parent_without_the_principal_group(features: Any, handler: str, complex_result: Any) -> None:
+    """A wider tier names the whole molecule on a ring parent (the ``benzene``, ``heterocycle`` or ``complex_ring``
+    candidate of the cascade) that does not carry the principal characteristic group: the name cites the group as a
+    prefix, and gives the parent the maximum number of principal characteristic groups. The group sits on no
+    ring ('N-[(Z)-2-(4-hydroxyphenyl)ethenyl]formamide', not '4-[(1Z)-2-formamidoethen-1-yl]phenol') or on another
+    ring ('(1S,4R,5S)-5-hydroxy-4-(1H-indol-3-yl)-1,8-dimethyl-2,3-dithia-6,8-diazabicyclo[3.2.2]nonane-7,9-dione',
+    not '3-[...-7,9-dioxo-2,3-dithia-6,8-diazabicyclo[3.2.2]nonan-4-yl]-1H-indole'): the wider tier's producers name
+    it in a prefix where the PIN tier's do not, and the cascade takes the first parent its producers name. Noted for
+    ``assembly.pin_first``: the tier gives the PIN tier's name when that is a PIN OPSIN reads back."""
+    from ...metrics.provenance import wider_tier_ctx
+    from ..fragment_naming import is_top_level_naming
+    pg, pg_atoms = getattr(features, 'principal_group', None), getattr(features, 'principal_group_atoms', None)
+    if pg is None or not pg_atoms or not wider_tier_ctx.get() or not is_top_level_naming():
+        return
+    parent = {'benzene': getattr(features, 'benzene_atom_to_locant', None),
+              'heterocycle': getattr(features, 'heterocycle_atom_to_locant', None),
+              'complex_ring': getattr(complex_result, 'atom_to_locant', None)}.get(handler)
+    if not parent:
+        return
+    from ...rules.parent_selection import is_principal_group_on_ring
+    if not is_principal_group_on_ring(features.mol, set(parent), pg_atoms, pg):
+        from ..pin_first import note_pin_tier_asked
+        note_pin_tier_asked()
 
 
 @_junior_ring_parent_is_not_a_pin
@@ -674,6 +736,7 @@ def name_tier_a_ring(
                     best.handler, total_heavy, best.name[:60],
                 )
             candidate_name = best.name
+            _note_parent_without_the_principal_group(features, best.handler, _complex_result_for_injection)
             if best.handler in ('benzene', 'heterocycle', 'complex_ring'):
                 _parent_set = best.parent_atom_indices
                 _real_coverage = (
@@ -745,8 +808,7 @@ def name_tier_a_ring(
                 if any(not _mol.GetBondBetweenAtoms(_m[0], _m[2]).IsInRing()
                        for _m in _mol.GetSubstructMatches(
                            _smarts("[CX3](=O)[OX2][#6]"))):
-                    from ...metrics.provenance import record_general_ring_prefix
-                    record_general_ring_prefix()
+                    _record_ester_cited_as_prefix()
             return NamingResult(
                 name=candidate_name,
                 tree=NameTreeNode(parent_stem=candidate_name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=candidate_name),

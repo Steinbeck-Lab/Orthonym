@@ -50,7 +50,14 @@ def note_amine_chain_parent(features) -> None:
 def name_tiered_with_offer(namer, smiles: str, run) -> dict:
     """``run(smiles)``, the tiered naming of the molecule, then:func:`prefer_clean_name` on its row and, for a
     best-effort abstention, ``default_tier_offer.offer_default_tier_row``. The flag and the held names of an
-    earlier naming are cleared first, so what the row is offered never depends on what was named before it."""
+    earlier naming are cleared first, so what the row is offered never depends on what was named before it. A
+    molecule a producer named in a lower class than the PIN tier may gets the PIN tier's row when that is a PIN read
+    back directly (``pin_first.pin_tier_checked``)."""
+    from .pin_first import pin_tier_checked
+    return pin_tier_checked(namer, smiles, lambda: _name_tiered_with_offer(namer, smiles, run), lambda row: row)
+
+
+def _name_tiered_with_offer(namer, smiles: str, run) -> dict:
     from .default_tier_offer import clear_held, offer_default_tier_row
     from .fragment_naming import hang_budget_trips
     from .memo import recording_scopes, scope_entries, seeded_scopes

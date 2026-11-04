@@ -2611,7 +2611,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # call stack), skip the probe — the caller already determined the
     # assembled name was inadequate, so proceed directly to decomposition.
     from ..assembly.fragment_naming import _get_visited
-    from ..namer import name_pipeline_only
+    from ..assembly.ester_prefix_probe import probe_name
 
     existing_smiles = Chem.MolToSmiles(mol)
     visited = _get_visited()
@@ -2620,7 +2620,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         # Return None to let the caller's assembly pipeline handle naming
         # instead of decomposing (which would produce garbled results).
         return None
-    existing_name = name_pipeline_only(existing_smiles, style=style)
+    existing_name = probe_name(existing_smiles, style)      #: an ester as a prefix is no name here
 
     # Step 3: Quality gate -- only decompose if existing name is poor
     quality_ok = existing_name and _name_quality_is_acceptable(existing_name, mol)
