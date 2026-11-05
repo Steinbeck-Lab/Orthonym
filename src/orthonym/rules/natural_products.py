@@ -372,9 +372,8 @@ def name_natural_product(mol) -> Optional[str]:
     # isomeric-SMILES-keyed and already safe.
     if scaffold_info.get("scaffold_class") == "steroid":
         _honesty_matched = set(scaffold_info.get("matched_atoms") or [])
-        _honesty_centres = Chem.FindMolChiralCenters(
-            mol, includeUnassigned=True, useLegacyImplementation=False
-        )
+        from ..perception.stereo import find_chiral_centres
+        _honesty_centres = find_chiral_centres(mol, includeUnassigned=True, useLegacyImplementation=False)
         _honesty_defined = [
             idx for idx, lbl in _honesty_centres if lbl != "?" and idx in _honesty_matched
         ]
@@ -1653,6 +1652,18 @@ def _np_parent_e(next_word: str) -> str:
     return "" if next_word[0] in _ELISION_VOWELS else "e"
 
 
+def _e_before_multiplied_yl(stem: str, scaffold_name: str, unsat_suffix: str, multiplier: str) -> str:
+    """The 'e' of 'ane', 'ene' or 'yne' of a stereoparent before a multiplied 'yl' ('diyl', 'triyl').
+
+     (a) and: the final 'e' is elided only before a vowel, and the multiplying prefix starts
+    with a consonant, so it stays: 'but-2-ene-1,4-diyl' (the Blue Book), 'cyclopent-3-ene-1,2-diyl' (:17278),
+    '5α-cholestane-3β,6α-diyl diacetate' (:31979), never 'androst-5-en-3β,17β-diyl'. ``unsat_suffix`` is the
+    unsaturation ending built without its 'e' ('an' for a saturated parent, '-5-en', '-yn')."""
+    if unsat_suffix == "an":
+        return _saturated_parent_e(stem, scaffold_name, f"{multiplier}yl")
+    return _np_parent_e(f"{multiplier}yl")
+
+
 def _saturated_parent_e(stem: str, scaffold_name: str, next_word: str) -> str:
     """The terminal 'e' of a fully saturated stereoparent name before ``next_word``
     (``_np_parent_e``), or none at all for a retained name that ends in 'an'.
@@ -2539,8 +2550,8 @@ def _assemble_np_ester_name(
         count = len(esters)
         yl_multi = multiplying_prefix(count)
         yl_suffix = f"-{locant_str}-{yl_multi}yl"
-        acyl_multi = multiplying_prefix(count)
-        acylate_word = f"{acyl_multi}{acylate_names[0]}"
+        unsat_suffix += _e_before_multiplied_yl(stem, scaffold_name, unsat_suffix, yl_multi)
+        acylate_word = f"{yl_multi}{acylate_names[0]}"
     else:
         # Multiple esters with DIFFERENT acids: use acyloxy prefix format
         # OPSIN rejects "diyl acid1 acid2" but accepts "(acyloxy)" prefix format

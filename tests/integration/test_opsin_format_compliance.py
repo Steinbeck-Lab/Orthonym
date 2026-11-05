@@ -368,17 +368,30 @@ class TestMalformedSuffixFixes:
     - cycloane: was "cyclo" + "ane" with empty stem (now returns SMILES fallback)
     """
 
+    # change-asserted-value (lane l17 suite fix, item 7, 113d76c6ce), the two tests on the benzamide compound below.
+    # The molecule holds two ring carboxamides, a fluorobenzamide and a 2,2-difluoro-1,3-benzodioxole-5-carboxamide, and the
+    # parent is the amide on the senior ring system: "SENIORITY ORDER ONLY FOR RINGS AND RING SYSTEMS",
+    # "The senior ring or ring system: (a) is a heterocycle" (the Blue Book,:19408), so the dioxole ring system
+    # outranks the benzene ring. The name that ships is
+    # on that amide ('...-3-carboxamide', the dioxole ring as the general engine writes it), no longer on the benzamide, so
+    # 'benzam' and 'benzoyl' are not in it. The tests ask the shipped configuration (OPSIN validity gate on): with the gate
+    # off the amide handler drops an N-substituent it cannot name, and the cascade rejects that name. The checks that
+    # stay are the point of the tests: no malformed suffix, an amide form, and the full InChIKey read back by OPSIN.
+    # Mutation: the 'benzam' or 'benzoyl' assertion held at b77a6ea7c0, the parent of 113d76c6ce.
+    @pytest.mark.opsin_gate
     def test_no_benzamideyl_in_output(self):
         """benzamideyl must not appear -- correct form is benzoyl or benzamido."""
+        from tests.support.rt_assert import assert_full_rt
         smiles = "CN(C(=O)c1ccc2c(c1)OC(F)(F)O2)c1cccc(C(=O)Nc2c(Br)cc(C(F)(C(F)(F)F)C(F)(F)F)cc2OC(F)F)c1F"
         name = name_compound(smiles)
         assert "benzamideyl" not in name, (
             f"Malformed suffix 'benzamideyl' found in: {name}"
         )
         # Should contain a valid amide-related form
-        assert "benz" in name.lower(), (
-            f"Expected benzene-derived fragment in name: {name}"
+        assert "amide" in name.lower(), (
+            f"Expected an amide form in name: {name}"
         )
+        assert_full_rt(name, smiles)
 
     def test_no_propanedioateyloxy_in_output(self):
         """propanedioateyloxy must not appear -- correct form is propanedioyloxy."""
@@ -414,14 +427,17 @@ class TestMalformedSuffixFixes:
             f"Expected non-trivial fallback, got: {name}"
         )
 
+    @pytest.mark.opsin_gate
     def test_benzamide_compound_opsin_parseable(self):
         """The benzamide compound should produce an OPSIN-parseable name."""
+        from tests.support.rt_assert import assert_full_rt
         smiles = "CN(C(=O)c1ccc2c(c1)OC(F)(F)O2)c1cccc(C(=O)Nc2c(Br)cc(C(F)(C(F)(F)F)C(F)(F)F)cc2OC(F)F)c1F"
         name = name_compound(smiles)
-        # Verify the name uses correct IUPAC forms (benzoyl, benzamide, etc.)
-        assert "benzam" in name.lower() or "benzoyl" in name.lower(), (
-            f"Expected valid benzamide/benzoyl form in: {name}"
+        # Verify the name uses correct IUPAC forms (benzoyl, benzamide, a carboxamide parent, etc.)
+        assert any(form in name.lower() for form in ("benzam", "benzoyl", "carboxamide")), (
+            f"Expected valid amide form in: {name}"
         )
+        assert_full_rt(name, smiles)
 
 
 class TestFormatEdgeFixes:

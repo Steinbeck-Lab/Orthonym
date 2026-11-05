@@ -198,12 +198,26 @@ PROMOTION_HELPER_ROWS = [
     #:26308), so the bare 'methylamino' after a compound acyl branch -- which
     # OPSIN's own grammar could misparse at the same boundary a bare 'formyl-
     # methylamino' does -- becomes '(methyl)amino'. RT-VERIFIED unchanged
-    # (assert_full_rt below).
+    # (assert_full_rt below). lane/l17 item 4 (change-asserted-value): the ring-bound acyl of the 4-hydroxyproline
+    # residue was '3-methyl-1-oxobutyl' (the general-nomenclature acyl of "Definitions and name formation",
+    # the Blue Book: "Compound substitutive names for acyclic acyl groups, such as '1-oxopropyl'... are included
+    # for use in general nomenclature"); it is '3-methylbutanoyl' now, the form of (:30608: the acyl group
+    # of an 'oic acid' is named "by changing the ending 'oic acid' to 'oyl'"; 'propanoyl (preferred prefix)',
+    # 'propionyl', '1-oxopropyl',:30612). The cause is the fragment cache, which serves a refusal only to the naming
+    # vocabulary that made it (``fragment_naming._refusal_vocabulary``): the prefix is made from the acid name of the
+    # branch now (``substituent_naming.acid_name_to_acyl_prefix``), where the substituent cascade named the branch
+    # (``substituent_enumerator._name_substituent_cascade``, the general '1-oxo' form) before.
+    # MEASURED: the peptide handler's pass 3 runs 0 times on this row, and a tree with the cache change alone gives the
+    # same name. The acyl groups on the amino nitrogens of the chain keep the general '1-oxoalkyl' spelling, a different
+    # route: an acyl on a nitrogen is named inside the amino prefix (``substituent_naming._located_fg_hetero_root`` ->
+    # ``composer._assemble_decorated_amino_prefix``), and ``acyl_prefix.acyl_prefix_text`` returns None for a carbonyl
+    # carbon bound to a nitrogen outside the group by design (LO4a: amido or acylamino is 's choice). The
+    # new value is read back whole by OPSIN 2.9.0 (assert_full_rt below, a java run outside the engine).
     ("CCCC[C@@H](C)C[C@@H](C)C(=O)N(C)[C@@H](CC(C)C)C(=O)N[C@H](C(=O)N(C)[C@H]"
      "(C(=O)N1C[C@@H](O)C[C@H]1C(=O)O)C(C)C)[C@@H](C)OC(C)=O",
      "(2S,4S)-1-[(2S)-2-{[(2S,3R)-3-(acetyloxy)-2-{[(2S)-2-{[(2R,4R)-2,4-dimethyl-"
      "1-oxooctyl](methyl)amino}-4-methyl-1-oxopentyl]amino}-1-oxobutyl](methyl)amino}-"
-     "3-methyl-1-oxobutyl]-4-hydroxypyrrolidine-2-carboxylic acid"),
+     "3-methylbutanoyl]-4-hydroxypyrrolidine-2-carboxylic acid"),
 ]
 
 

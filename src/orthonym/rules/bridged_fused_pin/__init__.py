@@ -292,8 +292,8 @@ def _stereo_outside(mol, atom_to_locant: Dict[int, Any]) -> bool:
     """True when a stereocentre or a stereogenic double bond lies outside the ring system. The
     package cites descriptors on the ring-system locants only; those of a substituent are cited
     by the substituent namer at the front of its prefix (``_outside_stereo_spelled``)."""
-    from rdkit.Chem import FindMolChiralCenters
-    for idx, _ in FindMolChiralCenters(mol, includeUnassigned=False, useLegacyImplementation=False):
+    from ...perception.stereo import find_chiral_centres
+    for idx, _ in find_chiral_centres(mol, includeUnassigned=False, useLegacyImplementation=False):
         if idx not in atom_to_locant:
             return True
     for b in mol.GetBonds():
@@ -325,9 +325,9 @@ def _stereo_from_rules_4_and_5(mol, atom_to_locant: Dict[int, Any]) -> bool:
     a pseudoasymmetric bridge atom. OPSIN 2.9.0 cannot place such a descriptor, so the
     name can never be read back to the full InChIKey; the builder declines it, so the
     default tier does not ship it as pin_unverified."""
-    from rdkit.Chem import FindMolChiralCenters
+    from ...perception.stereo import find_chiral_centres
     ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False, includeChirality=False))
-    for idx, _ in FindMolChiralCenters(mol, includeUnassigned=False, useLegacyImplementation=False):
+    for idx, _ in find_chiral_centres(mol, includeUnassigned=False, useLegacyImplementation=False):
         if idx not in atom_to_locant:
             continue
         nbr = [ranks[n.GetIdx()] for n in mol.GetAtomWithIdx(idx).GetNeighbors()]

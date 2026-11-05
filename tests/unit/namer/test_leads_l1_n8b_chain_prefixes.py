@@ -142,18 +142,7 @@ def test_every_atom_order_of_an_ester_gives_the_pin(smiles, pin, strict):
         assert (row["name"], row["tier"]) == (pin, "pin_verified"), order
 
 
-def test_a_chain_without_the_principal_group_atoms_of_the_default_chain_is_not_taken():
-    #: the chain holds the principal characteristic group before is reached. The
-    # selector counts a secondary amide for any chain with a carbon that bears its nitrogen, so
-    # the CH-CH2 chain of the nitrogen's other substituent ties with the acetyl chain and wins on
-    # its prefixes; that chain holds no atom of the amide, and is not taken (the amide is the
-    # parent, as it was: the lactone ring is not, 'Seniority of classes').
-    smiles = "COc1cc([C@H](Cc2ccccc2)NC(C)=O)oc(=O)c1"
-    amide = "N-[(1S)-1-(4-methoxy-2-oxo-2H-pyran-6-yl)-2-phenylethyl]acetamide"
-    assert opsin_key(amide) == rdkit_key(smiles)
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert (row["name"], row["tier"]) == (amide, "systematic_verified"), row
+def _features(smiles):
     from orthonym.perception.functional_groups import detect_functional_groups
     from orthonym.rules.seniority import get_principal_group
     mol = Chem.MolFromSmiles(smiles)
@@ -167,8 +156,37 @@ def test_a_chain_without_the_principal_group_atoms_of_the_default_chain_is_not_t
     f.mol, f.functional_groups, f.principal_group, f.principal_group_atoms = mol, fgs, pg, atoms
     f.ring_systems = [set(r) for r in mol.GetRingInfo().AtomRings()]
     ring_atoms = {a for r in f.ring_systems for a in r}
-    default = find_principal_chain(mol, fgs, pg, exclude_atoms=ring_atoms)
-    assert pg == "secondary_amide"
+    return f, find_principal_chain(mol, fgs, pg, exclude_atoms=ring_atoms)
+
+
+def test_the_n_substituent_chain_of_a_secondary_amide_is_no_senior_chain():
+    # "N-Substitution" (the Blue Book): R-CO-NHR' is named "by citing the substituents R' and R''
+    # as prefixes preceded by the locant N", so the CH-CH2 chain of the nitrogen's other substituent is no host of the
+    # amide, however many prefixes it bears: the acetyl chain is the parent and the senior chain of the ring-prefix
+    # count too (it was the N-substituent's chain, which labelled the name below the PIN, 'systematic_verified').
+    # The label is pin_unverified at the best-effort tier ('PIN form, preferred status not certified': the default tier
+    # builds the substituent as 'ethan-1-yl' first and ships the 'ethyl' of the promotion re-run uncertified); the name
+    # is read back by OPSIN's own StdInChIKey.
+    smiles = "COc1cc([C@H](Cc2ccccc2)NC(C)=O)oc(=O)c1"
+    amide = "N-[(1S)-1-(4-methoxy-2-oxo-2H-pyran-6-yl)-2-phenylethyl]acetamide"
+    assert opsin_key(amide) == rdkit_key(smiles)
+    from orthonym.cli import _emit_tier_flags
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (amide, "pin_unverified"), row
+    f, default = _features(smiles)
+    assert f.principal_group == "secondary_amide"
+    assert set(chains.principal_chain_with_ring_prefixes(f)) == set(default)
+    assert chains.p45_principal_chain(f, default) == default
+
+
+@pytest.mark.parametrize("smiles", ["CC(=O)NC(=O)Cc1ccccc1", "CC(=O)NNC(=O)Cc1ccccc1"])
+def test_a_chain_without_the_principal_group_atoms_of_the_default_chain_is_not_taken(smiles):
+    #: the chain holds the principal characteristic group before is reached. The selector counts an
+    # imide or a hydrazide for any chain that holds a carbon of its match, so the chain of the other acyl group (the
+    # phenylacetyl, with the ring prefix) ties with the acetyl chain and wins on its prefixes; that chain holds no atom
+    # of the group the default chain holds, and is not taken.
+    f, default = _features(smiles)
+    assert f.principal_group in ("imide", "hydrazide")
     # the senior chain of the ring-prefix count is the other one...
     assert set(chains.principal_chain_with_ring_prefixes(f)) != set(default)
     #... and the selector keeps the chain it was given

@@ -32,6 +32,11 @@ MAX_DECOMP_LEVELS = 3  # a phase: max iterative decomposition levels for mixed b
 # ---------------------------------------------------------------------------
 
 
+#: the memo namespace of the fragment names that the last rung of ``_name_fragment_with_fallback`` (the best-effort
+#: rescue) built: the general engine names an ester as '1-(alkoxy)-1-oxoalkane', an amine as a substituted alkane
+_T4_RESCUED_NAMES = "t4_rescued_fragment_name"
+
+
 def _name_fragment_with_fallback(smiles: str):
     """Name a fragment: recursive naming first, pipeline-only fallback, then
     a T4/general-engine best-effort rescue (a phase).
@@ -72,6 +77,8 @@ def _name_fragment_with_fallback(smiles: str):
     # only reached when both PIN-tier attempts above already failed.
     name = _name_fragment_t4_rescue(smiles)
     if name and "unknown" not in name.lower():
+        from ..assembly.memo import side_put
+        side_put(_T4_RESCUED_NAMES, name, True)     # a name the string role converters must not build on (see the gate)
         return name
 
     return None
@@ -420,7 +427,7 @@ def _token_matches_name(name_lower, token_patterns, bond_type):
 
 # (name, canonical SMILES) -> "does this name denote exactly this molecule?"
 # The oracle costs an OPSIN parse, so each distinct pair is asked once.
-_PROVEN_COMPLETE_CACHE: Dict[tuple, bool] = {}
+_PROVEN_COMPLETE_CACHE: Dict[tuple, Optional[bool]] = {}
 
 # Rollback lever. Set to a false value ('0'/'false'/'no'/'off') to restore the
 # pre-Z3 behaviour EXACTLY -- sound, because the only thing the oracle is ever
@@ -468,33 +475,68 @@ def _name_is_proven_complete(name: str, mol) -> bool:
     "``is_complete`` is therefore decided by CONSTITUTION -- the InChIKey
     skeleton block of the input compared with that of the parse-back -- and
     never by a threshold on a count."
+
+    A caller that must tell "another molecule" from "cannot say" (the ester probe, which REJECTS a name) reads
+    :func:`name_constitution_verdict`; this function answers True only for a proven name.
     """
+    return name_constitution_verdict(name, mol) is True
+
+
+#: a (name, molecule) pair OPSIN was not asked about yet (the cache holds True, False or None)
+_UNASKED = object()
+
+
+def name_constitution_verdict(name: str, mol) -> Optional[bool]:
+    """Does *name* denote exactly *mol*'s constitution, as OPSIN reads it? Three answers, not two:
+
+    * ``True``: OPSIN reads the name as the constitution of *mol* (the oracle of:func:`_name_is_proven_complete`);
+    * ``False``: OPSIN was asked and the name is not that of *mol*: it reads it as another constitution, or reads it as
+      no structure (a name no structure stands behind cannot be shipped, so it is no good name of *mol*; that answer is
+      not cached);
+    * ``None``: OPSIN was not asked, or could not compare: no name, no OPSIN jar or JVM, the oracle off
+      (``ORTHONYM_DECOMP_COVERAGE_ORACLE=0``), a run that gave no answer (a timeout of the JVM, a Java-side error: a
+      property of the host, and a verdict that moved with the load of a host would make the name of a molecule
+      load-dependent), no InChI to compare, an exception. A caller that REJECTS names on ``False`` keeps the name on
+      ``None`` (a name that cannot be judged is not a wrong one);:func:`_name_is_proven_complete`, which only rescues,
+      reads ``None`` as not proven.
+
+    OPSIN is asked once for each (name, molecule) pair."""
     if not name or mol is None:
-        return False
+        return None
     import os
     if os.environ.get(_COVERAGE_ORACLE_ENV, "1").strip().lower() in (
             "0", "false", "no", "off"):
-        return False
+        return None
     try:
         key = (name, Chem.MolToSmiles(mol))
     except Exception:
-        return False
-    cached = _PROVEN_COMPLETE_CACHE.get(key)
-    if cached is not None:
+        return None
+    cached = _PROVEN_COMPLETE_CACHE.get(key, _UNASKED)
+    if cached is not _UNASKED:
         return cached
     try:
-        from ..validation.atom_coverage import validate_atom_coverage
+        import shutil
+        from ..validation.atom_coverage import find_opsin_jar, validate_atom_coverage
+        if find_opsin_jar() is None or not shutil.which("java"):
+            return None                          # OPSIN cannot be asked: nothing is cached
         result = validate_atom_coverage(mol, name)
         # extra_atoms is redundant with constitution_match (identical skeleton
         # implies identical formula) and is asserted anyway, so that a future
         # change loosening is_complete cannot silently admit a name that
         # FABRICATES atoms -- the failure mode atom_coverage.py was rewritten
         # in 872cb124 to catch.
-        proven = bool(result.is_complete and result.extra_atoms == 0)
+        if result.is_complete and result.extra_atoms == 0:
+            verdict: Optional[bool] = True
+        elif result.method == "parse_back":      # another constitution
+            verdict = False
+        elif result.method == "unavailable":     # no structure came back: the name is not read (False), or the run
+            return False if result.opsin_unread else None   # failed (None); nothing is cached: a failed run is no property of the name
+        else:                                    # parse_back_no_inchi: nothing to compare
+            verdict = None
     except Exception:
-        proven = False
-    _PROVEN_COMPLETE_CACHE[key] = proven
-    return proven
+        verdict = None
+    _PROVEN_COMPLETE_CACHE[key] = verdict
+    return verdict
 
 
 # ---------------------------------------------------------------------------
@@ -872,19 +914,34 @@ def gate_nonsuffix_nacyl_float(amine_smiles: Optional[str],
     if (_dispatch_table._PEPTIDE_NAME_STANDS
             and _nacyl_float_on_systematic_amino_acid(amine_smiles, amine_name)):
         return None
+    from ..assembly.memo import side_get
+    if amine_name and side_get(_T4_RESCUED_NAMES, amine_name):
+        # the name of the amine is the best-effort rescue's ('(9Z)-1-{[...-2-amino-...]oxy}-1-oxooctadec-9-ene': the
+        # ester of the amine fragment as an oxo-alkane): it cites the nitrogen inside a substituent, so a bare locant N
+        # in front of it designates no nitrogen of its parent "Position of locants"; the Blue Book)
+        return None
     record_non_pin_fragment(float_name)
     return float_name
 
 
-def _amide_reference_tokens() -> str:
+def _amide_reference_tokens(name: str = "") -> str:
     """The name tokens (a regex alternation) that count as one reference to an amide bond in the
     multi-amide check of ``_name_quality_is_acceptable``. The PIN tier spells C6H5-NH- 'anilino'
     , the Blue Book: "The prefix name 'anilino' is retained as the preferred
     prefix"), so there it counts; the wider tiers keep the count they had, as a name that cites it
-    there comes from a general producer this check refused."""
+    there comes from a general producer this check refused.
+
+    In the name of a carbamate or carbamothioate ESTER (``name`` ends in the word) 'carbamoyl',
+    the Blue Book: the prefix of carbamic acid, H2N-CO-) is the group of an amide bond of the R or N group
+    ('{[2-(1H-indol-3-yl)ethyl]carbamoyl}furan'): the ester's own carbonyl is no amide bond of the molecule, so every
+    carbamoyl of its name stands for one. That name carries none of the other tokens and was refused, which handed
+    the molecule to the decomposition producer. Elsewhere the token stays uncounted: the name of an acylurea
+    ('N-carbamoylacetamide') cites the carbonyl of the urea as carbamoyl, a count this check never made."""
     from ..rules.pin_vocabulary import at_pin_tier
-    return ("carbohydrazide|hydrazide|hydrazid|amino|amido|amide|acetamid|formamid"
-            + ("|anilino" if at_pin_tier() else ""))
+    tokens = "carbohydrazide|hydrazide|hydrazid|amino|amido|amide|acetamid|formamid"
+    if name.rstrip().endswith(("carbamate", "carbamothioate", "carbamodithioate")):
+        tokens += "|carbamoyl(?!amino|oxy)"
+    return tokens + ("|anilino" if at_pin_tier() else "")
 
 
 def _name_quality_is_acceptable(name: str, mol) -> bool:
@@ -1062,7 +1119,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             # this can only RAISE amide_refs (make the gate more lenient), never
             # newly reject a name that passed before.
             for m in re.finditer(
-                r'(di|tri|tetra|penta)?(' + _amide_reference_tokens() + r')',
+                r'(di|tri|tetra|penta)?(' + _amide_reference_tokens(name) + r')',
                 name, re.IGNORECASE,
             ):
                 prefix = m.group(1)
@@ -1653,11 +1710,24 @@ def _tied_single_split(mol, bonds: List[Dict], style: str):
     best = _select_best_bond(mol, bonds)
     group = tied_ester_splits(mol, bonds, best, _split_balance)
     if len(group) == 1:
-        return best, _try_single_bond_decompose(mol, best, style)
+        return best, _named_split(mol, best, style)
     return choose_split(
         mol, group, best, style, _try_single_bond_decompose,
         lambda name, m, bond: _coverage_is_adequate(name, m, bond_type=bond["type"]),
         _exploration_exhausted)
+
+
+def _named_split(mol, bond: Dict, style: str = "pin") -> Optional[str]:
+    """The name of the split ``bond``: ``_try_single_bond_decompose``'s and, for an amide split whose parent ties with
+    another amide of the molecule, the choice of and (``amide_ties``)."""
+    name = _try_single_bond_decompose(mol, bond, style)
+    if not name or bond.get("type") != "amide":
+        return name
+    from .amide_ties import resolved_amide_split_name
+    from .bond_cleavage import find_cleavable_bonds
+    return resolved_amide_split_name(
+        mol, bond, name, style, _try_single_bond_decompose, find_cleavable_bonds,
+        lambda n, m, b: _coverage_is_adequate(n, m, bond_type=b["type"]) and _name_quality_is_acceptable(n, m))
 
 
 def _ester_acyl_ring(mol, acyl_c: int):
@@ -1784,6 +1854,40 @@ def _split_parent_is_junior(mol, expressed: Optional[str], exclude_atoms=frozens
     if rank_pg is None or rank_expressed is None:
         return False
     return rank_pg < rank_expressed
+
+
+def _split_parent_amide_is_junior(mol, bond: Dict, fragment_names: Dict, amine_is_parent: Optional[bool] = None) -> bool:
+    """True when the amide split ``bond`` names the molecule on an amide parent that another amide of the molecule
+    outranks: puts the amides in one class (Table 4.1,:18158), so the parent among them is the senior parent
+    structure of,, and (``rules.amide_parent``), and a name that cites the senior
+    amide as a prefix ('N-cyclopropyl-2-[2-(N-methylpropanamido)propanamido]acetamide' for a molecule whose propanamide
+    chains outrank the acetamide) is not the PIN. The parent of a split is the amide of the cut bond when the amine is
+    cited as an N-substituent, and the principal amide of the amine fragment when the acyl floats onto it
+    (``amine_is_parent``; by default the acyl floats when ``fragment_names`` has no simple amine prefix). The split
+    declines, at every tier: another split or the substitutive pipeline names the molecule on the senior amide, and a
+    name of the junior one is no better a name of the molecule at a wider tier (its prefixes are cited out of the order
+    of where the N-substituent is no simple one). False where the parent holds no carboxamide, where the keys tie,
+    and where the amides are not a choice between parents."""
+    if bond.get("type") != "amide":
+        return False
+    try:
+        from ..rules.amide_parent import parent_amide_is_junior
+        from .fragment_assembly import _amine_to_prefix
+        if amine_is_parent is None:
+            amine_is_parent = not _amine_to_prefix(fragment_names.get("amine") or "")
+        if not amine_is_parent:
+            return parent_amide_is_junior(mol, {bond["acid_atom"]})
+        side, stack = {bond["amine_atom"]}, [bond["amine_atom"]]
+        while stack:
+            atom = stack.pop()
+            for b in mol.GetAtomWithIdx(atom).GetBonds():
+                other = b.GetOtherAtomIdx(atom)
+                if b.GetIdx() != bond["bond_idx"] and other not in side:
+                    side.add(other)
+                    stack.append(other)
+        return parent_amide_is_junior(mol, side)
+    except Exception:  # noqa: BLE001 -- not decidable: the split is not judged
+        return False
 
 
 #: subtypes of one class ranked together class 11 "Amides [in the order of the
@@ -2049,9 +2153,9 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             amine_frag = next((f for f in fragments if f["side"] == "amine"), None)
             if acid_frag and amine_frag:
                 if (not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"])
+                        and not _split_parent_amide_is_junior(mol, bond, fragment_names, True)
                         and not _split_parent_is_junior(
-                            mol, _molecule_principal_group(
-                                Chem.MolFromSmiles(amine_frag["smiles"])),
+                            mol, _molecule_principal_group(Chem.MolFromSmiles(amine_frag["smiles"])),
                             {bond.get("acid_atom")})):
                     # Amine is more senior -> substitutive naming
                     from ..assembly.naming_utils import (
@@ -2102,7 +2206,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             _amine_frag = next((f for f in fragments if f["side"] == "amine"), None)
             _expressed = (_molecule_principal_group(Chem.MolFromSmiles(_amine_frag["smiles"]))
                           if _amine_frag else None)
-    if _split_parent_is_junior(mol, _expressed, {bond.get("acid_atom")}):
+    if _split_parent_is_junior(mol, _expressed, {bond.get("acid_atom")}) or _split_parent_amide_is_junior(mol, bond, fragment_names):
         return None
 
     # Assemble (delegate to fragment_assembly module)
@@ -2134,6 +2238,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         # prefix) is not its PIN 'dimethyl 2-(1-aminoethylidene)butanedioate'. Name
         # the polyester when its acid component can be named; otherwise keep the
         # mono-ester name, labelled below the PIN.
+        from ..metrics.provenance import record_non_pin_label
+        _record_split_mixed_anion_non_pin(mol, [bond], _assembled)
         try:
             from ..rules.esters import (
                 ester_shares_its_acid_with_another_ester,
@@ -2143,10 +2249,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                 _poly = name_polyacid_polyester(mol)
                 if _poly:
                     return _poly
-                from ..metrics.provenance import record_non_pin_label
                 record_non_pin_label(_assembled)
         except Exception:  # noqa: BLE001 -- the label must never break naming
-            from ..metrics.provenance import record_non_pin_label
             record_non_pin_label(_assembled)
     if bond["type"] in ("sulfonamide", "amide") and _assembled:
         # User ruling D3 (2026-10-02): a C-substituent of a one-carbon sulfonamide
@@ -2164,6 +2268,25 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             from ..metrics.provenance import record_non_pin_label
             record_non_pin_label(_assembled)
     return _assembled
+
+
+def _record_split_mixed_anion_non_pin(mol, bonds, name) -> None:
+    """Label ``name`` below the PIN when the ester split ``bonds`` names an ester whose alcohol component carries
+    another ester, cited as a prefix: method (2) of "When anions are different, two methods are used"
+    (the Blue Book; the label of ``rules.esters.record_polyol_mixed_anion_non_pin``, the ester route of the
+    pipeline, asked of the alcohol fragment of the split). The ester oxygens of the split itself are named as ester
+    groups, not cited as prefixes (the multiplicative 'diyl diacetate')."""
+    if not name:
+        return
+    try:
+        from ..rules.esters import record_split_polyol_mixed_anion_non_pin
+        split = [b for b in bonds if b.get("type") == "ester" and len(b.get("match") or ()) >= 4]
+        named_o = frozenset(int(b["match"][2]) for b in split)
+        for b in split:
+            record_split_polyol_mixed_anion_non_pin(
+                mol, int(b["alkyl_atom"]), int(b["match"][2]), name, named_o - {int(b["match"][2])})
+    except Exception:  # noqa: BLE001 -- the label must never break naming
+        pass
 
 
 _SULFONAMIDE_UNIT = Chem.MolFromSmarts("[SX4](=[OX1])(=[OX1])[NX3]")
@@ -2352,6 +2475,8 @@ def _try_multi_bond_decompose(
     if not _coverage_is_adequate(result, mol, bond_type=bond_type):
         return None
 
+    if bond_type == "ester":
+        _record_split_mixed_anion_non_pin(mol, bonds, result)
     return result
 
 
@@ -2570,6 +2695,16 @@ def _declined_leaves_no_provenance(fn):
     return _wrapper
 
 
+def _existing_is_preferred_to(existing_name: str, candidate: str, mol) -> bool:
+    """The pipeline's name beats ``candidate`` (a decomposition name) when the candidate is worse than it
+    (``_decomposition_is_worse``) and it names this molecule, not another (``names_another_molecule``: asked of OPSIN
+    only here, for a name that would be preferred, and once for each name)."""
+    if not existing_name or not _decomposition_is_worse(candidate, existing_name, mol):
+        return False
+    from ..assembly.ester_prefix_probe import names_another_molecule
+    return not names_another_molecule(existing_name, mol)
+
+
 @_declined_leaves_no_provenance
 def try_decompose(mol, style: str = "pin") -> Optional[str]:
     """Attempt decomposition of a molecule into named fragments.
@@ -2615,7 +2750,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # call stack), skip the probe — the caller already determined the
     # assembled name was inadequate, so proceed directly to decomposition.
     from ..assembly.fragment_naming import _get_visited
-    from ..assembly.ester_prefix_probe import probe_name
+    from ..assembly.ester_prefix_probe import names_another_molecule, probe_name
 
     existing_smiles = Chem.MolToSmiles(mol)
     visited = _get_visited()
@@ -2628,6 +2763,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
 
     # Step 3: Quality gate -- only decompose if existing name is poor
     quality_ok = existing_name and _name_quality_is_acceptable(existing_name, mol)
+    if quality_ok and names_another_molecule(existing_name, mol):
+        existing_name, quality_ok = '', False       # asked of OPSIN only for a name the gate took: no name of this ester
 
     # Step 3b: Glycoside bypass -- if a glycosidic bond leads to a known sugar,
     # decomposition will produce a better name (retained sugar name vs systematic
@@ -2690,14 +2827,13 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # existing pipeline (garbled tokens, bracket mismatches), prefer the
     # existing name to avoid replacing a parseable name with garbage.
     if len(bonds) == 1:
-        if single_result and existing_name:
-            if _decomposition_is_worse(single_result, existing_name, mol):
-                return existing_name
+        if single_result and _existing_is_preferred_to(existing_name, single_result, mol):
+            return existing_name
         return single_result
 
     # If single-bond result is adequate and not worse than existing, return it
     if single_result and _name_quality_is_acceptable(single_result, mol):
-        if not (existing_name and _decomposition_is_worse(single_result, existing_name, mol)):
+        if not _existing_is_preferred_to(existing_name, single_result, mol):
             return single_result
 
     # MULTI-BOND RETRY : try alternative bonds
@@ -2710,13 +2846,13 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         if _exploration_exhausted():
             break
         tried_indices.add(bond["bond_idx"])
-        alt_result = _try_single_bond_decompose(mol, bond, style)
+        alt_result = _named_split(mol, bond, style)
         # Coverage gate on retry results
         if alt_result and not _coverage_is_adequate(alt_result, mol, bond_type=bond["type"]):
             continue
         if alt_result and _name_quality_is_acceptable(alt_result, mol):
             # Also check that the alternative is not worse than existing name
-            if existing_name and _decomposition_is_worse(alt_result, existing_name, mol):
+            if _existing_is_preferred_to(existing_name, alt_result, mol):
                 continue
             return alt_result
 
@@ -2729,7 +2865,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 and not _exploration_exhausted()):
             iterative_result = _try_iterative_mixed_decompose(mol, bonds, style)
             if iterative_result:
-                if not (existing_name and _decomposition_is_worse(iterative_result, existing_name, mol)):
+                if not _existing_is_preferred_to(existing_name, iterative_result, mol):
                     return iterative_result
 
     # MULTI-BOND SAME-TYPE cleavage (a phase): if N+ bonds of the same
@@ -2748,7 +2884,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 same_type_bonds = [b for b in bonds if b["type"] == bond_type_key]
                 multi_result = _try_multi_bond_decompose(mol, same_type_bonds, style)
                 if multi_result:
-                    if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
+                    if not _existing_is_preferred_to(existing_name, multi_result, mol):
                         return multi_result
 
     # a phase: Mixed-bond threshold relaxation.
@@ -2767,7 +2903,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 ester_bonds = [b for b in bonds if b["type"] == "ester"]
                 multi_result = _try_multi_bond_decompose(mol, ester_bonds, style)
                 if multi_result:
-                    if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
+                    if not _existing_is_preferred_to(existing_name, multi_result, mol):
                         return multi_result
 
     # Ester-specific fallback: when single_result exists but failed quality,
@@ -2779,7 +2915,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
             ester_bonds = [b for b in bonds if b["type"] == "ester"]
             multi_result = _try_multi_bond_decompose(mol, ester_bonds, style)
             if multi_result and _name_quality_is_acceptable(multi_result, mol):
-                if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
+                if not _existing_is_preferred_to(existing_name, multi_result, mol):
                     return multi_result
 
     # a phase Step 2 -- the assembly WEAVER
@@ -2824,9 +2960,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # Compare decomposition result against existing pipeline name:
     # if decomposition produced a worse name (garbled, bracket-mismatched,
     # or containing malformed tokens), fall back to existing pipeline name.
-    if single_result and existing_name:
-        if _decomposition_is_worse(single_result, existing_name, mol):
-            return None  # Let existing pipeline name be used
+    if single_result and _existing_is_preferred_to(existing_name, single_result, mol):
+        return None  # Let existing pipeline name be used
 
     return single_result  # Best effort fallback
 

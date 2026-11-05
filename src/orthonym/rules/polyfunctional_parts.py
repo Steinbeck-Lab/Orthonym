@@ -14,6 +14,18 @@ _GO_ON = object()
 def _route_without_chain(atom_to_locant, features, mol, principal_chain, principal_group):
     """No principal chain or locant map: the routes that name the molecule without one."""
     if not principal_chain or not atom_to_locant:
+        # "When anions are identical functional class multiplicative nomenclature is used"
+        # (the Blue Book): a polyester of one alcoholic component whose acid components carry a ring (a ring ether,
+        # a saturated ring with a hydroxy group) has no chain, so ``_route_ester_second`` below is never reached for it;
+        # the multiplicative name is offered here, and a molecule it does not name goes on as before.
+        if principal_group == "ester":
+            _ester_matches = features.functional_groups.get("ester", [])
+            if len(_ester_matches) >= 2 and not any(
+                    mol.GetBondBetweenAtoms(_m[0], _m[2]).IsInRing() for _m in _ester_matches):     # no lactone
+                from ..rules.esters import _try_functional_class_diol_diester
+                _class_name = _try_functional_class_diol_diester(mol, _ester_matches)
+                if _class_name:
+                    return _class_name
         # --- a phase-02: Ring-as-parent polyfunctional path ---
         # When principal_chain is None but the molecule is cyclic, attempt
         # ring-as-parent naming. Conservative guards prevent intercepting
@@ -78,6 +90,31 @@ def _route_without_chain(atom_to_locant, features, mol, principal_chain, princip
                             return ring_name
         return None
     return _GO_ON
+
+
+def principal_amides_off_chain(features) -> bool:
+    """Several N-substituted amides (secondary or tertiary) are the principal group and the acyl carbon of one of them is
+    not on the principal chain: the two amides of ``CNC(=O)CNCC(=O)NCC``, joined by an azanediyl group, with the chain
+    on the one side. The chain-suffix machinery expresses the amides of the chain as the suffix and a prefix pair and no
+    N-substituent of the amide that is the suffix, so it names another molecule ('2-{[2-(ethylamino)-2-oxoethyl]amino}-1-
+    (methylamino)acetamide'), and a chain that holds no acyl carbon names it as 'aminopropanamide'. /:
+    the amide is the principal group and its N-substituents are located by N, so the name is built from an acyl chain
+    (the amide handler's, for one amide) or from the split of the decomposition engine, which names the amide of an acid
+    and an amine."""
+    pg = getattr(features, 'principal_group', None)
+    if pg not in ('secondary_amide', 'tertiary_amide'):
+        return False
+    matches = (getattr(features, 'functional_groups', None) or {}).get(pg) or []
+    chain = set(getattr(features, 'principal_chain', None) or ())
+    return len(matches) > 1 and any(m[0] not in chain for m in matches)
+
+
+def chain_fallback_declines(features) -> bool:
+    """The chain fallback of ``assembly.handlers.general_acyclic`` names no molecule whose principal group is an ester (one
+    substitutive name can only write the acid's anion:, the Blue Book) or N-substituted amides of
+    which the chain holds not every acyl carbon (:func:`principal_amides_off_chain`: a chain with no acyl carbon is named
+    'aminopropanamide'); the decomposition engine names both."""
+    return getattr(features, 'principal_group', None) == 'ester' or principal_amides_off_chain(features)
 
 
 def _route_amide_principal(features, mol, non_principal, principal_chain, principal_group):
@@ -236,6 +273,10 @@ def _route_amide_principal(features, mol, non_principal, principal_chain, princi
                 # ('1-(4-hydroxyanilino)ethanamide', OPSIN-unparseable -> abstain).
                 if _acyl_c not in set(principal_chain):
                     return None
+        elif principal_amides_off_chain(features):
+            # the chain-suffix machinery below cannot name them (see ``principal_amides_off_chain``): fail closed, as
+            # for the off-chain acyl above, so that it is not offered to a probe
+            return None
     return _GO_ON
 
 
@@ -278,6 +319,15 @@ def _route_ester_second(features, mol, principal_chain, principal_group):
     """An ester principal group: the second of its two early routes."""
     if principal_group == "ester":
         _ester_matches_all = features.functional_groups.get("ester", [])
+        if len(_ester_matches_all) >= 2:
+            # "When anions are identical functional class multiplicative nomenclature is used"
+            # (the Blue Book): the ester groups of one alcoholic component, named as one multivalent organyl group
+            # in front of the multiplied anion ('oxydi(ethane-2,1-diyl) diacetate', '2-oxopropane-1,3-diyl diacetate');
+            # the groups beside the esters are prefixes of the organyl group. Declines (None) for any other polyester.
+            from ..rules.esters import _try_functional_class_diol_diester
+            _polyol_pin = _try_functional_class_diol_diester(mol, _ester_matches_all)
+            if _polyol_pin:
+                return _polyol_pin
         if len(_ester_matches_all) == 1:
             from ..rules.esters import name_polyfunctional_ester_via_acid
             _ester_pin = name_polyfunctional_ester_via_acid(
@@ -320,7 +370,11 @@ def _group_on_chain_parent(chain_set, features, fg_name, matches, mol, ring_fg_g
             center = _find_fg_center_atom(mol, match, fg_name)
             if center is not None and center in chain_set and center not in ring_atom_set:
                 chain_matches.append(match)
-            elif any(a in chain_set and a not in ring_atom_set for a in match):
+            elif any(a in chain_set and a not in ring_atom_set for a in _fg_located_atoms(mol, match)):
+                # The group's own atoms decide where it sits (``_fg_located_atoms``): a tertiary-alcohol match also holds
+                # the carbinol carbon's three neighbours, one of which can be the chain atom a ring branch hangs from,
+                # so testing every atom kept the ring's OH and cited it a second time on the chain ('(2E)-3-(1,4-dihydroxy-
+                # 6-oxocyclohex-2-en-1-yl)-3-hydroxyprop-2-enoic acid' for the acid that has no 3-hydroxy group).
                 chain_matches.append(match)
             else:
                 # FG is on a ring - track for ring substituent naming

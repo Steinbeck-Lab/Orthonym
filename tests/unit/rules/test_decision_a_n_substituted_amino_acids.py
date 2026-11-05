@@ -77,7 +77,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CCCCC/C=C\\C[C@@H](/C=C/C=C\\C/C=C\\CCCC(=O)NCCS(=O)(=O)[O-])OO",
-    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
     "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
     "C[N+](C)(C)CC(O)CC(=O)[O-]",
     "C[N+](C)(C)C[C@@H](O)CC(=O)[O-]",
@@ -85,7 +84,6 @@ DEFAULT_TIER_DECLINES = frozenset({
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
     "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
 })
 
@@ -189,6 +187,10 @@ def test_systematic_name_at_the_pin_tier(namer, smiles, expected):
     # was 'N-[(2S)-2-acetamidopropanoyl](2S)-2-aminopropanoic acid' (pin_verified)
     ("CC(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",
      "(2S)-2-[(2S)-2-acetamidopropanamido]propanoic acid"),
+    # lane/l17 item 12 (change-asserted-value; quote:, the Blue Book, "Method (1) generates preferred
+    # IUPAC names"; independent check: ``assert_full_rt`` below; mutation: the row is demoted at lane/l17 4cadfc641a): the
+    # N-acyl float on '2-aminoethyl sulfate' is the amido prefix of the chain substituent of the sulfate ester
+    ("CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]", "2-tetradecanamidoethyl sulfate"),
 ])
 def test_float_refused_systematic_name_built(namer, smiles, expected):
     res = _dt_obj_row(namer, smiles)
@@ -201,11 +203,9 @@ def test_float_refused_systematic_name_built(namer, smiles, expected):
 @pytest.mark.parametrize("smiles", [
     # the ion keeps the acid's status (ions._acid_name_to_carboxylate,
     # ions.apply_ion_suffix_to_name): the 'N-acyl' float on a charged amine parent
-    # ('2-aminoethane-1-sulfonate', 'glycinate', '2-aminoethyl sulfate') has no
-    # systematic replacement yet
+    # ('2-aminoethane-1-sulfonate', 'glycinate') has no systematic replacement yet
     "CCCCC/C=C\\C[C@@H](/C=C/C=C\\C/C=C\\CCCC(=O)NCCS(=O)(=O)[O-])OO",
     "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
-    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
 ])
 def test_float_the_engine_cannot_replace_yet_is_demoted(namer, smiles):
     """Breadth never drops and the PIN tier never labels a non-PIN pin_verified: the

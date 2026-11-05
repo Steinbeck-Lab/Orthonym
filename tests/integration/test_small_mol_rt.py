@@ -394,8 +394,13 @@ class TestStereo:
             r"CCC/C=C\C/C=C\CCCCCCCC(=O)O"
         ) == "(9Z,12Z)-hexadeca-9,12-dienoic acid"
 
+    @pytest.mark.opsin_gate
     def test_074_cyclohexyl_diester(self):
-        """#74: 1,4-di(nonanoyloxy)cyclohexane."""
+        """#74: 1,4-di(nonanoyloxy)cyclohexane.
+
+        With the OPSIN validity gate on, as it ships: the PIN tier names nothing for the stereo layer of this diester
+        (lane l17 item 2, ac3be4d0b3) and the cascade ships the best-effort 'cis-1,4-bis(nonanoyloxy)cyclohexane'; with the
+        gate off the unverified '(1s,4s)-...' name of a producer is not shipped by the cascade."""
         name = name_compound(
             "CCCCCCCCC(=O)O[C@@H]1CC[C@H](OC(=O)CCCCCCCC)CC1"
         )

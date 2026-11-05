@@ -74,3 +74,31 @@ def test_a_structure_without_a_kekule_form_is_not_read_as_saturated():
     broken.UpdatePropertyCache(strict=False)
     with pytest.raises(Chem.KekulizeException):
         kekule_ring_double(broken, range(5))
+
+
+_HIS = "N[C@@H](Cc1cnc[nH]1)C(=O)"
+_TRP = "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)"
+
+
+@pytest.mark.parametrize("smiles,name", [
+    # (:54182) 'histidine', 'tryptophan'; (:54571) acyl groups 'histidyl', 'tryptophyl':
+    # the retained name carries the hydrogen of its imidazole or indole and cites none
+    (_HIS + "O", "L-histidine"),
+    (_TRP + "O", "N-acetyl-L-tryptophan"),
+    (_HIS + "N[C@@H](C)C(=O)O", "(2S)-2-(histidylamino)propanoic acid"),
+    (_TRP + "N[C@@H](C)C(=O)O", "(2S)-2-(tryptophylamino)propanoic acid"),
+    (_HIS + "N[C@@H](Cc1cnc[nH]1)C(=O)O", "histidylhistidine"),                      # both rings are residues
+    ("NC(N)=NCCC[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O", "histidylaspartylarginine"),
+])
+def test_the_ring_of_a_retained_amino_acid_residue_is_not_counted(smiles, name):
+    assert "P-14.7.1" not in _rules(smiles, name)
+
+
+@pytest.mark.parametrize("smiles,name", [
+    (_HIS + "Cn1cncc1", "histidyl-imidazolyl"),     # an imidazole that is no residue is read as any other
+    (_HIS + "N[C@@H](Cc1cnc[nH]1)C(=O)O", "(2S)-2-(histidylamino)-3-imidazolylpropanoic acid"),   # two rings, one citation
+    ("Cc1c[nH]cn1", "4-methylimidazole"),
+    ("c1ccc2[nH]ccc2c1", "indole"),
+])
+def test_a_ring_that_is_no_retained_residue_still_needs_its_indicated_hydrogen(smiles, name):
+    assert "P-14.7.1" in _rules(smiles, name)

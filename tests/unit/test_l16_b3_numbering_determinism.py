@@ -124,9 +124,10 @@ def test_one_organyl_esterified_by_one_acid_has_one_name_in_every_spelling():
     """ "Polyesters formed from a single 'alcoholic' component" (the Blue Book): "When anions are
     identical functional class multiplicative nomenclature is used" ('ethane-1,2-diyl diacetate'); the one-cut name
     '(acetyloxy)dibutylstannyl acetate' is no name of that rule, so the ionic drawing, the bonded drawing and a bracket
-    spelling of it keep one name."""
+    spelling of it have one name: the group of the hydride cited before the multiplied anion ('dibutylstannanediyl
+    diacetate', lane/l17 item 11; the book's 'dimethyl dibutylstannanediyl dibutanedioate',,:38202)."""
     namer = _tiered_namer("pin", "best-effort")
     names = {smi: namer.name_tiered(smi)["name"] for smi in (
         "CCCC[Sn+2]CCCC.CC(=O)[O-].CC(=O)[O-]", "CCCC[Sn](CCCC)(OC(C)=O)OC(C)=O",
         "CC(=O)[O][Sn]([CH2]CCC)([CH2]CCC)[O]C(C)=O")}
-    assert set(names.values()) == {"1-{[(acetyloxy)di(butyl)stannyl]oxy}-1-oxoethane"}, names
+    assert set(names.values()) == {"dibutylstannanediyl diacetate"}, names

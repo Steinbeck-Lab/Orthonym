@@ -47,7 +47,8 @@ DEFAULT_TIER_DECLINES = frozenset({
     "O=C(O)CC/C=C\\CC[C@H]1[C@@H](OCc2ccc(-c3ccccc3)cc2)CC(=O)[C@@H]1N1CCOCC1",
     "O=C[C@H](O)[C@@H](O)[C@H](O)COP(=O)(O)O",
     "O=S(=O)(O)OC/C=C/c1ccc(O)cc1",
-    "O=S(=O)(O)Oc1ccc2cccc(O)c2n1",
+    # ('O=S(=O)(O)Oc1ccc2cccc(O)c2n1' left this list: the strict path names it, the functional class name of the ester,
+    # test_f_an_oxoacid_ester_beside_a_hydroxy_group_is_the_functional_class_pin)
     # '([1,1':4',1''-terphenyl]-4-yl)methanol': an assembly of three rings numbered
     # with primed locants is not the PIN. (the Blue Book) "The
     # preferred numbering for ring assemblies composed of three or more identical
@@ -57,6 +58,9 @@ DEFAULT_TIER_DECLINES = frozenset({
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    # the best-effort tier offers the functional class name of the sulfate ester over the ketone, class 9
+    # above class 16, item 12 of lane l17), the strict path the sulfooxy prefix name
+    "O=C(CCc1cccc(OS(=O)(=O)O)c1)c1ccc(O)c(O)c1",
     "c12c(C/C=C(/CO)C)c(cc(O)c2C(=O)C[C@@H](c2cc(c(cc2)O)O)O1)O",
     "C/C(=C(/CC(=O)OC)\\C(=O)OC)/NC1CCCCC1",
     "C/C(=C\\Cc1c(O)cc(O)c2c1O[C@H](c1ccc(O)c(O)c1)CC2=O)CO",
@@ -553,7 +557,6 @@ def test_e_salts_with_carbon_keep_their_label(smiles, expected):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles", [
-    "O=S(=O)(O)Oc1ccc2cccc(O)c2n1",                       # dev2000, first run
     "O=C(CCc1cccc(OS(=O)(=O)O)c1)c1ccc(O)c(O)c1",          # dev2000, first run
     "O=S(=O)(O)OC/C=C/c1ccc(O)cc1",                        # dev2000, re-run
     "O=C[C@H](O)[C@@H](O)[C@H](O)COP(=O)(O)O",             # dev2000, phosphonooxy
@@ -563,6 +566,23 @@ def test_f_an_oxoacid_ester_prefix_beside_a_junior_suffix_is_not_the_pin(smiles)
         row = _row(smiles, tier)
         assert not is_failure_name(row["name"]), (tier, row)
         assert row["tier"] != "pin_verified" and not row["is_pin"], (tier, row)
+        assert_full_rt(row["name"], smiles)
+
+
+def test_f_an_oxoacid_ester_beside_a_hydroxy_group_is_the_functional_class_pin():
+    """change-asserted-value (lane l17 suite fix, item 12 054d0fac9d): '8-hydroxyquinolin-2-yl hydrogen sulfate' is the
+    functional class name of the ester, and the sulfooxy-prefix name ('2-(sulfooxy)quinolin-8-ol') that this test used to
+    label non-PIN is no longer built for the row. Primary source: SENIORITY ORDER FOR CLASSES, Table 4.1,
+    "9 Esters (functional class names are given to noncyclic esters;...)" (the Blue Book) ranks above "17 Hydroxy
+    compounds" (:18190), so the hydroxy group is cited as a prefix of the organyl group of the ester, and "Esters
+    of mononuclear noncarbon oxoacids" (:35916) names 'methyl hydrogen sulfate (PIN)'. Independent check: ``assert_full_rt``
+    reads the name back with OPSIN to the full InChIKey. Mutation: the test fails at a48b8c0345, the parent of 054d0fac9d,
+    which names '2-(sulfooxy)quinolin-8-ol' at best-effort and nothing at the PIN tier."""
+    smiles = "O=S(=O)(O)Oc1ccc2cccc(O)c2n1"
+    for tier in ("pin", "best-effort"):
+        row = _row(smiles, tier)
+        assert row["name"] == "8-hydroxyquinolin-2-yl hydrogen sulfate", (tier, row)
+        assert row["tier"] == "pin_verified" and row["is_pin"], (tier, row)
         assert_full_rt(row["name"], smiles)
 
 
@@ -921,9 +941,14 @@ def test_m_the_ordering_sort_key_memo_is_keyed_by_the_naming_context(monkeypatch
     ("CC1=C(C=C(C=C1)S(=O)(=O)N2CCCCC2)NC(=O)COC(=O)C3=CC=C(C=C3)NC(=O)C",
      "1-(3-{2-[(4-acetamidobenzoyl)oxy]acetamido}-4-methylbenzene-1-sulfonyl)piperidine"),
     # dev2000
+    # change-asserted-value (lane l17 suite fix, item 7, 83a5e16318): the amide is the parent, not a 'carboxamido' prefix of
+    # the morpholine. Primary source: SENIORITY ORDER FOR CLASSES, Table 4.1, "11 Amides" (the Blue Book) ranks
+    # above "19 Amines" (:18192), and N-Substitution (:32774) cites the substituent of the amide nitrogen with
+    # the locant N. Independent check: ``assert_full_rt`` reads the name back with OPSIN to the full InChIKey. Mutation:
+    # the row fails at 113d76c6ce, the parent of 83a5e16318, which names the morpholine parent.
     ("Cc1c(C(=O)Nc2ccc(N3C[C@@H](C)O[C@@H](C)C3)nc2)cccc1-c1ccc(OC(F)(F)F)cc1",
-     "(2R,6S)-2,6-dimethyl-4-(5-{2-methyl-3-[4-(trifluoromethoxy)phenyl]benzene-1-"
-     "carboxamido}pyridin-2-yl)morpholine"),
+     "N-{6-[(2R,6S)-2,6-dimethylmorpholin-4-yl]pyridin-3-yl}-2-methyl-3-[4-(trifluoromethoxy)phenyl]"
+     "benzene-1-carboxamide"),
 ])
 def test_m_the_ordering_sort_key_memo_is_keyed_by_the_session_depth(monkeypatch, smiles,
                                                                       expected):

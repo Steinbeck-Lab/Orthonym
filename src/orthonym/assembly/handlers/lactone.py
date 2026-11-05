@@ -60,7 +60,8 @@ def has_senior_group_outside(mol: Any, motif_atoms: set, own_atoms: tuple = ()) 
     the amide patterns reach past the ring to the substituents of the nitrogen (N-methyl, N-acyl), which
     are still pseudoketone-tier groups of the lactam, not separate senior groups."""
     from ...perception.functional_groups import detect_functional_groups
-    from ...rules.seniority import SENIORITY_ORDER, _PREFIX_ONLY_PRINCIPAL
+    from ...rules.seniority import (SENIORITY_ORDER, _OXOACID_ESTERS_PROMOTED, _PREFIX_ONLY_PRINCIPAL,
+                                    get_principal_group)
 
     ketone_rank = SENIORITY_ORDER.index("ketone")
     senior_classes = {
@@ -69,6 +70,10 @@ def has_senior_group_outside(mol: Any, motif_atoms: set, own_atoms: tuple = ()) 
     }
     lactone_atoms = set(motif_atoms)
     fgs = detect_functional_groups(mol)
+    if get_principal_group(mol, fgs)[0] in _OXOACID_ESTERS_PROMOTED:
+        # the acyclic ester of a phosphorus or sulfur oxoacid ranks above the pseudoketone classes 9 and
+        # 16, the note of class 9), where its name can be built: it is the principal group, not a group of the motif
+        return True
     for fg_name, matches in fgs.items():
         if fg_name not in senior_classes:
             continue

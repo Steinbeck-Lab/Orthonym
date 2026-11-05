@@ -54,6 +54,12 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   ('(O-2H)acetic acid') is read as written and is not rewritten, and the ``(2H)`` / ``(3H)`` that
   follows a locant, primed or not ('naphthalen-2(3H)-one', '[1,1'-biphenyl]-4'(2H)-one'), is the
   added-hydrogen mark.
+* ``assembly_diyl_enclosed``: (the Blue Book) cites the central group of a concatenated multiplicative
+  group first, before its multiplying prefix, and a ring assembly group stands as the book writes it ('10,10'-
+  [[1,1'-biphenyl]-4,4'-diylbis(oxy)]di(decanoic acid) (PIN)',:6126): '[1,1'-biphenyl]-4,4'-diylbis(methylene) diacetate'
+  is the same group before 'bis(methylene)'. OPSIN reads the group only when it is enclosed once more:
+  '([1,1'-biphenyl]-4,4'-diyl)bis(methylene) diacetate'. The twin encloses a bracketed ring assembly group, its locants
+  and its 'diyl' (or 'triyl') that stands in front of a multiplying prefix.
 * ``polyester_acyloxy`` (``validation.polyester_twin``): method (1), the functional-class
   polyol polyester name 'propane-1,2,3-triyl 1,3-diacetate 2-propanoate (PIN)' (the Blue Book)
   and its acyloxy spelling '1,3-bis[acetyloxy]-2-[propanoyloxy]propane', substitutive nomenclature of
@@ -206,6 +212,15 @@ def bare_hydrogen_groups(name: str) -> list:
     return [m.span() for m in _GROUP.finditer(name) if _count_one_group(name, m) != m.group(0)]
 
 
+#: a ring assembly group with its locants in front of a multiplying prefix: '[1,1'-biphenyl]-4,4'-diylbis(methylene)'
+_ASSEMBLY_DIYL = re.compile(
+    r"(?<![\w(\[])(\[[^\[\]()]*\]-\d+[a-z]?'*(?:,\d+[a-z]?'*)+-(?:di|tri)yl)(?=(?:bis|tris|tetrakis|di|tri|tetra)[(\[])")
+
+
+def _assembly_diyl_enclosed(name: str) -> str:
+    return _ASSEMBLY_DIYL.sub(r"(\1)", name)
+
+
 #: (rule id, rewrite) in the order the rules apply; each rewrite is pure and deterministic
 TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("bridge_sulfano", _bridge_rule("sulfano", "epithio", "(?!ne)")),
@@ -215,6 +230,7 @@ TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("isotope_letter_once", _letter_once),
     ("isotope_count_one", _count_one),
     ("aminiumyl_azaniumyl", _aminiumyl_azaniumyl),
+    ("assembly_diyl_enclosed", _assembly_diyl_enclosed),
     ("polyester_acyloxy", polyester_twin),
     ("halido_o", halido_twin),
     ("preselected_cage", preselected_cage_twin),

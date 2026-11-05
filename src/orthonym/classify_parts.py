@@ -7,6 +7,30 @@ from .namer import (Chem, _build_ring_info_for_parent_selection, _demote_offring
                     orient_chain, suffix_heteroatoms)
 
 
+def _acyl_chain_of_carboxamide(features, chain, ring_atoms):
+    """The chain that bears a carboxamide principal group, when ``chain`` (the principal chain by the whole match of the
+    group) is one that does not.
+
+     "N-Substitution", (the Blue Book): R-CO-NHR' is named "by citing the substituents R'
+    and R'' as prefixes preceded by the locant N" ('N-(propan-2-yl)acetamide (PIN)'), so the parent chain of the amide is
+    the acyl chain; "SENIORITY ORDER FOR PARENT STRUCTURES" (:18875): "The senior parent structure has the
+    maximum number of substituents corresponding to the principal characteristic group (suffix)", and the carbonyl
+    carbon is the one atom of the amide that a chain must hold to bear it (``parent_selection._count_pg_on_chain``). The
+    chain finder takes the N-substituent carbon of the match as a host as well, so an N-alkyl of three carbons beat the
+    two-carbon acyl on length, held no group by that count, tied the ring at none, and the ring won as senior
+    : the ring cascade then named the amide as a ring prefix, which is no PIN, and the amide namer was never
+    reached ('CC(C)NC(=O)Cc1ccccc1', 'CCCNC(=O)Cc1ccccc1'). Only an acyl chain of two carbons or more replaces it: a
+    one-carbon acyl (a formamide) is the single-carbon case of the parent choice below, which has its own route."""
+    from .perception.chains import _CARBOXAMIDE_PGS, carboxamide_acyl_chain
+    pg, pg_atoms = features.principal_group, features.principal_group_atoms
+    if pg not in _CARBOXAMIDE_PGS or not pg_atoms or not chain or len(chain) < 2:
+        return chain
+    from .rules.parent_selection import _count_pg_on_chain
+    if _count_pg_on_chain(features.mol, chain, pg_atoms, pg):
+        return chain
+    return carboxamide_acyl_chain(features, ring_atoms) or chain
+
+
 def ring_parent_choice(self, features):
     """A cyclic molecule: the parent choice between its ring systems and a chain."""
     if features.is_cyclic:
@@ -26,6 +50,7 @@ def ring_parent_choice(self, features):
             features.principal_group,
             exclude_atoms=all_ring_atoms
         )
+        potential_chain = _acyl_chain_of_carboxamide(features, potential_chain, all_ring_atoms)
         # 'Maximum number of substituents cited as prefixes' (the Blue Book:
         # 21604): "The preferred IUPAC name is based on the senior parent structure
         # that has the maximum number of substituents cited as prefixes" (the hydro
@@ -834,6 +859,24 @@ def carbocyclic_ring(self, features):
                 setattr(features, _field, sorted(locants))
 
 
+def _functional_groups_of_the_parent(features):
+    """``features.functional_groups``, with the carboxamide group of the principal group cut down to the amide groups the
+    parent was chosen among (``rules.amide_parent.senior_carboxamide_group``:,,,,
+     when that choice left out some: the principal chain bears the principal group, which is the senior amide's, not
+    one of every amide group of the class. The chain count of ``find_principal_chain`` read all of them, so a chain through
+    the other amide's nitrogen ('CC(C)C(=O)NCC(=O)NC': the glycyl chain bears its own amide and the nitrogen of the isobutyramide,
+    two groups of the class to the one of the isobutyryl chain) was the principal chain of a name whose parent is the
+    isobutyramide, and the amide assembler named the acyl chain from it ('N-[2-(methylamino)-2-oxoethyl]propanamide', the
+    methyl lost; the crotonyl chain as 'acetamide'), a name the read-back rejected, so the senior parent had no name."""
+    groups = features.functional_groups
+    pg, pg_atoms = features.principal_group, getattr(features, 'principal_group_atoms', None)
+    from .rules.amide_parent import CARBOXAMIDE_CLASSES
+    held = groups.get(pg) if pg in CARBOXAMIDE_CLASSES and pg_atoms else None
+    if held and len(pg_atoms) < len(held) and all(m in held for m in pg_atoms):
+        return {**groups, pg: list(pg_atoms)}
+    return groups
+
+
 def chain_parent(self, features):
     """The principal chain of an acyclic parent, or of a chain parent of a cyclic molecule."""
     if not features.is_cyclic or features.chain_is_parent:
@@ -846,7 +889,7 @@ def chain_parent(self, features):
                 _ring_exclude.update(ring)
             features.principal_chain = find_principal_chain(
                 features.mol,
-                features.functional_groups,
+                _functional_groups_of_the_parent(features),
                 features.principal_group,
                 exclude_atoms=_ring_exclude if _ring_exclude else None
             )

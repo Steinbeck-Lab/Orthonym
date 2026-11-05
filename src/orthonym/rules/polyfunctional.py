@@ -1426,6 +1426,18 @@ def _acyl_is_simple_saturated_chain(mol, acyl_c: int, n_atom: Optional[int]) -> 
     # acyclic
     if any(mol.GetAtomWithIdx(c).IsInRing() for c in seen):
         return False
+    # a bare chain: a heteroatom on a chain carbon (the pyrrolidin-1-yl of 'N-R-2-(pyrrolidin-1-yl)acetamide', a tetrazolyl,
+    # an alkoxy) is a prefix that the count-based name does not carry ('N-(3-methoxypropyl)acetamide' for it, the ring
+    # dropped). The carbonyl oxygen and the amide nitrogen are the acyl carbon's own; (the Blue Book)
+    # makes the acyl chain the parent and its substituents prefixes. A hydrogen (an isotope of it, '[2H]') is no hetero
+    # substituent: the isotope is cited by the isotope producer.
+    for c in seen:
+        for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+            if nb.GetIdx() in seen or nb.GetIdx() == n_atom or nb.GetAtomicNum() == 1:
+                continue
+            if c != acyl_c or not (nb.GetSymbol() == 'O' and mol.GetBondBetweenAtoms(
+                    c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0):
+                return False
     # saturated: every C-C bond within the acyl skeleton is single
     for c in seen:
         for nb in mol.GetAtomWithIdx(c).GetNeighbors():
@@ -1571,7 +1583,8 @@ def _name_ring_attached_anilide(features: Any) -> Optional[str]:
     if not _acyl_ring_is_simple_unsub_carbocycle(mol, acyl_c, n_atom):
         return None
     # fail closed on any DEFINED stereo (the delegated path emits no descriptors)
-    if (Chem.FindMolChiralCenters(mol, includeUnassigned=False)
+    from ..perception.stereo import find_chiral_centres
+    if (find_chiral_centres(mol, includeUnassigned=False)
             or any(b.GetStereo() != Chem.BondStereo.STEREONONE
                    for b in mol.GetBonds())):
         return None
@@ -1706,8 +1719,12 @@ def _single_substitutable_atom_parent(mol, features, principal_chain, all_prefix
         groups = set()
         for _m in (getattr(features, 'principal_group_atoms', None) or ()):
             groups.update(int(i) for i in _m)
-        from ..assembly.locant_omission import l6_chain_parent_one_substitutable_atom
-        return l6_chain_parent_one_substitutable_atom(mol, principal_chain, groups)
+        from ..assembly.locant_omission import (
+            l6_chain_parent_one_substitutable_atom,
+            parent_compound_group_atoms,
+        )
+        return l6_chain_parent_one_substitutable_atom(
+            mol, principal_chain, parent_compound_group_atoms(mol, principal_chain, groups))
     except Exception:  # noqa: BLE001 -- deny by default
         return False
 
@@ -1891,22 +1908,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         if ester_acyloxy_prefixes:
             _esters_demoted = True
 
-        # Re-select principal group excluding esters
-        filtered_fgs = {k: v for k, v in features.functional_groups.items() if k != "ester"}
-        new_principal, new_atoms = get_principal_group(mol, filtered_fgs)
-        if new_principal:
-            principal_group = new_principal
-            features.principal_group_atoms = new_atoms
-            # Update non_principal to exclude the new principal group
-            non_principal = {k: v for k, v in filtered_fgs.items()
-                            if k != new_principal and k not in ("alkene", "alkyne")}
-            # The re-selected principal group unions every present subtype of its
-            # equal-seniority class into ``principal_group_atoms`` (alcohols: one
-            # multiplied '-1,4-diol'), so the same-class subtypes must leave the
-            # prefix loop here too, exactly as at the top of this function. Without
-            # this the secondary OH of 'C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O' was cited
-            # twice, '4-hydroxy' and '-1,4-diol', which reads as a gem-diol.
-            non_principal = _drop_union_class_subtypes(non_principal, principal_group)
+        principal_group, non_principal = _reselect_principal_without_esters(
+            mol, features, _esters_demoted, principal_group, non_principal)
 
     # Collect all prefixes (FG prefixes + alkyl substituents)
     all_prefixes = []
@@ -3049,6 +3052,33 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if _esters_demoted:
         _record_el02_ester_prefix_name(name)
     return name
+
+
+def _reselect_principal_without_esters(mol, features, esters_demoted, principal_group, non_principal):
+    """The principal group and the groups left for the prefix loop once the esters are cited as 'acyloxy' prefixes :
+    the principal group of the molecule without its esters (``principal_group_atoms`` of ``features`` follow it)."""
+    filtered_fgs = {k: v for k, v in features.functional_groups.items() if k != "ester"}
+    new_principal, new_atoms = get_principal_group(mol, filtered_fgs)
+    if new_principal:
+        features.principal_group_atoms = new_atoms
+        # Update non_principal to exclude the new principal group
+        non_principal = {k: v for k, v in filtered_fgs.items()
+                        if k != new_principal and k not in ("alkene", "alkyne")}
+        # The re-selected principal group unions every present subtype of its
+        # equal-seniority class into ``principal_group_atoms`` (alcohols: one
+        # multiplied '-1,4-diol'), so the same-class subtypes must leave the
+        # prefix loop here too, exactly as at the top of this function. Without
+        # this the secondary OH of 'C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O' was cited
+        # twice, '4-hydroxy' and '-1,4-diol', which reads as a gem-diol.
+        return new_principal, _drop_union_class_subtypes(non_principal, new_principal)
+    if esters_demoted:
+        # Every ester is cited as an 'acyloxy' prefix and no other group is left to be the principal one: the parent takes
+        # no suffix (the arm of ``name_polyfunctional`` for ``principal_group is None``). Left as 'ester', the suffix of the
+        # demoted groups was built as well ('1,2-bis(acetyloxy)-3-ethoxypropane-1,2-dioate' for the diacetate of 3-ethoxy-
+        # propane-1,2-diol: the =O of each ester named twice, another molecule).
+        features.principal_group_atoms = []
+        return None, {k: v for k, v in filtered_fgs.items() if k not in ("alkene", "alkyne")}
+    return principal_group, non_principal
 
 
 def _record_el02_ester_prefix_name(name: str) -> None:

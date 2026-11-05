@@ -97,9 +97,39 @@ def test_a_group_senior_to_ketones_keeps_the_prefix_spelling():
         assert bool(got) == expect_suffix, (smiles, got)
 
 
+CARBAMATE_ROW = "O=C1NN=C(Cc2cccc(C(=O)N3CCC3)c2NC(=O)OC)c2ccccc12"
+
+
+def test_a_carbamate_ester_is_the_parent_and_the_ring_one_is_its_prefix_at_best_effort():
+    # Changed asserted value (lane/l17 item 3 fix round). Before: this row was one of the four whose best-effort name was
+    # the general engine's '4-({3-(azetidine-1-carbonyl)-2-[(methoxycarbonyl)amino]phenyl}methyl)-1-oxo-1,2-
+    # dihydrophthalazine' (systematic_verified), the carbamate cited as the prefix '(methoxycarbonyl)amino'. "SENIORITY
+    # ORDER FOR CLASSES", Table 4.1 (the Blue Book): "9 Esters (functional class names are given to noncyclic esters;...)"
+    # (:18182), above "11 Amides" (:18184) and "16 Ketones (of the type -C-CO-C-), pseudoketones..." (:18189); the carbamate is
+    # an ester of carbamic acid,:30758; '2-hydroxypropyl (2-aminoethyl)carbamate (PIN)',:30766), so it is the
+    # parent and both the hidden amide ('azetidine-1-carbonyl') and the ring ketone are cited as prefixes of the aryl group.
+    # The ring ketone is no suffix of the name (the ester is the parent), so the ring is cited as the substituent group
+    # '4-oxo-3,4-dihydrophthalazin-1-yl'. OPSIN 2.9.0 reads the new name back to the input's InChIKey (assert_full_rt: an
+    # independent parse, not the engine's own reader); the base 5cd9d81c3a name of the row is the old one, so this assertion
+    # fails there.
+    row = _row(CARBAMATE_ROW, "best-effort")
+    expected = ("methyl {2-(azetidine-1-carbonyl)-6-[(4-oxo-3,4-dihydrophthalazin-1-yl)methyl]phenyl}carbamate")
+    assert (row["name"], row["tier"]) == (expected, "pin_verified"), row
+    assert_full_rt(expected, CARBAMATE_ROW)
+
+
+def test_the_valid_tier_still_cites_the_carbamate_as_a_prefix_of_the_ring_parent():
+    # the valid and complete tiers keep the general engine's name: the one stays 'oxo' on the ring, not a '-one' suffix
+    for tier in ("valid", "complete"):
+        row = _row(CARBAMATE_ROW, tier)
+        assert row["tier"] == "systematic_verified", row
+        assert "phthalazin-1(2H)-one" not in row["name"], row
+        assert "1-oxo-1,2-dihydrophthalazine" in row["name"], row
+        assert_full_rt(row["name"], CARBAMATE_ROW)
+
+
 @pytest.mark.parametrize("smiles", [
     "O=C1NN=C(Cc2cccc(C(=O)N3CCC3)c2NC(N)=O)c2ccccc12",         # urea
-    "O=C1NN=C(Cc2cccc(C(=O)N3CCC3)c2NC(=O)OC)c2ccccc12",        # carbamate
     "O=C1NN=C(Cc2cccc(C(=O)N3CCC3)c2NC(N)=N)c2ccccc12",         # guanidine
     "O=C1NN=C(Cc2cccc(C(=O)N3CCC3)c2NC#N)c2ccccc12",            # cyanamide
 ])

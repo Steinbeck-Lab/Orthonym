@@ -74,8 +74,17 @@ DEFAULT_TIER_DECLINES = frozenset({
     "OC1C2CC3CC1CC(O)(C3)C2",
     "OCC1CCCN2CCCCC12",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+#... whose best-effort name is another one (it reads back exactly). lane/l17 item 2, the glycerol 1-ether 2,3-diester: the
+# default tier's name cites both esters as prefixes of the ether ('...-1-(octadecyloxy)-3-(tetracosanoyloxy)propane':
+# its pipeline name for the alcohol word is the carbon count 'nonatriacontyl', another molecule, so the weave builds it).
+# The best-effort tier's pipeline spells the alcohol word with the substituent primitive and names the ester as an ester,
+# '...-3-(octadecyloxy)propyl tetracosanoate' (OPSIN reads it back to the input). General methodology
+# (the Blue Book): "All preferred IUPAC names for esters are named by functional class nomenclature";
+# (:18158): class 9 esters rank above ethers' substituents, so the ester is the parent, as Esters cited as
+# prefixes (:31696) asks only for "another group... that has priority for citation as the principal group".
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
+})
 
 
 def _declined_pin_row(smiles):

@@ -95,12 +95,13 @@ def _row(smiles, tier):
     # "Substituents of the types -NH-CO-R and -NH-SO2-R" (the Blue Book, "Method (1) generates preferred IUPAC
     # names", '4-formamidobenzoic acid (PIN)':33000); the best-effort tier gave method (2), '(acetylamino)', which
     # the engine itself recorded as never the PIN (``_located_fg_hetero_root``). Read back to the input by OPSIN 2.9.0
-    # below. The compound acylamino prefix of an N,N-disubstituted amide, which has no amido form, keeps the marks
-    # this test is for.
+    # below. The N,N-disubstituted amide has its amido form too, '(N-methylacetamido)' (lane/l17 item 12,:32991 and
+    # '2-(N-methylpropanamido)benzene-1-sulfonic acid (PIN)':33040; change-asserted-value, mutation: the row names
+    # 'S-{2-[acetyl(methyl)amino]ethyl}...' at lane/l17 4cadfc641a): the marks of this test are the marks round it.
     ("CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O", "best-effort",
      "S-(2-acetamidoethyl) (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"),
     ("CC(=O)N(C)CCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O", "best-effort",
-     "S-{2-[acetyl(methyl)amino]ethyl} (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"),
+     "S-[2-(N-methylacetamido)ethyl] (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"),
 ])
 def test_engine_names_keep_their_marks(smiles, tier, name):
     row = _row(smiles, tier)

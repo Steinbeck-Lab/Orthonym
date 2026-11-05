@@ -79,7 +79,13 @@ POLYFUNCTIONAL_CONTROLS = {
     "OC(=O)CC(O)COc1ccccc1": "3-hydroxy-4-phenoxybutanoic acid",
     # the suffix group is -P(O)O: its match holds no chain atom, it is bonded to one
     # (the 'suffix groups sit on the parent' decline must not read it as off-chain)
-    "C(C(=O)NCP(O)O)N": "(2-aminoacetamido)methanephosphonous acid",
+    # lane/l17 item 12 (change-asserted-value; quote: "Names of substituted fundamental acyl groups derived from mononuclear
+    # noncarbon oxoacids" (the Blue Book), 'methylphosphonic acid (PIN)':36062, the substituent prefix 'methyl' on the
+    # 'phosphonic acid' parent, and:32991 for the amido prefix;
+    # independent check: ``name_is_rt_exact`` of the producer's return; mutation: lane/l17 4cadfc641a returns
+    # '(2-aminoacetamido)methanephosphonous acid', a name the book has no pattern for): the chain substituent
+    # '(2-aminoacetamido)methyl' is a prefix of the 'phosphonous acid'
+    "C(C(=O)NCP(O)O)N": "[(2-aminoacetamido)methyl]phosphonous acid",
     # a sulfone whose substituent the dispatcher names keeps its prefix
     "OC(=O)CC(O)CS(=O)(=O)C": "3-hydroxy-4-(methanesulfonyl)butanoic acid",
 }

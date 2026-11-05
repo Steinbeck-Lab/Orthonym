@@ -117,6 +117,21 @@ def peptide_like(mol) -> bool:
     return mol.HasSubstructMatch(_DIPEPTIDE_UNIT)
 
 
+def peptide_of_residues(mol) -> bool:
+    """:func:`peptide_like`, where the nitrogen that opens the dipeptide unit is the amino group of a residue. A ring
+    nitrogen that is joined to the alpha carbon from outside its ring is not one: the unit '(4-methylpiperazin-1-yl)
+    acetyl-glycine' is a heterocyclyl on an acetyl group (named as a substituted acetic acid), and the nitrogen
+    closing a ring through its alpha carbon ('prolyl') is. INTRODUCTION (the Blue Book): the section
+    describes "amino acids that constitute the building blocks of peptides and proteins"; a piperazin-1-ylacetic
+    acid is no such building block (the project's reading of that sentence)."""
+    ring_info = mol.GetRingInfo()
+    for n_idx, alpha_idx, *_ in mol.GetSubstructMatches(_DIPEPTIDE_UNIT):
+        if ring_info.NumAtomRings(n_idx) and not ring_info.AreAtomsInSameRing(n_idx, alpha_idx):
+            continue
+        return True
+    return False
+
+
 # The retained names of Table 10.4 ('common' alpha-amino acids, the Blue Book).
 # STANDARD_AMINO_ACIDS holds exactly the Table 10.4 set; NON_STANDARD_AMINO_ACIDS and
 # the OPSIN-imported entries (ornithine, sarcosine, dopa,...) are NOT in it. Used by

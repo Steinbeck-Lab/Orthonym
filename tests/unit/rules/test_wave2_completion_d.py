@@ -46,9 +46,17 @@ class TestAM6Sulfonamido:
     def test_protected(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_n_alkyl_sulfonamido_fails_closed(self, _validity_gate_on):
-        # N-alkylated sulfonamido is out of scope -> fail closed (unknown).
-        assert "unknown" in name_compound("CS(=O)(=O)N(C)CCC(=O)O", on_failure="label", emit_tier="pin")
+    def test_n_alkyl_sulfonamido_is_the_amido_prefix(self, _validity_gate_on):
+        """change-asserted-value (lane/l17, item 12 a performance pass, ``; it already failed at c302d83df4): the PIN tier failed
+        closed ('unknown') for an N-alkylated sulfonamido group. "Substituents of the types -NH-CO-R and -NH-SO2-R"
+        (the Blue Book): "Method (1) generates preferred IUPAC names", '(N-cyclopropylmethanesulfonamido)acetic acid'
+        (:33029): the group is the amido prefix on the acid parent. Independent check: a fresh OPSIN call reads the name to
+        the input's full key. Mutation: at `` the name is 'unknown organic compound'."""
+        from tests.support.rt_assert import assert_full_rt
+        smiles = "CS(=O)(=O)N(C)CCC(=O)O"
+        name = name_compound(smiles, on_failure="label", emit_tier="pin")
+        assert name == "3-(N-methylmethanesulfonamido)propanoic acid"
+        assert_full_rt(name, smiles)
 
 
 @pytest.mark.unit

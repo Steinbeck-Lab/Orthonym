@@ -105,25 +105,41 @@ def ambient_naming_state() -> tuple:
     (a counter of the ``name`` frames; no naming path reads it to decide a name, the recursion guard
     is the visited set above). Added: whether an alternate-parent rescue is running, which that key
     lacks. ``ORTHONYM_MEMO=verify`` compares every hit with a fresh naming."""
-    from ..decomposition.engine import nacyl_float_refusing
-    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
-                                      full_coverage_ctx, general_fallback_ctx)
-    from ..namer import _ALT_PARENT_RESCUE
-    from ..routing import dispatch_table as _dt
-    from .group_splitting import _IN_SPLIT_PROBE
-    from .locant_omission import (_ISOTOPE_PARENT_POSITIONAL, _ISOTOPIC_NAMING_SCOPE,
-                                  forced_locant_reason)
-    from .memo import book_forms_var
-    from .substituent_enumerator import _gate_is_reentrant
+    m = _ambient_modules()
+    pv = m.provenance
+    dt = m.dispatch_table
     guard = _fn._fragment_guard
     visited = getattr(guard, 'visited', None)
     return (frozenset(visited) if visited else frozenset(),
-            best_effort_ctx.get(), general_fallback_ctx.get(),
-            allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-            nacyl_float_refusing(), _dt._PEPTIDE_SUBST_ACTIVE, _dt._PEPTIDE_NAME_STANDS,
-            _gate_is_reentrant(), getattr(_IN_SPLIT_PROBE, 'active', False),
-            forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(), _ISOTOPE_PARENT_POSITIONAL.get(),
-            book_forms_var.get(), getattr(_ALT_PARENT_RESCUE, 'active', False))
+            pv.best_effort_ctx.get(), pv.general_fallback_ctx.get(),
+            pv.allow_aromatic_general_ctx.get(), pv.full_coverage_ctx.get(),
+            m.engine.nacyl_float_refusing(), dt._PEPTIDE_SUBST_ACTIVE, dt._PEPTIDE_NAME_STANDS,
+            m.enumerator._gate_is_reentrant(), getattr(m.group_splitting._IN_SPLIT_PROBE, 'active', False),
+            m.locant_omission.forced_locant_reason(), m.locant_omission._ISOTOPIC_NAMING_SCOPE.get(),
+            m.locant_omission._ISOTOPE_PARENT_POSITIONAL.get(),
+            m.memo.book_forms_var.get(), getattr(m.namer._ALT_PARENT_RESCUE, 'active', False))
+
+
+_AMBIENT = None
+
+
+def _ambient_modules():
+    """The modules:func:`ambient_naming_state` reads, imported once (each is imported inside the call because it imports
+    this module, and the call is made for every substituent naming: 15 import statements per call were most of its time).
+    The names it reads are looked up on the module at every call, as the ``from`` imports it had looked them up."""
+    global _AMBIENT
+    if _AMBIENT is None:
+        import types
+        from .. import namer
+        from ..decomposition import engine
+        from ..metrics import provenance
+        from ..routing import dispatch_table
+        from . import group_splitting, locant_omission, memo, substituent_enumerator
+        _AMBIENT = types.SimpleNamespace(
+            namer=namer, engine=engine, provenance=provenance, dispatch_table=dispatch_table,
+            group_splitting=group_splitting, locant_omission=locant_omission, memo=memo,
+            enumerator=substituent_enumerator)
+    return _AMBIENT
 
 
 def renaming_state() -> tuple:

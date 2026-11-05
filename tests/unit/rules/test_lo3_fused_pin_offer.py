@@ -116,8 +116,15 @@ def test_item_rows_best_effort_producer_and_default_tier():
 # '2-amino-6-(2-hydroxy-1-oxopropyl)-...' and its pyrazino[2,3-d]pyrimidine twin, are PINs now that the
 # acyl group is named as an acyl group, tests/unit/assembly/test_lo4a_acyl_prefix.py.)
 STILL_NOT_PIN_ROWS = [
+    # change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): the old name was
+    # '6-chloro-2-[5-chloro-2-(phosphonooxy)phenyl]quinazolin-4(1H)-one' (systematic_verified). (the Blue Book)
+    # puts "9 Esters" (:18182) above the ketone-like '-one' ring group (class 16,:18189), so the phosphate ester is the parent
+    #,:35916 'methyl dihydrogen phosphate (PIN)',:35940) and the quinazolinone a prefix of its organyl group; the
+    # name is in PIN form with the hydro-prefix spelling of a drawn 1H tautomer that no strict producer certifies, so it is
+    # pin_unverified (a breadth producer built it) and the default tier declines it. Read back below by ``name_is_rt_exact``;
+    # mutation: with ``seniority._OXOACID_ESTERS_PROMOTED`` empty the old name returns.
     ("O=c1nc(-c2cc(Cl)ccc2OP(=O)(O)O)[nH]c2ccc(Cl)cc12",
-     "6-chloro-2-[5-chloro-2-(phosphonooxy)phenyl]quinazolin-4(1H)-one"),
+     "4-chloro-2-(6-chloro-4-oxo-1,4-dihydroquinazolin-2-yl)phenyl dihydrogen phosphate"),
 ]
 
 
@@ -125,7 +132,7 @@ STILL_NOT_PIN_ROWS = [
 def test_offer_that_is_also_non_pin_changes_nothing(smiles, name):
     assert name_is_rt_exact(name, smiles), name
     b = name_breadth(smiles)
-    assert (b.get("name"), b.get("tier")) == (name, "systematic_verified"), b
+    assert (b.get("name"), b.get("tier")) == (name, "pin_unverified"), b
     assert name_default(smiles).get("tier") != "pin_verified"
 
 

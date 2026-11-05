@@ -339,7 +339,9 @@ _RT_BREADTH_GAPS = {
     # -- REMOVED 2026-10-09 (fix-all merge): the strict xfails went XPASS once the
     # ester fixes landed (the general acyclic fallback declines a principal ester, the
     # ester producer builds the group word from the alcohol's structure).
-    "002_penicillin_like",
+    # "002_penicillin_like" -- REMOVED lane/l17 item 12: the strict xfail went XPASS once the chain substituent had the
+    # method-(1) amido prefix, the Blue Book): '2-[carboxy(2-phenoxyacetamido)methyl]-5,5-dimethyl-
+    # 1,3-thiazolidine-4-carboxylic acid' round-trips exact.
     # "003_terpene_dioxolane" -- REMOVED 2026-09-27 (suite fix j6, TRIAGE g3
     # C17b): the decorated 1,3-dioxolan-4-yl prefix is now built at the PIN tier
     # (Hantzsch-Widman stem,; '(3R)-3,7-dimethyl-9-(2,2,5,5-
@@ -397,7 +399,7 @@ _RT_PARAMS = [
     for p in DEPTH_LIMIT_COMPOUNDS
 ]
 
-assert len(_RT_BREADTH_GAPS) == 5, "the measured gap list changed size"  # 6 until 017 left it (PB lane S, 2026-10-16)
+assert len(_RT_BREADTH_GAPS) == 4, "the measured gap list changed size"  # 6 until 017 left it (PB lane S, 2026-10-16), 5 until 002 left it (lane/l17 item 12)
 assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
     "a _RT_BREADTH_GAPS id does not match any DEPTH_LIMIT_COMPOUNDS param"
 )

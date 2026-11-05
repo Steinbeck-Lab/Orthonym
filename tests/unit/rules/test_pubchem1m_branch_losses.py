@@ -573,13 +573,21 @@ def test_single_descriptor_sweep_skips_locants_no_position_can_bear(monkeypatch)
     assert all("-2H" not in c for c in calls), calls
 
 
-# dev2000 row (not a holdout split): its main path makes 5 naming passes and the clean
-# recovery 52; the cap is never below _OFFER_MIN_PASSES, so the offer still
-# replaces the floor stand-in with the engine's name.
+# dev2000 row (not a holdout split). Its clean-first offer used to replace a floor stand-in with the engine's name, the
+# '[(4R,5S)-4-{[...]carbamoyl}-5-[formyl(hydroxy)amino]hexyl]benzene'.
+# change-asserted-value (lane l17 suite fix, item 7 f60ed2e5d9): the molecule holds two amide groups on different
+# chains, one class, and the parent among them is the chain of the greater number of skeletal atoms.
+# Primary source: "SENIORITY OF ACYCLIC CHAINS (THE PRINCIPAL CHAIN)",: "The principal chain has the
+# greater number of skeletal atoms [criterion (b) in ]" (the Blue Book): the pentanamide chain (5 atoms,
+# the phenyl on C-5) is senior to the butanamide chain (4 atoms), so the name is the pentanamide and no ring is the
+# parent. Independent check: ``assert_full_rt`` reads the name back with OPSIN to the input's full InChIKey.
+# Mutation: the test fails at b77a6ea7c0, the parent of f60ed2e5d9, which names the benzene parent. The row no longer
+# reaches the clean-first offer (measured: 0 calls of ``_prefer_clean_over_floor_substitute`` at the lane base and at
+# the lane head), so the assertion keeps what survives of the original one: no floor spelling ('cyclohexa').
 SMALL_OFFER_ROW = "CNC(=O)[C@@H](NC(=O)[C@H](CCCc1ccccc1)[C@H](C)N(O)C=O)C(C)(C)C"
 
 
 def test_offer_cap_leaves_a_small_molecule_offer_alone():
     res = name_best_effort(SMALL_OFFER_ROW)
     name = assert_full_rt(res.get("name"), SMALL_OFFER_ROW)
-    assert name.endswith("benzene") and "cyclohexa" not in name, name
+    assert name.endswith("-5-phenylpentanamide") and "cyclohexa" not in name, name

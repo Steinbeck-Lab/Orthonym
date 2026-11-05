@@ -83,6 +83,22 @@ _LOCANT = re.compile(r"\d+(?:λ\d+)?")
 # (=C=O, is left alone.
 _OXOMETHYL = re.compile(r"oxomethyl(?!idene)")
 
+# "Carbonic acid" (the Blue Book): "The nomenclature of chalcogen analogues and derivatives of carbonic acid is
+# based on functional replacement... Substitution of formic acid is not recommended for generation of these names." The
+# amide-like derivatives are named on carbamic acid,:30758: 'dimethylcarbamic acid (PIN)'), its chalcogen
+# analogues on 'carbamothioic', 'carbamodithioic'...: '(dimethylamino)methanethioate' of the S-ester of
+# dimethylcarbamothioic acid is not the PIN spelling ('S-phenyl dimethylcarbamothioate').
+_SUBSTITUTED_FORMIC_ACID = re.compile(
+    r"amino[)\]}]*methane(?:thio|dithio|seleno|telluro)?(?:ate|oic acid|oic [SOSeTe]-acid|oyl)")
+
+# "Esters cited as prefixes" (the Blue Book): an ester group -CO-OR' is cited by 'alkoxy...oxo',
+# '(alkyloxy)...oxo' or '(alkanyloxy)...oxo' on a chain, and on the carbon of the group itself by 'alkoxycarbonyl',
+# '(alkyloxy)carbonyl' or '(alkanyloxy)carbonyl': the book has no 'oxo(alkoxy)methyl' ('oxo[(trimethylsilyl)oxy]methyl',
+# '(methylsulfanyl)(oxo)methyl' of the thioester -CO-SR', cited by '(alkylsulfanyl)carbonyl'). A name that spells the group
+# so is a systematic name, not the PIN.
+_ESTER_GROUP_AS_OXOMETHYL = re.compile(
+    r"(?:oxo[\[(][^ ]*?(?:oxy|sulfanyl)[\])]|(?:oxy|sulfanyl)[\])]\(oxo\))methyl(?!idene|ene)")
+
 # retained 'acetic acid' / 'formic acid' (PINs) and the names derived
 # from them 'acetamide (PIN)', the Blue Book;:30444
 # 'formyl... methanoyl'): 'ethanoic acid', 'ethanamide', 'ethanoyl', 'ethanoate'
@@ -115,7 +131,9 @@ _ACYLOXY = re.compile(
 _SUFFIX_FREE_PARENT = re.compile(r"(?:ane|ene|yne)$")
 # The same rule, (:31698) with (:18160, esters are class
 # 9; amides 11, nitriles 14, aldehydes 15, ketones 16, hydroxy compounds 17, amines
-# 19, imines 20): a carboxylic or sulfur-acid ester (acyloxy, '...sulfonyloxy') or
+# 19, imines 20): a carboxylic, carbamic ('(methylcarbamothioyl)oxy', 'carbamoyl...sulfanyl':
+# "Carbonic acid",:30756, the esters of carbamic acid and of its chalcogen analogues
+# are class 9 too) or sulfur-acid ester (acyloxy, '...sulfonyloxy') or
 # thioester (acylsulfanyl, '...sulfinylsulfanyl'; '*S*-(2-cyanoethyl) cyclohexane
 # sulfinothioate (PIN)':31765, not '3-(cyclohexanesulfinylsulfanyl)propanenitrile') cited as
 # a prefix while the principal group expressed by the suffix is JUNIOR to esters is
@@ -126,7 +144,7 @@ _SUFFIX_FREE_PARENT = re.compile(r"(?:ane|ene|yne)$")
 # ending in an acid or an ester word are not.
 _ACYL_ESTER_PREFIX = re.compile(
     r"(?:acetyl|formyl|benzoyl|[a-z]anoyl|[a-z]enoyl|[a-z]ynoyl|[a-z]sulfonyl"
-    r"|[a-z]sulfinyl)\)?\]?\}?"
+    r"|[a-z]sulfinyl|carbamoyl|carbamothioyl|carbamodithioyl)\)?\]?\}?"
     r"(?:oxy|sulfanyl)(?!carbonyl)"
     # attached to carbon: not an acyl-X group on another heteroatom prefix
     # ('1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)',:39499)
@@ -712,7 +730,7 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
     remove a name the default tier shipped before."""
     if not name:
         return None
-    for rx in (_SMALL_RING_REPLACEMENT, _BENZENE_AS_TRIENE, _OXOMETHYL,
+    for rx in (_SMALL_RING_REPLACEMENT, _BENZENE_AS_TRIENE, _OXOMETHYL, _SUBSTITUTED_FORMIC_ACID, _ESTER_GROUP_AS_OXOMETHYL,
                _UNRETAINED_C1C2_ACID, _ACYLAMINO, _ALKAN_1_YL, _MISSING_HYPHEN,
                _UNCONTRACTED_OXY, _METHYL_ON_ETHYL, _ADAMANTANE_VB, _DIOXIDANYL,
                _OXO_ALKYL_ACYL, _UNENCLOSED_COMPOUND, _UNENCLOSED_ELEMENT_LOCANT,

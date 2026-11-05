@@ -16,6 +16,12 @@ The rule (the Blue Book):
 *: a heteroatom cited with lambda-n has bonding number n.
 *, (:3725,:24687): added indicated hydrogen ``n(mH)`` after a suffix locant
   is not the parent's indicated hydrogen and does not replace it.
+* "Retained names of the 'common' amino acids" (:54182, Table 10.4: 'histidine', systematic name
+  '2-amino-3-(1H-imidazol-4-yl)propanoic acid'; 'tryptophan', '2-amino-3-(1H-indol-3-yl)propanoic acid') and
+   "Acyl groups" (:54571): "changing the ending 'ine' (or 'an' in tryptophan) into 'yl', for example alanyl,
+  valyl, tryptophyl". The retained name and its acyl group name the imidazole and the indole of the side chain with
+  the hydrogen they imply and cite none, so a ring they name is not counted: the systematic name of the same residue
+  is the one that cites '1H'.
 
 Structure side: the RDKit graph. For the atoms of a mancude ring system that can carry a ring
 double bond (bonding number >= 3 and at least one bond left after the ring bonds), k = capable
@@ -255,6 +261,32 @@ _SAT_RETAINED = ('adamantan', 'cuban', 'morphinan', 'ergolin', 'estran', 'andros
                  'aspidospermidin', 'atisan', 'kauran', 'labdan', 'abietan', 'pimaran', 'taxan')
 _ASSEMBLY = re.compile(r"\d+(?:'|′)*[a-z]?(?:'|′)*,\d+(?:'|′)+[a-z]?(?:'|′)*-(?:bi|ter|quater)|"
                        r"\d+[a-z]?(?:'|′)+,\d+[a-z]?(?:'|′)*-(?:bi|ter|quater)")
+
+
+#: the side chain of an alpha-amino acid, ring atom -CH2-C(N)-C(=O): the shape of the residue of histidine and tryptophan
+_RESIDUE_SIDE_CHAIN = Chem.MolFromSmarts("[#6;R]-!@[CH2]-!@[CX4;!R](-!@[#7])-!@[CX3]=[#8,#7]")
+#: the retained amino acids whose side chain is a mancude ring system that needs an indicated hydrogen: the skeleton of the
+#: ring system (``_skel_key``) and the stems of their retained names, parent and acyl group
+_RETAINED_RESIDUE_RINGS = (
+    ('C1CNCN1', re.compile(r"histid(?:yl|in)")),                      # imidazole
+    ('C1CCC2NCCC2C1', re.compile(r"tryptophyl|tryptophan")),          # indole
+)
+
+
+def _retained_residue_rings(mol, rss, keys, lname):
+    """The indices of the ring systems that a retained amino-acid name of ``lname`` names with its own hydrogen: the
+    imidazole of a side chain ``-CH2-CH(N)-C(=O)`` when the name cites ``histidyl`` or ``histidine``, the indole when it
+    cites ``tryptophyl`` or ``tryptophan``, one ring system for each citation (a name that cites the residue twice
+    covers two rings, and a ring the structure carries beyond them is read as any other)."""
+    covered = set()
+    side_chain_atoms = {m[0] for m in mol.GetSubstructMatches(_RESIDUE_SIDE_CHAIN)}
+    for key, stem in _RETAINED_RESIDUE_RINGS:
+        budget = len(stem.findall(lname))
+        for ri, rs in enumerate(rss):
+            if budget and keys[ri] == key and side_chain_atoms & set(rs):
+                covered.add(ri)
+                budget -= 1
+    return covered
 
 
 def front_ih_groups(name):
@@ -529,6 +561,7 @@ def analyse(smiles: str, name: str) -> dict:  # noqa: C901 -- the rule's case an
     rss = ring_systems(mol)
     rs_of = {a: i for i, rs in enumerate(rss) for a in rs}
     keys = [_skel_key(mol, rs) for rs in rss]
+    residue_rings = _retained_residue_rings(mol, rss, keys, lname)
     # ring-assembly bonds: identical ring systems joined directly
     asm_order = defaultdict(int)
     asm_links = []
@@ -565,7 +598,9 @@ def analyse(smiles: str, name: str) -> dict:  # noqa: C901 -- the rule's case an
         retained_cation = any(t in lname for t in _RETAINED_CATIONS)
         need = 0
         note = ''
-        if total_rings >= 2 and any(t in lname for t in _STEREOPARENT_STEMS) and ri == stereo_rs:
+        if ri in residue_rings:
+            units.append(('retained-residue', 0))
+        elif total_rings >= 2 and any(t in lname for t in _STEREOPARENT_STEMS) and ri == stereo_rs:
             units.append(('stereoparent', 0))
         elif total_rings >= 2 and any(t in lname for t in _NUCLEOSIDE_STEMS) and \
                 {mol.GetAtomWithIdx(a).GetSymbol() for a in rs} <= {'C', 'N'}:

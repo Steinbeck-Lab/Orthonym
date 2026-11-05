@@ -304,6 +304,15 @@ def _acylate_for_site(mol, site) -> Optional[str]:
     defers to the substitutive pipeline."""
     if _site_acid_is_polycarboxylic(mol, site[1], site[2]):
         return None
+    # None as well for the site of a polyacid whose other carboxy group is an ester too (glycerol 2,3-dihydroxypropyl
+    # ethyl butanedioate): 'ethyl butanedioate 2,3-dihydroxypropyl' cannot be the name of a molecule that is an ester of
+    # one polyacid, whose PIN names the organyl groups in front of the acid component, "Fully
+    # esterified acids derived from a single acid are systematically named by placing the name(s) of the hydroxylic
+    # component... in front of the name of the acid component"; 'ethyl methyl butanedioate (PIN)'). The caller defers
+    # to the ester family, which builds it.
+    from .esters import ester_shares_its_acid_with_another_ester
+    if ester_shares_its_acid_with_another_ester(mol, site[1]):
+        return None
     acid = _acid_fragment_name(mol, site[1], site[2])
     return _acid_to_oate(acid) if acid else None
 

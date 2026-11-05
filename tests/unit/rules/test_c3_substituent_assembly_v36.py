@@ -262,9 +262,16 @@ def test_c3_estramustine_names_GREEN():
         f"estramustine acid carbon-counted again (bug 1 regressed): {name!r}"
     )
     # Bug 2 regression guard: the euphonic 'a' stem, never bare 'estr-'.
-    assert "estra" in name and "estr-" not in name, (
+    assert "estr-" not in name, (
         f"estramustine euphonic 'a' dropped (bug 2 regressed): {name!r}"
     )
+    # The carbamate (class 9 "Esters", the Blue Book) outranks the 17-hydroxy group (class 17,:18190) in
+    # "SENIORITY ORDER FOR CLASSES" (:18158), so the carbamate handler names the molecule as the ester, as it names the
+    # steroid acetates above, on the systematic fused parent: "INTRODUCTION" (:50943) "Preferred IUPAC names (PINs)
+    # are not identified for the compounds in this Chapter", so the semisystematic 'estra-1,3,5(10)-trien-3-yl' the
+    # steroid ester engine of rules/natural_products.py built before is not the name to pin. OPSIN reads it back (``passed``).
+    assert name == ("(8R,9S,13S,14S,17S)-17-hydroxy-13-methyl-7,8,9,11,12,13,14,15,16,17-decahydro-6H-cyclopenta[a]"
+                    "phenanthren-3-yl bis(2-chloroethyl)carbamate"), name
 
 
 # --- -C3 Task 2': the steroid-ESTER CLASS names + round-trips ---------------

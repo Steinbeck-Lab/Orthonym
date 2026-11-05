@@ -47,6 +47,12 @@ PAIRS = [
     ("cyclohexane(2H)carboxylic acid", "cyclohexane(2H1)carboxylic acid", "isotope_count_one"),
     # a letter locant of a nuclide counted three times is cited three times
     ("(N-2H3)ethan-1-aminium", "(N,N,N-2H3)ethan-1-aminium", "isotope_letter_once"),
+    # (:5238) cites the central group first; the book writes a ring assembly group as it stands
+    # ('10,10'-[[1,1'-biphenyl]-4,4'-diylbis(oxy)]di(decanoic acid) (PIN)',:6126), OPSIN reads it enclosed once more
+    ("[1,1'-biphenyl]-4,4'-diylbis(methylene) diacetate", "([1,1'-biphenyl]-4,4'-diyl)bis(methylene) diacetate",
+     "assembly_diyl_enclosed"),
+    ("[1,1':4',1''-terphenyl]-4,4''-diylbis(methylene) diacetate",
+     "([1,1':4',1''-terphenyl]-4,4''-diyl)bis(methylene) diacetate", "assembly_diyl_enclosed"),
 ]
 
 
@@ -76,6 +82,9 @@ def test_twin(pin, twin, rule):
     "[1,1'-biphenyl]-4'(2H)-one", "naphthalen-4a'(2H)-amine",      # after a primed locant
     # a locant in the descriptor: OPSIN reads the hydrogen nuclide as written
     "(O-2H)acetic acid", "(1-2H)ethan-1-ol", "(O-2H,18O)acetic acid",
+    # a ring assembly group that is no group before a multiplying prefix, one already enclosed, one inside brackets
+    "[1,1'-biphenyl]-4-yl acetate", "([1,1'-biphenyl]-4,4'-diyl)bis(methylene) diacetate",
+    "10,10'-[[1,1'-biphenyl]-4,4'-diylbis(oxy)]di(decanoic acid)",
 ])
 def test_no_twin(name):
     assert twin_of(name) is None
@@ -92,7 +101,8 @@ def test_the_rules_apply_in_table_order():
         "bridge_sulfano", "isotope_letter_once", "isotope_count_one")
     assert [rule for rule, _ in TWIN_RULES] == [
         "bridge_sulfano", "bridge_disulfano", "bridge_azano", "interior_phenalene", "isotope_letter_once",
-        "isotope_count_one", "aminiumyl_azaniumyl", "polyester_acyloxy", "halido_o", "preselected_cage"]
+        "isotope_count_one", "aminiumyl_azaniumyl", "assembly_diyl_enclosed", "polyester_acyloxy", "halido_o",
+        "preselected_cage"]
 
 
 def test_twin_of_is_pure_and_a_twin_is_not_rewritten_again():

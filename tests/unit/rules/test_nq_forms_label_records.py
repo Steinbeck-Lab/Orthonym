@@ -128,8 +128,12 @@ def test_the_mc2_demotion_does_not_touch_the_pin_controls(smiles, pin_name):
 def test_a_formyl_branch_on_a_disubstituted_amide_is_recorded_too():
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
         "CC(=O)CC(=O)OCCN(C)C=O")
-    assert row.get("name") == "2-[formyl(methyl)amino]ethyl 3-oxobutanoate", row
-    assert row.get("tier") == "systematic_verified", row
+    # lane/l17 item 12 (change-asserted-value; quote:, the Blue Book, "Method (1) generates preferred
+    # IUPAC names", '4-formamidobenzoic acid (PIN)':33000; independent check: ``name_is_rt_exact`` below; mutation: the
+    # row names '2-[formyl(methyl)amino]ethyl 3-oxobutanoate', systematic_verified, at lane/l17 4cadfc641a): the chain
+    # substituent has the N-substituted amido prefix, the method-(2) spelling this test records is no longer built here
+    assert row.get("name") == "2-(N-methylformamido)ethyl 3-oxobutanoate", row
+    assert row.get("tier") == "pin_verified", row
     assert name_is_rt_exact(row["name"], "CC(=O)CC(=O)OCCN(C)C=O")
 
 

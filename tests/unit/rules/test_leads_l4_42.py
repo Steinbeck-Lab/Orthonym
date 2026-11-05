@@ -63,8 +63,6 @@ def test_functional_class_ester_name_at_both_tiers(smiles, expected):
 
 # The head order stays where the ester is not offered or not outranking.
 HEAD_ORDER_ROWS = [
-    # the acid-like amide is class 11 and was not measured above the esters (follow-up below)
-    ("NC(=O)COP(=O)(OC)OC", "primary_amide"),
     # a carboxylic ester is senior to a phosphate ester (the acids' order, class 9)
     ("COC(=O)CCOP(=O)(OC)OC", "ester"),
     # a phosphorus ring atom is a cyclic ester, named as a heterocycle (Table 4.1 class 9 note)
@@ -107,12 +105,18 @@ def test_the_ring_system_owner_of_the_ester_is_named():
     assert (row.get("name"), row.get("tier")) == (name, "pin_verified"), row
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "P-41 Table 4.1 puts esters (class 9) above amides (class 11): the expected PIN is the "
-    "ester '2-amino-2-oxoethyl dimethyl phosphate'. Ranking the phosphate esters above the "
-    "amides was not measured (follow-up of lane L4), so the amide stays the head."))
 def test_ester_above_amide_follow_up():
-    assert _pg("NC(=O)COP(=O)(OC)OC") in ("phosphate_triester", "phosphate_diester")
+    """The follow-up of lane L4 (a strict xfail until lane/l17 item 12 built it): (the Blue Book) puts
+    esters (class 9) above amides (class 11,:18184), so the PIN is the ester '2-amino-2-oxoethyl dimethyl phosphate', the
+    amide its prefix '2-amino-2-oxoethyl',:32920, '5-(2-amino-2-oxoethyl)furan-2-carboxylic acid (PIN)',
+    :32940). change-asserted-value: the strict xfail and the head-order row ('primary_amide') move here; independent
+    check: ``name_is_rt_exact`` (a fresh OPSIN read to the input's full key). Mutation: with
+    ``seniority._OXOACID_ESTERS_PROMOTED`` empty the head is the amide and this test fails."""
+    smiles = "NC(=O)COP(=O)(OC)OC"
+    name = "2-amino-2-oxoethyl dimethyl phosphate"
+    assert _pg(smiles) == "phosphate_triester"
+    assert name_is_rt_exact(name, smiles), name
+    assert_pin_at_both_tiers(smiles, name)
 
 
 # Stereo-bearing owners: the functional-class name carries the descriptors inside the owners, and

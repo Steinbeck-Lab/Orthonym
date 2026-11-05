@@ -64,6 +64,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
 from ..data.locant_text import render_locants
+from ..data.metal_scope import GROUP_13_HYDRIDE_METALS
 from ..data.multipliers import multiplier_table
 from ..metrics.provenance import best_effort_ctx
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
@@ -478,6 +479,63 @@ def _name_iodane_diester(mol, hub) -> Optional[str]:
                   if mult in ('bis', 'tris', 'tetrakis', 'pentakis')
                   else f"{mult}{ate}")
     return f"{diyl} {ester_word}"
+
+
+#: the hubs whose polyvalent group a pseudoester can cite (Groups 14 and 13), with the standard bonding number of each;
+#: the Group 13 metals are those the table of admitted metals names on their parent hydrides, and boron, whose group
+#: 'boranetriyl' is in the book,:37266) and whose pseudoesters (:31653) lists among the elements Z
+#: ('boranetriyl triacetate' for B(OAc)3, read back by OPSIN 2.9.0; the book prints no such ester, so the name is below the PIN,
+#: ``hub_group_esters._PIN_HYDRIDE_HUBS`` leaves boron out)
+_POLYVALENT_HUB_VALENCE = {**{symbol: 4 for symbol in ('Si', 'Ge', 'Sn', 'Pb')},
+                           **{symbol: 3 for symbol in ('B',) + tuple(GROUP_13_HYDRIDE_METALS)}}
+_POLYVALENT_SUFFIX = {2: 'diyl', 3: 'triyl', 4: 'tetrayl'}
+
+
+def name_hub_polyvalent_group(mol, hub_idx: int, attach_atoms) -> Optional[str]:
+    """The group of a mononuclear Group 13 or 14 hydride whose free valences are the bonds to ``attach_atoms``
+    (the oxygens of the acyloxy groups of a pseudoester), named on the parent hydride: '<substituents><hydride>diyl'
+    ('dibutylstannanediyl', 'methyl(phenyl)silanediyl', 'stannanetetrayl', 'alumanetriyl'), else None.
+
+     / name the groups of the hydrides 'silanediyl' (:38073), 'stannanediyl' (:38081),
+    'stannanetriyl' (:38113), 'boranetriyl' (:37266); the substituents are cited before the hydride name in the block of
+     (``mononuclear_substituent_block``), as for the hydride itself. The book's own groups of this kind:
+    'dibutylstannanediyl',:38202) and 'alumanetriyl',:37526).
+
+    Fail-closed: the hub is acyclic, neutral, with no radical and with its standard bonding number, its bonds to
+    ``attach_atoms`` are single and two to four, and every other heavy neighbour is a carbon, single bonded, whose organyl
+    has a prefix name of ``organyl_prefix_name`` (hydrogen is the hydride's own). A halogen or a heteroatom on the hub
+    is not built. Pure: no mol mutation."""
+    hub = mol.GetAtomWithIdx(hub_idx)
+    standard = _POLYVALENT_HUB_VALENCE.get(hub.GetSymbol())
+    attach_list = list(attach_atoms)
+    attach = set(attach_list)
+    if (standard is None or hub.IsInRing() or hub.GetFormalCharge() != 0 or hub.GetNumRadicalElectrons() != 0
+            or hub.GetTotalValence() != standard or len(attach) != len(attach_list)
+            or len(attach) not in _POLYVALENT_SUFFIX):
+        return None
+    organyls: List[str] = []
+    seen = 0
+    for nbr in hub.GetNeighbors():
+        if nbr.GetAtomicNum() == 1:
+            continue
+        bond = mol.GetBondBetweenAtoms(hub_idx, nbr.GetIdx())
+        if bond.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        if nbr.GetIdx() in attach:
+            seen += 1
+            continue
+        if nbr.GetSymbol() != 'C':
+            return None
+        name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+        if name is None:
+            return None
+        organyls.append(name)
+    if seen != len(attach):
+        return None
+    block = _build_substituent_string(organyls) if organyls else ""
+    if block is None:
+        return None
+    return _assemble(block, None, f"{_HUB_STEMS[hub.GetSymbol()]}{_POLYVALENT_SUFFIX[len(attach)]}")
 
 
 def name_mononuclear_hydride(mol) -> Optional[str]:

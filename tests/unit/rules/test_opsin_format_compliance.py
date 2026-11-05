@@ -557,7 +557,10 @@ CANARY_KNOWN_DEFECTS = {
         "DK-SMALLRINGFUSED", (540,),
     ),
     "CCC(=O)OCC(=O)[C@@]1(OC(=O)CC)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
-        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11-hydroxy-16-methyl-3,20-dioxopregna-1,4-dien-17,21-diyl dipropanoate",
+        # lane/l17 change-asserted-value (item 2): was '...pregna-1,4-dien-17,21-diyl dipropanoate'; (the Blue Book) (a)
+        # elides the terminal 'e' of an 'ene' ending only "when followed by a suffix... beginning with 'a', 'e', 'i', 'o', 'u', or
+        # 'y'", and 'diyl' begins with 'd': 'pregna-1,4-diene-17,21-diyl'. OPSIN 2.9.0 reads the name to the input's full InChIKey.
+        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11-hydroxy-16-methyl-3,20-dioxopregna-1,4-diene-17,21-diyl dipropanoate",
         "DK-P101CIP", (550,),
     ),
     "NC(=O)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O": (

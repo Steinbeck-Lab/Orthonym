@@ -144,11 +144,13 @@ def test_a_fused_ring_prefix_cites_the_ring_fusion_centres(tier):
     stereodescriptors, preceded by a locant, must be cited to specify each stereogenic unit"; the fusion atoms of a
     fused ring are lettered "Numbering of peripheral skeletal atoms",:12501). The strict prefix of
     this branch cited (1R,2S) only, the gates rejected the route that took it, and a name with the hydroxy group as a
-    prefix ('1-(hydroxymethyl)octahydro-1H-indene',: the alcohol is a suffix) won. With 3aR,7aS cited the
-    methanol route keeps the name."""
+    prefix won. The carbamate is the parent word "SENIORITY ORDER FOR CLASSES", Table 4.1: class 9 "Esters",:18182,
+    ranks above class 17 "Hydroxy compounds",:18190; the exemplar of is '2-hydroxypropyl (2-aminoethyl)carbamate
+    (PIN)',:30766), and the fused ring prefix of its N group cites all four centres, 3aR and 7aS among them. (This row
+    asserted '{(1R,2S,3aR,7aS)-2-[(tert-butoxycarbonyl)amino]octahydro-1H-inden-1-yl}methanol', the alcohol as the parent.)"""
     smiles = "CC(C)(C)OC(=O)N[C@H]1C[C@H]2CCCC[C@@H]2[C@H]1CO"
     row = _row(smiles, tier)
-    assert row["name"] == "{(1R,2S,3aR,7aS)-2-[(tert-butoxycarbonyl)amino]octahydro-1H-inden-1-yl}methanol", row
+    assert row["name"] == "tert-butyl [(1R,2S,3aR,7aS)-1-(hydroxymethyl)octahydro-1H-inden-2-yl]carbamate", row
     assert_full_rt(row["name"], smiles)
 
 

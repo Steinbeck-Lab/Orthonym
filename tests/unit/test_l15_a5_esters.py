@@ -102,17 +102,23 @@ def test_controls_are_unchanged(smiles, name, label, tier):
     assert_full_rt(row["name"], smiles)
 
 
-# Controls that name no PIN: the wider tiers' systematic names stay (the PIN tier abstains), so the guard did not open
-# a new route to a name that drops an atom.
+# Controls the PIN tier does not name (it abstains), so the guard did not open a new route to a name that drops an atom: the
+# wider tiers name them as esters, in the form of a preferred name that the PIN tier did not certify (the label is
+# ``pin_unverified``, not ``pin_verified``; ``is_pin`` is False). "General methodology" (the Blue Book):
+# "All preferred IUPAC names for esters are named by functional class nomenclature"; the 'acyloxy' of "Esters
+# cited as prefixes" (:31696) is for an ester beside a group senior to it, and here the other group is an ester of its own
+# acid (the 'methyl' of the acetoxy acid's ester is the alcohol word). lane/l17 item 2: the wider tiers named these two with
+# the ester only in a prefix ('1-(acetyloxy)-2-methoxy-2-oxoethane', a name of a lower class, Table 4.1 class 9 esters above
+# class 17 hydroxy compounds); the ester name is read back by OPSIN to the input (``assert_full_rt``).
 _NON_PIN_CONTROLS = [
-    ("COC(=O)COC(C)=O", "1-(acetyloxy)-2-methoxy-2-oxoethane"),
-    ("CC(=O)OC(C)C(=O)OC", "2-(acetyloxy)-1-methoxy-1-oxopropane"),
+    ("COC(=O)COC(C)=O", "methyl (acetyloxy)acetate"),
+    ("CC(=O)OC(C)C(=O)OC", "methyl 2-(acetyloxy)propanoate"),
 ]
 
 
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _NON_PIN_CONTROLS)
-def test_non_pin_controls_are_unchanged(smiles, name, tier):
+def test_non_pin_controls_name_the_ester(smiles, name, tier):
     row = _row(smiles, tier)
-    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
+    assert (row["name"], row["tier"]) == (name, "pin_unverified"), row
     assert_full_rt(row["name"], smiles)

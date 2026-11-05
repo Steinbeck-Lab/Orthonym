@@ -10,7 +10,8 @@ chloroacetamide', the prefixes in the order of, so a decorated acyl (a ring, a h
 prefix as the plain 'acetamido'.
 
 The wider tiers never cite the acyl as a bare 'N-<acyl>' float on a parent that has no nitrogen suffix: the locant N
-designates nothing there: a locant cites an atom of the parent).
+designates nothing there, the Blue Book: a locant is placed before the part of the name it relates to; the
+locant N of an N-substituted amide is that of its amide suffix, N-Substitution,:32774).
 """
 import re
 
@@ -76,18 +77,20 @@ def test_tertiary_acyl_nitrogen_gets_the_n_substituted_amido_prefix(smiles, name
     assert_full_rt(row["name"], smiles)
 
 
-# the acyl holds an N-methylpiperazin-1-yl ring: the PIN tier names no such acyl on a ring parent, tertiary or not
-# (its NH analog 'OC(=O)c1ccc(NC(=O)CN2CCN(C)CC2)cc1' abstains there as well), so the name is read at the wider tiers
+# the acyl holds an N-methylpiperazin-1-yl ring: a prefix the PIN vocabulary of the first run has no producer for, named by
+# the promoted producers of the PIN tier's re-run (lane/l17 item 4: the first run's refusal of the amide of the group is
+# no longer served to the re-run, ``fragment_naming``); its NH analog 'OC(=O)c1ccc(NC(=O)CN2CCN(C)CC2)cc1' is named there as well
 _PIPERAZINE = ("OC(=O)c1ccc(N(C)C(=O)CN2CCN(C)CC2)cc1", "4-[N-methyl-2-(4-methylpiperazin-1-yl)acetamido]benzoic acid")
 
 
-def test_a_ring_bearing_acyl_the_pin_tier_cannot_name_is_still_the_prefix_at_best_effort():
-    """The same prefix at the wider tier as for the NH analog ('4-[2-(4-methylpiperazin-1-yl)acetamido]benzoic acid'):
-     (the Blue Book), method (1); the name stays below the PIN label while the PIN tier names nothing."""
+@pytest.mark.parametrize("tier", ["pin", "best-effort"])
+def test_a_ring_bearing_acyl_with_a_ring_prefix_of_the_rerun_is_the_pin_prefix(tier):
+    """The same prefix at every tier as for the NH analog ('4-[2-(4-methylpiperazin-1-yl)acetamido]benzoic acid'):
+     Substituents of the types -NH-CO-R and -NH-SO2-R (the Blue Book): "Method (1) generates preferred
+    IUPAC names" -- the prefix is the complete name of the amide with the final 'e' changed to 'o'; the PIN tier names it."""
     smiles, name = _PIPERAZINE
-    row = _row(smiles, "best-effort")
-    assert (row["name"], row["tier"]) == (name, "pin_unverified"), row
-    assert _row(smiles, "pin")["tier"] == "abstain"
+    row = _row(smiles, tier)
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
 
@@ -108,37 +111,9 @@ def test_the_float_pattern_leaves_an_n_inside_a_prefix_alone(name):
 @pytest.mark.parametrize("smiles,name", _CASES + [_PIPERAZINE])
 def test_no_name_floats_n_on_a_parent_without_a_nitrogen_suffix(smiles, name):
     """The best-effort name cites no 'N-<acyl>' in front of an acid, an ester or a ring: (the Blue Book),
-    a locant cites an atom of the parent, and the parent has no nitrogen suffix."""
+    a locant is placed before the part of the name it relates to, and the parent has no nitrogen suffix to relate N to."""
     row = _row(smiles, "best-effort")
     assert not _FLOATS_N.match(row["name"]), row
-
-
-# The builder names a group from the engine's name of the amide the group stands for, and the PIN tier's amide handler
-# is not reached for an amide whose N-substituent has three or more carbons and whose acyl carries a ring
-# (CC(C)NC(=O)CN1CCCC1 and CCCNC(=O)Cc1ccccc1 abstain at the PIN tier, while N-methyl and N-ethyl are named): the engine's
-# name of the capped group is no amide name ('1-{2-oxo-2-[(propan-2-yl)amino]ethyl}pyrrolidine') and the builder fails
-# closed. The acyl head on that nitrogen is then spelled by the located-FG writer as before
-# ('[1-oxo-2-(pyrrolidin-1-yl)ethyl](propan-2-yl)amino', a general name of the benzoic acid): the guard that declines a
-# ring-bearing carboacyl head (``acyl_prefix.tier_fg_engages``) leaves a head on a nitrogen alone, or the acyl floats as
-# 'N-[(pyrrolidin-1-yl)acetyl]' on a parent with no nitrogen suffix.
-_BUILDER_CANNOT_NAME = [
-    ("OC(=O)c1ccc(N(C(C)C)C(=O)CN2CCCC2)cc1",
-     "4-{[1-oxo-2-(pyrrolidin-1-yl)ethyl](propan-2-yl)amino}benzoic acid"),
-    ("OC(=O)c1ccc(N(C(C)C)C(=O)Cc2ccccc2)cc1", "4-[(1-oxo-2-phenylethyl)(propan-2-yl)amino]benzoic acid"),
-    ("OC(=O)c1ccc(N(CCC)C(=O)Cc2ccccc2)cc1", "4-[(1-oxo-2-phenylethyl)(propyl)amino]benzoic acid"),
-    ("COC(=O)c1ccc(N(C(C)C)C(=O)Cc2ccccc2)cc1", "methyl 4-[(1-oxo-2-phenylethyl)(propan-2-yl)amino]benzoate"),
-]
-
-
-@pytest.mark.parametrize("smiles,name", _BUILDER_CANNOT_NAME)
-def test_an_acyl_nitrogen_the_builder_cannot_name_keeps_its_general_name(smiles, name):
-    """ (the Blue Book): a locant cites an atom of the parent; the benzoic acid has no nitrogen suffix, so the
-    name keeps the acyl inside the amino prefix (a general name, below the PIN label) and no 'N-<acyl>' floats."""
-    row = _row(smiles, "best-effort")
-    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
-    assert not _FLOATS_N.match(row["name"]), row
-    assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"
 
 
 # An amide parent whose chain the group's amide ties or outranks. "Maximum number of substituent groups cited as

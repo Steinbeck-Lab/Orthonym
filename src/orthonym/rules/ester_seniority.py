@@ -16,12 +16,15 @@ functional class ester name (see through ". The examples fix the order of the cr
   its longest one, "THE PRINCIPAL SUBSTITUENT CHAIN" (b): "the greater number of skeletal atoms, i.e., the longest
   chain" (:22632), so the alcohol chain runs through the attachment carbon ('propan-2-yl', not 'ethyl').
 
-Alphanumerical order decides only what these leave tied; it is the caller's last criterion. Of two rings the
-heterocycle is senior, a nitrogenous one first (a) 'is a heterocycle', (b) 'has at least one nitrogen atom',
-the Blue Book-:19413): '6-[4-(acetyloxy)phenyl]pyridin-3-yl acetate (PIN)
-(not 4-[5-(acetyloxy)pyridin-2-yl]phenyl acetate; the nitrogenous ring is senior to the carbocyclic ring)' (:31895). What
-this does not model: the criteria of after the ring kind (the number of rings, the ring size), the heteroatoms
-of a chain and its unsaturation.
+Alphanumerical order decides only what these leave tied; it is the caller's last criterion. Of two rings the senior is
+that of "SENIORITY ORDER ONLY FOR RINGS AND RING SYSTEMS" (:19402), (:19408) "The senior ring or ring system:
+(a) is a heterocycle; (b) has at least one nitrogen atom; (c) has at least one heteroatom (in the absence of nitrogen) that
+occurs earlier in the following sequence: F > Cl > Br > I > O > S >...; (d) has the greater number of rings; (e) has the
+greater number of skeletal atoms; (f) has the greater number of heteroatoms of any kind; (g) has the greater number of
+heteroatoms occurring earlier in the sequence", then the criteria of that decide between rings
+(``rules.ring_selection.ring_system_score``); rings that tie on it go by their substituents:
+'6-[4-(acetyloxy)phenyl]pyridin-3-yl acetate (PIN) (not 4-[5-(acetyloxy)pyridin-2-yl]phenyl acetate; the nitrogenous ring is
+senior to the carbocyclic ring)' (:31895). What this does not model: the heteroatoms of a chain and its unsaturation.
 """
 from __future__ import annotations
 
@@ -59,28 +62,33 @@ def _ring_system(mol, idx: int) -> Set[int]:
     return system
 
 
-def _ring_component(mol, ring_atom: int) -> Tuple[int, int, int]:
-    """``(0, -ring kind, -substituents)``: a ring ranks before every chain; among rings a nitrogenous heterocycle ranks
-    before another heterocycle and that before a carbocycle (the Blue Book): "The senior ring or ring
-    system is a heterocycle [criterion (a) in ]"; (:19449): "has at least one nitrogen ring atom
-    [criterion (b)]"), and rings of one kind by the
-    number of their substituents. The ester group itself is one of the heavy atoms bonded to the ring system, so it is
-    not counted."""
+def _ring_component(mol, ring_atom: int) -> tuple:
+    """``(0, score of the ring system, -substituents)``: a ring ranks before every chain (1), the Blue Book:
+    19336: "Within the same class, a ring or ring system has seniority over a chain"); two rings by the engine's reading of
+    " SENIORITY ORDER ONLY FOR RINGS AND RING SYSTEMS" (:19402), (a) to (g) (:19408: a heterocycle, a
+    nitrogen atom, the senior heteroatom, the greater number of rings, of skeletal atoms, of heteroatoms, of the senior
+    heteroatoms), then the kinds of ring system of and the criteria of that decide between rings
+    (``rules.ring_selection.ring_system_score``, the one the principal amide of ``rules.amide_parent`` is ranked by); rings
+    of one score by the number of their substituents. The parent hydride comes before the number of
+    substituents INTRODUCTION,:21551: "Two or more names may result based on the same senior parent structure
+    selected according to, because of different substitution patterns"), so a benzoic acid with more substituents
+    is not senior to a naphthalenecarboxylic acid with fewer ('naphthalene-2-carboxylate' before 'benzoate': the greater
+    number of rings, (d), is element [3] of the score). The ester group itself is one of the heavy atoms bonded
+    to the ring system, so it is not counted."""
+    from .ring_selection import ring_system_score
     system = _ring_system(mol, ring_atom)
     outside = sum(1 for i in system for nb in mol.GetAtomWithIdx(i).GetNeighbors()
                   if nb.GetIdx() not in system and nb.GetAtomicNum() > 1)
-    symbols = {mol.GetAtomWithIdx(i).GetSymbol() for i in system}
-    kind = 2 if "N" in symbols else 1 if symbols - {"C"} else 0
-    return (0, -kind, -(outside - 1))
+    return (0, ring_system_score(mol, system), -(outside - 1))
 
 
-def _chain_component(length: int, degrees: int, own_atoms: int) -> Tuple[int, int, int]:
+def _chain_component(length: int, degrees: int, own_atoms: int) -> tuple:
     """``(1, -skeletal atoms, -substituents)``: each bond of the chain takes two of the degrees, the ``own_atoms`` heavy
     atoms bonded to the chain are those of the ester group itself, and every other neighbour is a substituent."""
     return (1, -length, -(degrees - 2 * (length - 1) - own_atoms))
 
 
-def _acid_component(mol, acyl_c: int, ester_o: int) -> Tuple[int, int, int]:
+def _acid_component(mol, acyl_c: int, ester_o: int) -> tuple:
     """The acid half: a ring acid when the acyl carbon is bonded to a ring carbon, else the acyl chain, whose first
     skeletal atom is the acyl carbon (its =O and the ester oxygen are the ester group)."""
     acyl = mol.GetAtomWithIdx(acyl_c)
@@ -91,7 +99,7 @@ def _acid_component(mol, acyl_c: int, ester_o: int) -> Tuple[int, int, int]:
     return _chain_component(length, degrees, 2)
 
 
-def _alcohol_component(mol, alkyl_c: int, ester_o: int) -> Tuple[int, int, int]:
+def _alcohol_component(mol, alkyl_c: int, ester_o: int) -> tuple:
     """The alcohol half: the ring system of the attachment atom, else the longest acyclic carbon chain THROUGH the
     attachment carbon (b)), which takes its two best arms."""
     attach = mol.GetAtomWithIdx(alkyl_c)

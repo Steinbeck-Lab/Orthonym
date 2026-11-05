@@ -138,7 +138,7 @@ def test_the_nitrogenous_ring_is_the_senior_acid_ring():
 
 
 _LACTONE_ROW = ("CCCC[C@H](O)/C=C/C(=O)O[C@@H]1[C@@H](C)[C@@H]2OC(=O)[C@H](C)[C@H](OC(C)=O)[C@@]2(C)O[C@H]1C")
-_LACTONE_ROW_PIN = ("(2S,3R,4R,4aS,7R,8S,8aS)-8-(acetyloxy)-2,4,7,8a-tetramethyl-6-oxooctahydropyrano[3,2-b]pyran-3-yl "
+_LACTONE_ROW_NAME = ("(2S,3R,4R,4aS,7R,8S,8aS)-8-(acetyloxy)-2,4,7,8a-tetramethyl-6-oxooctahydropyrano[3,2-b]pyran-3-yl "
                     "(2E,4S)-4-hydroxyoct-2-enoate")
 
 
@@ -161,12 +161,28 @@ def test_a_lactone_is_never_the_senior_ester_beside_an_acyclic_ester():
 
 
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
-def test_the_pyranopyranone_octenoate_keeps_its_pin_beside_a_lactone(tier):
-    """A a holdout split row: the PIN tier named it at the lane start with the octenoate as the parent ester (the acid
-    component of the longer chain,, the Blue Book) and the lactone cited as 'oxo' on the
-    pyrano[3,2-b]pyran,:32080); the senior-ester choice gave the lactone and the PIN tier abstained."""
+def test_the_pyranopyranone_octenoate_keeps_its_name_beside_a_lactone(tier):
+    """A a holdout split row: the name has the octenoate as the parent ester (the acid component of the longer chain,
+    , the Blue Book) and the lactone cited as 'oxo' on the pyrano[3,2-b]pyran,:32080).
+
+    It is no PIN (lane/l17 items 2 and 5): the ring is ONE 'alcoholic' component esterified by two different acids
+    (acetic and the octenoic acid), and a name that cites one of the two esters as a prefix is method (2) of
+    "When anions are different, two methods are used" (:31831): "Method (1) generates preferred IUPAC names but names
+    formed by using method (2) are acceptable in general nomenclature" (the example '(1) propane-1,2,3-triyl 2-acetate
+    1-hexadecanoate 3-[(9Z)-octadec-9-enoate] (PIN) (2) 2-(acetyloxy)-3-(hexadecanoyloxy)propyl (9Z)-octadec-9-enoate',
+    :31846). (:31858) is for polyesters of several alcoholic components. Its two ester groups (the lactone
+    is a heterocycle,,:18182) are on the rings of ONE ring system, so the PIN is the method (1) name
+    with the ring system as one multivalent organyl group (a ring system is one parent, '5α-cholestane-3β,6α-diyl
+    diacetate',,:31979); that name is not readable by OPSIN 2.9.0 (checked for 'butane-1,4-diyl acetate
+    propanoate': not parsed), so no PIN is shipped: the PIN tier declines, the wider tier ships the method (2) name,
+    which reads back, below the PIN. UNVERIFIED: that the multivalent group of a ring system that carries a lactone
+    ('6-oxooctahydropyrano[3,2-b]pyran-3,8-diyl') is read as one parent; the book prints no such row. The PIN-tier
+    abstention is the fail-closed direction."""
     row = _row(_LACTONE_ROW, tier)
-    assert (row["name"], row["tier"]) == (_LACTONE_ROW_PIN, "pin_verified"), row
+    if tier == "pin":
+        assert row["tier"] == "abstain" and not row["is_pin"], row
+        return
+    assert (row["name"], row["tier"]) == (_LACTONE_ROW_NAME, "systematic_verified"), row
     assert_full_rt(row["name"], _LACTONE_ROW)
 
 

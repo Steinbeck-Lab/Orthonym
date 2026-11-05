@@ -177,8 +177,6 @@ def test_carbonochloridic_amide():
 # urea builder cannot spell as a prefix -- that name is correct but not the PIN: it is
 # labelled below the PIN and the default tier declines.
 JUNIOR_PARENT_ROWS = [
-    ("CNC(=O)NCCC#N", "3-[(methylcarbamoyl)amino]propanenitrile"),
-    ("CNC(=O)NC(C)C#N", "2-[(methylcarbamoyl)amino]propanenitrile"),
     ("CNC(=O)NC(C#N)CCSC", "2-[(methylcarbamoyl)amino]-4-(methylsulfanyl)butanenitrile"),
     ("NC(=O)NCC(=O)NN", "2-(carbamoylamino)ethanehydrazide"),
     ("NC(=O)Nc1ccc(C(=O)NN)cc1", "4-(carbamoylamino)benzohydrazide"),
@@ -189,9 +187,26 @@ JUNIOR_PARENT_ROWS = [
 def test_junior_parent_name_is_not_the_pin(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
     # nothing else is certified either: the urea builder has no correct prefix for a
-    # hydrazide (it would write 'aminoamino'), and the urea + nitrile rows need a
-    # PIN-tier substituent namer that is not there
+    # hydrazide (it would write 'aminoamino'), and the urea + nitrile row needs a
+    # PIN-tier substituent namer for the cyano + methylsulfanyl chain that is not there
     assert_declined_at_default(smiles)
+
+
+# change-asserted-value (lane/l17 fix a performance pass): the first two rows of JUNIOR_PARENT_ROWS ('CNC(=O)NCCC#N', 'CNC(=O)NC(C)C#N') held
+# the nitrile-parent names below the PIN and declined at the default tier, because "the PIN-tier substituent namer does not
+# certify the 2-cyanoethyl arm". The chain producer now cites the nitrile as the prefix 'cyano', the Blue Book
+# "the -CN group is designated by the preferred prefix 'cyano'"; '2-cyanoethyl',:31765), so the urea handler names them: urea ranks
+# with the amides, above the nitriles,:18184 and:18187;,:33320), so the PIN is the urea name,
+# pin_verified at both tiers; the old nitrile-parent names stay below the PIN (``assert_not_pin_labelled``). Independent check:
+# ``assert_pin_at_both_tiers`` reads each name back with a fresh OPSIN call. Mutation: without Pass 1a of the chain producer these
+# rows are declined at the default tier again.
+@pytest.mark.parametrize("smiles,pin,nitrile_parent", [
+    ("CNC(=O)NCCC#N", "N-(2-cyanoethyl)-N'-methylurea", "3-[(methylcarbamoyl)amino]propanenitrile"),
+    ("CNC(=O)NC(C)C#N", "N-(1-cyanoethyl)-N'-methylurea", "2-[(methylcarbamoyl)amino]propanenitrile"),
+])
+def test_urea_with_a_cyanoalkyl_arm_is_the_pin(smiles, pin, nitrile_parent):
+    assert_pin_at_both_tiers(smiles, pin)
+    assert_not_pin_labelled(smiles, nitrile_parent)
 
 
 @pytest.mark.parametrize("smiles,name", [

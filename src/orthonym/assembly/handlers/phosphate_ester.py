@@ -43,6 +43,7 @@ def name_phosphate_ester(
     from ...rules.phosphorus import name_phosphate_ester as _name_phosphate_ester
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
+    from .carbamate import demote_below_carbamate_parent
 
     fg_key = features.principal_group
     matches = features.functional_groups.get(fg_key, [])
@@ -64,6 +65,7 @@ def name_phosphate_ester(
                 pool = get_current_pool()
                 pool.add(name, "phosphate_ester", features)
                 final_name = _inject_stereo_if_missing(features, pool.best().name)
+                demote_below_carbamate_parent(features, final_name)
                 return NamingResult(
                     name=final_name,
                     tree=NameTreeNode(parent_stem=final_name, class_id="phosphate_ester", iupac_section_cite="P-65.6", fragment_legacy=final_name),

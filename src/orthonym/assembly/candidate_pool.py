@@ -209,6 +209,20 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
 }
 
 
+def _label_amide_parent_by_literal_criterion_l(name: str, features: Any) -> None:
+    """Label an amide name below the PIN when its parent was chosen over a chain that criterion (l) of read literally
+    would make senior (``rules.amide_parent.stereo_criterion_could_differ``,, the Blue Book)."""
+    from ..rules.amide_parent import CARBOXAMIDE_CLASSES, STEREO_DETAIL, STEREO_RULE, stereo_criterion_could_differ
+    atoms = getattr(features, 'principal_group_atoms', None)
+    mol = getattr(features, 'mol', None)
+    if (not name or mol is None or not atoms or getattr(features, 'principal_group', None) not in CARBOXAMIDE_CLASSES
+            or not all(len(m) > 2 for m in atoms)):
+        return
+    if stereo_criterion_could_differ(mol, {m[0] for m in atoms}):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name, rule=STEREO_RULE, detail=STEREO_DETAIL)
+
+
 def _label_chain_parent_prefix_seniority(name: str, features: Any) -> None:
     """Label a chain-parent candidate below the PIN when makes another chain
     of the same rank senior.
@@ -224,8 +238,12 @@ def _label_chain_parent_prefix_seniority(name: str, features: Any) -> None:
     uncertified PIN-form name (``pin_unverified``). Fail closed and label only:
     the name stays, so the tiers below the PIN keep it.
     """
+    _label_amide_parent_by_literal_criterion_l(name, features)
     if not name or (getattr(features, 'chain_is_parent', False) != getattr(features, 'is_cyclic', False)):
         return                  # a ring parent; an acyclic chain is read for the tie of an amine's nitrogen only
+    from ..rules.esters import is_class_named_polyester
+    if is_class_named_polyester(name, getattr(features, 'mol', None)):
+        return                  # the multiplied anion of a polyester of one alcoholic component: no chain to choose
     from ..perception.chains import chain_parent_prefix_seniority
     from .spelling_offer import note_amine_chain_parent
     note_amine_chain_parent(features)       # the best-effort tier may prefer a ring parent's cleaner name

@@ -8,8 +8,9 @@
    prefix)' (:31342). The PIN tier dropped the group (no prefix form) and built a
    different molecule ('hexanoic acid' for 5-(sulfooxy)hexanoic acid).
 2. On benzene the same group was spelled 'sulfonyloxy' (-O-SO2- with a free valence on
-   S, a different molecule). Under a junior parent (phenol) the name is correct but is
-   not the PIN: the ester outranks the -OH), so it ships labelled below PIN.
+   S, a different molecule). Under a junior parent (phenol) the name on the phenol is correct but
+   is not the PIN: the ester outranks the -OH): the molecule is named by the functional
+   class ester, '2-hydroxyphenyl hydrogen sulfate' (lane/l17 fix round).
 3. The acyl chain of a thio/seleno ester keeps its multiple bonds ('dodeca-2,8-diene',
    ; it was always written '-ane') and its stereodescriptors stand in
    front of the acid word, as for every ester ('ethyl (2E)-but-2-enoate';,
@@ -34,20 +35,9 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "COc1cccc(OS(=O)(=O)O)c1O",
-    "NNC(=O)CCOS(=O)(=O)O",
-    "Nc1ccc(OS(=O)(=O)O)cc1",
-    "O=CCOS(=O)(=O)O",
-    "O=Cc1ccc(OP(=O)(O)O)cc1",
-    "O=Cc1ccc(OS(=O)(=O)O)cc1",
-    "O=Cc1ccccc1OS(=O)(=O)O",
-    "O=[N+]([O-])c1ccc(O)c(OS(=O)(=O)O)c1",
-    "OCCOS(=O)(=O)O",
-    "ON=CCOS(=O)(=O)O",
-    "Oc1cc(OS(=O)(=O)O)ccc1C=O",
-    "Oc1ccccc1OS(=O)(=O)O",
-})
+# (Lane/l17 fix round: the twelve molecules of the junior-parent tests below, whose name was a name the code records as not the
+# PIN and so declined at the default tier, are named by the functional class ester, the PIN; the set is empty.)
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
     "CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O",
@@ -88,17 +78,49 @@ def test_sulfooxy_prefix_under_a_senior_acid(smiles, expected):
     _assert_named(smiles, expected, {"pin_verified"})
 
 
-@pytest.mark.parametrize("smiles,expected", [
-    # the a dev split / milestone1500 M11 rows
-    ("COc1cccc(OS(=O)(=O)O)c1O", "2-methoxy-6-(sulfooxy)phenol"),
-    ("O=[N+]([O-])c1ccc(O)c(OS(=O)(=O)O)c1", "4-nitro-2-(sulfooxy)phenol"),
-    ("Oc1ccccc1OS(=O)(=O)O", "2-(sulfooxy)phenol"),
-    ("OCCOS(=O)(=O)O", "2-(sulfooxy)ethan-1-ol"),
-])
-def test_sulfooxy_under_a_junior_parent_is_labelled_below_pin(smiles, expected):
-    # a correct systematic name that is not the PIN (user decision 2026-09-30;
-    # Methods, "Tiers"): systematic_verified
-    _assert_named(smiles, expected, {"systematic_verified"})
+# change-asserted-value (lane/l17 fix round), the old -> new pairs, all read back by a fresh OPSIN call to the input's key:
+# 2-methoxy-6-(sulfooxy)phenol -> 2-hydroxy-3-methoxyphenyl hydrogen sulfate; 4-nitro-2-(sulfooxy)phenol -> 2-hydroxy-5-nitrophenyl
+# hydrogen sulfate; 2-(sulfooxy)phenol -> 2-hydroxyphenyl hydrogen sulfate; 2-(sulfooxy)ethan-1-ol -> 2-hydroxyethyl hydrogen sulfate;
+# 4-(sulfooxy)benzaldehyde -> 4-formylphenyl hydrogen sulfate; 2-(sulfooxy)benzaldehyde -> 2-formylphenyl hydrogen sulfate;
+# 2-hydroxy-4-(sulfooxy)benzaldehyde -> 4-formyl-3-hydroxyphenyl hydrogen sulfate; (sulfooxy)acetaldehyde -> 2-oxoethyl hydrogen
+# sulfate; 4-(sulfooxy)aniline -> 4-aminophenyl hydrogen sulfate; 3-(sulfooxy)propanehydrazide -> 3-hydrazinyl-3-oxopropyl hydrogen
+# sulfate; N-hydroxy-2-(sulfooxy)ethan-1-imine -> 2-(hydroxyimino)ethyl hydrogen sulfate; 4-(phosphonooxy)benzaldehyde ->
+# 4-formylphenyl dihydrogen phosphate.
+# Quote: (the Blue Book-18192) puts "9 Esters" above "12 Hydrazides", "14 Nitriles", "15 Aldehydes", "17 Hydroxy
+# compounds" and "19 Amines"; (:36484) cites the sulfur group by a prefix only "to a compound that contains also another
+# substituent having priority over the sulfur-containing group for citation as principal group"; (:35916) 'methyl hydrogen
+# sulfate (PIN)' (:35968), 'methyl dihydrogen phosphate (PIN)' (:35940); the book's own name of a hydroxy organyl of an acid ester
+# is '(2S)-2,3-dihydroxypropyl dihydrogen phosphate' (:55148,, no PIN label there,; the prefixes of the groups below
+# the ester are the book's 'formyl' ('4-formylbenzoic acid (PIN)',:2158), 'hydrazinyl'+'oxo' ('3-hydrazinyl-3-oxopropanoic acid
+# (PIN)',:34018), 'hydroxyimino' ('3-(hydroxyimino)butanal (PIN)',:38487). Independent check: the old names (the sulfooxy prefix
+# under a junior parent) violate Table 4.1, and a fresh OPSIN call reads every new name back to the full InChIKey of the input.
+# Mutation: with ``rules/seniority.py`` at 3ddf7c467e these rows name the old spelling and the tests fail (see the lane report).
+# Direct book support for the oxo group: "Esters of mononuclear noncarbon oxoacids" prints 'CH3-CO-CH2-CH2-O-BrO2
+# 3-oxobutyl bromate (PIN)' (:35974), a ketone group cited as a prefix of the organyl group of an ester of an inorganic acid.
+# UNVERIFIED: the book prints no PIN example of an organyl group that carries a hydroxy, formyl or amino group beside an acid
+# ester of sulfuric acid; for those the label rests on the class order of Table 4.1 and on 'Esters are named in the
+# same way as esters of organic acids'.
+_JUNIOR_PARENT_PINS = [
+    ("COc1cccc(OS(=O)(=O)O)c1O", "2-hydroxy-3-methoxyphenyl hydrogen sulfate"),
+    ("O=[N+]([O-])c1ccc(O)c(OS(=O)(=O)O)c1", "2-hydroxy-5-nitrophenyl hydrogen sulfate"),
+    ("Oc1ccccc1OS(=O)(=O)O", "2-hydroxyphenyl hydrogen sulfate"),
+    ("OCCOS(=O)(=O)O", "2-hydroxyethyl hydrogen sulfate"),
+    ("O=Cc1ccc(OS(=O)(=O)O)cc1", "4-formylphenyl hydrogen sulfate"),
+    ("O=Cc1ccccc1OS(=O)(=O)O", "2-formylphenyl hydrogen sulfate"),
+    ("Oc1cc(OS(=O)(=O)O)ccc1C=O", "4-formyl-3-hydroxyphenyl hydrogen sulfate"),
+    ("O=CCOS(=O)(=O)O", "2-oxoethyl hydrogen sulfate"),
+    ("Nc1ccc(OS(=O)(=O)O)cc1", "4-aminophenyl hydrogen sulfate"),
+    ("NNC(=O)CCOS(=O)(=O)O", "3-hydrazinyl-3-oxopropyl hydrogen sulfate"),
+    ("ON=CCOS(=O)(=O)O", "2-(hydroxyimino)ethyl hydrogen sulfate"),
+    ("O=Cc1ccc(OP(=O)(O)O)cc1", "4-formylphenyl dihydrogen phosphate"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", _JUNIOR_PARENT_PINS)
+def test_an_oxoacid_ester_under_a_junior_group_is_the_functional_class_pin(smiles, expected):
+    #: the ester outranks the groups below class 9, so it is the parent (functional class nomenclature,
+    # and those groups are cited as prefixes of its organyl group, never the sulfooxy prefix of a name on the junior group
+    _assert_named(smiles, expected, {"pin_verified"})
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -149,7 +171,8 @@ def test_thioester_dev_set_row():
 # principal group, then the sulfur-containing group is named by an appropriate prefix";
 # (:18160-18194) ranks acids (7) and esters (9) above hydrazides (12),
 # aldehydes (15), hydroxy compounds (17) and amines (19). The names below round-trip
-# (fresh OPSIN call, full key) but are not the PIN, so they ship below the PIN label.
+# (fresh OPSIN call, full key) but are not the PIN: since the lane/l17 fix round the engine names these molecules by the
+# functional class ester (``_JUNIOR_PARENT_PINS``), and these spellings are the names the guard below reads as non-PIN.
 _JUNIOR_HEAD_ROWS = [
     ("O=Cc1ccc(OS(=O)(=O)O)cc1", "4-(sulfooxy)benzaldehyde"),
     ("O=Cc1ccccc1OS(=O)(=O)O", "2-(sulfooxy)benzaldehyde"),
@@ -165,10 +188,10 @@ _JUNIOR_HEAD_ROWS = [
 
 
 @pytest.mark.parametrize("smiles,expected", _JUNIOR_HEAD_ROWS)
-def test_oxoacid_ester_prefix_under_a_junior_head_is_labelled_below_pin(smiles, expected):
-    # a correct systematic name that is not the PIN (user decision 2026-09-30;
-    # Methods, "Tiers"): systematic_verified
-    _assert_named(smiles, expected, {"systematic_verified"})
+def test_the_sulfooxy_spelling_under_a_junior_head_is_a_valid_name_below_the_pin(smiles, expected):
+    # the spelling is read back by a fresh OPSIN call to its molecule; the name of the engine for the molecule is the functional
+    # class ester of ``_JUNIOR_PARENT_PINS``, and the vocabulary guard below still reads this spelling as below the PIN
+    assert _key(_independent_parse(expected, smiles)) == _key(smiles)
 
 
 @pytest.mark.parametrize("name,token", [

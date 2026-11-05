@@ -154,8 +154,10 @@ ROWS = [
     # the parent: rules.parent_selection.single_carbon_hosts_suffix); the branch needs a senior group beside it.
     ("COS(=O)(=O)CC1CCC1C(=O)O", "[(methoxysulfonyl)methyl]"),
     # the centre of a sulfamide is never a skeletal atom of a chain, however many heteroatoms
-    # the chain holds, the Blue Book;,:23348)
-    ("CCOC(=O)NS(=O)(=O)N(C)Cc1cccc(C#N)c1", "{[(ethoxycarbonyl)sulfamoyl](methyl)amino}methyl"),
+    # the chain holds, the Blue Book;,:23348). The row was the 3-cyanophenyl one, whose
+    # PIN is the carbamate itself ('ethyl {[(3-cyanophenyl)methyl](methyl)sulfamoyl}carbamate': class 9
+    # esters,:18182, rank above class 14 nitriles,:18187); the branch needs a senior group beside it, here the acid
+    ("CCOC(=O)NS(=O)(=O)N(C)Cc1cccc(C(=O)O)c1", "{[(ethoxycarbonyl)sulfamoyl](methyl)amino}methyl"),
     # the descriptor of a stereogenic sulfinyl centre stands at the front of its prefix
     ("COc1ccc([S@@](N)=O)cc1C", "[(S)-aminosulfinyl]"),
     ("CCCCCCC#CCO[S@](=O)c1ccc(C)cc1", "{(S)-[(non-2-yn-1-yl)oxy]sulfinyl}"),

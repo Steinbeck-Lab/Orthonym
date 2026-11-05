@@ -153,8 +153,8 @@ def _ck(namespace, key):
         # renames the skeleton in that scope inside the call that named it without
         tag = tag + ("systematic-unnumbered",)
     if alternative_skeleton_active():
-        # the series and senior-hub producers make no offer in that scope (``rules.isotope_alternative``); the
-        # namer renames a labelled skeleton in it inside the call that named it without
+        # the series, senior-hub and multiplied-anion ester producers make no offer in that scope
+        # (``rules.isotope_alternative``); the namer renames a labelled skeleton in it inside the call that named it without
         tag = tag + ("isotope-alternative",)
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
@@ -163,6 +163,12 @@ def _ck(namespace, key):
     if pin_promotion_var.get():
         return (namespace, key, "pin-promotion") + tag
     return (namespace, key) + tag
+
+
+def run_context_key():
+    """The run context a value is computed in (the components of every cache key above, without a namespace or key):
+    two values computed under different contexts are not interchangeable."""
+    return _ck("run-context", None)
 
 
 class MemoMismatch(Exception):

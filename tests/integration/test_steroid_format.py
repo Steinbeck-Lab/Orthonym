@@ -131,7 +131,13 @@ class TestAssembleNpEsterName:
 
     @pytest.mark.integration
     def test_same_acid_diester_functional_class(self):
-        """Same-acid multi-ester uses diyl + multiplied acylate."""
+        """Same-acid multi-ester uses diyl + multiplied acylate.
+
+        Re-asserted 2026-11-05 (lane/l17 item 5, change-asserted-value). The old value, 'androstan-3,17-diyl diacetate',
+        elided the 'e' of 'androstane' before 'diyl'. (a): the final 'e' of a parent hydride name is elided only
+        before a vowel, and the multiplying prefix of 'diyl' starts with a consonant; the book's own names keep it:
+        '5α-cholestane-3β,6α-diyl diacetate' (the Blue Book,, 'but-2-ene-1,4-diyl' (:55652),
+        'cyclopent-3-ene-1,2-diyl' (:17278). OPSIN reads both spellings, so the round trip does not separate them."""
         result = _assemble_np_ester_name(
             "androst", "androstane", hydroxyls=[], ketones=[],
             unsaturation={"ene": [], "yne": []},
@@ -141,7 +147,7 @@ class TestAssembleNpEsterName:
             ],
             stereo_prefix="",
         )
-        assert result == "androstan-3,17-diyl diacetate"
+        assert result == "androstane-3,17-diyl diacetate"
 
     @pytest.mark.integration
     def test_mixed_acid_diester_acyloxy_prefix(self):

@@ -86,14 +86,16 @@ def test_pantetheine_3_hydroxy_descriptor_is_emitted():
 
 
 def test_pantetheine_3_hydroxy_descriptor_is_emitted_on_the_butoxy_chain():
-    # the on-chain stereocentre of the deep -O-<chain> (butoxy) substituent carries its
-    # locant + CIP descriptor ('(3R)-3-hydroxy-...-4-oxobutoxy')
+    # the on-chain stereocentre of the pantetheine chain carries its locant + CIP descriptor. It was the deep -O-<chain>
+    # (butoxy) substituent '(3R)-3-hydroxy-...-4-oxobutoxy' of the purine amine, the parent of a name that held the two amides
+    # only in prefixes. Lane/l17 item 10: the amides, the Blue Book: class 11) outrank the amines
+    # (class 19), so the molecule is named on its pantoyl amide, and the same centre is C-2 of the butanamide, '(2R)-...-2-
+    # hydroxy-...butanamide'. The name reads back to the input's full InChIKey (the independent OPSIN call below).
     name = _be_name(HYDROXYALKYL_SULFIDE_COA)
     assert name == (
-        "9-[(2R,3R,4S,5R)-5-{[(1,3-dihydroxy-3-[(3R)-3-hydroxy-4-({3-[(2-{[(2R)-2-"
-        "hydroxyhexadecyl]sulfanyl}ethyl)amino]-3-oxopropyl}amino)-2,2-dimethyl-4-"
-        "oxobutoxy]-1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy]methyl}-3-hydroxy-"
-        "4-(phosphonooxy)oxolan-2-yl]-9H-purin-6-amine"), name
+        "(2R)-4-[(3-{[(2R,3S,4R,5R)-5-(6-amino-9H-purin-9-yl)-4-hydroxy-3-(phosphonooxy)oxolan-2-yl]methoxy}-"
+        "1,3-dihydroxy-1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy]-2-hydroxy-N-{3-[(2-{[(2R)-2-hydroxyhexadecyl]"
+        "sulfanyl}ethyl)amino]-3-oxopropyl}-3,3-dimethylbutanamide"), name
     assert opsin_roundtrip_check(HYDROXYALKYL_SULFIDE_COA, name)["passed"], name
 
 

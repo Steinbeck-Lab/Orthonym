@@ -303,6 +303,30 @@ def name_sulfate_ester(mol, sulfur_idx: int) -> Optional[str]:
     return " ".join(pieces)
 
 
+def sulfate_ester_offered(mol, matches) -> bool:
+    """True when the functional-class name of the molecule's single acyclic sulfuric-acid ester can be built
+    (:func:`name_sulfate_ester` returns a name): the offer behind the principal-group rank of
+    ``rules.seniority.get_principal_group``, the sulfur analogue of ``rules.phosphorus.phosphate_ester_offered``
+     class 9, the Blue Book; "Esters of mononuclear noncarbon oxoacids",:35916). More
+    than one ester match, a sulfur ring atom (a cyclic ester is named as a heterocycle) or a stereo layer is never
+    offered, as for the phosphorus esters."""
+    try:
+        if not matches or len(matches) != 1:
+            return False
+        s_idx = next((a for a in matches[0] if mol.GetAtomWithIdx(a).GetSymbol() == "S"), None)
+        if s_idx is None:
+            return False
+        s = mol.GetAtomWithIdx(s_idx)
+        if s.IsInRing() or s.GetFormalCharge() != 0:
+            return False
+        from .phosphorus import _OFFER_STEREO_OWNERS, _has_stereo
+        if not _OFFER_STEREO_OWNERS and _has_stereo(mol):
+            return False
+        return name_sulfate_ester(mol, s_idx) is not None
+    except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
+        return False
+
+
 def name_sulfur_oxoacid_acyl_for_amino(
         mol, s_idx: int, frag_atoms: set) -> Optional[str]:
     """N-linked ``-NH-S(oxoacid)``: the acyl prefix for the amino wrapper.

@@ -1378,6 +1378,20 @@ def phosphate_ester_offered(mol, matches) -> bool:
         return False
 
 
+def pnictogen_inate_ester_offered(mol, matches, symbol) -> bool:
+    """True when the functional-class name of the molecule's single acyclic phosphinate, arsinate or stibinate ester
+    (``symbol`` P, As or Sb) can be built (:func:`_name_pnictogen_inate_ester`): the offer of
+    :func:`phosphate_ester_offered` for the esters of the acids of class 7c of (the Blue Book)."""
+    try:
+        if not matches or len(matches) != 1:
+            return False
+        if not _OFFER_STEREO_OWNERS and _has_stereo(mol):
+            return False
+        return _name_pnictogen_inate_ester(mol, matches[0], symbol) is not None
+    except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
+        return False
+
+
 def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
     """Functional-class name for the ANION of a P-oxoacid acid-ester.
 

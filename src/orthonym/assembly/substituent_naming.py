@@ -40,6 +40,9 @@ from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
+from .chain_amide_prefixes import consume_acylated_nitrogen, consume_sulfamoyl
+from .chain_decoration_prefixes import (alkoxy_decoration_tokens_are_real, consume_azido, consume_substituted_imino,
+                                        hand_on_numbering, unsaturated_chain_plan)
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
 from .prefix_derivation import retained_benzyl
 from .fragment_naming import name_fragment_recursively
@@ -1458,6 +1461,7 @@ _POLYFUNC_HYDROXY_PREFIX = "hydroxy"
 _POLYFUNC_AMINO_PREFIX = "amino"
 _POLYFUNC_IMINO_PREFIX = "imino"
 _POLYFUNC_CARBOXY_PREFIX = "carboxy"
+_POLYFUNC_CYANO_PREFIX = "cyano"
 # a phase (glucosinolate/thiohydroximate O-sulfate anion): the S-analogue of
 # hydroxy for a terminal -SH branch on a backbone carbon
 # ('2-sulfanylethyl', the direct parallel to '2-hydroxyethyl'). Documented as
@@ -1595,7 +1599,7 @@ def _branch_carbons_unbranched(mol, subtree, seed):
 
 
 def _name_branched_polyfunctional_substituent(
-    mol, backbone_set, attach_idx, prefix_on,
+    mol, backbone_set, attach_idx, prefix_on, pos_out=None,
 ):
     """W2F-P3 / /: name a BRANCHED acyclic saturated
     carbon substituent bearing detachable FG prefixes, numbered from the free
@@ -1660,7 +1664,7 @@ def _name_branched_polyfunctional_substituent(
         built.append(res)
     names = {name for name, _ in built}
     if len(names) == 1:
-        return built[0][0]
+        return hand_on_numbering(pos_out, next(c for k, c in keyed if k == best_key), built[0][0])
     # (m) between chains citing the same substituents: the lowest
     # locants in order of citation (alphanumerical order).
     multisets = {tuple(sorted((p, len(l)) for p, l in groups.items()))
@@ -2053,16 +2057,19 @@ def _name_branched_unsaturated_substituent(
     Principal chain: the longest carbon chain from the free valence (b),
     the Blue Book; "the first criterion... is the length of the
     chain; unsaturation is now the second criterion"), then the greater number
-    of multiple bonds,:21033) -- only chains carrying EVERY C=C are
-    admitted, since an off-chain C=C would need an unsaturated sub-branch prefix
-    this producer does not build. Off-chain carbons must form saturated,
-    unbranched sub-branches (named by ``name_substituent``: methyl,
-    hydroxymethyl,...), as in the saturated sibling
-    ``_name_branched_polyfunctional_substituent``. When several admitted chains
+    of multiple bonds,:21033; for a substituent group,
+    criterion (d): "the greater number of multiple bonds regardless of type").
+    A C=C that no kept chain carries is the prefix of its off-chain atom, named
+    by ``name_substituent`` with the free valence of its bond:
+    '2-methylidene-4-oxopentyl'); ``chain_decoration_prefixes.unsaturated_chain_plan``
+    decides which C=C are kept and which are prefixes. Off-chain carbons must
+    form saturated, unbranched sub-branches (named by ``name_substituent``:
+    methyl, hydroxymethyl,...), as in the saturated sibling
+    ``_name_branched_polyfunctional_substituent``, which names the substituent
+    whole when no longest chain carries a C=C. When several admitted chains
     remain, every one must give the SAME name (a symmetric choice); otherwise
     the choice would need the later criteria, not built here, and this
-    fails closed. The
-    ene/yl/E-Z finish is the linear path's
+    fails closed. The ene/yl/E-Z finish is the linear path's
     ``_unsaturated_substituent_name``. Fail-closed (None) outside that
     envelope; the whole name is still verified by the caller's gate.
     """
@@ -2075,19 +2082,15 @@ def _name_branched_unsaturated_substituent(
     if sum(1 for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
            if n.GetIdx() in backbone_set) > 1:
         return None  # secondary / internal attachment -> follow-on
-    ene_atoms = set().union(*core_double_bonds)
+    plan = unsaturated_chain_plan(
+        mol, _longest_carbon_chains_from(mol, backbone_set, attach_idx), attach_idx, core_double_bonds)
+    if plan is None:
+        return None
+    if not plan:  # no longest chain carries a C=C: each is a prefix, the chain is chosen as for a saturated one
+        return _name_branched_polyfunctional_substituent(mol, backbone_set, attach_idx, prefix_on, pos_out)
     names = set()
-    for chain in _longest_carbon_chains_from(mol, backbone_set, attach_idx):
-        if not chain or chain[0] != attach_idx:
-            return None
+    for chain, chain_double_bonds in plan:
         chain_set = set(chain)
-        if not ene_atoms <= chain_set:
-            continue
-        on_chain = all(
-            abs(chain.index(a) - chain.index(b)) == 1
-            for a, b in (tuple(pair) for pair in core_double_bonds))
-        if not on_chain:
-            continue
         pos = {idx: i + 1 for i, idx in enumerate(chain)}  # attach = 1
         groups: dict = defaultdict(list)
         for c_idx, prefixes in prefix_on.items():
@@ -2124,7 +2127,7 @@ def _name_branched_unsaturated_substituent(
                  for prefix in sorted(groups.keys(), key=alpha_sort_key)]
         joined = ''.join(_joined_prefix_parts(parts))
         name = _unsaturated_substituent_name(
-            mol, chain, pos, sub_set, core_double_bonds, joined,
+            mol, chain, pos, sub_set, chain_double_bonds, joined,
             get_chain_prefix(len(chain)), groups,
         )
         if name is None:
@@ -2314,6 +2317,11 @@ def _name_polyfunctional_acyclic_substituent_impl(
     def _add_prefix(carbon_idx: int, prefix: str) -> None:
         prefix_on.setdefault(carbon_idx, []).append(prefix)
 
+    # ---- Pass 0 (lane/l17 item 12,, the Blue Book): a pendant acylated nitrogen -N(R')-CO-R or
+    # -N(R')-SO2-R on a backbone carbon is the amido prefix of the whole group, as on a ring or a parent chain. Consumed
+    # first, so a ring on its acyl or on R' is part of that name and not a ring branch of the chain below. ----
+    consume_acylated_nitrogen(mol, sub_set, attach_idx, consumed, _add_prefix)
+
     # Suite fix j6 (TRIAGE g4 C5, prenylated-phenol trienoic acid): a RING
     # branch on an acyclic backbone carbon is a ring substituent prefix of the
     # chain substituent, which keeps the free valence: -CH2-C(=O)-Ar
@@ -2337,7 +2345,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             _cur = _stack.pop()
             for _nb in mol.GetAtomWithIdx(_cur).GetNeighbors():
                 _ni = _nb.GetIdx()
-                if (_ni in sub_set and _ni not in _core
+                if (_ni in sub_set and _ni not in _core and _ni not in consumed
                         and ring_info.NumAtomRings(_ni) == 0):
                     _core.add(_ni)
                     _stack.append(_ni)
@@ -2345,7 +2353,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             c_atom = mol.GetAtomWithIdx(c_idx)
             for b in c_atom.GetBonds():
                 r_idx = b.GetOtherAtomIdx(c_idx)
-                if (r_idx not in sub_set or r_idx in claimed
+                if (r_idx not in sub_set or r_idx in claimed or r_idx in consumed
                         or ring_info.NumAtomRings(r_idx) == 0):
                     continue
                 if (c_atom.GetSymbol() != 'C' or c_atom.GetFormalCharge() != 0
@@ -2378,7 +2386,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 claimed |= branch
                 consumed |= branch
                 ring_branch_hosts.setdefault(c_idx, []).append(rname)
-        if any(ring_info.NumAtomRings(i) > 0 for i in sub_set - claimed):
+        if any(ring_info.NumAtomRings(i) > 0 for i in sub_set - claimed - consumed):
             return None  # a ring atom not in a named ring branch -> decline
 
     # ---- Pass 1: carboxy (-C(=O)OH / -C(=O)O-). The carboxy carbon and its two
@@ -2420,6 +2428,38 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 consumed.add(dbl_o[0])
                 consumed.add(o_single.GetIdx())
                 _add_prefix(c_nbr[0], _POLYFUNC_CARBOXY_PREFIX)
+
+    # ---- Pass 1a, the Blue Book "the -CN group is designated by the preferred prefix 'cyano'"): a pendant
+    # nitrile -C#N on a backbone carbon is the detachable prefix 'cyano', its carbon and nitrogen consumed like the carboxy
+    # group's: '2-cyanoethyl' ('S-(2-cyanoethyl) cyclohexanesulfinothioate (PIN)',:31765). The cyano carbon is never a
+    # backbone carbon of the substituent, and a nitrile that is the principal group of the molecule is not a prefix of a
+    # group named here (the caller names the substituent of another parent). A fragment with a charged atom (an isocyano,
+    # an azido, a nitro group, an onium) keeps its old route: the passes below read such an atom by its charge
+    # ('(methylidyneazaniumyl)' for the isocyano of '1-cyano-1-isocyanoethyl'), which is not the group. ----
+    _charged = any(mol.GetAtomWithIdx(i).GetFormalCharge() for i in sub_set)
+    for idx in ([] if _charged else sorted(sub_set)):
+        if idx in consumed or idx == attach_idx:
+            continue
+        a = mol.GetAtomWithIdx(idx)
+        if (a.GetSymbol() != 'C' or a.GetFormalCharge() or a.GetIsotope() or a.GetNumRadicalElectrons()
+                or a.IsInRing() or a.GetDegree() != 2):
+            continue
+        n_nb = [n for n in a.GetNeighbors()
+                if n.GetSymbol() == 'N' and n.GetDegree() == 1 and not n.GetFormalCharge() and not n.GetIsotope()
+                and n.GetIdx() in sub_set
+                and mol.GetBondBetweenAtoms(idx, n.GetIdx()).GetBondType() == Chem.BondType.TRIPLE]
+        c_nb = [n for n in a.GetNeighbors()
+                if n.GetSymbol() == 'C' and n.GetIdx() in sub_set and n.GetIdx() not in consumed
+                and mol.GetBondBetweenAtoms(idx, n.GetIdx()).GetBondType() == Chem.BondType.SINGLE]
+        if len(n_nb) != 1 or len(c_nb) != 1:
+            continue
+        host = c_nb[0]
+        if (host.GetIdx() not in carbon_component(mol, sub_set, attach_idx) or host.IsInRing()
+                or any(b.GetBondType() == Chem.BondType.TRIPLE for b in host.GetBonds())):
+            continue
+        consumed.add(idx)
+        consumed.add(n_nb[0].GetIdx())
+        _add_prefix(host.GetIdx(), _POLYFUNC_CYANO_PREFIX)
 
     # ---- Pass 1b (RISK 5 Class 2, /: a SUBSTITUTED amine -N(R)(R') on a
     # backbone carbon -> a composed '(dialkylamino)' PREFIX, consuming the N and its alkyl branches. Every
@@ -2700,122 +2740,12 @@ def _name_polyfunctional_acyclic_substituent_impl(
             consumed.update(branch_atoms)
             _add_prefix(host, amino_pfx)
 
-    # ---- Pass 1f (a phase E2c, /, WRONG-MOLECULE
-    # RISK): a sulfonamide -S(=O)(=O)-NH2/-NHR/-NR2 hanging off a backbone
-    # carbon is the retained 'sulfamoyl' prefix, or its N-substituted
-    # '(R-sulfamoyl)'/'(dialkylsulfamoyl)' form -- '(methylsulfamoyl)methyl'
-    # for -CH2-SO2-NHCH3. Consumed HERE so it can never reach the generic
-    # recursive Tier-4 path + `parent_to_prefix`'s '-amide' string transform,
-    # which reads 'methanesulfonamide' as if it ended in the CARBOXAMIDE
-    # suffix and COLLAPSES THE SULFONYL TO 'carbamoyl' -- a WRONG
-    # CONSTITUTION (measured: '-CH2-SO2-NHCH3' -> the wrong 'carbamoylmethyl',
-    # a different molecule must catch). Reuses
-    # `rules.benzene._build_n_substituted_sulfamoyl_prefix` (the ring-side
-    # '{N-subs}sulfamoyl' builder) rather than re-deriving it, for the
-    # CHAIN-side attachment. Fail-closed (skip this S) for: a ring-borne
-    # sulfonyl, a charged/hypervalent/isotope-labelled S, a ring amide N,
-    # DISTINCT N,N-disubstituents (the shared builder's own conservative
-    # envelope -- nested 'ethyl(methyl)sulfamoyl' is not built), or any shape
-    # outside the plain sulfonamide envelope (a bridging N, a branch this
-    # project's organyl namer cannot express).
+    # ---- Pass 1f (a phase E2c, /, WRONG-MOLECULE RISK): a sulfonamide -SO2-NR2 on a backbone
+    # carbon is the 'sulfamoyl' prefix, consumed here so it never reaches the '-amide' -> 'carbamoyl' string transform of
+    # ``parent_to_prefix`` (chain_amide_prefixes.consume_sulfamoyl). ----
     if _amine_import_ok:
-        for idx in list(sub_set):
-            if idx in consumed:
-                continue
-            a = mol.GetAtomWithIdx(idx)
-            if a.GetSymbol() != 'S' or a.GetFormalCharge() != 0 or a.GetIsotope():
-                continue
-            if _ring_info_pf.NumAtomRings(idx) > 0:
-                continue
-            nbrs = list(a.GetNeighbors())
-            if len(nbrs) != 4 or any(n.GetIdx() not in sub_set for n in nbrs):
-                continue
-            dbl_o = []
-            host_c = None
-            n_idx = None
-            ok = True
-            for n in nbrs:
-                ni = n.GetIdx()
-                b = mol.GetBondBetweenAtoms(idx, ni)
-                if (n.GetSymbol() == 'O' and b.GetBondType() == Chem.BondType.DOUBLE
-                        and n.GetFormalCharge() == 0 and n.GetDegree() == 1):
-                    dbl_o.append(ni)
-                elif (n.GetSymbol() == 'C' and b.GetBondType() == Chem.BondType.SINGLE
-                        and host_c is None):
-                    host_c = ni
-                elif (n.GetSymbol() == 'N' and b.GetBondType() == Chem.BondType.SINGLE
-                        and n_idx is None):
-                    n_idx = ni
-                else:
-                    ok = False
-                    break
-            if not ok or len(dbl_o) != 2 or host_c is None or n_idx is None:
-                continue
-            if host_c in consumed:
-                continue
-            n_atom = mol.GetAtomWithIdx(n_idx)
-            if (_ring_info_pf.NumAtomRings(n_idx) > 0
-                    or n_atom.GetFormalCharge() != 0 or n_atom.GetIsotope()):
-                continue
-            if any(b.GetBondType() != Chem.BondType.SINGLE for b in n_atom.GetBonds()):
-                continue
-            n_branches = [nb.GetIdx() for nb in n_atom.GetNeighbors()
-                          if nb.GetIdx() != idx]
-            if any(b not in sub_set for b in n_branches):
-                continue
-
-            def _s_branch_component(seed, _block=None):
-                _blocked = _block or {idx, n_idx}
-                comp: Set[int] = set()
-                st = [seed]
-                while st:
-                    x = st.pop()
-                    if x in comp or x in _blocked or x not in sub_set:
-                        continue
-                    comp.add(x)
-                    for n in mol.GetAtomWithIdx(x).GetNeighbors():
-                        nj = n.GetIdx()
-                        if nj not in _blocked and nj not in comp:
-                            st.append(nj)
-                return comp
-
-            names = []
-            branch_atoms: Set[int] = set()
-            ok2 = True
-            for b0 in n_branches:
-                comp = _s_branch_component(b0)
-                if host_c in comp or attach_idx in comp:
-                    ok2 = False
-                    break
-                if any(mol.GetAtomWithIdx(v).GetFormalCharge() != 0 for v in comp):
-                    ok2 = False
-                    break
-                _fv = carbon_free_valence_prefix(mol, comp, b0)
-                nm = _fv.prefix
-                if nm is None:
-                    if _fv.must_fail_closed:
-                        ok2 = False
-                        break
-                    nm = composed_prefix_organyl_name(mol, comp, b0)
-                if nm is None:
-                    ok2 = False
-                    break
-                names.append(nm)
-                branch_atoms |= comp
-            if not ok2:
-                continue
-            if not names:
-                sulfamoyl_pfx = 'sulfamoyl'
-            else:
-                from ..rules.benzene import _build_n_substituted_sulfamoyl_prefix
-                sulfamoyl_pfx = _build_n_substituted_sulfamoyl_prefix(names)
-            if not sulfamoyl_pfx:
-                continue
-            consumed.add(idx)
-            consumed.update(dbl_o)
-            consumed.add(n_idx)
-            consumed.update(branch_atoms)
-            _add_prefix(host_c, sulfamoyl_pfx)
+        consume_sulfamoyl(mol, sub_set, attach_idx, consumed, _add_prefix, _ring_info_pf,
+                          carbon_free_valence_prefix, composed_prefix_organyl_name)
 
     # ---- Pass 1c (tail #7/#21, /: an ester whose
     # OXYGEN sits on a backbone carbon (-C-O-C(=O)-R) is the ACYLOXY detachable
@@ -2999,53 +2929,9 @@ def _name_polyfunctional_acyclic_substituent_impl(
         consumed.add(_neg_o)
         _add_prefix(_host_c, _POLYFUNC_NITRO_PREFIX)
 
-    # ---- Pass 1c3 /: a pendant AZIDO group on a backbone
-    # carbon (-N=[N+]=[N-], or its -[N-]-[N+]#N resonance spelling) is the
-    # detachable 'azido' prefix -- the same charge-separated, net-neutral shape as
-    # nitro above, with the same consequence when it is not consumed here: Pass
-    # 2's per-atom charge decline refuses the fragment and the recursive namer's
-    # string surgery turns the capped '1-azidopropane' into the wrong-end
-    # '1-azidopropyl' for -CH2CH2CH2N3 (TRIAGE g7 C14; the free valence takes
-    # locant 1, / -> '3-azidopropyl'). Structural match only:
-    # Na (neutral or -1, bonded to the unconsumed host carbon by a single bond and
-    # to Nb only), Nb (+1, bonded to Na and Nc only), Nc (terminal, charge making
-    # the three sum to 0) with the bond orders of one of the two resonance forms.
-    for _naidx in list(sub_set):
-        if _naidx in consumed:
-            continue
-        _na = mol.GetAtomWithIdx(_naidx)
-        if _na.GetSymbol() != 'N' or _na.GetDegree() != 2 or _na.IsInRing():
-            continue
-        _host_c = _nb_atom = None
-        for _nb in _na.GetNeighbors():
-            _bond = mol.GetBondBetweenAtoms(_naidx, _nb.GetIdx())
-            if (_nb.GetSymbol() == 'C' and _nb.GetIdx() in sub_set
-                    and _bond.GetBondType() == Chem.BondType.SINGLE):
-                _host_c = _nb.GetIdx()
-            elif _nb.GetSymbol() == 'N' and _nb.GetIdx() in sub_set:
-                _nb_atom = _nb
-        if _host_c is None or _nb_atom is None or _host_c in consumed:
-            continue
-        if _nb_atom.GetFormalCharge() != 1 or _nb_atom.GetDegree() != 2:
-            continue
-        _nc_atom = next((x for x in _nb_atom.GetNeighbors()
-                         if x.GetIdx() != _naidx), None)
-        if (_nc_atom is None or _nc_atom.GetSymbol() != 'N'
-                or _nc_atom.GetDegree() != 1 or _nc_atom.GetIdx() not in sub_set):
-            continue
-        _b_ab = mol.GetBondBetweenAtoms(_naidx, _nb_atom.GetIdx()).GetBondType()
-        _b_bc = mol.GetBondBetweenAtoms(_nb_atom.GetIdx(), _nc_atom.GetIdx()).GetBondType()
-        _form_1 = (_na.GetFormalCharge() == 0 and _nc_atom.GetFormalCharge() == -1
-                   and _b_ab == Chem.BondType.DOUBLE and _b_bc == Chem.BondType.DOUBLE)
-        _form_2 = (_na.GetFormalCharge() == -1 and _nc_atom.GetFormalCharge() == 0
-                   and _b_ab == Chem.BondType.SINGLE and _b_bc == Chem.BondType.TRIPLE)
-        if not (_form_1 or _form_2):
-            continue
-        if any(mol.GetAtomWithIdx(_x).GetTotalNumHs() for _x in
-               (_naidx, _nb_atom.GetIdx(), _nc_atom.GetIdx())):
-            continue
-        consumed.update((_naidx, _nb_atom.GetIdx(), _nc_atom.GetIdx()))
-        _add_prefix(_host_c, _POLYFUNC_AZIDO_PREFIX)
+    # ---- Pass 1c3 /: a pendant AZIDO group is the detachable 'azido' prefix, consumed before the
+    # backbone is read (``chain_decoration_prefixes.consume_azido``).
+    consume_azido(mol, sub_set, consumed, _add_prefix, _POLYFUNC_AZIDO_PREFIX)
 
     # ---- Pass 1d (a phase enabler, /: a pendant ONIUM --
     # cation branch off a backbone carbon (choline's -CH2-CH2-N+(CH3)3) is a
@@ -3130,6 +3016,10 @@ def _name_polyfunctional_acyclic_substituent_impl(
         # nesting: escalate past any marks inside the cation prefix.
         from .naming_utils import apply_enclosing_marks
         _add_prefix(host, apply_enclosing_marks(_cp, -1))
+
+    # ---- Pass 1g,: a substituted imino group =N-X on a chain carbon is the prefix '(Ximino)'.
+    if not consume_substituted_imino(mol, sub_set, attach_idx, consumed, _add_prefix):
+        return None
 
     # Backbone = every carbon not consumed by a carboxy group.
     backbone = [
@@ -5479,8 +5369,8 @@ def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
         if not acid_name:
             return None
         amido, acid_name = amido_prefix_from_acid_name(frag_smi, acid_name)
-        if not amido:  # an acyl holding a second COOH (Asp, Glu): 'carboxy' on the amide chain
-            from .acyl_amido_polyacid import polyacid_acyl_amido_prefix
+        from .acyl_amido_polyacid import ordinary_amido_is_the_acyl, polyacid_acyl_amido_prefix
+        if not (amido and ordinary_amido_is_the_acyl(mol, n_idx, carbonyl_c, sub_set, amido)):
             return polyacid_acyl_amido_prefix(mol, n_idx, carbonyl_c, sub_set, verify_acid)
         if amido and verify_acid:
             if not fragment_acid_name_verified(acid_name, frag_smi):
@@ -8098,17 +7988,11 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
     context variable a naming path branches on (among them the book-forms switch of
     roadmap N5, ``memo.book_forms_var``: the terminal-fragment writer names a fragment
     with its mechanical spellings first, inside the same memo scope)."""
-    from ..decomposition.engine import nacyl_float_refusing
-    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
-                                      full_coverage_ctx, general_fallback_ctx)
     from ..perception.molcache import atoms_of
-    from ..routing import dispatch_table as _dt
     from .fragment_naming import _fragment_guard as _g
-    from .group_splitting import _IN_SPLIT_PROBE
-    from .locant_omission import (_ISOTOPE_PARENT_POSITIONAL, _ISOTOPIC_NAMING_SCOPE,
-                                  forced_locant_reason)
-    from .memo import book_forms_var
-    from .substituent_enumerator import _gate_is_reentrant
+    from .nested_memo import _ambient_modules
+    # the modules this key reads, imported once (an import statement each, per call, was most of its cost)
+    m = _ambient_modules()
     sub = tuple(sub_atoms)
     sub_set = set(sub)
     atoms = atoms_of(mol)
@@ -8131,12 +8015,13 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
             tuple(cips),
             frozenset(visited) if visited else frozenset(),
             getattr(_g, 'session_depth', 0), id(getattr(_g, 'cache', None)),
-            best_effort_ctx.get(), general_fallback_ctx.get(),
-            allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-            nacyl_float_refusing(), _dt._PEPTIDE_SUBST_ACTIVE, _dt._PEPTIDE_NAME_STANDS, _gate_is_reentrant(),
-            getattr(_IN_SPLIT_PROBE, 'active', False), forced_locant_reason(),
-            _ISOTOPIC_NAMING_SCOPE.get(), _ISOTOPE_PARENT_POSITIONAL.get(),
-            book_forms_var.get())
+            m.provenance.best_effort_ctx.get(), m.provenance.general_fallback_ctx.get(),
+            m.provenance.allow_aromatic_general_ctx.get(), m.provenance.full_coverage_ctx.get(),
+            m.engine.nacyl_float_refusing(), m.dispatch_table._PEPTIDE_SUBST_ACTIVE,
+            m.dispatch_table._PEPTIDE_NAME_STANDS, m.enumerator._gate_is_reentrant(),
+            getattr(m.group_splitting._IN_SPLIT_PROBE, 'active', False), m.locant_omission.forced_locant_reason(),
+            m.locant_omission._ISOTOPIC_NAMING_SCOPE.get(), m.locant_omission._ISOTOPE_PARENT_POSITIONAL.get(),
+            m.memo.book_forms_var.get())
 
 
 def name_substituent_fragment(
@@ -8474,12 +8359,12 @@ def _name_substituent_fragment_uncached(
                 _rest = [i for i in sub_atoms if i != attach_idx]
                 _inner = name_substituent_fragment(
                     mol, _rest, _inner_nbrs[0], parent_chain + [attach_idx])
-                # Fail closed on generic-path mis-expressions: 'hydroxy'/
-                # 'oxo' garbage for embedded ethers the C-attach recursion
-                # cannot yet express (depth >=2 nesting stays closed).
-                if (not _inner or _inner == 'substituent'
-                        or 'hydroxy' in _inner or 'oxo' in _inner
-                        or _inner.endswith('ylyl')):
+                # Fail closed on generic-path mis-expressions: 'hydroxy'/'oxo' garbage for embedded ethers the C-attach
+                # recursion cannot yet express (depth >=2 nesting stays closed); a decoration of terminal -OH / =O groups
+                # is no such garbage, ``chain_decoration_prefixes.alkoxy_decoration_tokens_are_real``).
+                if (not _inner or _inner == 'substituent' or _inner.endswith('ylyl')
+                        or (('hydroxy' in _inner or 'oxo' in _inner)
+                            and not alkoxy_decoration_tokens_are_real(mol, _rest, _inner_nbrs[0]))):
                     return None
                 # morphology via the BB-verbatim composed_alkoxy_prefix:
                 # 'methoxymethyl' -> 'methoxymethoxy' (contract) but a ring/

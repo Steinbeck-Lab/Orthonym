@@ -109,8 +109,12 @@ def test_first_run_declined_reads_the_default_tier_rule_on_the_first_name(monkey
     monkeypatch.setattr(pin_rerun, "first_run_declined", spy)
     assert name_compound("COc1ccc2[nH]cc(CCNC(C)=O)c2c1", emit_tier="pin") == \
         "N-[2-(5-methoxy-1H-indol-3-yl)ethyl]acetamide"
-    assert len(seen) == 1 and seen[0][1] is True          # the first run's name was one the tier declines
-    assert seen[0][0] != "N-[2-(5-methoxy-1H-indol-3-yl)ethyl]acetamide"
+    # The first run's name was 'N-[2-(5-methoxy-1H-indol-3-yl)ethan-1-yl]acetamide', one the tier declines,
+    # the Blue Book: the locant 1 of a saturated chain is omitted, 'ethyl'), and the re-run gave the PIN. Lane/l17
+    # item 10: the split's N-substituent keeps the free valence as the alcohol rule does, so the first run is the PIN and
+    # the tier declines nothing; the verdict is still read, on that first name.
+    assert len(seen) == 1 and seen[0][1] is False
+    assert seen[0][0] == "N-[2-(5-methoxy-1H-indol-3-yl)ethyl]acetamide"
 
 
 def test_a_row_that_cannot_be_derived_is_no_decline():
@@ -156,6 +160,20 @@ def test_first_run_state_is_put_back_only_for_a_named_first_run():
 ])
 def test_the_class_guard_names_its_reason(smiles, name, reason):
     assert reason in rerun_class_guard(Chem.MolFromSmiles(smiles), name)
+
+
+@pytest.mark.parametrize("smiles, residues", [
+    ("NCC(=O)NCC(=O)O", True),                          # glycylglycine
+    ("OC(=O)CNC(=O)[C@@H]1CCCN1", True),               # prolylglycine: the nitrogen closes a ring through its alpha carbon
+    ("CC(=O)NCC(=O)NCC(=O)O", True),                   # an acetylated dipeptide
+    ("OC(=O)CNC(=O)CN1CCN(C)CC1", False),              # a piperazin-1-yl on an acetyl group: no amino group of a residue
+    ("OC(=O)CNC(=O)CN1CCCC1", False),
+])
+def test_a_ring_nitrogen_outside_the_alpha_carbon_is_no_residue_of_a_peptide(smiles, residues):
+    """ INTRODUCTION (the Blue Book): the amino acids of Chapter are "the building blocks of peptides
+    and proteins"; the name of '(4-methylpiperazin-1-yl)acetylglycine' is the method (1) name of the acetic acid."""
+    from orthonym.rules.peptides import peptide_of_residues
+    assert peptide_of_residues(Chem.MolFromSmiles(smiles)) is residues
 
 
 def test_the_class_guard_lets_a_plain_name_through():

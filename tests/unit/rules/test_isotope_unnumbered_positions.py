@@ -299,9 +299,16 @@ def test_the_composer_cites_the_lowest_locants_whatever_the_spelling_of_the_inpu
     # the ring of the labelled phenyl is read onto the input in two directions: 2,3,4,5 and not 3,4,5,6
     ("[2H]C1=CC(=C(C(=C1[2H])[2H])[2H])[Si](C2=C(C(=C(C(=C2[2H])[2H])[2H])[2H])[2H])"
      "C3=C(C(=C(C(=C3[2H])[2H])[2H])[2H])[2H]", "(2,3,4,5-2H4)phenyldi(2H5)phenylsilyl"),
-    # the two equivalent ends of a ring: {2,2,6} and not {2,6,6}, and the configuration is cited at the atom that has it
+    # the two equivalent ends of a ring: {3,3,5} and not {3,5,5}, and the configuration is cited at the atom that has it.
+    # change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from an earlier item of the lane): the name was
+    # '1-[(6S)-4-oxo(2,2,6-2H3)cyclohexyl]-4-propylcyclohexane', which cites the ketone as the prefix 'oxo' of a hydrocarbon
+    # parent. (the Blue Book) ranks "16 Ketones" (:18189) above the hydrocarbons, so the ring that bears the
+    # C=O is the parent and the group its suffix,:18875); the ring numbered from the carbonyl, and the
+    # lowest set of the modified atoms (i),:3336) is {3,3,5}, the configuration at the CHD atom 5. Independent check: a
+    # fresh OPSIN call reads the name to the input's full InChIKey (``name_is_rt_exact`` in ``_assert_row``). Mutation: with the
+    # ketone not the principal group the old name returns and this row fails.
     ("[H][C@@]1(CC(=O)CC(C1C2CCC(CC2)CCC)([2H])[2H])[2H]",
-     "1-[(6S)-4-oxo(2,2,6-2H3)cyclohexyl]-4-propylcyclohexane"),
+     "(5S)-4-(4-propylcyclohexyl)(3,3,5-2H3)cyclohexan-1-one"),
 ])
 def test_the_lowest_set_of_locants_is_cited_for_a_symmetric_skeleton(smiles, expected):
     """ NUMBERING (i) (the Blue Book): "lowest locants to the modified atoms or groups considered

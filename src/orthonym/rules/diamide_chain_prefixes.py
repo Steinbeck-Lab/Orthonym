@@ -11,9 +11,13 @@ from typing import List, Optional, Tuple
 from rdkit import Chem
 
 
-def chain_carbon_prefixes(mol: Chem.Mol, chain, covered: set, atom_to_locant: dict) -> Optional[List[Tuple[int, str]]]:
+def chain_carbon_prefixes(mol: Chem.Mol, chain, covered: set, atom_to_locant: dict, *,
+                          cite_stereo: bool = False) -> Optional[List[Tuple[int, str]]]:
     """``[(chain locant, prefix name),...]`` for every branch on a chain carbon outside ``covered``, or None when a
-    branch has no name (or is bonded by more than a single bond)."""
+    branch has no name (or is bonded by more than a single bond). A structure with a stereo layer is left to the
+    general path unless the caller cites the descriptors of the chain itself (``cite_stereo``:
+    ``amides.name_chain_diamide`` when the amide nitrogens are substituted, a class the general path does not
+    name)."""
     from ..assembly.substituent_enumerator import name_substituent
     chain_set, out, seen = set(chain), [], set(covered)
     for idx in chain:
@@ -37,8 +41,8 @@ def chain_carbon_prefixes(mol: Chem.Mol, chain, covered: set, atom_to_locant: di
             out.append((atom_to_locant[idx], str(name)))
     if any(a.GetAtomicNum() > 1 and a.GetIdx() not in seen for a in mol.GetAtoms()):
         return None
-    if out and (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
-                or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds())):
+    if out and not cite_stereo and (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
+                                    or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds())):
         return None     # the descriptors are cited by the general path ('(2S,3S)-2,3-dihydroxybutanediamide')
     return out
 

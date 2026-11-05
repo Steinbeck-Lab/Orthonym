@@ -14,7 +14,7 @@ now ranks the names (``tests/unit/assembly/test_form_choice.py`` pins the rules 
 * the names whose skeletons differ, by the fewer constructs the engine records as not PIN
   "Five-membered ring requirement" (:23708), "When fusion names are not allowed, unsaturated von Baeyer ring
   system names are preferred IUPAC names" (:23710);,:23682; "General rule for
-  systematically naming cationic centers in parent hydrides",:41366): rows 3, 34, 35.
+  systematically naming cationic centers in parent hydrides",:41366): rows 3, 33, 34, 35.
 * ``_FORMS_MAX_WORK`` counts the places of the +1, not the forms (the Kekule structures of one placement, which
   RDKit's enumeration did not give, count once): rows 13, 12, 22.
 
@@ -35,8 +35,8 @@ pytestmark = pytest.mark.opsin_gate
 
 TIER = "best-effort"
 
-#: (row, SMILES, the name, the criterion that decides): the 12 renames that were worse than main's, and now
-#: have the name main gave before RH (rows 12 and 22 below are other names)
+#: (row, SMILES, the name, the criterion that decides): the 12 renames that were worse than main's, and row 33 (lane/l17
+#: fix a performance pass), which now have the name main gave before RH (rows 12 and 22 below are other names)
 WORSE = [
     ("1", "C1=CC=C(C=C1)C2=C3C=CC(=C(C4=C(C5=C(C6=CC=C(N6C5=N4)C(=C7C=CC2=N7)C8=CC=CC=C8)C9=CC=CC=C9)[N+]1=CC=CC=C1)C1=CC=CC=C1)N3",
      "1-[4,9,14,19-tetraphenyl-2,21,23,24-tetraazahexacyclo[13.5.1.1^3,20.1^5,8.1^10,13.0^18,21]tetracosa-1,3(22),4,6,8,10(23),11,13,15,17,19-undecaen-22-yl]pyridin-1-ium",
@@ -62,8 +62,26 @@ WORSE = [
     ("26", "CN1C=CC=CC1=C2C3=NC(=C4C=CC(=C(C5=CC=C(N5)C(=C6C=CC2=N6)C7=C(C(=C(C(=C7F)F)F)F)F)C8=CC=CC=[N+]8C)[NH2+]4)C=C3",
      "6-(1-methyl-1,2-dihydropyridin-2-ylidene)-16-(1-methylpyridin-1-ium-2-yl)-11-(pentafluorophenyl)-20,21,22,23-tetraazapentacyclo[15.2.1.1^2,5.1^7,10.1^12,15]tricosa-1,3,5(23),7(22),8,10,12,14,16,18-decaen-20-ium",
      "P-31.1.4.2 (1): 2 compound locants in the ene list of the 20-ium macrocycle against 3"),
+    # row 33 moved here from KEPT (lane/l17 fix a performance pass), change-asserted-value: the name was
+    # '12-(1-methyl-1,4-dihydropyridin-4-ylidene)-7-(1-methylpyridin-1-ium-4-yl)-...-undecaen-23-ium' (the parent holds the
+    # cation, (a)) and is now main's name, the drawing's own. Quote: (the Blue Book) "When no
+    # hydrogen atoms are present or when an 'ylidene' type substituent group is needed, it is necessary to use 'added
+    # [indicated] hydrogen'", 'pyridin-1(4H)-yl (preferred prefix)' (:16079): the spelling '1-methyl-1,4-dihydropyridin-4-ylidene'
+    # (hydro prefixes where added hydrogen is required) is no PIN spelling, a construction of the kind criterion 1 ranks
+    # first ("a name that is built from a construction of that kind is no candidate for the preferred name, whatever its
+    # parent", ``assembly.form_choice``); the name of the drawing has none. The engine recorded that spelling as a label
+    # only, so the parent that holds the cation decided: and a quinoid form whose iminium name (item 7, ``)
+    # has no azamethane won over the drawing in row 34 (below). Independent check: ``opsin_key(name) == rdkit_key(smiles)``
+    # (a fresh OPSIN StdInChIKey) in the test body. Mutation: without ``record_non_pin_fragment`` in
+    # ``MonocycleForm.prefix_at_locant`` the old name is shipped and this row fails.
+    ("33", "C[N+]1=CC=C(C=C1)C2=C3C=CC(=C(C4=NC(=C(C5=CC=C(O5)C(=C6C=CC2=N6)C7=CC=CC=C7)C8=CC=CC=C8)C=C4)C9=CC=[N+](C=C9)C)N3",
+     "7,12-bis(1-methylpyridin-1-ium-4-yl)-2,17-diphenyl-21-oxa-22,23,24-triazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]tetracosa-1(20),2,4,6(24),7,9,11,13(22),14,16,18-undecaene",
+     "fewer non-PIN parts: 1-methylpyridin-1-ium-4-yl, not 1,4-dihydropyridin-4-ylidene (P-29.3.4.1, P-58.2.2.2)"),
     ("34", "C[N+]1=CC=C(C=C1)C2=CC=C(C=C2)NC(=O)C3=CC=C(C=C3)N=NNC4=CC=C(C=C4)C5=CC=[N+](C=C5)C",
      "1-({[4-(1-methylpyridin-1-ium-4-yl)phenyl]amino}diazenyl)-4-({[4-(1-methylpyridin-1-ium-4-yl)phenyl]amino}(oxo)methyl)benzene",
+     # item 7 (``) made the iminium form nameable without azamethane ('...cyclohexa-2,5-dien-1-iminium'); its
+     # constructs are the azaniumyl prefix and two 1,4-dihydropyridin-4-ylidene spellings (row 33), against the one
+     # 'amino(oxo)methyl' of the drawing, so the drawing's name stands (lane/l17 fix a performance pass)
      "fewer non-PIN parts: 1-methylpyridin-1-ium-4-yl, not 1-azamethan-1-ium-1-yl and 1,4-dihydropyridin-4-ylidene (P-73.1.1.2)"),
     ("35", "C[N+]1=CC=C(C=C1)C=CC2=CC=C(C=C2)NC3=NC(=NC(=N3)N(CCO)CCO)NC4=CC=C(C=C4)C=CC5=CC=[N+](C=C5)C.[Cl-].[Cl-]",
      # (g) (the Blue Book, section " NUMBERING":3219): "lowest locants for the substituent cited first as
@@ -124,9 +142,6 @@ KEPT = [
     # '(2-{...}hydrazinyl)' before, a locant of the unit without the free valence's
     ("30", "C[N+]1=C2C=CC=CN2C=C1C3=CC=C(C=C3)/C=N/NC(=O)N/N=C\\C4=CC=C(C=C4)C5=CN6C=CC=CC6=[N+]5C",
      "7-methyl-8-{4-[(1Z)-{[({(1E)-[4-(7-methyl-1,7-diazabicyclo[4.3.0]nona-1,3,5,8-tetraen-1-ium-8-yl)phenyl]methylidene}hydrazinyl)(oxo)methyl]hydrazinylidene}methyl]phenyl}-1,7-diazabicyclo[4.3.0]nona-1,3,5,8-tetraen-1-ium",
-     "systematic_verified"),
-    ("33", "C[N+]1=CC=C(C=C1)C2=C3C=CC(=C(C4=NC(=C(C5=CC=C(O5)C(=C6C=CC2=N6)C7=CC=CC=C7)C8=CC=CC=C8)C=C4)C9=CC=[N+](C=C9)C)N3",
-     "12-(1-methyl-1,4-dihydropyridin-4-ylidene)-7-(1-methylpyridin-1-ium-4-yl)-2,17-diphenyl-21-oxa-22,23,24-triazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]tetracosa-1(20),2,4,6(24),7,9,11(23),13(22),14,16,18-undecaen-23-ium",
      "systematic_verified"),
     ("t0", "CN\\1C=CS/C1=C\\2/C3=NC(=CC4=NC(=C(C5=NC(=CC6=CC=C2N6)C=C5)C7=[N+](C=CS7)C)C=C4)C=C3",
      "3-methyl-2-[12-(3-methyl-2,3-dihydro-1,3-thiazol-2-ylidene)-21,22,23,24-tetraazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]tetracosa-1(20),2,4,6(24),7,9,11(23),13(22),14,16,18-undecaen-2-yl]-1,3-thiazol-3-ium",

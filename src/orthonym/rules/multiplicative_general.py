@@ -71,6 +71,7 @@ the linker.
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter
 from itertools import combinations
 from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
@@ -367,8 +368,13 @@ class _Kernel:
         return self.skel | self.pcg
 
 
-def _ring_kernel_ok(mol, ring: FrozenSet[int]) -> bool:
-    """A monocycle that is saturated, or mancude without indicated hydrogen."""
+def _ring_kernel_ok(mol, ring: FrozenSet[int], fused: bool = False) -> bool:
+    """A monocycle that is saturated, or mancude without indicated hydrogen. With ``fused`` a ring system of several
+    rings too, when it is fully mancude with no hetero atom that carries a hydrogen, or fully saturated: the
+    systems whose name states no locant of its own beyond the numbering of the system (``naphthalene``,
+    ``quinoline``, ``decahydronaphthalene``)."""
+    if fused and _n_rings_in(mol, ring) > 1:
+        return _fused_kernel_ok(mol, ring)
     if _n_rings_in(mol, ring) != 1:
         return False
     atoms = [mol.GetAtomWithIdx(a) for a in ring]
@@ -381,7 +387,11 @@ def _ring_kernel_ok(mol, ring: FrozenSet[int]) -> bool:
         n = len(ring)
         het = [a for a in atoms if a.GetAtomicNum() != 6]
         if any(a.GetTotalNumHs() for a in het):
-            return False
+            # the azole of one NH ('1H-pyrazole', '1H-imidazole', '1H-pyrrole'): its name states the indicated hydrogen
+            #, which the central group of a polyester's alcoholic component numbers (``fused``)
+            return (fused and n == 5 and len(het) <= 2
+                    and all(a.GetAtomicNum() == 7 for a in het)
+                    and sum(1 for a in het if a.GetTotalNumHs()) == 1)
         if n == 6:
             return all(a.GetAtomicNum() in (6, 7) for a in atoms)
         if n == 5:
@@ -393,17 +403,72 @@ def _ring_kernel_ok(mol, ring: FrozenSet[int]) -> bool:
     return all(b.GetBondType() == Chem.BondType.SINGLE for b in bonds)
 
 
+def _fused_kernel_ok(mol, ring: FrozenSet[int]) -> bool:
+    atoms = [mol.GetAtomWithIdx(a) for a in ring]
+    if any(a.GetAtomicNum() not in _RING_ELEMENTS or a.GetFormalCharge() or a.GetIsotope() for a in atoms):
+        return False
+    bonds = [mol.GetBondBetweenAtoms(a, b) for a in ring for b in ring
+             if a < b and mol.GetBondBetweenAtoms(a, b) is not None]
+    if all(a.GetIsAromatic() for a in atoms):
+        return not any(a.GetAtomicNum() != 6 and a.GetTotalNumHs() for a in atoms)
+    if any(a.GetIsAromatic() for a in atoms):
+        return False
+    return all(b.GetBondType() == Chem.BondType.SINGLE for b in bonds)
+
+
+def _fused_numberings(mol, ring: FrozenSet[int]) -> Optional[List[Dict[int, Tuple[int, str]]]]:
+    """The numberings of a fused ring system as ``{atom: (number, letter)}`` (``(4, 'a')`` for 4a): the numbering the
+    fusion engine gives it, ``fusion_numbering.compute_fused_numbering``) and every numbering that an
+    automorphism of the system's skeleton (its atoms and bonds, the elements kept) carries it to, since a system
+    that has symmetry has all of them as numberings of the same standing, the heteroatoms and the
+    fusion carbon atoms take the lowest locants; no other rule separates them). None when the engine gives no
+    numbering."""
+    from .fusion_numbering import compute_fused_numbering
+    try:
+        base = compute_fused_numbering(mol, set(ring))
+    except Exception:  # noqa: BLE001 - an unnumbered system declines
+        return None
+    if not base or set(base) != set(ring):
+        return None
+
+    def norm(loc):
+        return (loc, "") if isinstance(loc, int) else (int(loc[0]), loc[1]) if isinstance(loc, tuple) else \
+            (int(str(loc).rstrip("abcdefghijklmnopqrstuvwxyz")), str(loc).lstrip("0123456789"))
+    base = {a: norm(l) for a, l in base.items()}
+    order = sorted(ring)
+    skel = Chem.RWMol()
+    for a in order:
+        skel.AddAtom(Chem.Atom(mol.GetAtomWithIdx(a).GetAtomicNum()))
+    index = {a: i for i, a in enumerate(order)}
+    for bd in mol.GetBonds():
+        x, y = bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()
+        if x in index and y in index:
+            skel.AddBond(index[x], index[y], Chem.BondType.SINGLE)
+    skel = skel.GetMol()
+    skel.UpdatePropertyCache(strict=False)
+    out, seen = [], set()
+    for match in skel.GetSubstructMatches(skel, uniquify=False, useChirality=False, maxMatches=4096):
+        num = {order[match[i]]: base[order[i]] for i in range(len(order))}
+        key = tuple(sorted(num.items()))
+        if key not in seen:
+            seen.add(key)
+            out.append(num)
+    return out or None
+
+
 def _ring_parent_name(mol, ring: FrozenSet[int]) -> Optional[str]:
     from ..assembly.fragment_naming import name_fragment_recursively
     from ..data.retained_names import get_retained_name
     from ..errors import is_failure_name
     from ..perception.molcache import canon_smiles
     rw = Chem.RWMol(mol)
+    nh = [mol.GetAtomWithIdx(a).GetTotalNumHs() if mol.GetAtomWithIdx(a).GetIsAromatic()
+          and mol.GetAtomWithIdx(a).GetAtomicNum() != 6 else 0 for a in sorted(ring)]
     for a in sorted(set(range(mol.GetNumAtoms())) - set(ring), reverse=True):
         rw.RemoveAtom(a)
-    for at in rw.GetAtoms():
-        at.SetNoImplicit(False)
-        at.SetNumExplicitHs(0)
+    for at, hs in zip(rw.GetAtoms(), nh):
+        at.SetNoImplicit(bool(hs))      # the hydrogen of an azole's NH is part of the ring
+        at.SetNumExplicitHs(hs)
         at.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
     try:
         Chem.SanitizeMol(rw)
@@ -858,7 +923,7 @@ def _name_unit(mol, k: _Kernel, attach: int, decos: List[Tuple[Set[int], int, in
 # ---------------------------------------------------------------------------
 
 class _Comp:
-    __slots__ = ("kind", "atoms", "order", "name", "ring_name", "assembly", "skel", "subs")
+    __slots__ = ("kind", "atoms", "order", "name", "ring_name", "assembly", "skel", "subs", "ester_group")
 
     def __init__(self, kind, atoms, order=None, name=None):
         # 'ring' | 'assembly' | 'chain' | 'chalc' | 'aba' | 'NH' | 'N3' | 'NN' | 'XX2'
@@ -871,6 +936,7 @@ class _Comp:
         self.ring_name = None
         self.assembly = None  # the ring assembly of an 'assembly' (detect_ring_assembly)
         self.subs = []        # (host atom, branch atoms, branch atom bonded to the host)
+        self.ester_group = False   # a ring of the central group of a polyester's alcoholic component (``ring_subs``)
 
 
 def _assembly_comps(mol, rings) -> Optional[List[_Comp]]:
@@ -1040,7 +1106,11 @@ def _aba_name(z_end: int, z_mid: int) -> Optional[str]:
 
 
 def _linker_components(mol, link: Set[int], rings, branches=(),
-                       strong_pg: bool = False) -> Optional[List[_Comp]]:
+                       strong_pg: bool = False, ring_subs: bool = False) -> Optional[List[_Comp]]:
+    """The components of the linker. ``ring_subs``: the central group of a polyester's alcoholic component
+    (``_ester_organyl_group``), whose ring systems may be fused systems and may carry substituent groups of their own
+    , the Blue Book: "Substitution, expressed by prefixes or implied, is allowed on simple
+    multiplicative groups, symmetrical or unsymmetrical"); in every other use a ring is a bare monocycle."""
     comps: List[_Comp] = []
     left = set(link)
     branch_hosts = Counter(h for h, _b, _atoms in branches)
@@ -1055,14 +1125,16 @@ def _linker_components(mol, link: Set[int], rings, branches=(),
         left -= c.atoms
     for rs in rings:
         if rs & left:
-            if not rs <= left or not _ring_kernel_ok(mol, rs):
+            if not rs <= left or not _ring_kernel_ok(mol, rs, fused=ring_subs):
                 return None
-            c = _Comp("ring", rs, _cycle_order(mol, rs))
-            if c.order is None:
+            fused_system = ring_subs and _n_rings_in(mol, rs) > 1
+            c = _Comp("ring", rs, None if fused_system else _cycle_order(mol, rs))
+            if c.order is None and not fused_system:
                 return None
             c.ring_name = _ring_parent_name(mol, rs)
             if c.ring_name is None:
                 return None
+            c.ester_group = ring_subs
             comps.append(c)
             left -= rs
     carbons = {a for a in left if mol.GetAtomWithIdx(a).GetAtomicNum() == 6}
@@ -1175,6 +1247,12 @@ def _linker_components(mol, link: Set[int], rings, branches=(),
     # the branches go to the component of their host atom; rings take none
     for host, b_atom, atoms in branches:
         c = next((c for c in comps if host in c.skel), None)
+        if ring_subs and c is not None and c.kind == "ring":
+            if mol.GetBondBetweenAtoms(host, b_atom).GetBondTypeAsDouble() != 1.0:
+                return None
+            c.subs.append((host, b_atom, atoms))
+            c.atoms = c.atoms | atoms
+            continue
         if c is None or c.kind in ("ring", "assembly", "chalc", "aba", "XX2", "NN", "NH", "N3"):
             return None
         if c.kind in ("atom", "hchain"):
@@ -1246,7 +1324,8 @@ def _hchain_hydride(z: int, n: int) -> Optional[str]:
 
 
 def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Set[int]],
-                orders: Sequence[float] = (), stereo: Optional[Dict[Tuple[int, int], str]] = None):
+                orders: Sequence[float] = (), stereo: Optional[Dict[Tuple[int, int], str]] = None,
+                centres=None):
     """Name a carbon-chain (or homogeneous hetero-chain) component. ``fv``: atom ->
     number of free valences; ``toward_parent``: atoms whose free valence points to the
     parent units (a branch component), or None for the central component. The second
@@ -1259,8 +1338,11 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
     entries = _sub_entries(mol, comp, fv)
     if entries is None:
         return None
+    chain_centres = [a for a in order if centres and a in centres]
     ylidene = False
     if n == 1:
+        if chain_centres:
+            return None
         a = order[0]
         h = mol.GetAtomWithIdx(a).GetTotalNumHs()
         if list(orders) == [1.0, 2.0]:
@@ -1314,7 +1396,7 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
         else:
             mult = sorted(min(num[order[i]], num[order[j]]) for i, j, _ in unsat)
             dbl = sorted(min(num[order[i]], num[order[j]]) for i, j, o in unsat if o == 2.0)
-            key = (fvl, mult, dbl, subl)
+            key = (fvl, mult, dbl, subl, _centre_ranks(centres, num, chain_centres) if chain_centres else ())
         cands.append((key, num))
     best = min(c[0] for c in cands)
     names = set()
@@ -1355,17 +1437,19 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
             if pre is None:
                 return None
             body = _join_prefix_to_name(pre, body)
-        if stereo:
+        if stereo or chain_centres:
             # (the Blue Book): '1,1'-[(1E)-1-(4-chlorophenyl)ethene-1,2-diyl]
             # dibenzene (PIN)': the descriptor of the double bond leads the name of the group,
-            # cited with the lowest locant of the bond
+            # cited with the lowest locant of the bond; the descriptors of stereocentres stand in the same
+            # parenthesis, in the order of the locants
             marks = []
             for i, j, o in unsat:
-                lab = stereo.get((min(order[i], order[j]), max(order[i], order[j])))
+                lab = (stereo or {}).get((min(order[i], order[j]), max(order[i], order[j])))
                 if lab is not None:
                     marks.append((min(num[order[i]], num[order[j]]), lab))
-            if len(marks) != len(stereo):
+            if stereo and len(marks) != len(stereo):
                 return None
+            marks += [(num[a], centres[a]) for a in chain_centres]
             body = "(" + render_locants(f"{loc}{lab}" for loc, lab in sorted(marks)) + ")-" + body
         names.add(body)
     if len(names) != 1:
@@ -1373,16 +1457,72 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
     return names.pop(), not entries
 
 
-def _ring_comp_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Set[int]]):
-    nums = _hetero_valid(mol, comp.atoms, _cycle_numberings(comp.order))
-    fixed = any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in comp.atoms)
-    if any(c != 1 for c in fv.values()):
+def _centre_ranks(centres, num, atoms) -> tuple:
+    """The CIP descriptors of the stereocentres ``atoms`` in the order of their locants under ``num``, ranked R before
+    S NUMBERING (j), the Blue Book: "When there is a choice for lower locants related to the presence of
+    stereogenic centers or stereoisomers, the lower locant is assigned to CIP stereodescriptors Z, R, M, and r [...]
+    that are preferred to E, S, P, and s")."""
+    return tuple(0 if centres[a] == "R" else 1 for a in sorted(atoms, key=lambda a: num[a]))
+
+
+def _stereo_block(num, marks) -> str:
+    """'(1R,2R)-' for ``marks`` = [(atom, 'R' | 'S' | 'E' | 'Z',...)] cited at the locants of ``num``, in the order of
+    the locants: the descriptors of a group stand in front of its name, one parenthesis, locants first)."""
+    cited = sorted(((num[a][0], num[a][1], lab) for a, lab in marks))
+    return "(" + render_locants(f"{n}{suf}{lab}" for n, suf, lab in cited) + ")-"
+
+
+def _ring_comp_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Set[int]], centres=None):
+    """The name of a ring component as a group with free valences: 'benzene-1,3,5-triyl', '1,2-phenylene',
+    'cyclopropane-1,1-diyl', and, for the central group of a polyester's alcoholic component
+    (``_linker_components`` ``ring_subs``), a ring that carries substituent groups ('4-chloro-1,3-phenylene'),
+    a fused system ('naphthalene-1,5-diyl') and stereocentres ('(1R,2R)-cyclohexane-1,2-diyl').
+
+    The numbering is the lowest locants, in order, for the heteroatoms (fixed by the ring), the free valences
+    ,: the free valences before the detachable prefixes), all substituent prefixes together, the
+    prefix cited first (g),:3306), then CIP R before S (j),:3346). Two free valences on one atom ('cyclopropane-1,1-diyl')
+    are those of a saturated ring only."""
+    if comp.subs and toward_parent is not None:
         return None
+    if comp.order is not None:
+        nums = [{a: (n, "") for a, n in num.items()}
+                for num in _hetero_valid(mol, comp.skel, _cycle_numberings(comp.order))]
+    else:
+        nums = _fused_numberings(mol, comp.skel)
+        if not nums:
+            return None
+    fixed = any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in comp.skel)
+    if any(c != 1 for c in fv.values()) and (
+            not comp.ester_group or any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in comp.skel)):
+        return None
+    indicated = re.match(r"(\d+)H-", comp.ring_name or "")
+    if indicated:
+        #: the name states the indicated hydrogen ('1H-pyrazole'); only the numberings that give the
+        # atom that carries it that locant name this structure
+        h_atoms = [a for a in comp.skel if mol.GetAtomWithIdx(a).GetAtomicNum() != 6
+                   and mol.GetAtomWithIdx(a).GetTotalNumHs()]
+        nums = [n for n in nums if len(h_atoms) == 1 and n[h_atoms[0]] == (int(indicated.group(1)), "")]
+        if not nums:
+            return None
+    entries = _sub_entries(mol, comp, fv)
+    if entries is None or any(nums[0][h][1] for h, _p in entries):
+        return None             # a prefix on a fusion atom has no locant that this writer cites
+    if entries and not any(mol.GetAtomWithIdx(a).GetTotalNumHs() for a in comp.skel
+                           if a not in {h for h, _p in entries} and a not in fv):
+        return None             # every position taken: the locants of a completely substituted group are omitted
+                                # under (the Blue Book), which this writer does not apply
+    ring_centres = [a for a in comp.skel if centres and a in centres]
+    from ..assembly.naming_utils import prefix_citation_sort_key
     cands = []
     for num in nums:
-        allv = sorted(num[a] for a in fv)
+        allv = sorted(num[a] for a, c in fv.items() for _ in range(c))
         if toward_parent is None:
-            key = (allv,)
+            by: Dict[str, List[Tuple[int, str]]] = {}
+            for h, p in entries:
+                by.setdefault(p, []).append(num[h])
+            key = (allv, sorted(num[h] for h, _p in entries),
+                   [sorted(by[p]) for p in sorted(by, key=prefix_citation_sort_key)],
+                   _centre_ranks(centres, num, ring_centres) if ring_centres else ())
         else:
             par = sorted(num[a] for a in toward_parent)
             key = (allv, par) if fixed else (par, allv)
@@ -1393,17 +1533,27 @@ def _ring_comp_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optiona
         if key != best:
             continue
         if toward_parent is None:
-            locs = sorted(num[a] for a in fv)
+            locs = sorted(num[a] for a, c in fv.items() for _ in range(c))
         else:
             locs = sorted(num[a] for a in fv if a not in toward_parent) + \
                 sorted(num[a] for a in toward_parent)
         word = _VALENCE_WORD.get(len(locs))
         if word is None:
             return None
+        text = [f"{n}{suf}" for n, suf in locs]
         if comp.ring_name == "benzene" and len(locs) == 2:
-            names.add(f"{locs[0]},{locs[1]}-phenylene")
+            body = f"{text[0]},{text[1]}-phenylene"
         else:
-            names.add(f"{comp.ring_name}-{render_locants(locs)}-{word}")
+            body = f"{comp.ring_name}-{render_locants(text)}-{word}"
+        if entries:
+            pre = _render_prefixes([(num[h][0], p) for h, p in entries], False)
+            if pre is None:
+                return None
+            from ..assembly.composition_primitives import _join_prefix_to_name
+            body = _join_prefix_to_name(pre, body)
+        if ring_centres:
+            body = _stereo_block(num, [(a, centres[a]) for a in ring_centres]) + body
+        names.add(body)
     if len(names) != 1:
         return None
     return names.pop(), True
@@ -1491,13 +1641,13 @@ def _units_and_linker(mol, units: List[_Kernel], rings, same_key_kernels):
     return link, decos, attach
 
 
-def _linker_tree(mol, link: Set[int], units, attach, rings):
+def _linker_tree(mol, link: Set[int], units, attach, rings, ring_subs: bool = False):
     split = _split_backbone(mol, link, [a for _h, a, _o in attach])
     if split is None:
         return None
     backbone, branches = split
     comps = _linker_components(mol, backbone, rings, branches,
-                               strong_pg=units[0].pg in _STRONG_PG)
+                               strong_pg=units[0].pg in _STRONG_PG, ring_subs=ring_subs)
     if comps is None:
         return None
     where = {}
@@ -1617,7 +1767,7 @@ def _atom_comp_name(mol, comp: _Comp, fv: Dict[int, int], orders: Sequence[float
     return _join_prefix_to_name(pre, word), False
 
 
-def _name_component(mol, comps, adj, edges, where, node, parent, stereo=None):
+def _name_component(mol, comps, adj, edges, where, node, parent, stereo=None, centres=None):
     c = comps[node[1]]
     fixed = _fixed_name(c)
     if fixed is not None:
@@ -1632,14 +1782,18 @@ def _name_component(mol, comps, adj, edges, where, node, parent, stereo=None):
         if parent is not None and nx != parent:
             toward.add(a)
     orders.sort()
+    if centres and parent is not None and any(a in centres for a in c.skel):
+        return None             # the configuration of a group of a branch is cited by no one here
     if c.kind in ("chain", "hchain"):
-        return _chain_name(mol, c, fv, toward, orders, stereo)
+        return _chain_name(mol, c, fv, toward, orders, stereo, centres)
     if c.kind == "atom":
+        if centres and any(a in centres for a in c.skel):
+            return None
         return _atom_comp_name(mol, c, fv, orders)
     if any(o != 1.0 for o in orders):
         return None
     if c.kind == "ring":
-        return _ring_comp_name(mol, c, fv, toward)
+        return _ring_comp_name(mol, c, fv, toward, centres)
     if c.kind == "assembly":
         return _assembly_comp_name(mol, c, fv, parent)
     return None
@@ -1660,20 +1814,20 @@ def _assembly_comp_name(mol, comp: _Comp, fv: Dict[int, int], parent):
     return (name, True) if name else None
 
 
-def _multiplying_group(mol, units, comps, edges, adj, where, stereo=None):
+def _multiplying_group(mol, units, comps, edges, adj, where, stereo=None, centres=None, ester_group=False):
     roots = [("c", i) for i in range(len(comps))
              if _identical_children(mol, adj, comps, units, edges, where, ("c", i), None)]
     if len(roots) != 1:
         return None
     root = roots[0]
     kids = [n for n in adj[root]]
-    rn = _name_component(mol, comps, adj, edges, where, root, None, stereo)
+    rn = _name_component(mol, comps, adj, edges, where, root, None, stereo, centres)
     if rn is None:
         return None
     root_name, _ = rn
     # a substituted central group is a compound group: enclosed ('(acetylazanediyl)',
-    # '(2-methylpropane-1,3-diyl)bis(oxy)',, the Blue Book)
-    root_subs = bool(comps[root[1]].subs)
+    # '(2-methylpropane-1,3-diyl)bis(oxy)',, the Blue Book); so is one that states a configuration
+    root_subs = bool(comps[root[1]].subs) or bool(centres and any(a in centres for a in comps[root[1]].skel))
     if all(k[0] == "u" for k in kids):
         return root_name, len(kids), root_subs or bool(stereo), comps[root[1]]
     if any(k[0] == "u" for k in kids):
@@ -1681,6 +1835,20 @@ def _multiplying_group(mol, units, comps, edges, adj, where, stereo=None):
     if root_subs or stereo:
         from ..assembly.naming_utils import apply_enclosing_marks as _enc
         root_name = _enc(root_name, -1)
+    elif ester_group and comps[root[1]].kind == "assembly":
+        # The Blue Book writes the group of a ring assembly as it stands before the multiplying prefix
+        # ('[1,1'-biphenyl]-4,4'-diylbis(methylene)', as '[1,1'-biphenyl]-4,4'-diylbis(oxy)' of:6126). OPSIN reads it
+        # only enclosed once more: the default tier spells the book's form (``validation.twin_spellings``,
+        # 'assembly_diyl_enclosed', proves its structure); a wider tier spells the form OPSIN reads and records
+        # it as no PIN spelling.
+        from ..validation.twin_spellings import pin_spellings_on
+        if not pin_spellings_on():
+            from ..metrics.provenance import record_non_pin_label
+            root_name = f"({root_name})"
+            record_non_pin_label(
+                root_name, rule="P-16.5.1.2",
+                detail="the group of a ring assembly is enclosed once more so that OPSIN reads it; the Blue Book "
+                       "writes it without the extra enclosing marks")
     # walk one branch: components in order, the last one carries the units
     branch: List[str] = []
     branch_locants: List[bool] = []
@@ -2075,6 +2243,156 @@ def name_general_multiplicative(mol) -> Optional[str]:
     except Exception as exc:  # noqa: BLE001 - the detector never breaks naming
         logger.debug("general multiplicative detector error: %s", exc)
         return None
+
+
+class _EsterOxygen:
+    """The oxygen of an ester group as the unit of a multivalent organyl group: in the functional class name of an
+    ester the alcoholic component takes the place that the identical parent structures take in a multiplicative name
+     "Introduction", (2), the Blue Book: "A subset of functional class nomenclature in which the identical
+    structural units are linked by a di- or polyvalent nonacidic residue (this subset is only used to name esters"), so
+    the group that links them is named as the central multiplicative group is."""
+    __slots__ = ("core", "pg")
+
+    def __init__(self, atom: int):
+        self.core = frozenset({atom})
+        self.pg = None
+
+
+def name_ester_organyl_group(mol, ester_matches) -> Optional[str]:
+    """The multivalent organyl group of the ester groups ``ester_matches`` (``(acyl C, =O, O, alcohol C)`` tuples), as
+    the first word of the functional class name of a polyester that has one alcoholic component, or None.
+
+     "Polyesters formed from a single 'alcoholic' component" (the Blue Book): "Esters derived from a
+    single 'polyhydroxylic' component are named by placing the name of the 'polyhydroxylic' component denoted by a
+    multivalent organyl group (alkyl, aryl, etc.) in front of the name(s) of the acid component"; the group is one
+    parent ('2-chloropropane-1,3-diyl') or a multiplicative group when the parents that carry the ester groups are
+    identical arms of a central unit ('1,2-phenylenedi(propane-3,1-diyl) diacetate [PIN; see (2) and
+    ]',:31829; '2-[3-(formyloxy)propyl]cyclohexane-1,1-diyldi(propane-3,1-diyl) diacetate (PIN)',:31878). The
+    conditions of (:23178) for the arms are those of ``_multiplying_group``: identical linking bonds,
+    symmetrically substituted arms, identical locants.
+
+    The group is named only for a whole molecule (``name_general_multiplicative`` gives the reason), with the alcoholic
+    component neutral, free of stereocentres and of an element or a unit the group reader does not know; the double bond
+    of a central chain keeps its descriptor. Nothing else is claimed: None leaves the molecule to the producers
+    that cite the other ester groups as prefixes."""
+    from ..assembly.fragment_naming import is_top_level_naming
+    from .isotope_alternative import alternative_skeleton_active
+    if mol is None or not is_top_level_naming() or alternative_skeleton_active():
+        return None             # (the isotope decorator withholds the group: the labels make its arms unlike)
+    try:
+        return _ester_organyl_group(mol, ester_matches)
+    except Exception as exc:  # noqa: BLE001 - the detector never breaks naming
+        logger.debug("ester organyl group error: %s", exc)
+        return None
+
+
+_ESTER_GROUP = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+
+
+def polyester_organyl_group_named(mol) -> bool:
+    """True when the polyester ``mol`` has a multivalent organyl group (:func:`name_ester_organyl_group`), whatever
+    the scope the naming runs in: the question of ``rules.isotope_alternative.has_alternative``."""
+    matches = [tuple(m) for m in mol.GetSubstructMatches(_ESTER_GROUP)]
+    if len(matches) < 2:
+        return False
+    try:
+        return _ester_organyl_group(mol, matches) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _ester_organyl_group(mol, ester_matches) -> Optional[str]:
+    if len(ester_matches) < 2 or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    # "Carbohydrates" (the Blue Book): a sugar has its carbohydrate name, not a systematic organyl group
+    from ..assembly.strict_ring_prefix import carbohydrate_core
+    if carbohydrate_core(mol, range(mol.GetNumAtoms())):
+        return None
+    oxygens = [m[2] for m in ester_matches]
+    acyl = {m[0] for m in ester_matches}
+    group_atoms = {x for m in ester_matches for x in m[:3]}
+    attach = [(m[2], m[3]) for m in ester_matches]
+    if len(set(oxygens)) != len(oxygens):
+        return None
+    # the alcoholic component: what the alcohol carbons reach without passing an ester oxygen
+    link: Set[int] = set()
+    stack = [a for _o, a in attach]
+    blocked = set(oxygens)
+    while stack:
+        a = stack.pop()
+        if a in link:
+            continue
+        link.add(a)
+        stack.extend(n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()
+                     if n.GetIdx() not in blocked and n.GetIdx() not in link)
+    if link & acyl or link & group_atoms or not {a for _o, a in attach} <= link:
+        return None
+    for a in link:
+        at = mol.GetAtomWithIdx(a)
+        if (at.GetAtomicNum() not in _ALLOWED_Z or at.GetIsotope() or at.GetNumRadicalElectrons()
+                or at.GetFormalCharge()):
+            return None
+        if at.GetAtomicNum() == 6 and _is_acid_group_carbon(at):
+            return None     # an acid ranks above the esters, Table 4.1): it would be the parent
+    centres = _link_centres(mol, link)
+    if centres is None:
+        return None
+    units = [_EsterOxygen(o) for o, _a in attach]
+    rings = _ring_systems(mol)
+    if any(rs & link and not rs <= link for rs in rings):
+        return None
+    tree = _linker_tree(mol, link, units, [(o, a, 1.0) for o, a in attach], rings, ring_subs=True)
+    if tree is None:
+        return None
+    comps, edges, adj, where = tree
+    if _phane_or_replacement(mol, rings, link, comps, group_atoms):
+        return None
+    stereo_labels = _double_bond_labels(mol)
+    if stereo_labels is None:
+        return None
+    mg = _multiplying_group(mol, units, comps, edges, adj, where, stereo_labels or None, centres or None,
+                            ester_group=True)
+    if mg is None:
+        return None
+    group, n_units, _enclose, root_comp = mg
+    if n_units != len(units):
+        return None
+    if stereo_labels and (root_comp.kind != "chain" or not all(
+            a in root_comp.skel and b in root_comp.skel for a, b in stereo_labels)):
+        return None     # the configuration of a double bond outside the central chain is not cited
+    if centres and not set(centres) <= root_comp.skel:
+        return None     # the configuration of a stereocentre outside the central group is not cited
+    return group
+
+
+def _is_acid_group_carbon(atom) -> bool:
+    """A carboxylic carbon (C(=O)OH) or a carbon of another acid group of the book's seniority list above esters."""
+    nbrs = list(atom.GetNeighbors())
+    return (any(n.GetAtomicNum() == 8 and n.GetTotalNumHs() == 1 and n.GetDegree() == 1 for n in nbrs)
+            and any(n.GetAtomicNum() == 8 and n.GetDegree() == 1 and n.GetTotalNumHs() == 0
+                    and atom.GetOwningMol().GetBondBetweenAtoms(atom.GetIdx(), n.GetIdx()).GetBondTypeAsDouble() == 2.0
+                    for n in nbrs))
+
+
+def _link_centres(mol, link: Set[int]):
+    """{atom: 'R' | 'S'} for the stereocentres of the alcoholic component; {} when it has none, None when a centre is no
+    R or S one (a pseudoasymmetric r or s centre, an unassigned label) or the labels cannot be read."""
+    if not any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in link):
+        return {}
+    from ..perception.stereo import get_stereocenters
+    try:
+        found = {c["idx"]: c["cip"] for c in get_stereocenters(Chem.Mol(mol))}
+    except Exception:  # noqa: BLE001
+        return None
+    out = {}
+    for a in link:
+        if mol.GetAtomWithIdx(a).GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED:
+            continue
+        lab = found.get(a)
+        if lab not in ("R", "S"):
+            return None
+        out[a] = lab
+    return out
 
 
 def _assembled_rings(mol, rings) -> Set[FrozenSet[int]]:

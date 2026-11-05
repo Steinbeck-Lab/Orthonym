@@ -118,6 +118,23 @@ def _functional_class_name(features: Any) -> Optional[str]:
         return None
 
 
+def _names_principal_esters_by_prefixes_only_at_the_pin_tier(mol) -> bool:
+    """True at the PIN tier for a whole molecule (the name of the assembler is no PIN there, see ``name_ring_ester``);
+    at a wider tier False, after noting that the PIN tier is to be asked for its name (``assembly.pin_first``). False
+    for a molecule with a pyranose or furanose ring: "Carbohydrates" (the Blue Book) gives the
+    carbohydrate name, not the systematic oxane name, as the PIN, and that route is not decided here."""
+    from ...metrics.provenance import wider_tier_ctx
+    from ..fragment_naming import is_top_level_naming
+    from ..strict_ring_prefix import carbohydrate_core
+    if not is_top_level_naming() or carbohydrate_core(mol, range(mol.GetNumAtoms())):
+        return False
+    if not wider_tier_ctx.get():
+        return True
+    from ..pin_first import note_pin_tier_asked
+    note_pin_tier_asked()
+    return False
+
+
 def name_ring_ester(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
@@ -155,10 +172,42 @@ def name_ring_ester(
         # injector fails closed rather than cite the ring's numbering.
         parent_scope = _alcohol_is_ring(features.mol)
     else:
-        ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
-        # Substitutive ring parent by construction -- the assembler numbers the
-        # ring and cites every ester as an acyloxy prefix on it.
-        parent_scope = 'ring'
+        # "When anions are identical functional class multiplicative nomenclature is used"
+        # (the Blue Book): the ester groups of one ring (or of identical arms of one ring) are one multivalent
+        # organyl group in front of the multiplied anion ('cyclohexane-1,2-diyl diacetate'); the acyloxy prefixes of
+        # the assembler below cite every principal ester as a prefix, which no PIN does.
+        from ...rules.esters import _try_functional_class_diol_diester
+        ring_ester_name = _try_functional_class_diol_diester(
+            features.mol, getattr(features, 'all_ester_matches', None) or [])
+        if ring_ester_name is not None:
+            parent_scope = None
+        else:
+            # The assembler below cites EVERY principal ester as an acyloxy prefix of the ring, which no PIN does:
+            # "All preferred IUPAC names for esters are named by functional class
+            # nomenclature", the other ester groups being the prefixes of the alcoholic component,
+            #:31856: '2-[2-(acetyloxy)ethyl]phenyl acetate (PIN)',:31897). The PIN tier does not take its name, so it
+            # leaves the molecule to the producers that name one ester by its class (the split of the decomposition
+            # engine); a wider tier keeps the name as its fallback and asks the PIN tier first.
+            if _names_principal_esters_by_prefixes_only_at_the_pin_tier(features.mol):
+                return None
+            # the name of a wider tier that cites the principal esters as prefixes is no name for the split's decision
+            # (``assembly.ester_prefix_probe``): the ester is named by its class where the split can
+            # ('4-(acetyloxy)phenyl propanoate', method (2) of,:31831), and this name stays when it cannot
+            from ..ester_prefix_probe import probe_watched, record_principal_ester_prefix
+            if probe_watched():
+                record_principal_ester_prefix()
+            ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
+            # Substitutive ring parent by construction -- the assembler numbers the
+            # ring and cites every ester as an acyloxy prefix on it.
+            parent_scope = 'ring'
+            #... which is the name of a lower class for an ester molecule General methodology, "All
+            # preferred IUPAC names for esters are named by functional class nomenclature"): in the probe of the
+            # decomposition engine at a wider tier it is no name (``assembly.ester_prefix_probe``), as the Tier-A ring
+            # cascade's is.
+            from ...metrics.provenance import wider_tier_ctx
+            from ..ester_prefix_probe import probe_watched, record_principal_ester_prefix
+            if ring_ester_name and wider_tier_ctx.get() and probe_watched():
+                record_principal_ester_prefix()
     if not ring_ester_name:
         return None
 

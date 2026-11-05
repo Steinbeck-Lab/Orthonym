@@ -292,7 +292,7 @@ _IDLE_CONTEXTVARS: Tuple[Tuple[str, str, object], ...] = (
 _IDLE_THREAD_LOCALS: Tuple[Tuple[str, str, Dict[str, object]], ...] = (
     ("orthonym.assembly.fragment_naming", "_fragment_guard",
      {"work_budget": None, "perf_budget": None, "analysis_budget": None,
-      "cache": None, "naming_pass_cap": None, "name_inputs": []}),
+      "cache": None, "cycle_hits": None, "naming_pass_cap": None, "name_inputs": []}),
     ("orthonym.namer", "_LP_INPUT", {"open": False, "rewrite": None}),
     ("orthonym.namer", "_CALLER_INPUT", {"smiles": None}),
     ("orthonym.namer", "_ALT_PARENT_RESCUE", {"active": False}),

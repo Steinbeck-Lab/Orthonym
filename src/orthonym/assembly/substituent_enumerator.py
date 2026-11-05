@@ -1038,9 +1038,6 @@ def _route_fragment_to_general_engine(mol, frag_atoms, attach_idx):
     return yl_name
 
 
-_ORDER_INT_RE = re.compile(r"\d+")   # Lever G: parse RDKit's '[0,1,2,]' output-order prop
-
-
 def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
                           best_effort_val):
     """Complete cache key for:func:`name_substituent` (M1 Lever C1).
@@ -1067,106 +1064,36 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     can only be used with molecules that have a single fragment", and logs the refusal
     on every call: the question is asked here, so it is not put to RDKit).
     """
+    from .fragment_key import key_parts
     from .nested_memo import renaming_state
-    attach_in_frag = attach_idx in frag_atoms
-    # RDKit refuses a fragment rooted at an atom of a molecule with more than one fragment ("rootedAtAtom
-    # can only be used with molecules that have a single fragment"), so such a molecule (a mixture named as
-    # one graph) gets the fragment SMILES unrooted and the attachment atom's place in its canonical atom
-    # order beside it: the same information as the rooted SMILES, and a key no single-fragment molecule
-    # shares. A key it cannot build skipped the cache, and a mixture re-asked for the same prefix tens of
-    # thousands of times inside one naming (the strict twin's promotion re-run).
-    multi_fragment = attach_in_frag and len(Chem.GetMolFrags(mol)) > 1
-    frag_set = set(frag_atoms)
-    _atoms = atoms_of(mol)
-    # Own bonds go to RDKit as ``bondsToUse`` (left to find them, a rooted call walks every bond: 1.7 vs 0.6 ms at
-    # 404 atoms, same string); the bond CIP stamp below takes them in bond-index order. With them RDKit skips its
-    # single-fragment check of a rooted call, so ``multi_fragment`` must keep a mixture unrooted (-1).
-    _frag_bonds = {}
-    for _i in frag_set:
-        for _b in _atoms[_i].GetBonds():
-            if _b.GetOtherAtomIdx(_i) in frag_set:
-                _frag_bonds[_b.GetIdx()] = _b
-    smi = Chem.MolFragmentToSmiles(
-        mol, atomsToUse=sorted(frag_atoms), bondsToUse=sorted(_frag_bonds),
-        rootedAtAtom=(attach_idx if attach_in_frag and not multi_fragment else -1),
-        isomericSmiles=True, canonical=True)
-    _a = mol.GetAtomWithIdx(attach_idx)
-    ext_free_valence = sum(
-        int(b.GetBondTypeAsDouble()) for b in _a.GetBonds()
-        if b.GetOtherAtom(_a).GetIdx() not in frag_set)
-    if not mol.HasProp('_smilesAtomOutputOrder'):
-        return None
-    _order = [int(x) for x in _ORDER_INT_RE.findall(mol.GetProp('_smilesAtomOutputOrder'))]
-    # Lever G (2026-09-12): one materialised atom tuple instead of two GetAtomWithIdx calls per
-    # atom here and two per external bond below. Same atoms, same values, same tuple.
-    atom_cips = tuple(
-        (_atoms[i].GetProp('_CIPCode') if _atoms[i].HasProp('_CIPCode') else None)
-        for i in _order)
-    _rank = {idx: pos for pos, idx in enumerate(_order)}
-    if multi_fragment:
-        smi = ("multi-fragment", smi, _rank.get(attach_idx, -1))
-    _bond_items = [((_rank.get(_b.GetBeginAtomIdx(), -1), _rank.get(_b.GetEndAtomIdx(), -1)),
-                    _b.GetProp('_CIPCode') if _b.HasProp('_CIPCode') else None)
-                   for _b in map(_frag_bonds.get, sorted(_frag_bonds))]
-    _bond_items.sort(key=lambda t: t[0])
-    bond_cips = tuple(c for _, c in _bond_items)
-    # Item-1 fix : MolFragmentToSmiles drops each fragment atom's bonds to
-    # atoms OUTSIDE the fragment and back-fills implicit H, so two structurally
-    # distinct substituents (terminal formyl-on-N `formamido` vs an acyl-bridge
-    # `carbamoyl`) collide on the same `smi`. `ext_free_valence` above measures
-    # only the ATTACH atom, so a non-attach atom's external bond was invisible.
-    # Capture every fragment atom's external-bond-order multiset, in the canonical
-    # fragment-SMILES output order, so the key is COMPLETE. Finer keys only turn a
-    # false HIT into a MISS (recompute) -> byte-identity-safe.
-    ext_bond_orders = tuple(
-        tuple(sorted(
-            b.GetBondTypeAsDouble()
-            for b in _atoms[i].GetBonds()
-            if b.GetOtherAtomIdx(i) not in frag_set))
-        for i in _order)
-    # Item-1 fix, a performance pass (, a review C1): the fragment SMILES + external-bond
-    # ORDERS still describe only the fragment and the multiplicities of its
-    # outward bonds -- NOT what those bonds lead to. Producers on the cascade read
-    # BEYOND the fragment: ``_name_amino_branch`` walks the acyl carbon's external
-    # chain and counts its carbons (in ONE molecule, a propanoyl and a butanoyl
-    # ``-NH-C(=O)-`` bridge both present the ``{N,C,O}`` sub-fragment), and the
-    # ring-cut checks read ``RingInfo`` for rings that close through external atoms
-    # (a pyrrolidine C4 vs an acyclic C4 diyl). Those distinct inputs cannot be
-    # told apart by any FRAGMENT-only signature.
+    # The structural components (the rooted fragment SMILES and the walks over the fragment atoms' bonds, kept for
+    # the naming scope: ``assembly.fragment_key``). The rest of the comments of this key:
     #
-    # The complete-by-construction fix (mirroring ``_POLYFUNC_MEMO_CACHE``'s
-    # ``(frozenset(sub_atoms), attach_idx)`` key, substituent_naming.py:1584): the
-    # memo scope is ONE top-level naming call, so within it the producer's input is
-    # exactly ``(mol, frag_atoms, attach_idx, flags)``. ``frozenset(frag_atoms)``
-    # is a PERFECT fragment discriminator within a molecule -- two different
-    # substituents are two different atom-index sets, so the propanoyl and butanoyl
-    # ``{N,C,O}`` fragments (distinct positions) get distinct keys -- and raw
-    # ``attach_idx`` splits the symmetric same-fragment/different-end case (C1.3,
-    # ``butan-1-yl`` vs ``butan-4-yl``). The retained structural bits (``smi``,
-    # ``ext_bond_orders``, CIP stamp) still discriminate mol OBJECTS, so a copy of
-    # the mol with coinciding indices but a different structure cannot false-hit.
-    # ``frozenset(frag_atoms)`` strictly subsumes what a canonical-rank signature
-    # did (it separates even symmetric fragments a rank collapses), so the key is
-    # only FINER -> a false HIT can become only a MISS (recompute) -> byte-identity
-    # preserved.
-    # The whole molecule's atom-ordered graph (``_mol_graph_key``, as in the key of
-    # ``name_substituent_for_ordering``): "within one scope the input is exactly (mol, frag_atoms,
-    # attach_idx)" holds for ONE molecule, and a scope holds several -- the nested namings of a
-    # glycoside name its smaller pieces as molecules of their own, with the same atom indices. The
-    # bits above did not tell them apart: the O-CH2 of {6, 7} was '{[...tetrahydroxyoxan-2-yl]methoxy}'
-    # in the sugar alone and '{[(...)-6-{[...]oxy}-3,4,5-trihydroxyoxan-2-yl]methoxy}' in the whole
-    # glycoside, and the first molecule's value was served to the second.
-    # The state of a re-entrant naming (``nested_memo.renaming_state``): 'NC(=O)C(N)CO' of one molecule
-    # was declined inside the peptide handler's attempt and is '2-amino-3-hydroxypropanamido' outside it.
-    # a lever: the strict PIN twin (namer.py) runs with the four breadth flags OFF,
-    # so a value cached at one configuration must never be served to another when the
-    # twin shares this run's memo scope. ``best_effort_val`` is already the
-    # ``best_effort_ctx`` bit; append the other three. Finer key => only MORE misses
-    # (recompute), never a false hit => byte-identity-safe.
+    # * ``MolFragmentToSmiles`` drops each fragment atom's bonds to atoms OUTSIDE the fragment and back-fills implicit
+    # H, so two structurally distinct substituents (terminal formyl-on-N `formamido` vs an acyl-bridge `carbamoyl`)
+    # collide on the same `smi`; ``ext_bond_orders`` (every fragment atom's external-bond-order multiset, in the
+    # canonical output order) and ``ext_free_valence`` separate them. A fragment of a molecule with more than one
+    # fragment is keyed by its unrooted SMILES and the attachment atom's place in the canonical atom order (RDKit
+    # refuses a rooted SMILES there).
+    # * ``frozenset(frag_atoms)`` is a PERFECT fragment discriminator within a molecule, and raw ``attach_idx`` splits
+    # the symmetric same-fragment/different-end case (``butan-1-yl`` vs ``butan-4-yl``); producers on the cascade
+    # read BEYOND the fragment (``_name_amino_branch`` walks the acyl carbon's external chain, the ring-cut checks
+    # read ``RingInfo`` for rings that close through external atoms), which no fragment-only signature tells apart.
+    # Finer keys only turn a false HIT into a MISS (recompute): byte-identity-safe.
+    # * The whole molecule's atom-ordered graph (``_mol_graph_key``, as in the key of ``name_substituent_for_ordering``):
+    # a scope holds several molecules (the nested namings of a glycoside name its smaller pieces as molecules of their
+    # own, with the same atom indices), and the bits above did not tell them apart.
+    # * The state of a re-entrant naming (``nested_memo.renaming_state``: the tier flags, decision A's N-acyl float
+    # scope, the peptide handler's attempt,...) changes the name; a lever: the strict PIN twin runs with the four
+    # breadth flags OFF, so a value cached at one configuration is never served to another.
+    parts = key_parts(mol, frag_atoms, attach_idx)
+    if parts is None:
+        return None
+    smi, attach_in_frag, ext_free_valence, atom_cips, bond_cips, ext_bond_orders, graph_key = parts
     return (smi, attach_in_frag, ext_free_valence,
             bool(allow_mancude), best_effort_val, atom_cips, bond_cips,
             ext_bond_orders, frozenset(frag_atoms), attach_idx,
-            engine_orders_with_mancude(), _mol_graph_key(mol), renaming_state())
+            engine_orders_with_mancude(), graph_key, renaming_state())
 
 
 def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
@@ -4041,7 +3968,7 @@ def _book_monocycle_core_tail(mol, core, attach_idx, deco_carriers):
     if not ring_forms_enabled():
         return None
     from ..rules.monocycle_forms import monocycle_form
-    form = monocycle_form(mol, sorted(core), attach_idx, list(deco_carriers))
+    form = monocycle_form(mol, sorted(core), attach_idx, list(deco_carriers), allow_lambda=True)
     if form is None:
         return None
     tail = form.prefix(attach_idx, 1)
@@ -5996,11 +5923,10 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
     # carbon, so the acylamino loop above skips it; without this branch the
     # cascade re-roots the fragment as `carbamoyl` (swaps S->C, drops S, the two
     # =O and R -- a different molecule). Shared primitive; fails closed (None)
-    # for substituted-arene / CF3 / N,N-disubstituted R (those keep abstaining).
-    from .substituent_naming import sulfonamido_prefix_from_n_branch
-    _sulfonamido = sulfonamido_prefix_from_n_branch(
-        mol, attach_idx, frag_atoms, parent_atoms)
-    if _sulfonamido:
+    # for substituted-arene / CF3 R (those keep abstaining); -N(R')-SO2-R: N-substituted prefix.
+    from .n_acyl_amido import sulfonamido_or_urea_prefix
+    _sulfonamido = sulfonamido_or_urea_prefix(mol, attach_idx, frag_atoms, parent_atoms)
+    if _sulfonamido:  # -NH-SO2-R, -N(R')-SO2-R, '(N-cyclopropylmethanesulfonamido)acetic acid':33029), urea
         return _sulfonamido
 
     # Check for anilino: -NH-phenyl (isolated benzene ring directly on N).

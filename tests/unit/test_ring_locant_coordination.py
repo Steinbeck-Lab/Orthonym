@@ -70,10 +70,20 @@ class TestMultipleEstersPlusSubstituent:
     """Compounds with multiple ester prefixes AND additional substituents."""
 
     def test_diacetyloxy_methyl_cyclohexane(self):
-        """CC(=O)OC1CC(OC(C)=O)CC(C)C1: both esters AND methyl must appear."""
-        result = name_compound("CC(=O)OC1CC(OC(C)=O)CC(C)C1")
-        assert "methyl" in result, f"Missing 'methyl' in: {result}"
-        assert "acetyloxy" in result, f"Missing 'acetyloxy' in: {result}"
+        """CC(=O)OC1CC(OC(C)=O)CC(C)C1: both esters AND the methyl must appear, in the functional class name.
+
+        change-asserted-value (lane l17 suite fix, item 2): the two acetates are the identical anions of one
+        'alcoholic' component, a diol, so the name is the multiplicative functional class name. Primary source:
+        "Polyesters formed from a single 'alcoholic' component",: "When anions are identical functional class
+        multiplicative nomenclature is used. Names are formed by citing the multivalent group, the multiplicative prefix,
+        and the multiplied anionic component name." (the Blue Book; 'ethane-1,2-diyl diacetate (PIN)',:31823).
+        Independent check: ``assert_full_rt`` reads the name back with OPSIN to the input's full InChIKey. Mutation: the
+        assertion fails at the lane base 32ce9ed20e, which names '1,5-bis(acetyloxy)-3-methylcyclohexane'."""
+        from tests.support.rt_assert import assert_full_rt
+        smiles = "CC(=O)OC1CC(OC(C)=O)CC(C)C1"
+        result = name_compound(smiles)
+        assert result == "5-methylcyclohexane-1,3-diyl diacetate", f"Got: {result}"
+        assert_full_rt(result, smiles)
 
 
 class TestLocantConsistency:

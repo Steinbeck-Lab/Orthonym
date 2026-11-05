@@ -75,6 +75,9 @@ class CoverageResult:
             a count.
         method: 'parse_back', 'trivial', 'parse_back_no_inchi', or
             'unavailable'.
+        opsin_unread: With ``method == 'unavailable'``: OPSIN ran and read the name as no structure (a property of the
+            name), as against a run that gave no answer (no jar or JVM, a timeout, a Java-side error: a property of the
+            host, which is all ``False`` says). Always ``False`` for the other methods.
         claimed_atom_indices: Indices of atoms accounted for. Empty on the
             parse-back path, which compares whole structures rather than
             mapping atom to atom.
@@ -106,6 +109,7 @@ class CoverageResult:
     input_inchikey: str = ""
     parsed_inchikey: str = ""
     parsed_smiles: str = ""
+    opsin_unread: bool = False
 
 
 def find_opsin_jar() -> Optional[str]:
@@ -129,6 +133,10 @@ _OPSIN_PARSE_CACHE = {}
 _OPSIN_PARSE_CACHE_MAX = 16384
 
 
+def _parse_cache_key(name: str, opsin_jar: str, allow_radicals: bool = False) -> tuple:
+    return (name, opsin_jar, True) if allow_radicals else (name, opsin_jar)
+
+
 def _parse_name_with_opsin(name: str, opsin_jar: str, allow_radicals: bool = False) -> Optional[str]:
     """Memoizing wrapper over:func:`_parse_name_with_opsin_uncached`.
 
@@ -139,7 +147,7 @@ def _parse_name_with_opsin(name: str, opsin_jar: str, allow_radicals: bool = Fal
     """
     if not name or not opsin_jar:
         return None
-    key = (name, opsin_jar, True) if allow_radicals else (name, opsin_jar)
+    key = _parse_cache_key(name, opsin_jar, allow_radicals)
     cached = _OPSIN_PARSE_CACHE.get(key, _CACHE_MISS)
     if cached is not _CACHE_MISS:
         return cached
@@ -149,11 +157,29 @@ def _parse_name_with_opsin(name: str, opsin_jar: str, allow_radicals: bool = Fal
     return result
 
 
+#: the keys of ``_OPSIN_PARSE_CACHE`` whose run gave no answer (a timeout, a Java-side error, no JVM): their ``None`` says
+#: nothing of the name, as against the ``None`` of a name OPSIN read as no structure (``validate_atom_coverage``)
+_OPSIN_UNANSWERED: set = set()
+
+
 _CACHE_MISS = object()
 
 
 def _parse_name_with_opsin_uncached(name: str, opsin_jar: str, allow_radicals: bool = False) -> Optional[str]:
-    """Parse a single IUPAC name to SMILES using OPSIN JAR.
+    """:func:`_opsin_read`'s structure, the answer of the run noted for:func:`validate_atom_coverage`
+    (``_OPSIN_UNANSWERED``)."""
+    smiles, answered = _opsin_read(name, opsin_jar, allow_radicals)
+    key = _parse_cache_key(name, opsin_jar, allow_radicals)
+    if answered:
+        _OPSIN_UNANSWERED.discard(key)
+    else:
+        _OPSIN_UNANSWERED.add(key)
+    return smiles
+
+
+def _opsin_read(name: str, opsin_jar: str, allow_radicals: bool = False) -> "tuple[Optional[str], bool]":
+    """Parse a single IUPAC name to SMILES using OPSIN JAR: ``(smiles, answered)``, ``answered`` False when the run gave no
+    answer (the subprocess could not run or timed out, a name with a free valence that only the in-process JVM reads).
 
     Mirrors the batch approach from ``scripts/benchmark_chebi500.py``
     (stdin/stdout mode with a single name written to a temp file).
@@ -163,10 +189,10 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str, allow_radicals: b
         opsin_jar: Path to OPSIN CLI JAR file.
 
     Returns:
-        Canonical SMILES string if parse succeeds, else ``None``.
+        Canonical SMILES string if parse succeeds, else ``None``, and whether OPSIN answered.
     """
     if not name or not opsin_jar:
-        return None
+        return None, False
 
     # PERF : prefer the ONE lazily-started in-process JVM (jvm_bridge,
     # JPype) over a fresh ~0.82 s cold `java -jar` launch per name -- that
@@ -191,18 +217,18 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str, allow_radicals: b
 
     if not served:
         if allow_radicals:
-            return None     # the subprocess reads without -r: a name with a free valence is not read
+            return None, False     # the subprocess reads without -r: a name with a free valence is not read
         stdout_text = _opsin_cli_stdout(name, opsin_jar)
         if stdout_text is None:
-            return None
+            return None, False
 
     stdout_lines = stdout_text.strip().split("\n") if stdout_text else []
     if stdout_lines and stdout_lines[0].strip():
         smiles = stdout_lines[0].strip()
         mol = Chem.MolFromSmiles(smiles)
         if mol is not None:
-            return Chem.MolToSmiles(mol, canonical=True)
-    return None
+            return Chem.MolToSmiles(mol, canonical=True), True
+    return None, True
 
 
 def _opsin_cli_stdout(name: str, opsin_jar: str) -> Optional[str]:
@@ -327,12 +353,13 @@ def validate_atom_coverage(
         if not shutil.which("java"):
             opsin_jar = None
 
+    read_with_r = False
+
     # Parse-back approach
     if opsin_jar is not None and name:
         from .read_back_policy import radical_floor_stereo_active
-        parsed_smiles = _parse_name_with_opsin(
-            name, opsin_jar,
-            allow_radicals=radical_floor_stereo_active() and any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()))
+        read_with_r = radical_floor_stereo_active() and any(a.GetNumRadicalElectrons() for a in mol.GetAtoms())
+        parsed_smiles = _parse_name_with_opsin(name, opsin_jar, allow_radicals=read_with_r)
         if parsed_smiles is not None:
             parsed_mol = Chem.MolFromSmiles(parsed_smiles)
             if parsed_mol is not None:
@@ -394,7 +421,9 @@ def validate_atom_coverage(
                     parsed_smiles=parsed_smiles,
                 )
 
-    # Fallback: OPSIN unavailable or parse failed
+    # Fallback: OPSIN unavailable or parse failed; ``opsin_unread``: OPSIN answered, and read the name as no structure
+    unread = (opsin_jar is not None and bool(name)
+              and _parse_cache_key(name, opsin_jar, read_with_r) not in _OPSIN_UNANSWERED)
     return CoverageResult(
         total_heavy_atoms=total_heavy,
         claimed_atoms=0,
@@ -402,4 +431,5 @@ def validate_atom_coverage(
         coverage_ratio=0.0,
         is_complete=False,
         method="unavailable",
+        opsin_unread=unread,
     )

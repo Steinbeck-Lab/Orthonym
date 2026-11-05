@@ -64,8 +64,18 @@ def test_w4_ring_ester_count1_complex_enclosed(eng):
     assert name is not None and "unknown" not in name.lower()
     assert "(1-chloroethyl)" in name
     assert "4-1-chloroethyl" not in name
-    # acyloxy branch (LEAVE, composer.py:4104 byte-identity note) unchanged
-    assert "bis(acetyloxy)" in name
+    # change-asserted-value (lane/l17, item 2; found by a bisect over the lane: 'cd7c7daf96' left the name
+    # '1,2-bis(acetyloxy)-4-(1-chloroethyl)benzene' for a method (2) name and '697de5689d' gave the one below). The two
+    # acetyloxy groups are the esters of one 'polyhydroxylic' component, so the PIN is the functional class name of
+    # that component, whose multivalent organyl group is the arene: "Polyesters formed from a single
+    # 'alcoholic' component" (the Blue Book): "Esters derived from a single 'polyhydroxylic' component are named
+    # by placing the name of the 'polyhydroxylic' component denoted by a multivalent organyl group (alkyl, aryl, etc.) in
+    # front of the name(s) of the acid component", (:31819): "When anions are identical functional class
+    # multiplicative nomenclature is used"; the book's phenylene name is 'dimethyl 1,4-phenylene dipropanedioate (PIN)'
+    # (:31692). The substitutive '1,2-bis(acetyloxy)...benzene' of the old expectation is no PIN. Independent check: the
+    # round trip of this name by OPSIN (``test_w4_roundtrips_to_input``). Mutation: at `` the name is the old
+    # one and this assertion fails.
+    assert name == "4-(1-chloroethyl)-1,2-phenylene diacetate"
 
 
 @pytest.mark.roundtrip

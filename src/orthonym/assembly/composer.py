@@ -59,6 +59,7 @@ from ..errors import (  # G0 fail-closed refusal (DD7 S1); a voided candidate (T
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
 # Complex ring system imports
+from ..rules.amide_parent import spelled_outside_n_substituents
 from ..rules.bicyclo import is_bicyclo_system
 from ..rules.n_substituted_acids import N_PREFIX_GROUPS, ring_anchored_atoms as ring_anchored_n_group_atoms
 from ..rules.bridged_fused import detect_bridged_fused, name_bridged_fused_system
@@ -7144,7 +7145,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         if base_name:
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             # Note: NameFragment.text already includes locants -- use directly.
-            prefixes = _generate_prefixes(features)
+            prefixes = spelled_outside_n_substituents(mol, amide_atoms, _generate_prefixes(features))
             if prefixes:
                 prefix_parts = []
                 _ring_prefix_locants = []
@@ -7434,7 +7435,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             # Note: _generate_prefixes returns NameFragments whose.text
             # already includes locants (e.g., "2-methyl"), so use.text
             # directly -- do NOT re-prepend locants from.locants field.
-            prefixes = _generate_prefixes(features)
+            prefixes = spelled_outside_n_substituents(mol, amide_atoms, _generate_prefixes(features))
             if prefixes:
                 prefix_parts = []
                 _prefix_part_locants = []
@@ -7510,7 +7511,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             fragments.append(suffix)
 
     # Generate non-principal group prefixes (halogens, hydroxy, etc.)
-    prefixes = _generate_prefixes(features)
+    prefixes = spelled_outside_n_substituents(mol, amide_atoms, _generate_prefixes(features))
     fragments.extend(prefixes)
 
     # Generate stereodescriptors (R/S stereocenters and E/Z double bonds)
@@ -11041,53 +11042,13 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 break
 
         if carbonyl_c is None:
-            # method (1), BB 33019): an R-SO2-NH- branch on
-            # a chain is the '(...sulfonamido)' prefix (sulfonamide final 'e' ->
-            # 'o'), NOT an 'amino' split of the N. Only fires when the N attaches
-            # to the chain via a sulfonyl S (SX4, two =O) and carries no other
-            # heavy substituent (heavy degree 2: chain + S). N-alkyl sulfonamido
-            # (BB 33029 N-cyclopropyl) fails closed to None (unknown).
-            if atom.GetDegree() == 2:
-                _sulfonyl = None
-                for _sn in atom.GetNeighbors():
-                    if _sn.GetSymbol() != 'S' or _sn.GetIdx() not in sub_set:
-                        continue
-                    _dbl_o = [
-                        _o.GetIdx() for _o in _sn.GetNeighbors()
-                        if _o.GetSymbol() == 'O' and _o.GetIdx() in sub_set
-                        and mol.GetBondBetweenAtoms(
-                            _sn.GetIdx(), _o.GetIdx()
-                        ).GetBondTypeAsDouble() == 2.0
-                    ]
-                    _rest = [
-                        _x.GetIdx() for _x in _sn.GetNeighbors()
-                        if _x.GetIdx() != idx and _x.GetIdx() not in _dbl_o
-                    ]
-                    if len(_dbl_o) == 2 and len(_rest) == 1:
-                        _sulfonyl = (_sn.GetIdx(), _rest[0])
-                        break
-                if _sulfonyl is not None:
-                    _s_idx, _acyl = _sulfonyl
-                    _n = _pure_linear_alkyl_len(mol, _acyl, {_s_idx})
-                    if _n is not None and _n >= 1:
-                        return f"({get_chain_prefix(_n)}anesulfonamido)"
-                    # isolated benzene wholly in sub -> (benzenesulfonamido)
-                    _ra = mol.GetAtomWithIdx(_acyl)
-                    if _ra.GetIsAromatic() and _ra.GetSymbol() == 'C':
-                        _ri_s = mol.GetRingInfo()
-                        for _ring in _ri_s.AtomRings():
-                            if (_acyl in _ring and len(_ring) == 6
-                                    and all(r in sub_set for r in _ring)
-                                    and all(
-                                        mol.GetAtomWithIdx(r).GetIsAromatic()
-                                        and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
-                                        for r in _ring)):
-                                _rset = set(_ring)
-                                if not any(set(o) != _rset and set(o) & _rset
-                                           for o in _ri_s.AtomRings()):
-                                    return "(benzenesulfonamido)"
-                    # sulfonyl-N present but the acyl is un-nameable -> fail closed
-                    return None
+            # method (1), BB 33019; BB 33029 N-cyclopropyl): an R-SO2-NH- or -N(R')-SO2-R branch on a chain is
+            # the '(...sulfonamido)' prefix, NOT an 'amino' split of the N; one it cannot spell fails closed (never the
+            # '(methylamino)' of the alkylamino fallback below, which has no place for the sulfonyl)
+            from .n_acyl_amido import chain_sulfonamido_prefix
+            _sulfonamido = chain_sulfonamido_prefix(mol, idx, sub_atoms, chain_set)
+            if _sulfonamido is not None:
+                return _sulfonamido or None
             #, BB 34537): an -N(H)-C(=N-NH2)-R amidrazone
             # branch is the '(...hydrazonamido)' prefix (analogous to acetamido
             # but with =N-NH2 in place of =O). Detect an in-branch hydrazono C
@@ -11324,16 +11285,15 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                         # The acyl walk covers every acyl atom, so the
                         # completeness gate holds and no atom is dropped.
                         if set(sub_atoms) == _af2 | {idx}:
-                            from .substituent_naming import (
-                                acid_name_to_amido_prefix, amido_prefix_from_acid_name,
-                            )
+                            from .substituent_naming import acid_name_to_amido_prefix, amido_prefix_from_acid_name
+                            from .acyl_amido_polyacid import ordinary_amido_is_the_acyl as _is_the_acyl
                             _amido = amido_prefix_from_acid_name(_fs, _an)[0]
                             if _amido is None:
                                 _sys = name_fragment_recursively(
                                     _fs, style='systematic')
                                 if _sys:
                                     _amido = acid_name_to_amido_prefix(_sys)
-                            if _amido:
+                            if _amido and _is_the_acyl(mol, idx, carbonyl_c, _af2 | {idx}, _amido):
                                 if (any(ch.isdigit() for ch in _amido)
                                         or '-' in _amido):
                                     # nesting: a compound amido prefix
@@ -11348,11 +11308,10 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                                     return _aem(_amido, -1)
                                 return _amido
                         if allow_acylamino_fallback and _acyl_accounts_for_branch:
-                            from ..decomposition.fragment_assembly import (
-                                _acid_to_acyl,
-                            )
+                            from ..decomposition.fragment_assembly import _acid_to_acyl
+                            from .acyl_amido_polyacid import acyl_name_is_the_acyl
                             _ac = _acid_to_acyl(_an)
-                            if _ac:
+                            if _ac and acyl_name_is_the_acyl(mol, idx, carbonyl_c, _af2 | {idx}, _an, _ac):
                                 return f"({_ac}amino)"
             except Exception:
                 pass  # Fall through to linear chain logic

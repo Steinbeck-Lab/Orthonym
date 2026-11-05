@@ -262,14 +262,19 @@ def _note_principal_group_off_every_ring(features: Any) -> None:
         note_pin_tier_asked()
 
 
-def _record_ester_cited_as_prefix() -> None:
+def _record_ester_cited_as_prefix(polycyclic: bool = False) -> None:
     """The cascade's name cites the molecule's principal ester as a prefix: labelled below the PIN
     (``record_general_ring_prefix``); in the probe of the decomposition engine at a wider tier the record is the
-    probe's (``assembly.ester_prefix_probe``), and the naming that ships the name records the label itself."""
+    probe's (``assembly.ester_prefix_probe``), and the naming that ships the name records the label itself. The name of
+    a polycyclic parent (``polycyclic``) has no other way to the PIN tier's name of the functional class: its probe is
+    watched at the PIN tier too, so that the split names the ester ('4-(methoxycarbonyl)phenyl naphthalene-2-carboxylate'),
+    and the one-way label of the call is not set by the probe. The probe of the PIN tier (no wider tier) is the same: the
+    prefix name of its cascade is no PIN, so the probe has no name and the split names the ester ('...-1,5-dioxonan-7-yl
+    butanoate', the lactone rings cited by their ``dioxo``), and the label of the call is for the name that ships."""
     from ...metrics.provenance import record_general_ring_prefix, wider_tier_ctx
     from ..ester_prefix_probe import probe_watched, record_principal_ester_prefix
-    if wider_tier_ctx.get() and probe_watched():
-        record_principal_ester_prefix()
+    if probe_watched():
+        record_principal_ester_prefix(pin_tier=polycyclic or not wider_tier_ctx.get())
         return
     record_general_ring_prefix()
     if wider_tier_ctx.get():
@@ -277,6 +282,23 @@ def _record_ester_cited_as_prefix() -> None:
         from ..pin_first import note_pin_tier_asked
         if is_top_level_naming():
             note_pin_tier_asked()                   # the PIN tier names the ester ('methyl 4-(...)benzoate')
+
+
+def _note_principal_ester_cited_as_prefix(features: Any, polycyclic: bool = False) -> None:
+    """The ring cascade's name of a molecule whose principal group is an exocyclic ester cites that ester as a prefix
+     "All preferred IUPAC names for esters are named by functional class nomenclature"; the acyloxy /
+    alkoxycarbonyl prefixes are for an ester beside a senior group,,:31698): the name is valid, not
+    preferred ('3-[(3-hydroxy-2-phenylpropanoyl)oxy]-8-methyl-8-azabicyclo[3.2.1]octane',
+    '2-{[4-(methoxycarbonyl)phenoxy]carbonyl}naphthalene'), and ships at the general tier, never as pin_verified."""
+    from ..fragment_naming import is_top_level_naming
+    if getattr(features, 'principal_group', None) == 'ester' and is_top_level_naming():
+        from ...perception.smarts_cache import compiled as _smarts
+        _mol = features.mol
+        # an ester whose C(=O)-O bond is not a ring bond (a lactone is
+        # named as a ring '-one', which IS its PIN form)
+        if any(not _mol.GetBondBetweenAtoms(_m[0], _m[2]).IsInRing()
+               for _m in _mol.GetSubstructMatches(_smarts("[CX3](=O)[OX2][#6]"))):
+            _record_ester_cited_as_prefix(polycyclic)
 
 
 def _note_parent_without_the_principal_group(features: Any, handler: str, complex_result: Any) -> None:
@@ -617,6 +639,7 @@ def name_tier_a_ring(
                     "polycyclic", _ha, (polycyclic_name or "")[:60],
                 )
             _nm = pool_polycyclic_candidate(features, style)
+            _note_principal_ester_cited_as_prefix(features, polycyclic=True)
             return NamingResult(
                 name=_nm,
                 tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
@@ -799,16 +822,7 @@ def name_tier_a_ring(
             # not preferred ('3-[(3-hydroxy-2-phenylpropanoyl)oxy]-8-methyl-8-
             # azabicyclo[3.2.1]octane'). It ships at the general tier, never as
             # pin_verified -- the same demotion as a general-only ring prefix.
-            if (getattr(features, 'principal_group', None) == 'ester'
-                    and is_top_level_naming()):
-                from ...perception.smarts_cache import compiled as _smarts
-                _mol = features.mol
-                # an ester whose C(=O)-O bond is not a ring bond (a lactone is
-                # named as a ring '-one', which IS its PIN form)
-                if any(not _mol.GetBondBetweenAtoms(_m[0], _m[2]).IsInRing()
-                       for _m in _mol.GetSubstructMatches(
-                           _smarts("[CX3](=O)[OX2][#6]"))):
-                    _record_ester_cited_as_prefix()
+            _note_principal_ester_cited_as_prefix(features)
             return NamingResult(
                 name=candidate_name,
                 tree=NameTreeNode(parent_stem=candidate_name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=candidate_name),

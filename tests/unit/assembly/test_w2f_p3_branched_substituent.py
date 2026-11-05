@@ -48,10 +48,20 @@ class TestItem15BranchedSubstituent:
         assert _name("OC(=O)C1CCCCC1CCC(C)=O") == \
             "2-(3-oxobutyl)cyclohexane-1-carboxylic acid"
 
-    # --- fail-closed: nitrile branch is outside the v1 recognised-FG set ---
+    # --- the nitrile branch: the prefix 'cyano' (lane/l17 fix a performance pass) ---
     @pytest.mark.usefixtures("gated")
-    def test_failclosed_nitrile_branch(self):
-        assert _name("OC(=O)C1CCCCC1CC(C#N)CC(C)=O") == "unknown organic compound"
+    def test_nitrile_branch_is_the_cyano_prefix(self):
+        """change-asserted-value: the nitrile branch was outside the v1 recognised-FG set and the PIN tier failed closed
+        ('unknown organic compound'); the substituent namer now cites the nitrile as the prefix 'cyano':
+        (the Blue Book) "the -CN group is designated by the preferred prefix 'cyano'", on the chain numbered from the
+        free valence, as the branched hydroxymethyl/oxo rows above. Independent check: a fresh OPSIN call reads the
+        name to the input's full InChIKey. Mutation: without Pass 1a of the polyfunctional chain producer the name is
+        'unknown organic compound' again."""
+        from tests.support.rt_assert import assert_full_rt
+        smiles = "OC(=O)C1CCCCC1CC(C#N)CC(C)=O"
+        name = _name(smiles)
+        assert name == "2-(2-cyano-4-oxopentyl)cyclohexane-1-carboxylic acid"
+        assert_full_rt(name, smiles)
 
     # --- unit-level: the substituent namer itself ---
     def test_substituent_namer_branched(self):

@@ -1772,12 +1772,44 @@ def get_n_substituted_carbamoylamino_prefix(
     distal_n = _urea_distal_n(mol, atoms, principal_chain)
     if distal_n is None:
         return None
+    proximal = _proximal_substituted_urea(mol, urea_set, distal_n, principal_chain)
+    if proximal is not None:
+        # the proximal nitrogen carries a group of its own (-N(R')-CO-NR2): the prefix is the amino prefix that holds the
+        # carbamoyl prefix of the distal nitrogen and R', the one primitive of the ring and
+        # chain-substituent namers; 'carbamoylamino' would drop R'
+        from .n_acyl_amido import urea_prefix
+        return urea_prefix(mol, *proximal)
     core = _carbamoyl_with_distal_substituents(mol, distal_n, urea_set)
     if core is None:
         return None
     if core == "carbamoyl":
         return "carbamoylamino"
     return f"({core})amino"
+
+
+def _proximal_substituted_urea(mol, urea_set: Set[int], distal_n: int, principal_chain) -> Optional[tuple]:
+    """``(n_idx, branch_atoms, host)`` of the proximal nitrogen of the urea ``urea_set`` (the one beside ``distal_n``) when it
+    holds a group besides the one chain atom it hangs on, else None. ``branch_atoms`` is the whole pendant group (the
+    nitrogen's side of the chain bond), ``host`` the chain atom. None where the parent context does not show the
+    attachment (no chain atom, or two bonds into the chain): the orientation was decided by the cues of
+    :func:`_urea_distal_n`, and a nitrogen's other neighbours are no substituents of it."""
+    prox = next((i for i in urea_set if mol.GetAtomWithIdx(i).GetSymbol() == 'N' and i != distal_n), None)
+    if prox is None:
+        return None
+    chain = set(principal_chain or ())
+    ext = [nb.GetIdx() for nb in mol.GetAtomWithIdx(prox).GetNeighbors()
+           if nb.GetIdx() not in urea_set and nb.GetAtomicNum() > 1]
+    hosts = [i for i in ext if i in chain]
+    if len(hosts) != 1 or not [i for i in ext if i not in chain]:
+        return None
+    seen, stack = set(), [prox]
+    while stack:
+        a = stack.pop()
+        if a in seen or a in chain:
+            continue
+        seen.add(a)
+        stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors())
+    return prox, seen, hosts[0]
 
 
 def _chalcogen_of_thiourea_match(mol, atoms: tuple) -> Optional[str]:
@@ -1842,6 +1874,8 @@ def get_n_substituted_carbamothioylamino_prefix(
     distal_n = _urea_distal_n(mol, atoms, principal_chain)
     if distal_n is None:
         return None
+    if _proximal_substituted_urea(mol, core_set, distal_n, principal_chain) is not None:
+        return None     # -N(R')-CS-NR2: 'carbamothioylamino' would drop R'; the caller re-parents onto thiourea
     core = _carbamoyl_with_distal_substituents(
         mol, distal_n, core_set, stem="carbamothioyl"
     )

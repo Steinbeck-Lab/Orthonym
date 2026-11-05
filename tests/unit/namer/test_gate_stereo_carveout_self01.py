@@ -101,9 +101,17 @@ def test_witness_wrong_molecule_no_longer_ships():
     finally:
         _nm._DISABLE_VALIDITY_GATE = _prev
     assert out != WITNESS_BAD_NAME, "the wrong-molecule name still ships"
-    assert out == "unknown organic compound", (
-        f"expected the honest descriptive fallback, got {out!r} -- if this is a "
+    # The witness used to end as the honest fallback 'unknown organic compound': the carbamate handler built the right name,
+    # 'methyl {2-[(1R,2S,5S)-6,6-dibromobicyclo[3.1.0]hexan-2-yl]ethyl}carbamate', and a front-of-name block '(1S,4S,5R)-'
+    # (numbered in a skeleton a carbamate has not, was put before it, which the gate then rightly suppressed. The
+    # handler now declares the carbamate a parent with no numbered skeleton (``parent_scope='retained_no_locants'``, as the
+    # urea handler does), so the name ships as built. What this test pins is that nothing wrong ships: the name is the
+    # one string below and OPSIN reads it back to the input with every stereocentre (checked independently of the engine).
+    assert out == "methyl {2-[(1R,2S,5S)-6,6-dibromobicyclo[3.1.0]hexan-2-yl]ethyl}carbamate", (
+        f"expected the correct carbamate name, got {out!r} -- if this is a "
         "different wrong name, a second generator has been unmasked (invariant 11)")
+    from tests.support.rt_assert import assert_full_rt
+    assert_full_rt(out, WITNESS_SMILES)
 
 
 # ---------------------------------------------------------------------------

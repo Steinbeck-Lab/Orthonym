@@ -46,13 +46,30 @@ _MAX_VISITED_SIZE = 50  # a phase: raised from 30 for deeper decomposition; fall
 # once the per-top-level work budget is proven a sufficient anti-runaway guard corpus-wide.
 
 # giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
-# fragment cache to mark a fragment that is internal notes-INDEPENDENTLY unnameable (the
-# recursive namer refused it / it produced a refusal sentinel / it raised) so the
-# combinatorial partition search never re-descends the same dead fragment (e.g.
-# the bare diphosphate ``COP(=O)(O)OP(=O)(O)O`` in an acyl-CoA). NOT used for the
-# cycle or depth-net outcomes, which are context-DEPENDENT (they can succeed at a
-# shallower depth), so caching those would cost breadth.
+# fragment cache (as ``(_NEG_CACHE, vocabulary)``, ``_refusal_vocabulary``) to mark a
+# fragment that the namer could not name in one naming vocabulary (the recursive namer
+# refused it / it produced a refusal sentinel / it raised) so the combinatorial
+# partition search never re-descends the same dead fragment (e.g. the bare diphosphate
+# ``COP(=O)(O)OP(=O)(O)O`` in an acyl-CoA). It counts in the vocabulary that made it
+# only: the PIN tier's re-run (``assembly.memo.pin_promotion_var``) names fragments the
+# first run refused. NOT used for the cycle or depth-net outcomes, which are
+# context-DEPENDENT (they can succeed at a shallower depth), so caching those would
+# cost breadth.
 _NEG_CACHE = object()
+
+
+def _refusal_vocabulary() -> tuple:
+    """The naming vocabulary a refusal is made in: the run context of ``assembly.memo`` (the PIN promotion re-run, the
+    wider tier, the book forms...) and the renaming state of ``assembly.nested_memo`` (the four tier flags, the scope
+    of the N-acyl float refusals, the peptide handler's attempt and its stand of a peptide name). A fragment the PIN
+    vocabulary cannot name is named by the promoted producers of the re-run ('N-methyl-2-(4-methylpiperazin-1-yl)
+    acetamide'), and one the first pass of the peptide handler refuses (the float withheld) is named in its second;
+    a refusal counts only in the vocabulary that made it. The attempt itself always runs inside the fragment
+    recursion it starts (``name_fragment_recursively`` adds the fragment to the visited set before naming it), so
+    that component of the state is the same for the request and the write."""
+    from .memo import run_context_key
+    from .nested_memo import renaming_state
+    return (run_context_key(), (True,) + renaming_state()[1:])
 
 
 def _get_visited() -> set:
@@ -65,6 +82,66 @@ def _get_visited() -> set:
         visited = set()
         _fragment_guard.visited = visited
     return visited
+
+
+#: key prefix of a cache entry whose name was computed beside a cycle hit (see:func:`_cycle_hits_since`)
+_CTX_KEY = "\x00ctx"
+
+
+def _note_cycle_hit(canonical) -> None:
+    """Log that naming a fragment met ``canonical`` already on the visited set (a cycle, answered with no name); a
+    frozenset logs all of its SMILES at once."""
+    log = getattr(_fragment_guard, 'cycle_hits', None)
+    if log is None:
+        log = _fragment_guard.cycle_hits = []
+    log.append(canonical)
+
+
+def _visited_frozen(visited: set) -> frozenset:
+    """``frozenset(visited)``, the one object of the last call while the set is unchanged (a giant molecule asks the depth
+    net tens of thousands of times for one visited set, and each ask logs it)."""
+    last = getattr(_fragment_guard, 'visited_frozen', None)
+    if last is None or last != visited:
+        last = _fragment_guard.visited_frozen = frozenset(visited)
+    return last
+
+
+def _cycle_hit_mark() -> int:
+    """The position in the cycle-hit log, to read the hits of a naming that follows (:func:`_cycle_hits_since`)."""
+    return len(getattr(_fragment_guard, 'cycle_hits', None) or ())
+
+
+def _cycle_hits_since(mark: int, own: str) -> frozenset:
+    """The fragments a naming since ``mark`` met on the visited set, those of ``own`` (the fragment named) left out.
+
+    A fragment's name is a function of its SMILES only as long as no sub-fragment met a SMILES that was on the visited
+    set (the cycle answer is no name, so the name composed around it is a degraded one, a function of the visited set
+    as well). The names cached under the bare SMILES are served to any later caller; one computed beside a cycle hit is
+    kept under:data:`_CTX_KEY` with these SMILES and served only while all of them are on the visited set again.
+    ``own`` is on the visited set during its own naming, by definition, so a hit on it is no context."""
+    log = getattr(_fragment_guard, 'cycle_hits', None) or ()
+    met = set()
+    previous = None
+    for entry in log[mark:]:
+        if entry is previous:
+            continue
+        previous = entry
+        if isinstance(entry, str):
+            met.add(entry)
+        else:
+            met.update(entry)
+    met.discard(own)
+    return frozenset(met)
+
+
+def _resolve_cycle_hits(mark: int, met: frozenset) -> None:
+    """Close a naming's slice of the cycle-hit log: the hits on the fragment itself are met inside its own naming and
+    concern no caller; the others stay (:func:`_cycle_hits_since`) for the fragment that is named around this one."""
+    log = getattr(_fragment_guard, 'cycle_hits', None)
+    if log is not None:
+        del log[mark:]
+        if met:
+            log.append(met)
 
 
 def in_fragment_recursion() -> bool:
@@ -308,6 +385,7 @@ def end_naming_session():
         # start/end_naming_session caller, preserving that legacy behaviour).
         if getattr(_fragment_guard, 'name_call_depth', 0) <= 0:
             _fragment_guard.cache = None
+            _fragment_guard.cycle_hits = None
     else:
         _fragment_guard.session_depth = depth
 
@@ -637,6 +715,7 @@ def exit_name_scope():
         _fragment_guard.analysis_budget = None
         _fragment_guard.unproven_floor = None
         _fragment_guard.cache = None
+        _fragment_guard.cycle_hits = None
         _fragment_guard.naming_pass_cap = None
         _fragment_guard.main_ring_trips = None
     else:
@@ -800,7 +879,7 @@ def isolated_naming_session(reset_cache: bool = False):
             _fragment_guard.cache = saved_cache
 
 
-_SPECULATIVE_STATE = ('cache', 'session_depth', 'visited',
+_SPECULATIVE_STATE = ('cache', 'session_depth', 'visited', 'cycle_hits',
                       'work_budget', 'perf_budget', 'analysis_budget', 'unproven_floor')
 _UNSET = object()
 
@@ -826,6 +905,9 @@ def speculative_fragment_naming():
     visited = saved['visited']
     if visited is not _UNSET and visited is not None:
         _fragment_guard.visited = set(visited)
+    hits = saved['cycle_hits']
+    if hits is not _UNSET and hits is not None:
+        _fragment_guard.cycle_hits = list(hits)
     try:
         yield
     finally:
@@ -858,6 +940,15 @@ def is_top_level_naming() -> bool:
         True if no fragments are currently being named.
     """
     return get_naming_depth() == 0
+
+
+def _remember_fragment_name(runtime_cache: dict, cache_key: str, value, met: frozenset) -> None:
+    """Keep ``value`` for ``cache_key``: under the bare key when the naming met no cycle, else with the SMILES it met
+    (:func:`_cycle_hits_since`) under:data:`_CTX_KEY`."""
+    if met:
+        runtime_cache[(_CTX_KEY, cache_key)] = (met, value)
+    else:
+        runtime_cache[cache_key] = value
 
 
 def name_fragment_recursively(smiles: str, style: str = 'pin',
@@ -908,10 +999,25 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
 
     # Tier 2: runtime dynamic cache — populated during this naming session
     runtime_cache = getattr(_fragment_guard, 'cache', None)
+    visited = _get_visited()
     if runtime_cache is not None:
         dynamic = runtime_cache.get(cache_key)
+        if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
+            dynamic = None      # a refusal made in another vocabulary counts for nothing here
+        if dynamic is None:
+            # a name computed beside a cycle hit is served only where the same SMILES are on the visited set
+            in_context = runtime_cache.get((_CTX_KEY, cache_key))
+            if in_context is not None and in_context[0] <= visited:
+                dynamic = in_context[1]
+                if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
+                    dynamic = None
+                else:
+                    # the name carries its context to the fragment that is being named around it
+                    _note_cycle_hit(in_context[0])
+        if isinstance(dynamic, tuple):      # a refusal: (_NEG_CACHE, the vocabulary that made it)
+            return None
         if dynamic is not None:
-            return dynamic if dynamic is not _NEG_CACHE else None
+            return dynamic
 
     # giant-molecule hang fix: charge the per-top-level work budget for every
     # genuine naming ATTEMPT (a cache hit above is free and already returned). This
@@ -933,8 +1039,8 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
 
     # Cycle detection: if this SMILES is already being named up the call
     # stack, we have circular recursion. Return None (caller will fallback).
-    visited = _get_visited()
     if canonical in visited:
+        _note_cycle_hit(canonical)
         logger.info(
             "CYCLE detected: smiles=%s already in visited set (size=%d)",
             smiles[:60], len(visited),
@@ -961,9 +1067,13 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         # abstention below. Cache under the style-aware key. (a review review NIT 9.)
         fallback_name = (name_pipeline_only(canonical) if style == 'pin'
                          else None)
+        # the answer of the depth net, a name or none, is a function of the whole visited set (its size, and what the
+        # pipeline met on it): it is cached with that set and logged for the fragment named around it
+        visited_now = _visited_frozen(visited)
+        _note_cycle_hit(visited_now)
         if fallback_name is not None and not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
-                runtime_cache[cache_key] = fallback_name
+                _remember_fragment_name(runtime_cache, cache_key, fallback_name, visited_now)
             return fallback_name
         # Task 0.1: fragment could not be named (depth safety net).
         from ..metrics.abstention import AbstentionCode, record_abstention
@@ -973,10 +1083,13 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
 
     # Mark as in-progress, name it, then unmark
     visited.add(canonical)
+    hit_mark = _cycle_hit_mark()
     try:
         from ..errors import is_refusal_sentinel
         from ..namer import name_compound
         result = name_compound(canonical, style=style)
+        met = _cycle_hits_since(hit_mark, canonical)
+        _resolve_cycle_hits(hit_mark, met)
         # THE chokepoint where a WHOLE-MOLECULE naming becomes a NAME COMPONENT.
         # `name_compound` is always-emit: when it cannot name the input it returns
         # a refusal sentinel STRING ('zinc compound (not supported)',
@@ -994,12 +1107,12 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             # refused it standalone). Negative-cache it so the partition search
             # never re-descends this dead end (giant-molecule hang fix).
             if runtime_cache is not None:
-                runtime_cache[cache_key] = _NEG_CACHE
+                _remember_fragment_name(runtime_cache, cache_key, (_NEG_CACHE, _refusal_vocabulary()), met)
             return None
         if result:
             # Populate runtime cache with successful result
             if runtime_cache is not None:
-                runtime_cache[cache_key] = result
+                _remember_fragment_name(runtime_cache, cache_key, result, met)
             return result
         # Task 0.1: fragment could not be named (empty result).
         # NOT negative-cached: an empty result can be depth-INDUCED (name_compound's

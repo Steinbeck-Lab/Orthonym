@@ -232,4 +232,9 @@ class TestRegressionUnaffected:
         V38-PEPTIDE-PIN-VERDICT.md), so neither Lever C nor this producer names it."""
         smi = "N[C@@H](C)C(=O)NCC(N)=O"
         result = _dt_name_compound(smi)
-        assert result == "2-[(2S)-2-aminopropanamido]acetamide", result
+        # change-asserted-value (lane/l17 item 7): was '2-[(2S)-2-aminopropanamido]acetamide'. "SENIORITY OF ACYCLIC
+        # CHAINS (THE PRINCIPAL CHAIN)" (the Blue Book): "(b) has the greater number of skeletal atoms"; the two amides
+        # are one class and the alanine chain (three atoms) outranks the glycine chain (two), so the amide of
+        # the acyl end is the parent. The read-back to the full InChIKey is checked by test_peptide_capped_termini's twin of
+        # this molecule (``_full_rt``, OPSIN outside the engine); mutation: fails at 10accd4429, which names the old string.
+        assert result == "(2S)-2-amino-N-(2-amino-2-oxoethyl)propanamide", result

@@ -311,12 +311,16 @@ ASSEMBLY_POSITIVES = [
     # in test_fused_large_ring_pin.py)
     # A bridged tetracyclic oxirane/ether cage (4,8,11-trioxatetracyclo[7.4.1.0^3,5.0^6,14]tetradecane),
     # which no fusion builder names at either tree. The compound prefix
-    # '[(S)-1,3-bis(acetyloxy)propyl]' is enclosed in brackets, its descriptor and its own
-    # 'bis(acetyloxy)' carry parentheses) and alphabetized at 'b',:3477): before
+    # '[(S)-1,3-bis(methylsulfanyl)propyl]' is enclosed in brackets, its descriptor and its own
+    # 'bis(methylsulfanyl)' carry parentheses) and alphabetized at 'b',:3477): before
     # 'methyl' and 'prop-2-yn-1-yl'. Found by scanning pubchem_2000 for rows this tier emits; identical
-    # at 0c529ca8d and after the LO fix round; OPSIN full-key exact.
-    ("C[C@@H]1CO[C@]([C@H]2[C@@H]3[C@@H]1C[C@H]4[C@@]([C@@H]3[C@H](O2)CC#C)(O4)C)(C)[C@H](CCOC(=O)C)OC(=O)C",
-     "(1R,3S,5R,6S,7R,9R,10R,13S,14R)-10-[(S)-1,3-bis(acetyloxy)propyl]-5,10,13-trimethyl-7-"
+    # at 0c529ca8d and after the LO fix round; OPSIN full-key exact. The row had two acetates, '[(S)-1,3-bis(acetyloxy)
+    # propyl]'; lane/l17 item 10 names that molecule as the ester it is, '(1S)-3-(acetyloxy)-1-[...tetradecan-10-yl]propyl
+    # acetate',:31663: esters are named by functional class;,:18158: class 9), so the
+    # acetates became the sulfides that carry the same compound prefix ('bis(...)' at 'b', its descriptor, its brackets)
+    # and the ring is as before (the C-10 descriptor is 'S' with sulfur: CIP priorities).
+    ("C[C@@H]1CO[C@]([C@H]2[C@@H]3[C@@H]1C[C@H]4[C@@]([C@@H]3[C@H](O2)CC#C)(O4)C)(C)[C@H](CCSC)SC",
+     "(1R,3S,5R,6S,7R,9R,10S,13S,14R)-10-[(S)-1,3-bis(methylsulfanyl)propyl]-5,10,13-trimethyl-7-"
      "(prop-2-yn-1-yl)-4,8,11-trioxatetracyclo[7.4.1.0^3,5.0^6,14]tetradecane"),
 ]
 
@@ -569,3 +573,29 @@ def test_a_decorated_ring_is_never_named_by_its_bare_parent_hydride(smiles):
         assert emitted != bare.name, (
             f"{smiles} was named {emitted!r} -- the bare ring parent, with the "
             f"decoration dropped")
+
+
+#: The acetate input of the row that ASSEMBLY_POSITIVES held until lane/l17 item 10 (the sulfide row there carries the same
+#: compound prefix): a bridged tetracyclic oxirane/ether cage with a 1,3-diacetoxypropyl group.
+ACETATE_ROW = (
+    "C[C@@H]1CO[C@]([C@H]2[C@@H]3[C@@H]1C[C@H]4[C@@]([C@@H]3[C@H](O2)CC#C)(O4)C)(C)[C@H](CCOC(=O)C)OC(=O)C",
+    "(1S)-3-(acetyloxy)-1-[(1R,3S,5R,6S,7R,9R,10R,13S,14R)-5,10,13-trimethyl-7-(prop-2-yn-1-yl)-4,8,11-"
+    "trioxatetracyclo[7.4.1.0^3,5.0^6,14]tetradecan-10-yl]propyl acetate",
+)
+
+
+@pytest.mark.opsin_gate
+def test_the_acetate_row_is_named_as_the_ester_it_is_and_labelled_below_the_pin(opsin_gate):
+    """The molecule is an ester of a diol: "All preferred IUPAC names for esters are named by functional class
+    nomenclature" (the Blue Book) and (:18158, class 9), so the name cites the acetates as an ester
+    and not as the 'bis(acetyloxy)' prefix of the ring (which is what ASSEMBLY_POSITIVES held for this input). The name is
+    the monoester with the second acetate as an 'acetyloxy' prefix, which reads back to the molecule. The preferred name
+    is the one of the diacetate of the diol, '1-[...]propane-1,3-diyl diacetate' (the polyester of one acid,,
+    which the decomposition does not build for an alcohol component with a bridged ring; the name built is therefore
+    labelled below the PIN (systematic_verified) and the PIN tier gives no name."""
+    smiles, expected = ACETATE_ROW
+    row = _namer("best-effort").name_tiered(smiles)
+    assert row["name"] == expected, row
+    assert row["tier"] == "systematic_verified" and not row["is_pin"], row
+    assert _rt_inchikey(row["name"]) == _inchikey(smiles)
+    assert _abstains(_namer("pin").name(smiles))

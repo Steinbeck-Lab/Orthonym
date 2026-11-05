@@ -949,6 +949,23 @@ def _formamide_completely_substituted(parent_name, amide_type, n_subs) -> Option
         return None
 
 
+def _chain_stereo_descriptors(mol, chain, atom_to_locant, reverse: bool):
+    """``[(locant, code),...]`` of the stereogenic units of the chain, numbered in one direction."""
+    from .stereochemistry import collect_stereodescriptors
+    n = len(chain)
+    return collect_stereodescriptors(
+        mol, {a: ((n + 1 - atom_to_locant[a]) if reverse else atom_to_locant[a]) for a in chain})
+
+
+def _cite_chain_stereo(mol, name: str, descriptors) -> Optional[str]:
+    """``name`` with the descriptors of its chain at the front, or None when a stereogenic unit of the structure is
+    cited nowhere. (the Blue Book): the descriptors of the parent stand at the front of the complete name,
+    in the locants of its numbering; those inside a prefix are cited by the prefix."""
+    from .stereochemistry import format_stereodescriptor_string, general_engine_stereo_complete
+    full = f"{format_stereodescriptor_string(descriptors)}{name}"
+    return full if general_engine_stereo_complete(mol, full) else None
+
+
 def name_chain_diamide(
     mol, all_amide_matches: List[tuple], chain: List[int],
     atom_to_locant: Dict[int, int],
@@ -1020,7 +1037,12 @@ def name_chain_diamide(
     # is left to the general path, which cites it; naming the bare saturated
     # parent here dropped it.
     from .diamide_chain_prefixes import chain_carbon_prefixes, merged_prefix_parts
-    c_prefixes = chain_carbon_prefixes(mol, chain, covered, atom_to_locant)    # '2-chloro-N1,N4-dimethyl...'
+    # A stereo layer is cited here when an amide nitrogen is substituted ('(2S)-2-acetamido-N1-methylbutanediamide'):
+    # the general path names no such diamide (it reads the carbonyl at the free end as a CH2). The other diamides
+    # with a stereo layer keep their names from the general path.
+    cites_stereo = any(names for _locant, names in per_end)
+    c_prefixes = chain_carbon_prefixes(mol, chain, covered, atom_to_locant,    # '2-chloro-N1,N4-dimethyl...'
+                                       cite_stereo=cites_stereo)
     if c_prefixes is None:
         return None
     _chain_set = set(chain)
@@ -1044,13 +1066,26 @@ def name_chain_diamide(
         out += [(chain_len + 1 - loc) if reverse else loc for loc, _n in c_prefixes]
         return sorted(out)
 
+    # A stereo layer is cited at the front of the name only when the nitrogens are substituted and a branch stands on
+    # the chain (see ``cites_stereo``); the descriptors of the chain are then part of criterion (j).
+    _stereo_cited = bool(c_prefixes) and cites_stereo and (
+        any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
+        or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()))
+
+    def _chain_descriptors(reverse: bool):
+        # none when the name does not cite them
+        return _chain_stereo_descriptors(mol, chain, atom_to_locant, reverse) if _stereo_cited else []
+
     def _tiers(reverse: bool):
         """The numbering criteria that remain once the carbonyls are at the ends (``### ****
-        NUMBERING``, the Blue Book): (f) the locants of the N-prefixes together (:3301), (g) the prefix
-        cited first at the lowest locant (:3307), (i) the lowest locants to the isotopically modified atoms
-        (:3336), (j) the CIP stereodescriptors cited inside the prefixes at their locants (:3346). leaves
-        R and S out (:3446), so two N-prefixes that differ only in them tie on (g) and "isotopic modifications
-        have seniority for low locants over stereodescriptors described in (j)" (:3346)."""
+        NUMBERING``, the Blue Book): (f) the locants of the N-prefixes together (:3301), (g) "lowest locants for
+        the substituent cited first as a prefix in the name" (:3307), (i) the lowest locants to the isotopically
+        modified atoms (:3336), (j) "the lower locant is assigned to CIP stereodescriptors Z, R, M, and r
+        (pseudoasymmetry) that are preferred to E, S, P, and s" (:3346), those of the chain and those cited inside
+        the prefixes together. leaves R and S out (:3446), so two N-prefixes that differ only in them tie on
+        (g) and "isotopic modifications have seniority for low locants over stereodescriptors described in (j)"
+        (:3346). A chain whose two numberings give the same descriptors ('(2R,3R)', C2 symmetric) ties on every
+        criterion and is named in either; the meso chain takes '(2R,3S)', the R at the lower locant."""
         from ..assembly.locant_omission import isotope_locant_key
         from ..assembly.naming_utils import numbering_cip_key
         eff_of = {}
@@ -1063,9 +1098,15 @@ def name_chain_diamide(
                  for locant, names in per_end for name in names]
         cited += [(((chain_len + 1 - loc) if reverse else loc), name) for loc, name in c_prefixes]
         return (_n_locants_for(reverse), sorted((alpha_sort_key(name), eff) for eff, name in cited),
-                isotope_locant_key(mol, eff_of), numbering_cip_key((), cited))
+                isotope_locant_key(mol, eff_of), numbering_cip_key(_chain_descriptors(reverse), cited))
 
-    reverse = _tiers(True) < _tiers(False)
+    _t_fwd, _t_rev = _tiers(False), _tiers(True)
+    reverse = _t_rev < _t_fwd
+    if _stereo_cited and _t_fwd == _t_rev and _chain_descriptors(False) != _chain_descriptors(True):
+        return None     # criterion (j) leaves the two numberings tied and their descriptors differ: no name
+
+    def _with_stereo(name: str) -> Optional[str]:
+        return _cite_chain_stereo(mol, name, _chain_descriptors(reverse)) if _stereo_cited else name
 
     # Build (effective_locant, name) pairs across both ends.
     placed = []  # (eff_locant, name)
@@ -1083,7 +1124,7 @@ def name_chain_diamide(
     c_placed = [(((chain_len + 1 - loc) if reverse else loc), name) for loc, name in c_prefixes]
     if not placed and not c_placed:
         # Symmetric unsubstituted diamide (e.g. butanediamide) — plain parent.
-        return parent_name
+        return _with_stereo(parent_name)
 
     # Group by substituent name, collecting its N-locants.
     groups: Dict[str, List[int]] = defaultdict(list)
@@ -1111,8 +1152,9 @@ def name_chain_diamide(
 
     if c_placed:
         _by_name = {name: prefix for (_k, prefix), name in zip(parts, groups)}
-        return "-".join(merged_prefix_parts(groups, c_placed, lambda n, _l: _by_name[n], alpha_sort_key_rs)) + parent_name
+        return _with_stereo(
+            "-".join(merged_prefix_parts(groups, c_placed, lambda n, _l: _by_name[n], alpha_sort_key_rs)) + parent_name)
     parts.sort(key=lambda p: p[0])
     n_prefix_string = "-".join(p[1] for p in parts)
 
-    return f"{n_prefix_string}{parent_name}"
+    return _with_stereo(f"{n_prefix_string}{parent_name}")

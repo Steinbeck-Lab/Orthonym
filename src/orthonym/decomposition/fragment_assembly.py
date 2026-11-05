@@ -898,21 +898,26 @@ def _alcohol_group_candidates(
     (``_alcohol_structural_group``). A candidate is shipped only after its name round-trips
     to the parent, so a wrong linking oxygen costs the candidate, not the molecule.
     """
-    word = _alcohol_to_alkyl(alcohol_name)
+    word, rule = _alcohol_to_alkyl_by_rule(alcohol_name)
     monovalent = _is_monovalent_group_word(word)
+    # the name states its linking oxygen as '-ol' (or is a group word): the 'alkane' rule reads none, a name that
+    # cites the hydroxy group as a prefix is no name of an alcohol
+    states_the_oxygen = rule != ALKANE_FORM_RULE
     alcohol_smiles = (fragment_smiles or {}).get("alkyl")
     if not alcohol_smiles:
         return [(word, False)] if monovalent else []
     alcohol_mol = _Chem.MolFromSmiles(alcohol_smiles)
     if (alcohol_mol is not None and len(_free_hydroxyl_sites(alcohol_mol)) == 1
-            and monovalent):
+            and monovalent and states_the_oxygen):
         return [(word, False)]
     out: List[Tuple[str, bool]] = [(word, True)] if monovalent else []
     if parent_smiles:
         structural = _alcohol_structural_group(
             alcohol_smiles, (fragment_smiles or {}).get("acid"), parent_smiles)
         if structural and structural != word:
-            out.append((structural, True))
+            # the string word of a name that does not state the oxygen cannot be the group, so the group built from the
+            # structure is the first candidate: the alcohol may be an alcohol, phenol, heterol or enol)
+            out.insert(0 if not states_the_oxygen else len(out), (structural, True))
     return out
 
 
@@ -3136,15 +3141,28 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
         >>> _alcohol_to_alkyl("butan-1-ol")
         'butyl'
     """
+    return _alcohol_to_alkyl_by_rule(alcohol_name)[0]
+
+
+#: The rule of:func:`_alcohol_to_alkyl_by_rule` that reads no '-ol' from the name: it cuts the 'ane' of a hydrocarbon name.
+ALKANE_FORM_RULE = "alkane"
+
+
+def _alcohol_to_alkyl_by_rule(alcohol_name: str) -> Tuple[str, str]:
+    """``(word, rule)`` of:func:`_alcohol_to_alkyl`: ``rule`` names the branch that built the word ('trivial', 'alkyl',
+    'polyol', 'ol', 'alkane', 'as-is'). Only the first four read the linking oxygen from the name: a name of an alcohol
+    states it as '-ol' (or is a group word already), and the 'alkane' rule cuts the 'ane' of a name that does not, so
+    that a hydroxy group cited as a prefix stays in the word ('9-hydroxy-...nonyl') and the free valence has no
+    locant."""
     name = alcohol_name.strip()
 
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ALCOHOL_TO_ALKYL:
-        return _TRIVIAL_ALCOHOL_TO_ALKYL[name.lower()]
+        return _TRIVIAL_ALCOHOL_TO_ALKYL[name.lower()], "trivial"
 
     # If already in alkyl form (ends with "yl"), return as-is
     if name.endswith("yl"):
-        return name
+        return name, "alkyl"
 
     # A multiplied '-ol' ('ethane-1,2-diol') names an alcohol with several hydroxy groups:
     # no monovalent group can be read from the name (which hydroxy is the linking one?),
@@ -3152,7 +3170,7 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
     # for every other name this rule cannot convert; callers test the result with
     # ``_is_monovalent_group_word``.
     if _POLYOL_NAME_RE.search(name):
-        return name
+        return name, "polyol"
 
     # Systematic alcohol: "propan-1-ol" -> "propyl"
     # Strip locant + "-ol" suffix
@@ -3176,7 +3194,7 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
             # '1' (or absent) keeps the classic contracted elision below
             # (propan-1-ol -> propyl) to stay byte-identical on chains.
             if locant is not None and locant != "1":
-                return f"{base}-{locant}-yl"
+                return f"{base}-{locant}-yl", "ol"
             # (the Blue Book): the locant 1 is omitted, and 'ane'
             # becomes 'yl', only for a SATURATED chain (and,, a saturated
             # monocycle: 'cyclohexyl'). Every other parent keeps its free-valence
@@ -3185,31 +3203,31 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
             # '4-chloronaphthalenyl'), a von Baeyer or retained cage
             # ('bicyclo[2.2.1]heptan-1-yl', 'adamantan-1-yl').
             if locant == "1" and not _is_saturated_chain_stem(base):
-                return f"{base}-1-yl"
+                return f"{base}-1-yl", "ol"
             # Convert "-an" ending to "-yl" (propan -> propyl)
             if base.endswith("an"):
-                return base[:-2] + "yl"
+                return base[:-2] + "yl", "ol"
             # Convert "-en"/"yn" endings too
             if base.endswith("en"):
-                return base + "yl"
+                return base + "yl", "ol"
             if base.endswith("yn"):
-                return base + "yl"
-            return base + "yl"
+                return base + "yl", "ol"
+            return base + "yl", "ol"
 
     # Simple "-ol" suffix: "methanol" -> "methyl"
     if name.endswith("ol"):
         base = name[:-2]
         if base.endswith("an"):
-            return base[:-2] + "yl"
-        return base + "yl"
+            return base[:-2] + "yl", "ol"
+        return base + "yl", "ol"
 
     # Alkane form: "methane" -> "methyl", "ethane" -> "ethyl"
     if name.endswith("ane"):
-        return name[:-3] + "yl"
+        return name[:-3] + "yl", ALKANE_FORM_RULE
 
     # If it doesn't match known patterns, return as-is
     # (may already be a substituent name)
-    return name
+    return name, "as-is"
 
 
 #: One substituent word of a hydroxylamine name that is not enclosed: 'methyl', 'tert-butyl',
@@ -3313,7 +3331,14 @@ def _amine_to_prefix(amine_name: str) -> Optional[str]:
         if base.endswith("yl"):
             return base
 
-        # Systematic: "propan-1-amine" -> "propyl"
+        # Systematic: "propan-1-amine" -> "propyl", "2-methylcyclohexan-1-amine" -> "2-methylcyclohexyl". The free valence
+        # of the group stands where the amino group stood, so the group is the one of the alcohol of the same name
+        #, the Blue Book: the locant 1 is omitted for a saturated chain and a saturated monocycle,
+        # '2-methylcyclopentyl (preferred prefix)',:16204; every other parent keeps it).
+        if base.endswith("-") or base.endswith("an"):
+            word, rule = _alcohol_to_alkyl_by_rule(base + "ol")
+            if rule == "ol" and _is_monovalent_group_word(word):
+                return word
         # Strip locant + convert
         import re
         match = re.match(r'^(.+?)(?:-\d+)?$', base)

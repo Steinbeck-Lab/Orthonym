@@ -21,7 +21,12 @@ NAMED = [
      "1-amino-2,4-dihydroxy-9,10-dioxo-3-sulfo-9,10-dihydroanthracene"),   # 3-(1,1-dioxo-2-oxa-1λ6-thiaethyl)
     ("Nc1c(O)c(S(=O)(=O)[O-])c(O)c2c1C(=O)c1ccccc1C2=O",
      "1-amino-2,4-dihydroxy-9,10-dioxo-3-sulfonato-9,10-dihydroanthracene"),  # 3-(1-oxido-1-oxo-2-oxa-1-thiaeth-1-en-1-yl)
-    ("CC(=O)NCCOS(=O)(=O)O", "N-[2-(sulfooxy)ethyl]acetamide"),           # N-(4,4-dioxo-3,5-dioxa-4λ6-thiapentyl)
+    # change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): the old name was
+    # 'N-[2-(sulfooxy)ethyl]acetamide' (before that N-(4,4-dioxo-3,5-dioxa-4λ6-thiapentyl)). (the Blue Book):
+    # "9 Esters" (:18182) above "11 Amides" (:18184); (:35916) 'methyl hydrogen sulfate (PIN)' (:35968); the amide is
+    # the amido prefix,:32991 'Method (1) generates preferred IUPAC names'). Read back below by
+    # ``assert_full_rt``; mutation: with ``seniority._OXOACID_ESTERS_PROMOTED`` empty the old name returns.
+    ("CC(=O)NCCOS(=O)(=O)O", "2-acetamidoethyl hydrogen sulfate"),
     ("CCOP(=S)(OCC)SCC(=O)OC", "methyl [(diethoxyphosphorothioyl)sulfanyl]acetate"),
     ("CCSCCSP(=S)(OC)OC", "1-[(dimethoxyphosphorothioyl)sulfanyl]-2-(ethylsulfanyl)ethane"),
     ("CCOP(=S)(OCC)Oc1ccc(cc1)[N+](=O)[O-]", "1-[(diethoxyphosphorothioyl)oxy]-4-nitrobenzene"),

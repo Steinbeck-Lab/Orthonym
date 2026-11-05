@@ -76,9 +76,11 @@ def rerun_class_guard(mol, name: str) -> Optional[str]:
       sphingoid): the same sentence of, and a glyceride named by prefixes is the method (2) name
       of "When anions are different, two methods are used" (:31831), whose PIN is the
       method (1) name (:31846);
-    * a dipeptide unit (``rules.peptides.peptide_like``): "AMINO ACIDS AND PEPTIDES" (:54150) is a chapter whose
-      compounds (:50943) gives no PIN, and the substitutive name of a peptide-like molecule is not promoted
-      (DT3 lead decision 1);
+    * a dipeptide unit of amino acid residues (``rules.peptides.peptide_of_residues``): "AMINO ACIDS AND
+      PEPTIDES" (:54150) is a chapter whose compounds (:50943) gives no PIN, and the substitutive name of a
+      peptide-like molecule is not promoted (DT3 lead decision 1); a heterocyclyl on an acetyl group of an
+      N-acylglycine ('[2-(4-methylpiperazin-1-yl)acetamido]acetic acid') is no residue, and the name is the method (1)
+      name of the acetic acid, as the strict path gives it for '[2-(pyrrolidin-1-yl)acetamido]acetic acid';
     * a spelling failure of the PIN (``validation.pin_spelling.check_pin_spelling``), for example the
       stereodescriptor of a substituent at the front of a heteroatom parent,:44643)."""
     if mol is None:
@@ -95,8 +97,8 @@ def rerun_class_guard(mol, name: str) -> Optional[str]:
             return f"natural-product class {natural_product} (P-101)"
         if detect_lipid_backbone(mol) is not None:
             return "lipid backbone (P-100)"
-        from ..rules.peptides import peptide_like
-        if peptide_like(mol):
+        from ..rules.peptides import peptide_of_residues
+        if peptide_of_residues(mol):
             return "peptide-like (P-103)"
         if _prostane_like(mol):
             return "prostane skeleton (P-101)"

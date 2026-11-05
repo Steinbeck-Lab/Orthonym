@@ -37,7 +37,9 @@ ROOT = Path(__file__).resolve().parents[2]
 # the message at WARNING before this change.
 INTERNAL = [
     ("OC(O)c1ccc(Br)c(C(O)O)c1", "self_consistency rejected (different molecule)"),
-    ("CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O", "OPSIN validity gate suppressed unparseable name"),
+    # (the a dev split row that logged this line before lane l17, 'CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O', is named
+    # by the amido and ester producers now and the gate has nothing to suppress; this a dev split row still logs it)
+    ("CCCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12", "OPSIN validity gate suppressed unparseable name"),
     ("C[N+](C)(C)[O-]", "OPSIN grammar validation failed"),
     ("Cc1ccc2cc(N3CC[C@H](NC(=O)Cn4cnc(C#N)n4)C3)ccc2n1", "Stereo backstop"),
     ("NC(CO)C(=O)NNCc1ccc(O)c(O)c1O", "Could not name compound substituent at locant"),

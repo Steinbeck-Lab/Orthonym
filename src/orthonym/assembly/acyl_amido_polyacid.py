@@ -52,22 +52,76 @@ def _cip_labels(mol, atoms: Iterable[int]) -> dict:
     return {i: copy.GetAtomWithIdx(i).GetPropsAsDict().get('_CIPCode') for i in atoms}
 
 
-def _amide_of_acyl(mol, n_idx: int, acyl) -> Optional[str]:
+def _amide_of_acyl(mol, n_idx: int, acyl, halogen: Optional[int] = None) -> Optional[str]:
     """SMILES of the primary amide the amido prefix stands for: the acyl atoms plus the amide N
-    as NH2, every other atom removed."""
+    as NH2, every other atom removed. With ``halogen`` (an atomic number), the acyl halide of that
+    element: the nitrogen is replaced by it."""
     rw = Chem.RWMol(mol)
     keep = set(acyl) | {n_idx}
+    # the atoms that lose a neighbour take their hydrogens again; an atom that keeps its neighbours keeps its own
+    # (the hydrogen of an indole [nH] cannot be recomputed: the ring does not kekulize without it)
+    cut = {n.GetIdx() for a in rw.GetAtoms() if a.GetIdx() not in keep for n in a.GetNeighbors()} & keep
+    if halogen is not None:
+        rw.GetAtomWithIdx(n_idx).SetAtomicNum(halogen)
     for idx in sorted((a.GetIdx() for a in rw.GetAtoms() if a.GetIdx() not in keep), reverse=True):
         rw.RemoveAtom(idx)
     try:
         amide = rw.GetMol()
-        for atom in amide.GetAtoms():
-            atom.SetNoImplicit(False)
-            atom.SetNumExplicitHs(0)
+        survivors = sorted(keep)
+        for new_idx, old_idx in enumerate(survivors):
+            if old_idx in cut or old_idx == n_idx:
+                atom = amide.GetAtomWithIdx(new_idx)
+                atom.SetNoImplicit(False)
+                atom.SetNumExplicitHs(0)
         Chem.SanitizeMol(amide)
         return Chem.MolToSmiles(amide)
     except Exception:  # noqa: BLE001 - a molecule that will not sanitize is a decline
         return None
+
+
+def ordinary_amido_is_the_acyl(mol, n_idx: int, carbonyl_c: int, sub_atoms, amido: str) -> bool:
+    """False when the ordinary route's ``amido`` prefix (the acid name of the acyl with '...oic acid' turned into
+    '...amido', ``substituent_naming.acid_name_to_amido_prefix``) is not the amide of THIS acyl.
+
+    An acyl that holds a second free COOH has an acid name whose '...oic acid' may be that other group:
+    '3-amino-4-{...}-4-oxobutanoic acid' names the Asp side-chain acid of an Asp-Leu-Met acyl whose own
+    carboxyl is cited as '1-hydroxy-...-1-oxobutan-2-yl', and '...-4-oxobutanamido' is a prefix of another
+    molecule. The amide the prefix stands for ('...amide', method (1), the Blue Book) must read
+    back from OPSIN as the amide of the acyl on the full InChIKey, as ``polyacid_acyl_amido_prefix`` demands of its own
+    prefix when it is asked for a verified one. An acyl with no second acid is the ordinary route's, unchecked here."""
+    sub_set = set(sub_atoms)
+    if not any(m[0] != carbonyl_c and m[0] in sub_set for m in mol.GetSubstructMatches(_FREE_ACID)):
+        return True
+    acyl = sorted(sub_set - {n_idx})
+    amide_smiles = _amide_of_acyl(mol, n_idx, acyl)
+    if not amide_smiles or not amido.endswith('o'):
+        return False
+    from .substituent_naming import fragment_acid_name_verified
+    return bool(fragment_acid_name_verified(amido[:-1] + 'e', amide_smiles))
+
+
+def acyl_name_is_the_acyl(mol, n_idx: int, carbonyl_c: int, sub_atoms, acid_name: str, acyl_name: str) -> bool:
+    """False when ``acyl_name``, the acyl prefix of ``acid_name`` ('...oic acid' turned into '...oyl',
+    "changing the ending 'oic acid' to 'oyl'", the Blue Book), is the acyl of another group than the one at
+    ``carbonyl_c`` of the N-attached acyl ``sub_atoms``.
+
+    An acyl that holds a second free COOH has an acid name whose '...oic acid' may be that other group: the acid
+    '2-({[...]amino}oxy)-2-methylpropanoic acid' of 'C(=O)C(=NOC(C)(C)C(=O)O)Ar' cites the carboxyl of the acyl as
+    'carboxy', and '...-2-methylpropanoyl' is the acyl of the other. The acyl chloride the name stands for
+    ('...oyl chloride', must read back from OPSIN as the acyl chloride of the acyl on the full InChIKey.
+    Unchecked (True): an acyl with no second acid (the ordinary route's), and an acid name that is a poly-acid or a
+    functional replacement acid (``acid_name_to_amido_prefix`` has no spelling for it: its '...oyl' is a divalent
+    group, which this single-acyl read-back does not describe; the validity gate rejects such a name when it is wrong)."""
+    sub_set = set(sub_atoms)
+    if not any(m[0] != carbonyl_c and m[0] in sub_set for m in mol.GetSubstructMatches(_FREE_ACID)):
+        return True
+    from .substituent_naming import acid_name_to_amido_prefix, fragment_acid_name_verified
+    if not acid_name_to_amido_prefix(acid_name):
+        return True
+    chloride = _amide_of_acyl(mol, n_idx, sorted(sub_set - {n_idx}), halogen=17)
+    if not chloride or not acyl_name:
+        return False
+    return bool(fragment_acid_name_verified(f"{acyl_name} chloride", chloride))
 
 
 def polyacid_acyl_amido_prefix(mol, n_idx: int, carbonyl_c: int, sub_atoms,

@@ -310,8 +310,17 @@ CI_BENCHMARK = [
         # The name leaves out the E/Z of the amidine C=N, which the InChIKey cannot see, so it is no PIN since
         # d900357be (stereo_unexpressed). "Stereodescriptors used in substitutive nomenclature"
         # (the Blue Book,:44624): "In preferred IUPAC names, stereodescriptors, preceded by a locant,
-        # must be cited to specify each stereogenic unit". The strict path and best-effort build the same name.
-        _declined_at_default("(2S)-5-[(1-amino-2-fluoroethylidene)amino]-2-benzamidopentanamide"),
+        # must be cited to specify each stereogenic unit". The strict path and best-effort built the same name.
+        # change-asserted-value (lane l17 suite fix, item 7 f60ed2e5d9, 113d76c6ce): the molecule holds two amides, the
+        # benzamide on a ring and the pentanamide on a chain. Primary source: "Systems composed of rings and
+        # chains", (1): "Within the same class, a ring or ring system has seniority over a chain" (the Blue Book):
+        # the benzamide is the parent, so the strict path's name that cites it as 'benzamido' on the pentanamide is the name
+        # of a junior parent, which the amide parent choice declines at every tier. The strict path names nothing
+        # (UNNAMEABLE: the strict path has no spelling for the N-substituent of the benzamide, a 1-amino-1-oxopentan-2-yl with a nitrogen group at C-5; the benzoyl ornithinamide without the amidine is unnamed there too); the best-effort name and
+        # the name of the 'valid' tier read back to the full InChIKey (``assert_tier_contract``). Mutation: the old
+        # ``_declined_at_default`` row fails at b77a6ea7c0, which names '(2S)-5-[(1-amino-2-fluoroethylidene)amino]-2-
+        # benzamidopentanamide'.
+        _declined("UNNAMEABLE"),
         marks=_GATE,
     ),
     pytest.param(

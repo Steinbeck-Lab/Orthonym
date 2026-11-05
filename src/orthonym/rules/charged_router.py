@@ -2399,6 +2399,33 @@ def _is_protonated_amine_cation(mol) -> bool:
             and len(chain_nitrogens) == 1)
 
 
+def _amine_principal_cation(mol, sites) -> bool:
+    """True for a cation whose one charge is the +1 of an acyclic nitrogen with one to three carbon neighbours: the
+    protonated amine whose parent can be the amine itself, forced as the principal group of the neutral skeleton."""
+    cations = sites.get('cations') or []
+    if len(cations) != 1:
+        return False
+    atom = mol.GetAtomWithIdx(cations[0]['atom_idx'])
+    return (atom.GetSymbol() == 'N' and not atom.IsInRing()
+            and 1 <= sum(1 for nb in atom.GetNeighbors() if nb.GetSymbol() == 'C') <= 3)
+
+
+def _covering_neutral_name(neutral_name: str, neutral_smi: str, style: str, mol, sites) -> Optional[str]:
+    """``neutral_name`` of the aminium route when it covers every heavy atom of ``neutral_smi``, else the gated
+    re-entry's name when that one does (B1). When none covers: '' for a cation whose parent can be the amine itself
+    (OFFER, not return: ranks cations, class 6, the Blue Book, above amides, so the parent is the
+    amine and the forced re-entry derives it, shipped on a full-key read-back only), None to abstain."""
+    if _reenter_atom_coverage(neutral_name, neutral_smi) is not False:
+        return neutral_name
+    try:
+        retry = _reenter_gated(neutral_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        retry = ''
+    if retry and not _is_malformed_parent(retry) and _reenter_atom_coverage(retry, neutral_smi) is not False:
+        return retry
+    return '' if _amine_principal_cation(mol, sites) else None
+
+
 def _hydron_scope(cation):
     """The scope that names the neutral amine of a protonated amine cation as if its suffix nitrogen
     held the hydron (``locant_omission.suffix_nitrogen_gains_hydron``); no scope for any other cation."""
@@ -3860,16 +3887,9 @@ def route_charged(mol, style: str = 'pin') -> str:
     # the systematic parent). Scoped to the aminium branch so no other charged class
     # changes. This closes the gate-disabled atom-drop door -- a 0-wrong FIX.
     if cation_kind == 'aminium':
-        if _reenter_atom_coverage(neutral_name, neutral_smi) is False:
-            try:
-                retry = _reenter_gated(neutral_smi, style)
-            except (RecursionError, ValueError, RuntimeError):
-                retry = ''
-            if (retry and not _is_malformed_parent(retry)
-                    and _reenter_atom_coverage(retry, neutral_smi) is not False):
-                neutral_name = retry
-            else:
-                return ''  # no covering systematic name -> abstain (0-wrong)
+        neutral_name = _covering_neutral_name(neutral_name, neutral_smi, style, mol, sites)
+        if neutral_name is None:
+            return ''  # no covering systematic name -> abstain (0-wrong)
 
     # --- Step 6: re-apply the class-correct ionic / radical suffix.
     if radical_suffix is not None:
@@ -3949,7 +3969,7 @@ def route_charged(mol, style: str = 'pin') -> str:
         # (a phase): a senior-group protonated amine becomes an 'azaniumyl'
         # substituent prefix /, not 'ium' appended to the parent;
         # a principal amine keeps the proven '-aminium' suffix.
-        naive = _aminium_or_azaniumyl(neutral_name, sites, mol) or ''
+        naive = (_aminium_or_azaniumyl(neutral_name, sites, mol) if neutral_name else '') or ''
         # B2 (aminium-suffix correctness): the naive transform blindly appends
         # 'ium' to whatever neutral name it is handed. When that neutral name is a
         # RETAINED name whose principal suffix is NOT the amine (trometamol is

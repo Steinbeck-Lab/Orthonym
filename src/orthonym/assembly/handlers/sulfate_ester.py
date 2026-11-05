@@ -50,6 +50,8 @@ def name_sulfate_ester(
                 pool = get_current_pool()
                 pool.add(name, "sulfate_ester", features)
                 final_name = _inject_stereo_if_missing(features, pool.best().name)
+                from .carbamate import demote_below_carbamate_parent
+                demote_below_carbamate_parent(features, final_name)
                 return NamingResult(
                     name=final_name,
                     tree=NameTreeNode(

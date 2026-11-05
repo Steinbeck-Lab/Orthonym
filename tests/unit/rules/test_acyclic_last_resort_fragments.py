@@ -7,8 +7,8 @@ whole `enumerator_last_resort` terminal class on the 500-row best-effort census
 (seed 42, `benchmarks/pubchem_2000.csv`) -- measured at, matching the
 census figure of 11 recorded in internal notes.
 
-2026-09-30: nine of the eleven name atom-complete now (see _PIN_BUILT,
-_PIN_NOT_BUILT and _STILL_LAST_RESORT below); the organometallic two stay strict
+2026-09-30: nine of the eleven name atom-complete now (see _PIN_BUILT
+and _STILL_LAST_RESORT below); the organometallic two stay strict
 xfails.
 
 These tests were RED ON PURPOSE. They pin the oracle for the follow-up build and
@@ -41,13 +41,11 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
-})
+# None remains since lane/l17 item 12: the one row of the set, '2-tetradecanamidoethyl sulfate', is named at the default
+# tier (see _PIN_BUILT).
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
-})
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
 
 def _declined_pin_row(smiles):
@@ -141,8 +139,13 @@ def test_fragments_are_distinct():
 # pin_verified; independent check: ``name_is_rt_exact`` below, OPSIN 2.9.0 to the
 # input's full InChIKey; mutation: the row fails at the lane start, which declines
 # it). A SECONDARY acyl nitrogen on a sulfate ester ('2-tetradecanamidoethyl
-# sulfate') has no producer on the anion-ester path yet, so its shipped N-acyl
-# float stays below pin_verified (decision A part 1).
+# sulfate') is the method-(1) amido prefix of the chain substituent as well
+# (lane/l17 item 12, ``assembly.chain_amide_prefixes``; change-asserted-value: it
+# was in _PIN_NOT_BUILT, its shipped N-acyl float below pin_verified, decision A
+# part 1; quote:, the Blue Book, "Method (1) generates
+# preferred IUPAC names"; independent check: ``name_is_rt_exact`` below, OPSIN
+# 2.9.0 to the input's full InChIKey; mutation: the row fails at lane/l17 4cadfc641a,
+# which ships the float below pin_verified).
 # - the compound alkyloxy prefix inside 'methyl' takes its own marks,
 # (:7232), '(benzyloxy)carbonyl (preferred prefix)' (:18116).
 _PIN_BUILT = {
@@ -155,13 +158,12 @@ _PIN_BUILT = {
     # lane/l15 task A9: the tertiary acyl nitrogen is the N-substituted amido prefix
     "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C":
         "2-{N-[3-(decyloxy)propyl]-2-methylprop-2-enamido}ethane-1-sulfonate",
-}
-_PIN_NOT_BUILT = {
+    # lane/l17 item 12: the secondary acyl nitrogen of the chain substituent of a sulfate ester
     "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]": "2-tetradecanamidoethyl sulfate",
 }
 # The rows that named atom-complete before the rest (g6 C15).
-_NAMED_EARLIER = ({"CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC", "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C"}
-                  | set(_PIN_NOT_BUILT))
+_NAMED_EARLIER = {"CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC", "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C",
+                  "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]"}
 _LAST_RESORT_ROWS = [s for s in FRAGMENTS if s not in _NAMED_EARLIER]
 # 2026-09-30 (pre-existing 26): six of the eight remaining rows name atom-complete
 # now. With the gate on, `Orthonym(general_fallback=True)` names each one, and the
@@ -198,22 +200,3 @@ def test_fragment_named_at_the_pin_tier(smiles, expected):
     assert r["name"] == expected, r
     assert r["tier"] == "pin_verified", r
     assert name_is_rt_exact(expected, smiles), r
-
-
-@pytest.mark.parametrize("smiles", sorted(_PIN_NOT_BUILT))
-def test_fragment_ships_below_the_pin_tier(smiles):
-    from tests.support.rt_assert import name_is_rt_exact
-    r = _dt_row(smiles)
-    assert not is_refusal_sentinel(r["name"]), r
-    assert r["tier"] != "pin_verified", r
-    assert name_is_rt_exact(r["name"], smiles), r
-
-
-@pytest.mark.parametrize("smiles,expected", sorted(_PIN_NOT_BUILT.items()))
-@pytest.mark.xfail(strict=True, reason=(
-    "PIN cites the N-acyl amine as an '-amido' prefix (P-66.1.1.4.3, "
-    "BlueBookV2.md:32998) on the sulfate/sulfonate ester; the anion-ester path "
-    "has no amido producer (it ships the N-acyl float below pin_verified) -- TODO "
-    "in TRIAGE.md 'Suite fix -- j5-pin-labels-b'"))
-def test_fragment_pin_spelling(smiles, expected):
-    assert _dt_name(smiles) == expected

@@ -280,9 +280,12 @@ class TestWholeName:
          "{[(benzyloxy)carbonyl]amino}acetic acid"),
         ("OC(=O)CNC(=O)OC", "[(methoxycarbonyl)amino]acetic acid"),
         ("OC(=O)CNC(=O)OCC", "[(ethoxycarbonyl)amino]acetic acid"),
-        # Not just the acid parent: an alcohol parent takes the same prefix.
+        # An alcohol does not take the prefix: "SENIORITY ORDER FOR CLASSES" (the Blue Book), Table 4.1 ranks class 9
+        # "Esters" (:18182) above class 17 "Hydroxy compounds" (:18190), so the carbamate is the parent word and the hydroxy
+        # group the prefix: the exemplar of is '2-hydroxypropyl (2-aminoethyl)carbamate (PIN)' (:30766). (This row
+        # asserted '2-[(tert-butoxycarbonyl)amino]ethan-1-ol', which names the alcohol as the parent.)
         ("CC(C)(C)OC(=O)NCCO",
-         "2-[(tert-butoxycarbonyl)amino]ethan-1-ol"),
+         "tert-butyl (2-hydroxyethyl)carbamate"),
         # The sulfur analogue, end to end (BB 18128 '(acetylsulfanyl)carbonyl').
         ("CSC(=O)NCC(=O)O",
          "{[(methylsulfanyl)carbonyl]amino}acetic acid"),

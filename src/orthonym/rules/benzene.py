@@ -2119,6 +2119,11 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                         'is_complex': _complex,
                     }
 
+    if h_count + len(neighbors) == 2:  # (the Blue Book method (1) is the PIN,:33040): '(N-phenylacetamido)', no anilino; (:33354) urea
+        from ..assembly.n_acyl_amido import acylated_n_group
+        if (_acyl_n := acylated_n_group(mol, n_idx, ring_atoms)) is not None:
+            return _acyl_n
+
     # / (plan P1AM Task 8): ring-attached
     # -NH-S(=N-NH2)(R)[=O]? -> '(...sulfino/sulfonohydrazonamido)'.
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'S':
@@ -2298,11 +2303,6 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'is_complex': True,
                     **amine_promotion(mol, _branch_atoms, _bname),
                 }
-
-    if h_count == 0 and len(neighbors) == 2:  # (the Blue Book method (1) is the PIN,:33040): '(N-phenylacetamido)', no anilino
-        from ..assembly.n_acyl_amido import tertiary_acyl_amido_group
-        if (_acyl_n := tertiary_acyl_amido_group(mol, n_idx, ring_atoms)) is not None:
-            return _acyl_n
 
     # (the Blue Book) N,N-disubstituted ANILINO. -N(R)-C6H5 takes the
     # PREFERRED prefix 'N-<R>anilino': the Blue Book verbatim

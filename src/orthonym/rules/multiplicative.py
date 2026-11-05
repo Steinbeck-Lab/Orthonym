@@ -4957,7 +4957,7 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
     # 2,2'-oxydi(ethan-1-ol) (PIN), 4,4'-oxydi(cyclohexane-1-carboxylic
     # acid) (PIN), N1,N1'-methylenedi(benzene-1,4-diamine) (PIN,
     # — mid-name comma locants do NOT trigger bis).
-    if re.match(r"^(?:\d|N[-,'0-9])", parent_name):
+    if _unit_name_is_substituted(re.sub(r"^\([^()]*\)-", "", parent_name)):   # a front stereodescriptor is no part of the spelling
         return COMPLEX_MULTIPLIERS.get(unit_count)
 
     # (c) (the Blue Book): 'bis', 'tris' "before skeletal
@@ -5233,10 +5233,10 @@ def _assemble_multiplicative_name(
     # _select_multiplier on the leading-locant test.
     # A derived multiplier ('bis', 'tris') always takes the parentheses
     #, the Blue Book; "1,1'-methylenebis(azepane)").
-    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS as _CM
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS as _CM, apply_enclosing_marks
     if (any(ch.isdigit() for ch in parent_name) or parent_lower.startswith("dec")
             or multiplier in _CM.values()):
-        return f"{locant_prefix}{bridge_token}{multiplier}({parent_name})"
+        return f"{locant_prefix}{bridge_token}{multiplier}{apply_enclosing_marks(parent_name, -1)}"
 
     # Handle names with spaces (e.g., "benzoic acid" -> "tribenzoic acid")
     if " " in parent_name:

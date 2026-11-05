@@ -45,8 +45,20 @@ def test_saturated_skeleton_predicate():
 
 @pytest.mark.unit
 def test_unsaturated_cyano_fragment_is_not_counted():
+    """The carbon COUNT never names the fragment ('pentyl' dropped the alkene, the methyl and the nitrile).
+
+    change-asserted-value (lane/l17 fix a performance pass): the expectation was '' (the substituent primitive declined a nitrile
+    on a chain, and the count tail refused). The primitive now spells the cyano group as a prefix:
+    (the Blue Book) "the -CN group is designated by the preferred prefix 'cyano'", on the unsaturated group of
+     (:17205) 'prop-2-en-1-yl', numbered from the free valence: '1-cyano-2-methylprop-2-en-1-yl'. It is
+    never the count word. Independent check: a fresh OPSIN call reads '1-cyano-2-methylprop-2-en-1-yl acetate' to the
+    input's full InChIKey. Mutation: without Pass 1a of
+    ``substituent_naming._name_polyfunctional_acyclic_substituent_impl`` the function returns '' again."""
     mol, atoms = _alkyl_atoms("C=C(C)C(C#N)OC(C)=O", 3)  # C=C(C)C(C#N)-O...
-    assert get_alkyl_fragment_name(mol, atoms) == ""
+    name = get_alkyl_fragment_name(mol, atoms)
+    assert name == "1-cyano-2-methylprop-2-en-1-yl" and name != "pentyl"
+    from tests.support.rt_assert import assert_full_rt
+    assert_full_rt(name + " acetate", "C=C(C)C(C#N)OC(C)=O")
 
 
 @pytest.mark.unit

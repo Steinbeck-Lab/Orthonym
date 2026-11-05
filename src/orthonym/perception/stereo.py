@@ -201,6 +201,16 @@ def _clear_nonexpressible_amine_n_cip(mol) -> None:
             continue
 
 
+def find_chiral_centres(mol, **kwargs) -> List:
+    """``Chem.FindMolChiralCenters`` run on a disposable copy of ``mol``: the labeller it calls (``rdCIPLabeler``
+    when it labels the CIP codes, RDKit's default) writes ``_CIPCode`` on every atom and bond of the molecule it is
+    given, over the labels of ``assign_stereochemistry`` (``centres``), and the two labellers differ at an exocyclic
+    double bond to an aromatic-flagged ring atom ('E' for the 'Z' of ``centres``), so a count of the centres taken on
+    the shared molecule changed the descriptors that every name built afterwards cited. The centres of a copy are
+    the centres of ``mol`` (chirality is copy-invariant)."""
+    return Chem.FindMolChiralCenters(Chem.Mol(mol), **kwargs)
+
+
 def get_stereocenters(mol) -> List[Dict]:
     """
     Get all stereocenters with their CIP labels.

@@ -1305,12 +1305,12 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             # natural products in Chapter are not identified"
             # (the Blue Book); its systematic acid is the parent whose
             # '-oic acid' becomes '-oate',:40955).
+            from .anion_neutral_names import neutral_skeleton_name_once
             for _sys_namer in (
                     (_try_neutralize_and_name_without_carbohydrate,)
                     if refused_conversion else
-                    (_try_neutralize_and_name_systematic,
-                     _try_neutralize_and_name_without_carbohydrate)):
-                sys_neutral_name = _sys_namer(mol)
+                    (_try_neutralize_and_name_systematic, _try_neutralize_and_name_without_carbohydrate)):
+                sys_neutral_name = neutral_skeleton_name_once(_sys_namer, mol)
                 if not sys_neutral_name:
                     continue
                 sys_anion_name = _acid_name_to_carboxylate(

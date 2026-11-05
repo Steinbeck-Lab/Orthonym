@@ -8,6 +8,7 @@ import subprocess
 import pytest
 from orthonym.namer import name_compound
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_full_rt
 
 
 # ---------------------------------------------------------------------------
@@ -60,27 +61,46 @@ class TestRingEsterPrefixJoining:
         """
         assert name_compound("CC(=O)Oc1ccccc1") == "phenyl acetate"
 
+    @pytest.mark.opsin_gate
     def test_different_acyloxy_benzene(self):
-        """Two different acyloxy prefixes on benzene have locants and hyphens."""
-        result = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
-        assert result is not None
-        assert "acetyloxy" in result
-        assert "propanoyloxy" in result
-        # Should NOT have direct concatenation without hyphens
-        assert "acetyloxypropanoyloxy" not in result
+        """Two different esters on one ring: the second is the one acyloxy prefix of the organyl word.
 
+        Re-asserted 2026-11-05 (lane/l17 item 5, change-asserted-value). The old value was the acyloxy form on the
+        ring ('4-(acetyloxy)-1-(propanoyloxy)benzene'), a name with no ester word: "All preferred IUPAC
+        names for esters are named by functional class nomenclature" (the Blue Book). The shipped value is the
+        functional class name of method (2) of (:31831): "Method (1) generates preferred IUPAC names
+        but names formed by using method (2) are acceptable in general nomenclature", with "(2) 4-(acetyloxy)phenyl
+        dichloroacetate" (:31840, the same shape with other anions). Method (1), '1,4-phenylene acetate propanoate',
+        is the PIN and OPSIN 2.9.0 reads it not, so the name is no PIN and the default tier declines it; it ships
+        at a wider tier, labelled systematic_verified, read back by OPSIN to the full InChIKey. The anion that stands
+        as the word of the name is the propanoate, the one the split of the decomposition engine makes the principal
+        one; (:31856) fixes no other choice for two anions of one ring.
+        """
+        smiles = "CC(=O)Oc1ccc(OC(=O)CC)cc1"
+        result = name_compound(smiles, include_confidence=True)
+        assert result["name"] == "4-(acetyloxy)phenyl propanoate", result
+        assert result["tier"] == "systematic_verified", result
+        assert_full_rt(result["name"], smiles)
+
+    @pytest.mark.opsin_gate
     def test_different_acyloxy_benzene_format(self):
-        """Two different acyloxy prefixes produce locant-(prefix) format."""
+        """Two different esters of one ring: the acyloxy prefix of the organyl word is parenthesised."""
         result = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
-        # Should be like: 1-(acetyloxy)-4-(propanoyloxy)benzene
-        assert "(" in result  # Parenthesized prefixes
+        assert result == "4-(acetyloxy)phenyl propanoate", result
 
+    @pytest.mark.opsin_gate
     def test_same_acyloxy_cyclohexane(self):
-        """Same acyloxy prefix twice uses multiplier."""
+        """Identical anions on one ring: the functional class multiplicative name.
+
+        Re-asserted 2026-11-05 (lane/l17 item 5, change-asserted-value). The old value only asked for 'acetyloxy' and
+        'cyclohexane' in the name ('1,2-bis(acetyloxy)cyclohexane'). (the Blue Book): "When
+        anions are identical functional class multiplicative nomenclature is used", 'ethane-1,2-diyl diacetate (PIN)'
+        (:31823), 'propane-1,2,3-triyl triacetate (PIN)' (:31827); the multivalent organyl group of a ring is named as
+        the group of one parent. The name is read back by OPSIN to the full InChIKey.
+        """
         result = name_compound("CC(=O)OC1CCCCC1OC(C)=O")
-        assert result is not None
-        assert "acetyloxy" in result
-        assert "cyclohexane" in result
+        assert result == "cyclohexane-1,2-diyl diacetate", result
+        assert_full_rt(result, "CC(=O)OC1CCCCC1OC(C)=O")
 
 
 @pytest.mark.integration
@@ -252,13 +272,17 @@ class TestEsterOPSINRoundTrip:
         assert name == "phenyl acetate"
         assert "--" not in name
 
+    @pytest.mark.opsin_gate
     def test_format_multi_acyloxy_has_parentheses(self):
-        """Multi-acyloxy benzene uses parenthesized prefix format."""
+        """Multi-acyloxy benzene uses parenthesized prefix format.
+
+        The shipped name of the molecule is '4-(acetyloxy)phenyl propanoate' (method (2) of,:31831; see
+        TestRingEsterPrefixJoining.test_different_acyloxy_benzene for the 2026-11-05 re-assertion): the acetyloxy prefix
+        is parenthesised, and the propanoate is the anion word, not a second prefix.
+        """
         name = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
-        assert name is not None
-        # Should use (acetyloxy) and (propanoyloxy) format
-        assert "(acetyloxy)" in name
-        assert "(propanoyloxy)" in name
+        assert name == "4-(acetyloxy)phenyl propanoate", name
+        assert "(acetyloxy)" in name and not name.endswith(")")
 
     def test_format_diacetate_has_multiplier(self):
         """Glycerol diacetate: the multiplied anion takes 'di'."""

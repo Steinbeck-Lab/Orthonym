@@ -17,6 +17,50 @@ from ..rules.lambda_convention import nonstandard_bonding_number
 from .molcache import atoms_of, neighbors_of
 from ..rules.locants import compare_locant_sets  # perf lever A10 (2026-09-13): hoisted (23,785 executions per 300 molecules)
 
+#: the carboxamide classes: the match of each leads with the carbonyl carbon (``[CX3](=O)[NX3]...``)
+_CARBOXAMIDE_PGS = frozenset({"primary_amide", "secondary_amide", "tertiary_amide"})
+
+
+def _pcg_anchor(principal_group, match, skeletal_suffix: bool, acyl_anchor: bool) -> Set[int]:
+    """The atoms of a principal-group ``match`` that can make a chain bear the group.
+
+    ``acyl_anchor`` (a carboxamide): the carbonyl carbon alone. "N-Substitution",
+    (the Blue Book): R-CO-NHR' is named "by citing the substituents R' and R'' as prefixes preceded by the locant
+    N" ('N-(propan-2-yl)acetamide (PIN)'), so the chain that bears the amide is its acyl chain and the N-substituent
+    carbon of the match ('[CX3](=O)[NX3H1][#6]') is a prefix and no host. The parent choice between a ring and a chain
+    counts the group on that carbon alone (``parent_selection._count_pg_on_chain``). Read as a host, a three-carbon
+    N-alkyl chain beat the two-carbon acyl chain and left the amide off the chain that choice was given."""
+    if acyl_anchor and principal_group in _CARBOXAMIDE_PGS:
+        return {match[0]}
+    if not skeletal_suffix:
+        return set(match)
+    from ..rules.parent_selection import _pg_attachment_atoms
+    return set(_pg_attachment_atoms(principal_group, tuple(match)))
+
+
+def carboxamide_acyl_chain(features, ring_atoms: Set[int]) -> Optional[List[int]]:
+    """The acyl chain of a carboxamide principal group: the chain of two carbons or more that bears the group by its carbonyl
+    carbon alone (``find_principal_chain(acyl_anchor=True)``), ring atoms left out; None for another group, an acyl chain
+    of one carbon (a formamide is the single-carbon case of the parent choice and has its own route), or a chain that does
+    not bear the group.
+
+     "N-Substitution", (the Blue Book): R-CO-NHR' is named "by citing the substituents R'
+    and R'' as prefixes preceded by the locant N", so the N-substituent carbon of the match is a prefix and never a host
+    of the amide. The parent choice of a cyclic molecule (``classify_parts.ring_parent_choice``) and the comparison
+    of the chain it takes (:func:`principal_chain_with_ring_prefixes`) ask for the same chain, so that the comparison never
+    prefers the N-substituent's chain to the acyl chain the parent is."""
+    pg, pg_atoms = getattr(features, 'principal_group', None), getattr(features, 'principal_group_atoms', None)
+    mol = getattr(features, 'mol', None)
+    if pg not in _CARBOXAMIDE_PGS or not pg_atoms or mol is None:
+        return None
+    from ..rules.parent_selection import _count_pg_on_chain
+    acyl = find_principal_chain(
+        mol, getattr(features, 'functional_groups', None) or {}, pg, exclude_atoms=ring_atoms, acyl_anchor=True)
+    if acyl and len(acyl) >= 2 and _count_pg_on_chain(mol, acyl, pg_atoms, pg):
+        return acyl
+    return None
+
+
 # a phase (heteroatom-only-suffix acids): characteristic-heteroatom
 # (atomic number) for FG classes whose SMARTS matches S/P + O with NO carbon
 # atom in the match tuple. sulfonic_acid, sulfinic_acid, phosphonic_acid and
@@ -501,6 +545,7 @@ def find_principal_chain(
     exclude_atoms: Optional[Set[int]] = None,
     *,
     ring_prefixes: bool = False,
+    acyl_anchor: bool = False,
 ) -> Optional[List[int]]:
     """
     Find the principal chain following IUPAC 2013 rules.
@@ -539,6 +584,8 @@ def find_principal_chain(
             after it (the comparison cannot be decided). Used by
             ``chain_parent_prefix_seniority`` to check the chain a producer
             was given.
+        acyl_anchor: True: only the carbonyl carbon makes a chain bear a carboxamide, so the chain is its acyl chain
+            (:func:`_pcg_anchor`). Asked by ``classify_parts.ring_parent_choice``.
 
     Returns:
         List of atom indices forming the principal chain, in order (None only
@@ -672,19 +719,14 @@ def find_principal_chain(
         # branch below (the correct semantics for an exocyclic heteroatom).
         # Function-local import: rules.parent_selection imports perception.chains
         # at module scope, so a top-level import here would be circular.
-        from ..rules.parent_selection import (
-            SKELETAL_SUFFIX_PGS,
-            _pg_attachment_atoms,
-        )
+        from ..rules.parent_selection import SKELETAL_SUFFIX_PGS
         _skeletal_suffix = (
             _het_z is None and principal_group in SKELETAL_SUFFIX_PGS
         )
 
         def _pcg_anchor_atoms(match) -> Set[int]:
             """Atoms of ``match`` that can make a chain bear this PCG."""
-            if not _skeletal_suffix:
-                return set(match)
-            return set(_pg_attachment_atoms(principal_group, tuple(match)))
+            return _pcg_anchor(principal_group, match, _skeletal_suffix, acyl_anchor)
 
         for match in fg_matches:
             fg_atoms.update(_pcg_anchor_atoms(match))
@@ -1341,6 +1383,7 @@ def principal_chain_with_ring_prefixes(features) -> Optional[List[int]]:
                 principal_group,
                 exclude_atoms=ring_atoms,
                 ring_prefixes=True,
+                acyl_anchor=carboxamide_acyl_chain(features, ring_atoms) is not None,
             )
         tied = _P45_TIE.get()
     except Exception:                            # fail closed: undecided

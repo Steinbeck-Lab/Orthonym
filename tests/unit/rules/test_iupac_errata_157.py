@@ -554,6 +554,12 @@ _DEHYDRO_SITES = {
     # docstrings that quote (e)(i) "low locants are given to hydro/dehydro prefixes": they
     # rank the locants of names already built, they build no dehydro prefix
     "assembly/form_choice.py",
+    # the amide-parent selection quotes "the maximum number of substituents cited as prefixes (other than
+    # 'hydro/dehydro')" in its docstring (lane/l17 item 7): a quotation, it builds no dehydro prefix
+    "rules/amide_parent.py",
+    # the amide tie names quote "(other than 'hydro/dehydro' prefixes)" in the docstring (lane/l17 item 10): a
+    # quotation, it compares the locants of names already built and builds no dehydro prefix
+    "rules/amide_tie_names.py",
     "rules/ring_cation_hydro.py",
     # the spiro component namer quotes (e) in its docstring (UN U2, 2026-10-19);
     # it numbers ring double bonds, it builds no dehydro prefix

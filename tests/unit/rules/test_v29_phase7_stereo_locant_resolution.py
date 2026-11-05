@@ -567,17 +567,18 @@ def test_ring_parent_descriptors_are_not_dropped(namer, smiles, expected):
     assert _dt_obj_name(namer, smiles) == expected
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "holds for this spelling only. The strict path numbers the ring by the order the atoms were written "
-    "in (P-14.4 (g), :3307, is not applied: the fluorine takes locant 3, 4, 6, 2 or 5 by spelling) and "
-    "cites the four descriptors of one numbering with the prefixes of another. Every spelling is now named "
-    "as RDKit's canonical SMILES is, '(1R,2S,4R,5S)-1,2,3,5,6-pentakis(acetyloxy)-4-fluorocyclohexane', "
-    "which does not read back to the input (the base names that spelling the same; the default tier "
-    "declines it and the best-effort tier names the molecule from another producer)"))
 def test_pentaacetate_ring_parent_keeps_its_descriptors(namer):
     """The contract of the strict-xfail row above, independent of its spelling:
     the ring parent's four descriptors survive, i.e. the name round-trips to the
-    input's FULL InChIKey (stereo layer included; OPSIN run outside the engine)."""
+    input's FULL InChIKey (stereo layer included; OPSIN run outside the engine).
+
+    Held back as a strict xfail until lane/l17 item 10: the strict path numbered the ring by the order the atoms were
+    written in and cited the four descriptors of one numbering with the prefixes of another, so the name did not read
+    back to the input. The alcohol fragment of the split of the ester is now named from its structure where its own name
+    cites the hydroxy group as a prefix (``decomposition.fragment_assembly._alcohol_group_candidates``), and the
+    molecule is named by the class of its principal group, '(1R,2S,4R,5S)-2,3,4,5-tetrakis(acetyloxy)-6-fluorocyclohexyl
+    acetate', the Blue Book: esters are named by functional class nomenclature), which OPSIN
+    reads back to the full InChIKey (checked outside the engine below)."""
     from tests.support.rt_assert import assert_full_rt
     name = _dt_obj_name(namer, PENTAACETATE)
     assert_full_rt(name, PENTAACETATE)

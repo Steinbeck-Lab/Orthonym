@@ -577,8 +577,11 @@ def test_t4_rescue_memo_keeps_none_and_keys_on_the_context(monkeypatch):
 # unmemoised repeat did (the ChEBI acetylated oligosaccharide ran out of analysis
 # budget at 33.5 s without the memo and ran 409 s to the same name with free hits).
 
+# The first piece names a lysine whose side chain carries the adipoyl ester of a second lysyl-adipoyl unit. Its amide
+# twin (the side chain an amide, 'lys3-adipoyl') is named at the pin tier by the amido prefix of since item 4
+# of lane l17 and asks for 14 distinct fragments with no repeat (14 requests, 14 keys), so the memo has nothing to save there.
 LYSINE_PEPTIDE_PIECES = [
-    "NCCCC[C@H](NC(=O)CCCCC(=O)N[C@@H](CCCCN)C(=O)O)C(=O)N[C@@H](CCCCNC(=O)CCCCC(=O)O)C(=O)O",
+    "NCCCC[C@H](NC(=O)CCCCC(=O)N[C@@H](CCCCN)C(=O)O)C(=O)N[C@@H](CCCCOC(=O)CCCCC(=O)N[C@@H](CCCCN)C(=O)O)C(=O)O",
     "NCCCC[C@H](NC(=O)[C@H](CCCCN)NC(=O)CCCCC(=O)N[C@@H](CCCCN)C(=O)O)C(=O)N[C@@H](CCCCOC(=O)CCCCC(=O)O)C(=O)O",
 ]
 
@@ -596,7 +599,7 @@ def _fragment_namer_spy(monkeypatch):
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", LYSINE_PEPTIDE_PIECES, ids=["lys3-adipoyl", "lys4-ester"])
+@pytest.mark.parametrize("smiles", LYSINE_PEPTIDE_PIECES, ids=["lys3-adipoyl-ester", "lys4-ester"])
 def test_substituent_fragment_memo_saves_repeats_and_keeps_the_name(monkeypatch, smiles):
     """Call-count guard (fails without the memo): fewer fresh substituent-fragment
     namings than with the memo off, and the same name and tier."""

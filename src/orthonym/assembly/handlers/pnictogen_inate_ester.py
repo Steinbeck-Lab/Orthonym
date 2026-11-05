@@ -68,6 +68,8 @@ def name_pnictogen_inate_ester(
     # OPSIN-unparseable, shipped at pin_verified (TRIAGE g3 C10e). Declare it.
     final_name = _inject_stereo_if_missing(
         features, pool.best().name, parent_scope='retained_no_locants')
+    from .carbamate import demote_below_carbamate_parent
+    demote_below_carbamate_parent(features, final_name)
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(

@@ -58,11 +58,12 @@ def hetero_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int) -> Optio
     ``-NH-SO2-R`` branch is the method (1) '{R}sulfonamido' prefix, the Blue Book), as at the PIN
     tier ('[(1E)-2-phenylethene-1-sulfonamido]acetate', not '{[...sulfonyl]amino}'); any other branch is named by
     ``substituent_naming._located_fg_hetero_root``."""
-    from .substituent_naming import _located_fg_hetero_root, sulfonamido_prefix_from_n_branch
+    from .n_acyl_amido import sulfonamido_prefix
+    from .substituent_naming import _located_fg_hetero_root
     atom = mol.GetAtomWithIdx(attach_idx)
     if atom.GetSymbol() == 'N':
         parent = {nb.GetIdx() for nb in atom.GetNeighbors()} - set(sub_atoms)
-        sulfonamido = sulfonamido_prefix_from_n_branch(mol, attach_idx, sub_atoms, parent)
+        sulfonamido = sulfonamido_prefix(mol, attach_idx, sub_atoms, parent)
         if sulfonamido:
             return sulfonamido
     return _located_fg_hetero_root(mol, sub_atoms, attach_idx)

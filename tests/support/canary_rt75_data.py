@@ -1289,7 +1289,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OCCCC(=O)CCOC(C)=O",
-        "1,6-bis(acetyloxy)hexan-3-one",
+        # lane/l17 change-asserted-value (item 2; found by a bisect over the lane): was '1,6-bis(acetyloxy)hexan-3-one'.
+        # (the Blue Book) ranks "9 Esters" (:18182) above "16 Ketones" (:18189); the two acetates are the esters of one
+        # 'polyhydroxylic' component, so (:31815) and (:31819) name it by its multivalent organyl group
+        # ('propane-1,2,3-triyl triacetate (PIN)'); OPSIN 2.9.0 reads the name to the input's full InChIKey (fresh run)
+        "3-oxohexane-1,6-diyl diacetate",
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)CN)C(=O)N[C@@H](CC(N)=O)C(=O)O",
@@ -1760,7 +1764,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OC1C(c2ccccc2)CCC(c2ccccc2)C1O",  # aromatic,medium
-        "2-(acetyloxy)-3-hydroxy-1,4-diphenylcyclohexane",
+        # lane/l17 change-asserted-value (item 2): was '2-(acetyloxy)-3-hydroxy-1,4-diphenylcyclohexane'.: "9 Esters"
+        # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the parent: (:31663) "All preferred IUPAC names for
+        # esters are named by functional class nomenclature", the organyl group numbered from its free valence, the hydroxy and
+        # phenyl groups its prefixes at {2,3,6}, lower than {2,5,6}; OPSIN 2.9.0 reads the name to the input's full InChIKey (fresh run)
+        "2-hydroxy-3,6-diphenylcyclohexyl acetate",
     ),
     (
         "CCCCC/C=C\\C[C@H](/C=C/C=C\\C/C=C\\CCCC(=O)[O-])OO",  # acyclic,charged,medium

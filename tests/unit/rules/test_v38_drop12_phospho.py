@@ -42,9 +42,9 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "OCCOP(=O)(O)O",
-})
+# (Lane/l17 fix a performance pass: the one molecule of the set, 'OCCOP(=O)(O)O', is named by the functional class ester, the PIN, '2-hydroxyethyl
+# dihydrogen phosphate' (``test_byte_identity_controls``); the set is empty.)
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
@@ -233,7 +233,13 @@ def test_determinism(smiles):
     # (not ethanephosphonic acid)' (:35461): the acid is a functional parent, not a suffix; the
     # old string was '2-hydroxyethane-1-phosphonic acid' (OPSIN reads both to one InChIKey).
     ("OCCP(=O)(O)O", "(2-hydroxyethyl)phosphonic acid"),
-    ("OCCOP(=O)(O)O", "2-(phosphonooxy)ethan-1-ol"),
+    # change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): '2-(phosphonooxy)ethan-1-ol'
+    # -> '2-hydroxyethyl dihydrogen phosphate' (pin_verified). Quote: (the Blue Book) ranks "9 Esters" (:18182)
+    # above "17 Hydroxy compounds" (:18190); (:35916) names 'methyl dihydrogen phosphate (PIN)' (:35940), and the book's own
+    # name of a hydroxy organyl of that ester is '(2S)-2,3-dihydroxypropyl dihydrogen phosphate',:55148; gives no
+    # PIN there). Independent check: ``test_the_dihydrogen_phosphate_of_ethylene_glycol_reads_back`` below. Mutation: with
+    # ``seniority._OXOACID_ESTERS_PROMOTED`` empty the old name returns and this row fails.
+    ("OCCOP(=O)(O)O", "2-hydroxyethyl dihydrogen phosphate"),
     ("OC(=O)CP(=O)(O)O", "phosphonoacetic acid"),
     ("c1ccccc1CP(=O)(O)O", "benzylphosphonic acid"),
     ("CCO", "ethanol"),
@@ -241,3 +247,9 @@ def test_determinism(smiles):
 ])
 def test_byte_identity_controls(smiles, expected):
     assert _dt_name_compound(smiles) == expected
+
+
+@pytest.mark.roundtrip
+def test_the_dihydrogen_phosphate_of_ethylene_glycol_reads_back():
+    from tests.support.rt_assert import assert_full_rt
+    assert_full_rt("2-hydroxyethyl dihydrogen phosphate", "OCCOP(=O)(O)O")

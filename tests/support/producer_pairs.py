@@ -154,7 +154,10 @@ PAIRS = [
     # stilbenedisulfonic acid until the ring with the most principal groups became the parent, since when
     # the benzene writer names that one ('inner:tier_a_ring')
     ("NC(=NO)NCCC[C@H]([NH3+])C(=O)[O-]", "best-effort", "engine:t4"),
-    ("COC(=O)c1ccc(OC(CO)C(O)c2ccc(O)c(OC)c2)c(OC)c1", "best-effort", "engine:t4"),
+    # (the second row of this list names the ester by functional class since the ring carboxamide commit of lane l17,
+    # 83a5e16318: 'methyl 4-{[1,3-dihydroxy-1-(4-hydroxy-3-methoxyphenyl)propan-2-yl]oxy}-3-methoxybenzene-1-carboxylate'
+    # is built by the ester family of the inner table, and is no longer asked; the first and the third row stay T4's)
+    ("COC(=O)c1ccc(OC(CO)C(O)c2ccc(O)c(OC)c2)c(OC)c1", "best-effort", "inner:ester_family"),
     ("C[C@@H]1CCC2C(C)(C)[C@H](O)CC[C@]2(C)[C@@]12Cc1c(O)cc3c(c1O2)CNC3=O", "best-effort", "engine:t4"),
     # the stereo of the input composed onto the string of a producer
     *STEREO_COMPOSED,

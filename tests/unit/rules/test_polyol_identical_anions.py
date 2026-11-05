@@ -14,6 +14,7 @@ InChIKey.
 import pytest
 
 from tests.support.pin_tiers import assert_pin_at_both_tiers
+from tests.support.rt_assert import assert_full_rt
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -45,13 +46,20 @@ def _esters(smiles):
 @pytest.mark.parametrize("smiles,expected", [
     # the acid keeps its substituents (was 'propane-1,3-diyl diacetate': Cl dropped)
     ("ClCC(=O)OCCCOC(=O)CCl", "propane-1,3-diyl bis(chloroacetate)"),
-    # an unsaturated residue is not the saturated diyl (was 'butane-1,4-diyl diacetate')
-    ("CC(=O)OC/C=C/COC(C)=O", None),
+    # an unsaturated residue is not the saturated diyl (was 'butane-1,4-diyl diacetate'). Re-asserted 2026-11-05
+    # (lane/l17 item 5, change-asserted-value): the producer declined (None) and now names the residue it sees, the
+    # unsaturated group 'but-2-ene-1,4-diyl' (the retained prefix of, the Blue Book) with the descriptor
+    # of its double bond in front style, '(2E)'), in front of the multiplied anion,
+    #:31819). The name is read back by OPSIN to the full InChIKey, the E/Z layer included (asserted below).
+    ("CC(=O)OC/C=C/COC(C)=O", "(2E)-but-2-ene-1,4-diyl diacetate"),
+    ("CC(=O)OC/C=C\\COC(C)=O", "(2Z)-but-2-ene-1,4-diyl diacetate"),
 ])
 def test_the_diol_diester_producer_names_only_what_it_sees(smiles, expected):
     from orthonym.rules.esters import _try_functional_class_diol_diester
     mol, esters = _esters(smiles)
     assert _try_functional_class_diol_diester(mol, esters) == expected
+    if expected:
+        assert_full_rt(expected, smiles)
 
 
 def test_the_acyloxy_polyol_producer_declines_a_substituted_acid():

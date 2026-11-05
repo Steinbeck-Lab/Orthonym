@@ -56,8 +56,15 @@ class TestAcyloxyParenthesization:
         )
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_cyclohexyl_diester_uses_bis(self):
-        """Cyclohexyl diester uses bis(nonanoyloxy)."""
+        """Cyclohexyl diester uses bis(nonanoyloxy).
+
+        With the OPSIN validity gate on (the shipped configuration): the PIN tier names nothing for the stereo layer of
+        this diester since the functional class name of a ring ester it cannot build is left to the split (item 2 of lane
+        l17, ac3be4d0b3), and the name that ships is the best-effort 'cis-1,4-bis(nonanoyloxy)cyclohexane', the name this
+        test has always read. With the gate off the same row is the unverified '(1s,4s)-...' name of a producer that the
+        cascade does not ship."""
         name = name_compound(
             "CCCCCCCCC(=O)O[C@@H]1CC[C@H](OC(=O)CCCCCCCC)CC1"
         )
@@ -145,16 +152,22 @@ class TestParenthesizationCompounds:
         )
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_compound_106_no_hybrid_format(self):
-        """Compound #106 (HA=34): tris(acetyloxy)benzene, not tri(acetyloxy)."""
+        """Compound #106 (HA=34): no hybrid tri(acetyloxy) format.
+
+        change-asserted-value (lane l17 suite fix, item 2): the molecule is named as an ester, one acetate the principal
+        group and two acetyloxy prefixes of its organyl group, so no acetyloxy is multiplied and 'tris(acetyloxy)' no longer
+        arises. Primary source: "All preferred IUPAC names for esters are named by functional class
+        nomenclature" (the Blue Book; the acyloxy prefixes are for an ester beside a senior group,,
+        :31698). Independent check: ``assert_full_rt`` reads the name back with OPSIN to the full InChIKey. Mutation: the
+        old assertion 'tris(acetyloxy)' held at the lane base, which names '1-(acetyloxy)-4-[2,3-bis(acetyloxy)-...]benzene'."""
+        from tests.support.rt_assert import assert_full_rt
         smiles = "CC(=O)Oc1ccc(-c2c(O)c(O)c(-c3ccc(O)c(O)c3)c(OC(C)=O)c2OC(C)=O)cc1"
         name = name_compound(smiles)
-        assert "tris(acetyloxy)" in name, (
-            f"Expected 'tris(acetyloxy)' in '{name}'"
-        )
-        assert "tri(acetyloxy)" not in name or "tris(acetyloxy)" in name, (
-            f"Unexpected hybrid 'tri(acetyloxy)' in '{name}'"
-        )
+        assert name == ("2-(acetyloxy)-3-[4-(acetyloxy)phenyl]-6-(3,4-dihydroxyphenyl)-4,5-dihydroxyphenyl acetate"), name
+        assert "tri(acetyloxy)" not in name, f"Unexpected hybrid 'tri(acetyloxy)' in '{name}'"
+        assert_full_rt(name, smiles)
 
 
 # ============================================================================

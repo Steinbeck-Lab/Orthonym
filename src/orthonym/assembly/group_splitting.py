@@ -52,10 +52,12 @@ logger = logging.getLogger(__name__)
 # there is no infinite recursion.
 _IN_SPLIT_PROBE = threading.local()
 
-# Per-process cache of the probe (full split name) keyed by canonical SMILES, so a
-# repeated molecule does not pay a second full re-naming. The OpsinOracle separately
-# caches the (candidate, target) -> RT-result.
-_PROBE_NAME_CACHE: dict = {}
+# The probe (the full split name) is not cached here: it is a nested ``name_compound`` call, whose scope-bound memo
+# (``name_compound_nested``) keys the name by the SMILES and the ambient naming state (tier flags, the split probe
+# itself), so a repeated molecule does not pay a second re-naming in one naming call and no name of one tier or state
+# is served to another. A process-wide cache keyed by the SMILES alone did that (two calls of one molecule named a
+# different number of substituent fragments, ``tests/integration/test_producer_identity.py``). The OpsinOracle
+# separately caches the (candidate, target) -> RT-result.
 
 
 # W2F-P2: lazy module-level oracle for the narrow DEFAULT-ON split branch
@@ -249,13 +251,11 @@ _DECOMPOSERS = {
 
 def _probe_full_split_name(mol: Any) -> Optional[str]:
     """Re-name the whole molecule with group-splitting ON to obtain the actual
-    assembled split name (the RT-gate candidate). Recursion-guarded + cached."""
+    assembled split name (the RT-gate candidate). Recursion-guarded; the nested naming is memoised per naming call."""
     try:
         smi = Chem.MolToSmiles(mol)
     except Exception:
         return None
-    if smi in _PROBE_NAME_CACHE:
-        return _PROBE_NAME_CACHE[smi]
     _IN_SPLIT_PROBE.active = True
     name = None
     try:
@@ -266,7 +266,6 @@ def _probe_full_split_name(mol: Any) -> Optional[str]:
         name = None
     finally:
         _IN_SPLIT_PROBE.active = False
-    _PROBE_NAME_CACHE[smi] = name
     return name
 
 

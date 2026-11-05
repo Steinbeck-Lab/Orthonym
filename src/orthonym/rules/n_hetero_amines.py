@@ -276,7 +276,8 @@ def _name_n_hetero_substituted(mol, style: str) -> Optional[str]:
     core = _core(mol)
     if core is None:
         return None
-    if Chem.FindMolChiralCenters(mol, includeUnassigned=False, useLegacyImplementation=False):
+    from ..perception.stereo import find_chiral_centres
+    if find_chiral_centres(mol, includeUnassigned=False, useLegacyImplementation=False):
         return None
     if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
         return None

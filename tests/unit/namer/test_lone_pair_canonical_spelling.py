@@ -50,14 +50,22 @@ AZIRIDINE_FIRST = "[N@@]1(Cc2cc(-c3cccc4c3OC(F)(F)O4)ccc2F)[C@@H](C(OC)=O)C1"
 
 R102_NAME = "(1R,2S)-1,2-diphenylphospholane"
 R358_NAME = "(1R,2R)-2-[(2R)-2-(diphenylphosphanyl)propyl]-1-phenylphospholane"
-R665_NAME = ("methyl (1R,2S,6R,8S)-4-methoxy-3,7,9,11-tetraoxa-8-phosphatricyclo[6.2.1.0^2,6]"
-             "undecane-5-carboxylate")
-R322_NAME = ("6-benzamido-9-[(2R,3R,4R,5R)-5-{[bis(4-methoxyphenyl)(phenyl)methoxy]methyl}-4-"
+# R665, R322 and R633 after lane/l17 item 7: a count of chiral centres runs on a copy (``perception.stereo.find_chiral_centres``),
+# so the CIP labels the bridged fused builder and the amide parent read are the molecule's own. R665 is named as a bridged fused
+# ring system, which ranks above a von Baeyer system "...the following order: cyclic phane systems > fused ring
+# systems > bridged fused systems > non-fused bridged systems", the Blue Book; "the bridged fused ring name is preferred to
+# the von Baeyer name",:23883); R322 and R633 are named on the amide (class 11,; "the maximum number of
+# substituents corresponding to the principal characteristic group (suffix)",:18875) and no longer cite it as the 'benzamido'
+# prefix of a suffix-less purine. Every one is read back to the standard reading of the input by OPSIN's own StdInChIKey (the
+# lone-pair centre included, test_the_other_phosphorus_rows_are_named_at_best_effort below); the bridged fused numbering and
+# prefix order rest on the builder's own derivation (``rules/bridged_fused_pin``), unverified here.
+R665_NAME = ("methyl (2S,5R,5aS,8aR)-7-methoxyhexahydro-2,5-epoxyfuro[3,2-d][1,3,2]dioxaphosphepine-8-carboxylate")
+R322_NAME = ("N-{9-[(2R,3R,4R,5R)-5-{[bis(4-methoxyphenyl)(phenyl)methoxy]methyl}-4-"
              "{[(2S,4R,5S)-4-cyclopentyl-4-methyl-3-oxa-1-aza-2-phosphabicyclo[3.3.0]octan-2-yl]oxy}-"
-             "3-fluorooxolan-2-yl]-9H-purine")
-R633_NAME = ("6-benzamido-9-[(2R,3R,4R,5R)-5-{[bis(4-methoxyphenyl)(phenyl)methoxy]methyl}-4-"
+             "3-fluorooxolan-2-yl]-9H-purin-6-yl}benzamide")
+R633_NAME = ("N-{9-[(2R,3R,4R,5R)-5-{[bis(4-methoxyphenyl)(phenyl)methoxy]methyl}-4-"
              "{[(1S,6S,8R)-6,9-dimethyl-7-oxa-9-aza-8-phosphabicyclo[4.3.0]nonan-8-yl]oxy}-"
-             "3-fluorooxolan-2-yl]-9H-purine")
+             "3-fluorooxolan-2-yl]-9H-purin-6-yl}benzamide")
 
 
 @lru_cache(maxsize=None)

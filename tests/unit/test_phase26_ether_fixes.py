@@ -79,13 +79,22 @@ class TestGlycosideNaming:
     # what makes them safe). In PRODUCTION (gate ON) both abstain — the 0-wrong
     # pin. This is unchanged by F-spell-oxy (the gate-off raw string moved, the
     # production behaviour did not); asserted gate-on so it is meaningful.
+    # Changed asserted value (lane/l17 item 3 fix a performance pass): B5 (the O-methyl thiocarbamate with the rhamnose glycoside) abstained
+    # here, because no producer ranked the thiocarbamate. It is the ester of carbamothioic acid "Esters of
+    # carbonic acid, cyanic acid, and polycarbonic acids modified by functional replacement", the Blue Book: "Names of
+    # acids modified by functional replacement are used to generate preferred IUPAC names of corresponding esters";
+    # Table 4.1,:18182: class 9 esters above class 17 hydroxy compounds), named 'O-methyl (...)carbamothioate', and OPSIN
+    # 2.9.0 reads the name back to the input (assert_full_rt, an independent parse). The abstain is no longer the behaviour
+    # of the row; the guard of this test (suppresses a wrong name) stays for any row that still abstains.
     @pytest.mark.opsin_gate
-    @pytest.mark.parametrize("smiles,test_id", [
-        ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "B5-glycosyloxy"),
-    ])
-    def test_complex_ether_abstains_in_production(self, smiles, test_id):
-        """Gate-ON: suppresses the RT-WRONG best-effort name."""
-        assert name_compound(smiles, on_failure="label", emit_tier="pin") == "unknown organic compound", test_id
+    def test_thiocarbamate_with_sugar_is_named_in_production(self):
+        from tests.support.jars import jar_or_skip
+        from tests.support.rt_assert import assert_full_rt
+        smiles = "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1"
+        name = name_compound(smiles, on_failure="label", emit_tier="pin")
+        assert name == "O-methyl ({4-[(3,4,5-trihydroxy-6-methyloxan-2-yl)oxy]phenyl}methyl)carbamothioate", name
+        jar_or_skip()
+        assert_full_rt(name, smiles)
 
     # Task 12 fix a performance pass (wp6-tests; t12-research rest-of-suite item 35), D-b: B3
     # (trigalloyl ester) moved out of the abstain list -- the gate-on PIN tier now ships

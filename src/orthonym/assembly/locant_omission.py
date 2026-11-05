@@ -63,6 +63,7 @@ __all__ = [
     "l3_locant_omitted_for_parent_atoms",
     "l6_all_substitutable_h_share_one_locant",
     "l6_chain_parent_one_substitutable_atom",
+    "parent_compound_group_atoms",
     "l6_ring_parent_one_substitutable_atom",
     "mononuclear_parent_locant_required",
     "suffix_nitrogen_hydrogens_are_caps",
@@ -644,6 +645,29 @@ def l6_all_substitutable_h_share_one_locant(
             return False
         locants.add(loc)
     return len(locants) == 1
+
+
+def parent_compound_group_atoms(mol, chain_atoms: Iterable[int], group_atoms: Iterable[int]) -> set:
+    """The atoms of a principal group's matches (``group_atoms``) that belong to the parent compound the licence of
+    :func:`l6_chain_parent_one_substitutable_atom` reads: a carbon that is neither on the chain nor bonded to it is a
+    substituent of the group's nitrogen (the 'N-methyl' of ``[CX3](=O)[NX3]([#6])[#6]``), no atom of the parent
+    compound, so it is left out and the nitrogen holds the hydrogen it replaced.
+
+     (the Blue Book) "All locants are omitted for parent compounds when all substitutable hydrogen atoms
+    have the same locant" reads the UNSUBSTITUTED parent compound, and 'acetamide' keeps '2-' because its N-H are
+    substitutable too ('N-carbamoyl-2-phenylacetamide (PIN)',:33364). Kept among the group atoms, the N-substituent
+    carbons of a secondary or tertiary amide made its nitrogen hold no hydrogen, the licence hold for the chain
+    carbon alone, and the prefixes lose their locants ('[N-(2,3-dihydroxypropyl)](N-methyl)(phenyl)acetamide' for
+    N-(2,3-dihydroxypropyl)-N-methyl-2-phenylacetamide). A group whose atoms are all the group's own (an acid,
+    a nitrile, a primary amide) is returned whole."""
+    chain = {int(a) for a in chain_atoms}
+    keep = set()
+    for g in (int(a) for a in group_atoms):
+        atom = mol.GetAtomWithIdx(g)
+        if (g in chain or atom.GetAtomicNum() != 6
+                or any(n.GetIdx() in chain for n in atom.GetNeighbors())):
+            keep.add(g)
+    return keep
 
 
 def l6_chain_parent_one_substitutable_atom(

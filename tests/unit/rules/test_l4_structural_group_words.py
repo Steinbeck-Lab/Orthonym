@@ -115,10 +115,32 @@ def test_group_name_is_built_from_structure(smiles, expected):
 # a preferred name. "Seniority order for classes" (the Blue Book): an ester-type
 # group outranks an alcohol.
 UNRECOGNISED_GROUP_IN_ARYL = [
-    "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
     "COC(=S)NCc1ccc(OCC(O)CO)cc1",
     "COC(=S)NCc1ccc2ccccc2c1OCC(O)CO",
 ]
+
+# Changed asserted value (lane/l17 item 3 fix a performance pass). The row 'COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1' stood in the list
+# above: no PIN, because the producer that chose the parent could not rank the O-alkyl thiocarbamate. The group is now read:
+# (the Blue Book) names the acids by functional replacement in carbamic acid ('carbamothioic O-acid (PIN)',
+#:30774) and "Esters of carbonic acid, cyanic acid, and polycarbonic acids modified by functional
+# replacement" (:32023): "Names of acids modified by functional replacement are used to generate preferred IUPAC names of
+# corresponding esters. Element symbols O, S, etc. and locants are used to designate the location of organyl groups";
+# Table 4.1 (:18182,:18190) ranks the ester (class 9) above the hydroxy compound (class 17). So the parent is the ester,
+# 'O-methyl...carbamothioate', and the sugar is a prefix of its N group; the name is a PIN and OPSIN 2.9.0 reads it back to
+# the input's InChIKey (assert_full_rt, an independent parse). The base 5cd9d81c3a name of the row is a non-PIN with the
+# hydroxy compound as the parent ('...oxan-2-yl)oxy]phenyl}methyl)amino]...'), so the old assertion held there.
+THIOCARBAMATE_WITH_SUGAR = "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1"
+
+
+@pytest.mark.opsin_gate
+def test_a_thiocarbamate_ester_with_a_sugar_in_an_aryl_is_named_as_the_ester():
+    from tests.support.default_tier import default_tier_row
+    from tests.support.rt_assert import assert_full_rt
+
+    row = default_tier_row(THIOCARBAMATE_WITH_SUGAR)
+    expected = "O-methyl ({4-[(3,4,5-trihydroxy-6-methyloxan-2-yl)oxy]phenyl}methyl)carbamothioate"
+    assert (row["name"], row["tier"], row["is_pin"]) == (expected, "pin_verified", True), row
+    assert_full_rt(expected, THIOCARBAMATE_WITH_SUGAR)
 
 
 @pytest.mark.opsin_gate

@@ -40,10 +40,11 @@ ROWS = [
     ("CCCCCCCCCC(=O)OC[C@H](CO)OP(=O)([O-])OCC[N+](C)(C)C",
      "(2S)-1-(decanoyloxy)-3-hydroxypropan-2-yl 2-(N,N-dimethylmethanaminiumyl)ethyl phosphate",
      "(2S)-1-(decanoyloxy)-3-hydroxypropan-2-yl 2-(trimethylazaniumyl)ethyl phosphate"),
-]
-#: the sphingomyelin with an amide group in its group: the PIN tier has no name for the group, the best-effort tier names it
-BEST_EFFORT_ONLY = [
+    # the sphingomyelin with an amide group in its group (lane/l17 item 12): the amide is the method-(1) prefix of the chain,
+    # (the Blue Book) "Method (1) generates preferred IUPAC names": 'hexadecanamido'. The PIN tier had no
+    # name for the group; 'dimethylmethanaminiumyl' (d) is cited before 'hexadecanamido...octadecyl' (h),.
     ("CCCCCCCCCCCCCCCC(=O)N[C@@H](COP(=O)([O-])OCC[N+](C)(C)C)[C@H](O)CCCCCCCCCCCCCCC",
+     "2-(N,N-dimethylmethanaminiumyl)ethyl (2S,3R)-2-hexadecanamido-3-hydroxyoctadecyl phosphate",
      "(2S,3R)-2-hexadecanamido-3-hydroxyoctadecyl 2-(trimethylazaniumyl)ethyl phosphate"),
 ]
 
@@ -61,14 +62,6 @@ def test_the_default_tier_names_the_diester_with_the_aminiumyl_pin(smiles, pin, 
 
 @pytest.mark.parametrize("smiles, pin, general", ROWS)
 def test_the_best_effort_tier_names_it_with_the_azaniumyl_prefix_below_the_pin(smiles, pin, general):
-    row = _row(smiles, "best-effort")
-    assert (row["name"], row["tier"]) == (general, "systematic_verified"), row
-    assert name_is_rt_exact(row["name"], smiles), row
-
-
-@pytest.mark.parametrize("smiles, general", BEST_EFFORT_ONLY)
-def test_a_group_the_pin_tier_cannot_name_is_named_at_best_effort(smiles, general):
-    assert _row(smiles, "pin")["tier"] == "abstain"
     row = _row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (general, "systematic_verified"), row
     assert name_is_rt_exact(row["name"], smiles), row

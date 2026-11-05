@@ -34,6 +34,7 @@ from .isotope_licence import apply_unit_licences, unit_has_no_free_position
 from .isotope_offsets import restrict_offsets, search_space
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
+from .isotope_unit_slots import multiplied_unit_slots as _multiplied_unit_slots
 from .lambda_convention import LAMBDA as _LAMBDA
 
 #: One locant of a replacement or Hantzsch-Widman stem: a number, a letter, and the lambda number the
@@ -3704,17 +3705,6 @@ def _decorate_one_labelled_copy(skeleton, keys, original, stripped,
     return winners[0][1]
 
 
-#: The multiplying prefixes that can open a multiplied substituent and the number
-#: of copies each states /: 'di', 'tri',... for a simple
-#: substituent, 'bis', 'tris',... for a compound one). Longest first, so 'tetrakis'
-#: is not read as 'tetra'.
-_UNIT_MULTIPLIER_COUNT = {
-    "tetrakis": 4, "tris": 3, "bis": 2, "hepta": 7, "octa": 8, "nona": 9,
-    "deca": 10, "tetra": 4, "penta": 5, "hexa": 6, "tri": 3, "di": 2,
-}
-_UNIT_MULTIPLIER_RE = re.compile(
-    "(?:" + "|".join(_UNIT_MULTIPLIER_COUNT) + r")(?=[a-z(\[{]|-(?:tert|sec)-)")
-
 #: Bounds of the per-unit search of:func:`_decorate_uniform_multiplier`, like the
 #: ``_MULTI_LOCANT`` caps above: the highest unit locant tried, the number of locant
 #: specifications tried per (multiplier, substituent word) slot, and the OPSIN parses
@@ -3750,42 +3740,6 @@ def _escalate_for_unit_descriptor(name: str, desc_start: int, desc: str) -> str:
     masked = name[:desc_start] + stand_in + name[desc_start + len(desc):]
     out = _escalate_marks_for_descriptor(masked, desc_start)
     return out[:desc_start] + desc + out[desc_start + len(stand_in):]
-
-
-def _multiplied_unit_slots(skeleton: str):
-    """Every place of ``skeleton`` where a multiplying prefix opens a multiplied
-    substituent, as ``(copies, head, base, tail, enclosed)``: the name up to and
-    including the multiplier, the substituent word, and what follows it.
-
-     (the Blue Book): the descriptor is inserted "before the part of the
-    compound that is isotopically substituted"; for a multiplied substituent that is
-    the substituent word, inside the multiplier's marks:43770; the verbatim
-    '1,2-di[(13C)methyl]benzene (PIN)',:43734). The multiplier may lead the name
-    ('tetramethylsilane', 'dimethyl sulfate'), follow locants ('1,2-diethylbenzene',
-    'N,N,N-trimethyl...') or sit inside the marks of an outer group ('...-2,3-bis(
-    hexadecanoyloxy)propoxy...'). A multiplied word is enclosed ('bis(hexadecanoyloxy)')
-    or, for a simple prefix, bare ('diethyl'); a multiplier-like run inside a word
-    ('hexadecanoyl', 'dihydro') is not offered, and a slot that reads no unit fails
-    the caller's round trip, so a surplus slot costs a parse, never a wrong name."""
-    from ..assembly.naming_utils import _SIMPLE_PREFIX_VOCABULARY, matching_close
-    for m in _UNIT_MULTIPLIER_RE.finditer(skeleton):
-        p = m.start()
-        if p and skeleton[p - 1] not in "-([{ ,":
-            continue
-        copies = _UNIT_MULTIPLIER_COUNT[m.group(0)]
-        head, rest = skeleton[:m.end()], skeleton[m.end():]
-        if rest[:1] in ("(", "[", "{"):
-            close = matching_close(rest, 0, "([{")
-            if close is not None:
-                yield copies, head, rest[1:close], rest[close + 1:], True
-            continue
-        run = re.match(r"[a-z]+", rest)
-        if not run:
-            continue
-        word = run.group(0)
-        for k in range(len(word), 0, -1):
-            if word[:k] in _SIMPLE_PREFIX_VOCABULARY:
-                yield copies, head, word[:k], rest[k:], False
 
 
 def _unit_locant_choices(el: str, u: int, k_max: int):
@@ -4210,12 +4164,11 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
-    from .isotope_alternative import alternative_skeleton, alternative_skeleton_active, has_alternative
+    from .isotope_alternative import alternative_skeleton_active, decorate_alternative, has_alternative
     from .isotope_passes import decorate_passes, lone_atom_isotope_name
     name = lone_atom_isotope_name(original) or decorate_passes(smiles, style, namer, original, stripped, label_map)
     if name is None and not alternative_skeleton_active() and has_alternative(stripped):
-        with alternative_skeleton():
-            name = decorate_passes(smiles, style, namer, original, stripped, label_map)
+        name = decorate_alternative(stripped, lambda: decorate_passes(smiles, style, namer, original, stripped, label_map))
     return name
 
 

@@ -41,16 +41,25 @@ def _amino(smi, frag, attach, parent):
 
 
 def test_n_methyl_acetamido_no_dropped_prefix():
-    # CN(C(C)=O)c1ccccc1: C0-N1(-C2(=O3)-C?...)-ring; frag {0,1,2,3,4}, attach N1.
+    # CN(C(C)=O)c1ccc(C(=O)O)cc1: C0-N1(-C2(=O3)-C4)-ring; frag {0,1,2,3,4}, attach N1.
     # F-amido: the N-methyl is now CITED (not dropped) -> the correct prefix.
-    m = Chem.MolFromSmiles("CN(C(C)=O)c1ccccc1")
-    parent = {5, 6, 7, 8, 9, 10}
+    # lane/l17 fix a performance pass (change-asserted-value: the MOLECULE of the test changes, the expected value does not): the
+    # prefix is the amido prefix of a group that is not the principal group, the Blue Book; the amide
+    # is the suffix of the parent when it is the senior group,:32991), and since item 12 the helper declines
+    # the amide of a molecule whose principal group it is (``n_acyl_amido.group_is_principal``): the plain acetanilide
+    # 'CN(C(C)=O)c1ccccc1' is 'N-methyl-N-phenylacetamide', its helper value is None; with a carboxylic acid (class 7a) the
+    # amide is a prefix: '4-(N-methylacetamido)benzoic acid'. Mutation: with the old molecule the helper returns None.
+    m = Chem.MolFromSmiles("CN(C(C)=O)c1ccc(C(=O)O)cc1")
+    parent = set(range(5, m.GetNumAtoms()))
     assert _name_amino_branch(m, {0, 1, 2, 3, 4}, 1, parent) == "N-methylacetamido"
+    # the plain acetanilide: the amide is the principal group, so the helper builds no prefix for it
+    m = Chem.MolFromSmiles("CN(C(C)=O)c1ccccc1")
+    assert _name_amino_branch(m, {0, 1, 2, 3, 4}, 1, {5, 6, 7, 8, 9, 10}) is None
 
 
 def test_n_methyl_formamido_no_dropped_prefix():
-    m = Chem.MolFromSmiles("CN(C=O)c1ccccc1")  # C0-N1(-C2=O3)-ring
-    parent = {4, 5, 6, 7, 8, 9}
+    m = Chem.MolFromSmiles("CN(C=O)c1ccc(C(=O)O)cc1")  # C0-N1(-C2=O3)-ring, a senior acid (see the acetamido test above)
+    parent = set(range(4, m.GetNumAtoms()))
     assert _name_amino_branch(m, {0, 1, 2, 3}, 1, parent) == "N-methylformamido"
 
 

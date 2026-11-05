@@ -289,8 +289,10 @@ def test_the_organotin_cation_beside_its_anion_is_named_through_its_bonded_drawi
 def test_a_dibutyltin_dication_with_two_acetates_is_named_and_read_back():
     smiles = "CCCC[Sn+2]CCCC.CC(=O)[O-].CC(=O)[O-]"
     res = name_best_effort(smiles)
+    # (the Blue Book): the multivalent group, then the multiplied anion ('dibutylstannanediyl
+    # diacetate', as the book's 'dimethyl dibutylstannanediyl dibutanedioate',,:38202); no PIN label
     assert (res["name"], res["tier"], res["is_pin"]) == (
-        "1-{[(acetyloxy)di(butyl)stannyl]oxy}-1-oxoethane", "systematic_verified", False), res
+        "dibutylstannanediyl diacetate", "systematic_verified", False), res
     assert name_is_rt_exact(res["name"], smiles)
     assert _tiered_namer("pin", "pin").name_tiered(smiles)["tier"] != "pin_verified"
 

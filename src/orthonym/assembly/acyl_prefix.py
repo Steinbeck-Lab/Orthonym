@@ -120,7 +120,7 @@ def tier_fg_engages(mol, sub_atoms, attach_idx, best_effort, pin) -> bool:
     prefix) ethanoyl 1-oxoethyl",:30442). The head of an acyl on a nitrogen is not declined: that group is the amido
     prefix of (``n_acyl_amido``), which is built before this one is asked; where it cannot name the group
     (the PIN tier's amide handler names no amide of a three-carbon N-substituent beside a ring-bearing acyl) nothing spells the acyl, and it floats as 'N-<acyl>' on a
-    parent that has no nitrogen suffix, so the general '[1-oxo-2-R-ethyl](R')amino' name stands."""
+    parent that has no nitrogen suffix Position of locants, the Blue Book), so the general '[1-oxo-2-R-ethyl](R')amino' name stands."""
     if not (best_effort or pin) or attach_idx is None or attach_idx not in set(sub_atoms):
         return False
     try:

@@ -132,15 +132,24 @@ def test_ring_name_of_the_guanidine_arm_the_builder_cannot_spell_is_labelled_bel
     assert d.get("tier") != "pin_verified", d
 
 
-def test_nitrile_junior_to_guanidine_default_tier_declines():
-    """Parity with urea ('N-(2-cyanoethyl)-N'-methylurea', test_pin_class_t13_carbonic.py):
-    the PIN-tier substituent namer does not certify the 2-cyanoethyl arm, so the guanidine name
-    ships at the best-effort tier only and the default tier declines the nitrile-parent name."""
+def test_nitrile_junior_to_guanidine_is_named_on_the_guanidine_at_both_tiers():
+    """Parity with urea ('N-(2-cyanoethyl)-N'-methylurea', test_pin_class_t13_carbonic.py): guanidine ranks with the
+    amides class 11, the Blue Book) above the nitriles (class 14), (:34266), and
+    the nitrile is its prefix 'cyano',:34734: "the -CN group is designated by the preferred prefix
+    'cyano'") on the substituent group '2-cyanoethyl' ('S-(2-cyanoethyl) cyclohexanesulfinothioate (PIN)',:31765).
+
+    change-asserted-value (lane/l17 fix a performance pass): the PIN-tier substituent namer did not name the 2-cyanoethyl arm, so
+    the guanidine name shipped at the best-effort tier only (pin_unverified) and the default tier declined; the
+    polyfunctional chain producer now cites the nitrile as 'cyano' (Pass 1a), so the name is pin_verified at both tiers.
+    Independent check: ``name_is_rt_exact`` (a fresh OPSIN read to the input's full key). Mutation: without Pass 1a the
+    old label returns and this test fails."""
     smiles = "N#CCCN=C(N)N"
     assert_not_pin_labelled(smiles, "3-[(diaminomethylidene)amino]propanenitrile")
     b = name_breadth(smiles)
-    assert (b.get("name"), b.get("tier")) == ("N-(2-cyanoethyl)guanidine", "pin_unverified"), b
-    assert name_default(smiles).get("tier") != "pin_verified"
+    assert (b.get("name"), b.get("tier")) == ("N-(2-cyanoethyl)guanidine", "pin_verified"), b
+    assert name_is_rt_exact("N-(2-cyanoethyl)guanidine", smiles)
+    d = name_default(smiles)
+    assert (d.get("name"), d.get("tier")) == ("N-(2-cyanoethyl)guanidine", "pin_verified"), d
 
 
 # The independent spelling check (validation/spelling/checks_parent.py) sees a guanidine too.
@@ -269,10 +278,16 @@ def test_urea_beside_an_acyclic_imide_is_not_labelled_below_the_pin():
     """The same reading in the urea rank: ``urea_parent_expected`` took the acyclic imide of
     'N-acetyl-4-[(methylcarbamoyl)amino]benzamide' for a class 13 group (junior to urea) and
     labelled the amide name below the PIN; the amide is senior to urea ('N-carbamoyl-2-phenylacetamide
-    (PIN)',:33364), so that name keeps the label the producer earned. A cyclic imide stays junior."""
+    (PIN)',:33364), so that name keeps the label the producer earned. A cyclic imide stays junior.
+
+    Lane/l17 item 12 (change-asserted-value; quote:, the Blue Book, acyclic imides "are named as
+    N-acyl derivatives of the senior primary amide", and,:33338, '2-[(methylcarbamoyl)amino]naphthalene-1-
+    carboxylic acid (PIN)':33354; independent check: OPSIN reads the name back to the input; mutation: lane/l17 4cadfc641a
+    labels it pin_unverified): the urea prefix of a ring is the amino prefix that carries the carbamoyl prefix, built
+    and not read from the engine's general namer, so the name earns pin_verified."""
     b = name_breadth("CNC(=O)Nc1ccc(cc1)C(=O)NC(=O)C")
     assert (b.get("name"), b.get("tier")) == (
-        "N-acetyl-4-[(methylcarbamoyl)amino]benzamide", "pin_unverified"), b
+        "N-acetyl-4-[(methylcarbamoyl)amino]benzamide", "pin_verified"), b
     c = name_breadth("NC(=O)NCCN1C(=O)CCC1=O")
     assert (c.get("name"), c.get("tier")) == (
         "1-[2-(carbamoylamino)ethyl]pyrrolidine-2,5-dione", "systematic_verified"), c

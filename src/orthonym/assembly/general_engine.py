@@ -2503,6 +2503,7 @@ def name_general_monocycle(
     from ..rules.ring_selection import select_principal_ring_system
     from ..rules.seniority import get_suffix
     from .halogen_ring_ions import ring_ion_parent_name
+    from . import monocycle_ring_amide as mono
     from .substituent_enumerator import discover_substituents, name_substituent
 
     reason = _common_refusal(mol, allow_charged=allow_charged)
@@ -2519,7 +2520,7 @@ def name_general_monocycle(
     # universal recursion names them). ---
     ring_systems = list(getattr(features, 'ring_systems', None) or [])
     if ring_systems:
-        senior = select_principal_ring_system(mol, ring_systems)
+        senior = mono.senior_ring_system(mol, ring_systems, features)
         senior_set = set(senior) if senior else None
     else:
         senior_set = None
@@ -2657,6 +2658,10 @@ def name_general_monocycle(
                 loc = min(atom_to_locant[n] for n in nbrs)
             pg_locants.append(loc)
 
+    n_sub_atoms, n_sub_entries, n_sub_bindings, n_reason = mono.ring_amide_n_block(
+        mol, suffix_core, pg_matches, ring_set, suffix_atoms, allow_aromatic_general)
+    if n_reason:
+        return _refuse(n_reason)
     # A '-one' on an aromatic ring carbon needs added-hydrogen machinery this
     # path does not build (pyridin-2(1H)-one); fail closed rather than emit an
     # aromatic-carbon-with-=O impossibility.
@@ -2693,7 +2698,7 @@ def name_general_monocycle(
     ordered_ring = sorted(ring_set, key=lambda i: atom_to_locant[i])
     try:
         subs = discover_substituents(
-            mol, ring_set | suffix_atoms, parent_type='chain',
+            mol, ring_set | suffix_atoms | n_sub_atoms, parent_type='chain',
             principal_chain=ordered_ring, atom_to_locant=atom_to_locant,
             general_fallback=True)
     except AssertionError as e:
@@ -2747,17 +2752,12 @@ def name_general_monocycle(
             context="prefix", is_ring=True, is_heterocyclic=False,
             is_monosubstituted=is_only_one_substitutable_position(_hydride))
 
-    prefix_parts = []
-    for prefix in sorted(groups, key=_citation_key):
-        locs = sorted(groups[prefix])
-        text = _mult_prefix(len(locs), prefix)
-        if text is None:
-            return _refuse("multiplicity beyond table")
-        prefix_parts.append(text if _omit_ring_locant
-                            else render_locants(locs) + '-' + text)
+    prefix_parts = mono.prefix_parts({p: sorted(g) for p, g in groups.items()}, n_sub_entries, _omit_ring_locant)
+    if prefix_parts is None:
+        return _refuse("multiplicity beyond table")
 
     # --- suffix text + parent-'e' elision ---
-    bindings = frag_bindings
+    bindings = frag_bindings + n_sub_bindings
     core = parent_name
     if suffix_core:
         suffix_text = _ring_suffix_text(suffix_core, pg_locants)

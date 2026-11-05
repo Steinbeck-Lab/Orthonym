@@ -2537,8 +2537,8 @@ def _l6_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     groups = set()
     for match in (getattr(features, "principal_group_atoms", None) or ()):
         groups.update(int(i) for i in match)
-    from ..locant_omission import l6_chain_parent_one_substitutable_atom
-    return l6_chain_parent_one_substitutable_atom(mol, chain, groups)
+    from ..locant_omission import l6_chain_parent_one_substitutable_atom, parent_compound_group_atoms
+    return l6_chain_parent_one_substitutable_atom(mol, chain, parent_compound_group_atoms(mol, chain, groups))
 
 
 def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:

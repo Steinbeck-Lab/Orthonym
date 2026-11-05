@@ -150,16 +150,20 @@ class TestCTerminalAmide:
     def test_leucinamide_cterm(self):
         result = _dt_name_compound(self.ILE_TO_LEU_NH2)
         assert not is_failure_name(result), result
-        # change-asserted-value (lane/l15 task A4): was ``result.endswith("leucinamide")``, the retained peptide name
-        # (labelled below the PIN tier: Decision A part 2 below). Primary source: "Substituents of the
-        # types -NH-CO-R and -NH-SO2-R" (the Blue Book): "(1) substitutively, by using a prefix formed by
-        # changing the final letter 'e' in the complete name of the amide to 'o'" and "Method (1) generates preferred
-        # IUPAC names" (:32998): every inner residue is '...amido' and the C-terminal residue the amide
-        # '4-methylpentanamide' of its own substitutive name. Independent check: ``_full_rt`` reads the name back with
-        # OPSIN to the input's full InChIKey. Mutation: the test fails at the lane start, which names
-        # the retained '...leucinamide'. The Phe witness above keeps its retained name (A4's route does not reach it).
-        assert result.endswith("-4-methylpentanamide") and "leucin" not in result, result
+        # change-asserted-value (lane/l17 item 6): was ``result.endswith("-4-methylpentanamide")`` (lane/l15 task A4), the
+        # substitutive amido name. Primary source: "SENIORITY ORDER FOR PARENT STRUCTURES", (the Blue Book)
+        # "The senior parent structure has the maximum number of substituents corresponding to the principal characteristic
+        # group (suffix)...": the amido name takes the 4-methylpentanamide chain (one amide group) as its parent, and the
+        # asparagine residue is a chain with two (a butanediamide: ``NC(=O)CC(N-)C(=O)N-``), so that name is not the PIN
+        # spelling. The handler prefers a substitutive name because it is the PIN (decision A, method (1),
+        #:32998); one that breaks a rule of the PIN spelling is offered after the peptide name,:54158), exactly as
+        # the Phe witness above, whose general path builds no substitutive name at all. Independent check: the structure
+        # carries the two amide groups on one chain (RDKit, below) and ``_full_rt`` reads the name back with OPSIN to the
+        # input's full InChIKey. Mutation: the test fails at the lane start, which names the amido name.
+        assert result.endswith("leucinamide") and result.startswith("isoleucyl"), result
         assert _full_rt(self.ILE_TO_LEU_NH2, result), result
+        asn_chain = Chem.MolFromSmarts("[NX3;H2][CX3](=O)[CH2][CX4][CX3](=O)[NX3;H1]")
+        assert Chem.MolFromSmiles(self.ILE_TO_LEU_NH2).HasSubstructMatch(asn_chain)
 
     def test_simple_hand_built_alanylglycinamide(self):
         """Minimal synthetic witness (Ala-Gly-NH2) for a fast, easy-to-read
@@ -171,7 +175,19 @@ class TestCTerminalAmide:
         # PIN tier). Peptides are not PINs; the PIN is the substitutive name
         # (V38-PEPTIDE-PIN-VERDICT.md; controller ruling, CHEBI:141425): the Ala acyl
         # is the method (1) amido prefix, the Blue Book).
-        assert result == "2-[(2S)-2-aminopropanamido]acetamide", result
+        # change-asserted-value (lane/l17 item 7): was '2-[(2S)-2-aminopropanamido]acetamide', the amide of the CONH2 end
+        # as the parent. Primary source: "SENIORITY OF ACYCLIC CHAINS (THE PRINCIPAL CHAIN)" (the Blue Book):
+        # "When there is a choice for the principal chain, the following criteria are applied, in the order listed... The
+        # principal chain: (a) contains the greater number of heteroatoms of any kind; (b) has the greater number of skeletal
+        # atoms"; the amides are one class, so both amide chains are candidates, and the alanine chain
+        # (CH3-CH(NH2)-CO, three atoms) has more skeletal atoms than the glycine chain (CH2-CO, two). cites the
+        # amido prefix only "when a group having preference for citation as a principal characteristic group is present".
+        # Independent check: ``_full_rt`` (OPSIN, outside the engine) reads the new name back to the input's full InChIKey,
+        # and the same rule gives the mirrored 2-(2-chloro-N-methylacetamido)propanamide of lane/l15 A9 its longer chain.
+        # Mutation: the assertion fails at the lane start, which names the old string.
+        # What would make it wrong: a book rule that ranks a primary amide above a secondary one inside the one class (none
+        # found; example (5),:21730, takes the N-methylpropanamide as the parent beside a primary amide).
+        assert result == "(2S)-2-amino-N-(2-amino-2-oxoethyl)propanamide", result
         assert _full_rt(smi, result), result
 
     def test_giant_30_residue_lysinamide_cterm_and_perf(self):
@@ -251,8 +267,15 @@ class TestNMethylNTerminus:
         # emission asserted below; full-InChIKey round-trip verified.
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
+        # change-asserted-value (lane/l17 item 7): was '(2S)-N-methylisoleucyl...valinamide'; the orphan leading '(2S)', the
+        # descriptor of the C-terminal valine hoisted to the front by the parent that was the CONH2 end, is gone now that the
+        # parent amide is chosen by / (rules.amide_parent). MACHINE-CONFIRMED: ``_full_rt`` below reads the new name
+        # back to the input's full InChIKey (every residue is L, which OPSIN reads from the retained names), and the old
+        # name read back alike, so neither spelling lost a stereocentre. UNVERIFIED: that the book prefers the name without
+        # the leading descriptor (the book gives no peptide name of this kind); it rests on the retained residue names
+        # carrying the configuration, and the open item is a Blue Book / peptide example with a C-terminal amide.
         assert result == (
-            "(2S)-N-methylisoleucylserylprolylalanylleucylleucylalanyl"
+            "N-methylisoleucylserylprolylalanylleucylleucylalanyl"
             "serylleucylvalinamide"
         ), result
         assert result.endswith("valinamide"), result

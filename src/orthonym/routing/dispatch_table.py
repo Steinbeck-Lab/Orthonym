@@ -1693,6 +1693,32 @@ def _rt_full_match(name: str, mol) -> bool:
         return False
 
 
+def _breaks_pin_spelling(name: str, mol) -> bool:
+    """True when the PIN spelling check finds a rule ``name`` breaks other than. The marker
+    ("INTRODUCTION", the Blue Book: no PINs are identified for the compounds of Chapter lowers every
+    name of an amino acid or peptide, retained or systematic, so it says nothing of the form of a substitutive name;
+    any other failure is a rule of the systematic name itself "Maximum number of substituents
+    corresponding to the principal characteristic group",:18875: a parent that carries fewer amide groups than
+    another chain of the structure). Fail-open: a check that raises finds no failure."""
+    try:
+        from orthonym.validation.pin_spelling import check_pin_spelling
+        return any(f.rule != "P-100" for f in check_pin_spelling(mol, name))
+    except Exception:
+        return False
+
+
+def _caller_tier_flags() -> dict:
+    """The engine switches of the tier a peptide sub-namer is called at, as ``name`` published them (an empty
+    dict for the PIN tier: the sub-namer is then the PIN tier's, as it always was)."""
+    from orthonym.metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                             full_coverage_ctx, general_fallback_ctx)
+    flags = {"general_fallback": general_fallback_ctx.get(),
+             "general_fallback_unverified": best_effort_ctx.get(),
+             "allow_aromatic_general": allow_aromatic_general_ctx.get(),
+             "full_coverage": full_coverage_ctx.get()}
+    return flags if flags["general_fallback"] else {}
+
+
 def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                     style: str = "pin", **kwargs) -> Optional[str]:
     """: peptide / N-acyl-amino-acid PINs are the SUBSTITUTIVE form.
@@ -1723,16 +1749,19 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
     # Only the TOP-level peptide gets the substitutive attempt.
     global _PEPTIDE_SUBST_ACTIVE, _PEPTIDE_NAME_STANDS
     _in = canonical_smiles or smiles
+    _subst = None       # the systematic name of a spelling-flawed attempt, held until the peptide name is looked up
+    _attempt_state = None   # what that attempt left (provenance, stored candidate), put back if its name ships after all
     if (_in and not _PEPTIDE_SUBST_ACTIVE
             and mol.GetNumHeavyAtoms() <= _PEPTIDE_SUBST_MAX_HEAVY):
         try:
             from orthonym.decomposition.engine import _NACYL_FLOAT_REFUSALS
             from orthonym.namer import Orthonym
 
-            def _sub_name():
+            def _sub_name(**tier_flags):
                 return Orthonym(
                     style=style,
                     _seed_excluded_dispatch_classes=frozenset({StoutClass.PEPTIDE}),
+                    **tier_flags,
                 ).name(_in)
 
             def _usable(name):
@@ -1767,12 +1796,59 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                         _peptide_name = name_peptide(mol)
                         _PEPTIDE_NAME_STANDS = bool(
                             _peptide_name and not is_failure_name(_peptide_name))
+                        from orthonym.metrics import provenance as _pv
+                        _prov_before_float = _pv.get_provenance()
                         _subst = _sub_name()
                         _demoted = True
+                        _tier_flags = _caller_tier_flags()
+                        if _usable(_subst) and _tier_flags:
+                            # Pass 3, a wider tier only, for a float that pass 2 ships. The PIN vocabulary of the
+                            # sub-namer has no producer for a prefix of the molecule (a ring the promoted producers
+                            # of the PIN tier name, '4-methylpiperazin-1-yl'), and the float cites the locant N on a
+                            # parent that has no amide or amine suffix, where N relates to no part of the name:
+                            # Position of locants (the Blue Book, "Locants (numerals and/or letters)
+                            # are placed immediately before that part of the name to which they relate"); the
+                            # locant N of an N-substituted amide is the nitrogen of its amide suffix,
+                            # N-Substitution (:32774). The molecule is named once more by the tier's own engine,
+                            # the float withheld, and, when that name is not accepted, by the engine of the tier
+                            # below that has no unverified opt-in (best-effort offers complete's). The name that
+                            # is accepted is the one the engine builds: the amido prefix of (method
+                            # (1) generates preferred IUPAC names,:32998) where it can, or a method (2) acylamino
+                            # name, which is a valid systematic name and not a PIN ('2-[(4-amino-4-oxo-2-
+                            # sulfobutanoyl)(octadecyl)amino]butanedioic acid'); the float stays the name of a
+                            # molecule that no engine names otherwise (an offer, not a return).
+                            # The float is a rejected candidate when a wider name wins: the provenance its naming
+                            # left (the producer, the gate outcome) is put back before that naming
+                            # (``restore_provenance``), and the float's own back when none wins.
+                            _prov_with_float = _pv.get_provenance()
+                            _offers = [_tier_flags]
+                            if _tier_flags["general_fallback_unverified"]:
+                                _offers.append({**_tier_flags, "general_fallback_unverified": False,
+                                                "full_coverage": False})
+                            for _offer in _offers:
+                                _pv.restore_provenance(_prov_before_float)
+                                _tok = _NACYL_FLOAT_REFUSALS.set([])
+                                try:
+                                    _wider = _sub_name(**_offer)
+                                finally:
+                                    _NACYL_FLOAT_REFUSALS.reset(_tok)
+                                # It wins when it is in PIN form: a name that cites 'oxo' for an acyl or a recorded
+                                # non-PIN part (the last-resort floor, '1-oxopentane') does not displace a float
+                                # whose parent is a retained residue ('N-acylglutamyl-D-proline',.
+                                if _usable(_wider) and not _pv.name_carries_non_pin_part(
+                                        _pv.get_provenance(), _wider):
+                                    _subst, _demoted = _wider, False
+                                    break
+                            else:
+                                _pv.restore_provenance(_prov_with_float)
                 finally:
                     _PEPTIDE_SUBST_ACTIVE = False
                     _PEPTIDE_NAME_STANDS = False
-                return (_subst if _usable(_subst) else None), _demoted
+                _ok = _usable(_subst)
+                # a systematic name that breaks a rule of the PIN spelling is offered, not preferred: the handler
+                # prefers the substitutive name because it is the PIN (decision A), and this one is not
+                _flawed = bool(_ok and not _demoted and _breaks_pin_spelling(_subst, mol))
+                return (_subst if _ok else None), _demoted, _flawed
 
             # One substitutive attempt per peptide per top-level naming call. The
             # decomposition re-reaches this handler for the same peptide fragment
@@ -1790,10 +1866,19 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
             # budget, so the peptide abstained instead of shipping its name.
             from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
             _key = (_in, style, renaming_state())
-            _subst, _demoted = cached_nested_call(
+            from orthonym.assembly.coverage_scoring import _confidence_store
+            from orthonym.metrics.provenance import get_provenance, restore_provenance
+            _before = (get_provenance(), getattr(_confidence_store, "last_candidate", None))
+            _subst, _demoted, _flawed = cached_nested_call(
                 "peptide_substitutive_attempt", _key, _attempt,
                 replay_budgets=False)
-            if _subst:
+            if _flawed:
+                # the name is offered, not returned: what the attempt recorded (its provenance, the stored
+                # candidate whose locant map the stereo backstop reads) is not that of the name returned below
+                _attempt_state = (get_provenance(), getattr(_confidence_store, "last_candidate", None))
+                restore_provenance(_before[0])
+                _confidence_store.last_candidate = _before[1]
+            if _subst and not _flawed:
                 if _demoted:
                     # Name-scoped record in THIS context: the float site records its
                     # own string, but the sub-namer may have reshaped the whole name.
@@ -1801,9 +1886,19 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                     record_non_pin_fragment(_subst)
                 return _subst
         except Exception:
+            _subst = None
             _PEPTIDE_SUBST_ACTIVE = False
             _PEPTIDE_NAME_STANDS = False
     _retained = name_peptide(mol)
+    if _subst and not (_retained and not is_failure_name(_retained)):
+        # no peptide name to prefer: the systematic name that breaks a spelling rule still ships (a name is never lost),
+        # with what its attempt recorded: its producer, its gate outcome, the candidate of the stereo backstop
+        from orthonym.assembly.coverage_scoring import _confidence_store
+        from orthonym.metrics.provenance import restore_provenance
+        if _attempt_state:
+            restore_provenance(_attempt_state[0])
+            _confidence_store.last_candidate = _attempt_state[1]
+        return _subst
     if _retained and not is_failure_name(_retained):
         # The retained acyl-prefix peptide name ('prolylalanylalanine') is kept
         # for breadth, but it is not a PIN: controller ruling (2026-09-24, TRIAGE.md

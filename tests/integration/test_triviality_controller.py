@@ -223,25 +223,28 @@ class TestMultiplierAlphabetization:
         Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#
         Source: 150-internal notes + V18 plan section 6 line 1031
         """
+        # change-asserted-value (lane l17 suite fix, item 2): 1-bromo-3,5-diacetoxybenzene is named by functional class,
+        # '5-bromo-1,3-phenylene diacetate', and its 'acet' is the anion of the ester, which follows the organyl group, not a
+        # prefix to order against 'bromo'. Primary source: "Polyesters formed from a single 'alcoholic'
+        # component",: "When anions are identical functional class multiplicative nomenclature is used. Names
+        # are formed by citing the multivalent group, the multiplicative prefix, and the multiplied anionic component name."
+        # (the Blue Book). Independent check: ``assert_full_rt`` reads the name back with OPSIN to the full InChIKey.
+        # Mutation: the name at the lane base is '1,5-bis(acetyloxy)-3-bromobenzene'.
+        from tests.support.rt_assert import assert_full_rt
         smiles = "Brc1cc(OC(C)=O)cc(OC(C)=O)c1"
         name = name_compound(smiles)
-        assert name is not None, f"name_compound returned None for {smiles!r}"
+        assert name == "5-bromo-1,3-phenylene diacetate", name
+        assert_full_rt(name, smiles)
+        # The alphanumerical order of the detachable prefixes where the acetyloxy groups stay prefixes (a carboxylic acid is
+        # senior to the ester): 'acet' < 'brom' although the multiplied prefix is 'bis',.
+        smiles = "CC(=O)Oc1cc(C(=O)O)cc(OC(C)=O)c1Br"
+        name = name_compound(smiles)
+        assert name == "3,5-bis(acetyloxy)-4-bromobenzoic acid", name
         lower = name.lower()
-        # a phase REVIEW root-cause fix: previously this test
-        # silently passed when the output omitted either substring
-        # (e.g., a pipeline regression returning 'unknown' or an
-        # unrelated retained name would no-op the alphabetization
-        # check). Assert both substrings are present so a regression
-        # actually fails the suite.
-        assert "acet" in lower and "brom" in lower, (
-            f"P-14.5 + WR-03: expected both 'acet' and 'brom' in "
-            f"'{name}' (regression silently passed before WR-03 fix)"
-        )
-        # Find positions of 'acet' and 'brom' substrings (tolerant of
-        # 'diacetoxy' vs 'bis(acetyloxy)' vs 'acetate' surface forms).
         assert lower.index("acet") < lower.index("brom"), (
             f"P-14.5: acet- ('a') must precede brom- ('b') in '{name}'"
         )
+        assert_full_rt(name, smiles)
 
 
 # ============================================================================

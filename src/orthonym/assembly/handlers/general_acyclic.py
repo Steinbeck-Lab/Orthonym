@@ -100,11 +100,11 @@ def name_general_acyclic(
     )
 
     # === Body: verbatim lift of composer.py:951-1055 (chain-fallback section) ===
-    # A principal ester is named by functional class, 'alkyl alkanoate',
-    # the Blue Book); one substitutive name here can only write the acid's anion and
-    # drops the alcohol, so decline and let the decomposition engine name the ester.
-    if getattr(features, 'principal_group', None) == 'ester':
-        logger.debug("fallback_chain_ring decline: principal ester smiles=%s",
+    # A principal ester is named by functional class, 'alkyl alkanoate', the Blue Book): one
+    # substitutive name here drops the alcohol. Off-chain amides likewise: decline, the decomposition engine names them.
+    from ...rules.polyfunctional_parts import chain_fallback_declines
+    if chain_fallback_declines(features):
+        logger.debug("fallback_chain_ring decline: principal ester or off-chain amides smiles=%s",
                      getattr(features, 'canonical_smiles', '?'))
         return None
 

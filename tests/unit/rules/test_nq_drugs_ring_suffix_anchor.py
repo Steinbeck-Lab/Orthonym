@@ -30,11 +30,19 @@ def test_a_carbocycle_keeps_the_principal_groups_suffix_at_locant_1(smiles, name
     # writer dropped its non-cited ring group; they are now the ester names
     # 'methyl 2-carbamoyl-...-3-carboxylate' (PIN,: esters 9 above amides 11), pinned with an
     # OPSIN full-InChIKey read-back in test_leads_l5_item22.py (leads item 22).
-    ("O=C1OCC(C(N)=O)C1C", "3-methyl-2-oxooxolane-4-carboxamide"),
+    ("O=C1OCC(C(N)=O)C1C", "4-methyl-5-oxooxolane-3-carboxamide"),
 ])
-def test_a_hydro_heterocycle_with_an_ester_and_an_amide_keeps_main_s_name(smiles, name):
-    # the amide is never the cited suffix of a ring whose principal group is an ester
-    #, the Blue Book above:18184); main's names, below the PIN at every tier
-    assert Orthonym(style="pin").name_tiered(smiles)["tier"] == "abstain"
+def test_a_lactone_with_an_amide_names_the_amide_as_the_suffix(smiles, name):
+    """change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): the old name was
+    '3-methyl-2-oxooxolane-4-carboxamide' (systematic_verified, the PIN tier abstained), and the test named the ring's lactone
+    an ester 'whose principal group' beats the amide. A lactone is a cyclic ester named as a heterocycle, a pseudoketone: (the Blue Book) "lactones and other cyclic esters are named as heterocycles; see 16 below", class 16
+    (:18189) "See Classes 8, 9, 11 and 13, on lactones, lactams"; (:29314) "Cyclic anhydrides, esters and amides are
+    named as pseudoketones"; so the carboxamide (class 11,:18184) is the suffix and the ring C=O the prefix 'oxo',
+    and the principal group takes the lowest locant, 3 rule c): '4-methyl-5-oxooxolane-3-carboxamide', not the
+    locant 4 of the old name. Independent check: a fresh OPSIN call reads the name to the input's full InChIKey. Mutation:
+    with ``seniority._head_principal_group`` not stepping aside for a ring ester the old name returns."""
+    from tests.support.rt_assert import assert_full_rt
+    assert Orthonym(style="pin").name_tiered(smiles)["name"] == name
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+    assert_full_rt(name, smiles)

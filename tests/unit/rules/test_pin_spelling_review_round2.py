@@ -635,7 +635,15 @@ def test_identical_prefix_names_to_merge_direct():
     ("CC(=O)CCO[N+](=O)[O-]", "3-oxobutyl nitrate", "pin_verified"),
     ("NCCO[N+](=O)[O-]", "2-aminoethyl nitrate", "pin_verified"),
     ("OCC(O[N+](=O)[O-])CO[N+](=O)[O-]", "2,3-bis(nitrooxy)propan-1-ol", "systematic_verified"),
-    ("NC(=O)CCOS(=O)(=O)O", "3-(sulfooxy)propanamide", "systematic_verified"),
+    # change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): '3-(sulfooxy)propanamide'
+    # (systematic_verified) -> '3-amino-3-oxopropyl hydrogen sulfate' (pin_verified), the sulfur sibling of the nitrate row above.
+    # Quote: SENIORITY ORDER FOR CLASSES, Table 4.1 (the Blue Book): "9 Esters" (:18182) ranks above "11 Amides"
+    # (:18184); "Esters of mononuclear noncarbon oxoacids" (:35916) names 'methyl hydrogen sulfate (PIN)' (:35968) and
+    # (:36484) cites a sulfur group by a prefix only beside "another substituent having priority... as principal
+    # group", which an amide has not; the amide is the prefix '3-amino-3-oxopropyl' as '5-(2-amino-2-oxoethyl)furan-2-carboxylic
+    # acid (PIN)' (:32940). Independent check: ``assert_full_rt`` in the test body (a fresh OPSIN read to the input's key).
+    # Mutation: with ``seniority._OXOACID_ESTERS_PROMOTED`` empty the old name returns and this row fails.
+    ("NC(=O)CCOS(=O)(=O)O", "3-amino-3-oxopropyl hydrogen sulfate", "pin_verified"),
     # a senior head keeps the prefix PIN ('2-(tert-butylimino)-3-methyl-3-
     # (nitrooxy)butanoic acid (PIN)',:25963; '3-(sulfooxy)propanoic acid (PIN)')
     ("OC(=O)CCO[N+](=O)[O-]", "3-(nitrooxy)propanoic acid", "pin_verified"),

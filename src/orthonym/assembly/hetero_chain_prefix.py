@@ -66,6 +66,14 @@ def fragment_parent_to_prefix(mol, sub_atoms, attach_idx, parent_name: str, carb
             from ..metrics.provenance import record_uncertified_pin_name
             record_uncertified_pin_name(prefix)
         return prefix
+    if (attach_idx is not None and mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P'
+            and _cites_phosphorus_group_as_prefix(parent_name)):
+        # the converse of the case above: capped with hydrogen, the P(=O)(OCH3)2 of a phosphonate is named on a carbon
+        # skeleton ('{[methoxy(oxo)-λ5-phosphanyl]oxy}methane', the P-H form), and its '-yl' form puts the free valence
+        # on that carbon, a different group,:15762: the parent substituent group carries the free valence).
+        # A phosphorus attachment is read off a name whose parent is the phosphorus (a hydride, 'phosphanone') only; the
+        # oxoacid-group prefix namer ('dimethoxyphosphoryl', rules.oxoacid_group_prefix) builds the rest from the structure.
+        return None
     if parent_name.strip() == 'dioxidane' and _is_bare_hydroperoxy(mol, sub_atoms, attach_idx):
         # Hydroperoxides (the Blue Book): "The prefix 'hydroperoxy' is formed by concatenation to
         # describe the group –OOH as a substituent in the presence of a characteristic group having priority for
@@ -79,6 +87,13 @@ def fragment_parent_to_prefix(mol, sub_atoms, attach_idx, parent_name: str, carb
         return None
     from .substituent_naming import ATTACH_LOCANT_UNKNOWN, parent_to_prefix
     return parent_to_prefix(parent_name, chain_length=carbon_count, attach_locant=ATTACH_LOCANT_UNKNOWN)
+
+
+def _cites_phosphorus_group_as_prefix(parent_name: str) -> bool:
+    """True when ``parent_name``, the name of a capped fragment, spells a phosphorus group as a prefix of another parent
+    ('{[methoxy(oxo)-λ5-phosphanyl]oxy}methane', '(dimethoxyphosphoryl)ethane'): the phosphorus is not the parent of the name."""
+    name = parent_name.strip()
+    return ('phosphanyl' in name or 'phosphoryl' in name) and not name.endswith(NONCARBON_PARENT_HYDRIDE_STEMS)
 
 
 def amide_joined_at_nitrogen(parent_name: str, mol, sub_atoms, attach_idx) -> bool:

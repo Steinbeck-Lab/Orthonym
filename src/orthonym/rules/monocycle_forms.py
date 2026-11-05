@@ -123,9 +123,13 @@ class MonocycleForm:
             # an 'ylidene' type substituent group is needed, it is necessary to use 'added
             # [indicated] hydrogen'"; 'pyridin-1(4H)-yl (preferred prefix)' (:16079),
             # (:24703). This spelling uses hydro prefixes instead: valid, not the PIN.
-            from ..metrics.provenance import record_non_pin_label
+            from ..metrics.provenance import record_non_pin_fragment, record_non_pin_label
             record_non_pin_label(out, rule="P-58.2.2.2",
                                  detail="hydro prefixes where added hydrogen is required")
+            # also a construct the Blue Book gives no PIN, as the azamethane and azaniumyl parts are: the form choice
+            # (``assembly.form_choice``, criterion 1, "a construction the Blue Book does not allow in a PIN") ranks the
+            # names of one species' charge forms by them before the parent that holds the cation
+            record_non_pin_fragment(out)
         return out
 
 
@@ -268,11 +272,12 @@ def monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[i
                    branch_atoms: Sequence[int] = (),
                    allow_cation: bool = False,
                    branch_names: Optional[Sequence[str]] = None,
-                   free_valences: Sequence[int] = ()) -> Optional[MonocycleForm]:
+                   free_valences: Sequence[int] = (),
+                   allow_lambda: bool = False) -> Optional[MonocycleForm]:
     """The book's name and numbering of one ring (``_monocycle_form``), recorded with
     ``assembly.book_prefixes.note_book_form`` when one is given."""
     form = _monocycle_form(mol, ring_atoms, free_valence_atom, branch_atoms, allow_cation,
-                           branch_names, free_valences)
+                           branch_names, free_valences, allow_lambda)
     if form is not None:
         from ..assembly.book_prefixes import note_book_form
         note_book_form("ring")
@@ -283,14 +288,22 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
                     branch_atoms: Sequence[int] = (),
                     allow_cation: bool = False,
                     branch_names: Optional[Sequence[str]] = None,
-                    free_valences: Sequence[int] = ()) -> Optional[MonocycleForm]:
+                    free_valences: Sequence[int] = (),
+                    allow_lambda: bool = False) -> Optional[MonocycleForm]:
     """The book's name and numbering of the single ring ``ring_atoms``, or ``None``.
 
     ``branch_atoms`` lists the ring atoms that carry a substituent prefix, once per prefix
      (f) lowest locants). ``free_valence_atom`` is the ring atom of the free valence
     of a substituent prefix, ``None`` for a parent. ``free_valences`` are the ring atoms that
     hold a free valence of a polyvalent group ('benzene-1,4-diyl',: each carries one
-    radical electron in ``mol`` and the locants of the set are the lowest (c))."""
+    radical electron in ``mol`` and the locants of the set are the lowest (c)).
+
+    ``allow_lambda`` spells a saturated ring whose heteroatoms of other bonding numbers are chalcogens that no other
+    heteroatom of the ring repeats, by the lambda convention in the Hantzsch-Widman name,
+    "a lambda-bearing ring cites its locants"): '1,2λ6-oxathiolan-3-yl' for the sultone ring, its oxo groups cited by the
+    caller "Preferred IUPAC names for heteromonocyclic rings with no more than ten ring members are
+    Hantzsch-Widman names"). The heteroatom locants are then fixed by the seniority of the elements, whichever atom
+    carries the lambda (an element the ring has once)."""
     ring = list(ring_atoms)
     ring_set = set(ring)
     valences = set(free_valences)
@@ -319,10 +332,18 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
     hetero = [a for a in ring if mol.GetAtomWithIdx(a).GetSymbol() != "C"]
     if any(mol.GetAtomWithIdx(a).GetSymbol() not in _RANK for a in hetero):
         return None
+    lam: Dict[int, int] = {}      # ring atom -> its bonding number, where the lambda convention is needed
     for a in hetero:
         atom = mol.GetAtomWithIdx(a)
         if atom.GetTotalValence() + (a in valences) != _BONDING[atom.GetSymbol()] + (a in cationic):
-            return None
+            from .lambda_convention import nonstandard_bonding_number
+            n = None if (a in cationic or a in valences or not allow_lambda
+                         or atom.GetSymbol() not in ("S", "Se", "Te")) else nonstandard_bonding_number(mol, a)
+            if n is None:
+                return None
+            lam[a] = n
+    if any(sum(mol.GetAtomWithIdx(b).GetSymbol() == mol.GetAtomWithIdx(a).GetSymbol() for b in hetero) > 1 for a in lam):
+        return None       # a lambda atom whose element the ring repeats: its locant would depend on the lambda (not built)
     aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring)
     if not aromatic and any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring):
         return None
@@ -335,6 +356,8 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
                   for i in range(len(order))]
     saturated = (not aromatic) and all(
         b.GetBondType() == Chem.BondType.SINGLE for b in ring_bonds)
+    if lam and not saturated:
+        return None       # a lambda atom in a ring with double bonds takes indicated hydrogen and hydro prefixes (not built)
 
     if not hetero:
         if exo_multiple:
@@ -375,13 +398,14 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
                                _saturated_ring_retained_name, build_hw_name)
     try:
         # (Tables 2.2, 2.3): a retained name, looked up by the ring skeleton
-        retained = (_saturated_ring_retained_name(mol, ring) if saturated
-                    else _mancude_retained_stem(mol, ring))
+        retained = None if lam else (_saturated_ring_retained_name(mol, ring) if saturated
+                                     else _mancude_retained_stem(mol, ring))
         if retained in _RETAINED_HETERO_LOCANTS:
             stem = retained
         else:
             # (with:8470) on this form's own locants
-            stem = build_hw_name(sorted(het.items()), len(ring), saturated, not saturated)
+            stem = build_hw_name(sorted(het.items()), len(ring), saturated, not saturated,
+                                 lambda_by_locant={numbering[a]: n for a, n in lam.items()} or None)
             if stem and not saturated:
                 stem = _apply_retained_stem(stem)
     except Exception:  # noqa: BLE001 - a builder that raises is a decline

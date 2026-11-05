@@ -129,7 +129,6 @@ DECLINED_ROWS = [
     "OCCOS(=O)O",
     "OCCOP(=O)(O)OP(=O)(O)O",
     "OC1CCC(OS(=O)(=O)Cl)CC1",
-    "OCC(COP(=O)(O)O)CC",
 ]
 
 
@@ -165,3 +164,14 @@ def test_the_branch_builder_keeps_its_two_conditions():
     assert name_acid_linked_branch(
         mol, branch, 5, "carboxylic_acid",
         functional_groups=detect_functional_groups(mol)) is None
+
+
+# change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): 'OCC(COP(=O)(O)O)CC' stood in
+# DECLINED_ROWS ('2-(hydroxymethyl)... phosphonooxy' prefix names, below the PIN). (the Blue Book) puts "9
+# Esters" (:18182) above "17 Hydroxy compounds" (:18190); (:35916) names the partial ester 'methyl dihydrogen phosphate
+# (PIN)' (:35940), and the book's own name of a hydroxy organyl of that ester is '(2S)-2,3-dihydroxypropyl dihydrogen phosphate'
+#,:55148). So the ester is the parent and the hydroxy group a prefix of its organyl group, pin_verified at both tiers;
+# ``assert_pin_at_both_tiers`` reads the name back with a fresh OPSIN call. Mutation: with ``seniority._OXOACID_ESTERS_PROMOTED``
+# empty the prefix name returns and is declined.
+def test_a_hydroxy_organyl_of_a_phosphate_monoester_is_the_pin():
+    assert_pin_at_both_tiers("OCC(COP(=O)(O)O)CC", "2-(hydroxymethyl)butyl dihydrogen phosphate")

@@ -9,6 +9,7 @@ all other groups become prefixes.
 from typing import Dict, List, Optional, Tuple
 
 from .n_substituted_acids import CN_GROUPS, group_at_rank, rank_group
+from .amide_parent import senior_carboxamide_group
 
 # (2026-04-25): per-FG SMARTS attachment atom override.
 #
@@ -428,6 +429,8 @@ SENIORITY_ORDER = [
 
     # Phosphorus compounds (functional class or substitutive naming)
     "phosphine_oxide",
+    # the esters of the class 7d acids, the partial ones ('dihydrogen phosphate', 'hydrogen sulfate') included, are esters of
+    # class 9 ranked by their acid (``ESTER_ACID_ORDER``, ``_promoted_oxoacid_ester``): below the carboxylic esters and the carbamate
     "phosphate_triester",
     "phosphate_diester",
     "phosphate_monoester",
@@ -1174,42 +1177,89 @@ PREFIX_FORMS = {
 }
 
 
-#: Esters of acyclic phosphoric acid ranked with the esters when their functional-class name
-#: can be built (``get_principal_group``). Tri- before di-: the ``SENIORITY_ORDER`` order.
-_PHOSPHATE_ESTER_PROMOTED = ("phosphate_triester", "phosphate_diester")
+#: The acyclic esters of the oxoacids of classes 7c and 7d of (:data:`ESTER_ACID_ORDER`), in the order of
+#: their acids (class 7c before 7d; tri- before di- before mono-, the ``SENIORITY_ORDER`` order), that rank with the esters
+#: when their functional-class name can be built (``get_principal_group``).
+_OXOACID_ESTERS_PROMOTED = (
+    "phosphonate_diester", "phosphinate_ester", "arsinate_ester", "stibinate_ester",
+    "phosphate_triester", "phosphate_diester", "phosphate_monoester", "phosphite_triester",
+    "sulfate_diester", "sulfate_monoester",
+)
 
-#: Molecules (by ``id``) whose phosphate-ester offer is being built right now. The functional-
-#: class namer names the owners through the substituent namer, which may ask for the
-#: principal group of the same molecule again; that nested question gets the head answer.
-_PHOSPHATE_OFFER_ACTIVE: set = set()
+#: the symbol of the central atom of the esters of ``_OXOACID_ESTERS_PROMOTED`` that one namer reads for all three
+_PNICTOGEN_INATE_ATOM = {"phosphinate_ester": "P", "arsinate_ester": "As", "stibinate_ester": "Sb"}
+
+#: Molecules (by ``id``) whose oxoacid-ester offer is being built right now, with the ester it is built for. The
+#: functional-class namer names the owners through the substituent namer, which may ask for the principal group of the
+#: same molecule again; that nested question gets the head answer (:func:`offered_principal_group` is the hypothesis, for
+#: the one reader that needs it).
+_OXOACID_OFFER_ACTIVE: dict = {}
 
 
-def _promoted_phosphate_ester(mol, functional_groups, head_name):
-    """The acyclic phosphoric-acid ester to rank as the principal group, or None.
+def offered_principal_group(mol):
+    """``(group_name, matches)`` of the oxoacid ester whose name is being built for ``mol`` right now (the offer of
+    ``get_principal_group``), else None. The amido prefix of an acylated nitrogen is cited in the name of that ester
+    (``assembly.n_acyl_amido.group_is_principal``), so the question of whether the amide is the principal group is asked
+    of the ester being offered, which outranks it."""
+    return _OXOACID_OFFER_ACTIVE.get(id(mol))
+
+
+def _oxoacid_ester_offered(mol, fg_name, matches) -> bool:
+    """True when the functional-class name of the acyclic ester ``fg_name`` (``matches``) can be built for ``mol``."""
+    if fg_name.startswith("sulfate"):
+        from .sulfur_oxoacid import sulfate_ester_offered
+        return sulfate_ester_offered(mol, matches)
+    if fg_name in _PNICTOGEN_INATE_ATOM:
+        from .phosphorus import pnictogen_inate_ester_offered
+        return pnictogen_inate_ester_offered(mol, matches, _PNICTOGEN_INATE_ATOM[fg_name])
+    from .phosphorus import phosphate_ester_offered
+    return phosphate_ester_offered(mol, matches)
+
+
+def _promoted_oxoacid_ester(mol, functional_groups, head_name, head_matches=()):
+    """The acyclic ester of a phosphorus or sulfur oxoacid to rank as the principal group, or None.
 
      "SENIORITY ORDER FOR CLASSES" (the Blue Book), Table 4.1: "9 Esters
     (functional class names are given to noncyclic esters; lactones and other cyclic esters
-    are named as heterocycles; see 16 below)" (:18182) ranks above "16 Ketones" (:18189),
-    "17 Hydroxy compounds" (:18190) and "19 Amines" (:18192); "Esters of
-    mononuclear noncarbon oxoacids" (:35916) names 'trimethyl phosphate (PIN)' (:35936) and
-    'methyl dihydrogen phosphate (PIN)' (:35940) as functional-class esters.
+    are named as heterocycles; see 16 below)" (:18182) ranks above "10 Acid halides and pseudohalides",
+    "11 Amides" (:18183), "12 Hydrazides", "13 Imides", "14 Nitriles", "15 Aldehydes", "16 Ketones" (:18189),
+    "17 Hydroxy compounds" (:18190) and "19 Amines" (:18192); the esters rank among themselves by their acid
+    (:data:`ESTER_ACID_ORDER`, "Esters cited as prefixes",:31696), so the esters of the acids of classes 7c
+    and 7d rank below the carboxylic and sulfonic esters (7a) and the carbamates (7b). "Esters of mononuclear
+    noncarbon oxoacids" (:35916) names 'trimethyl phosphate (PIN)' (:35936), 'methyl dihydrogen phosphate (PIN)'
+    (:35940) and 'methyl hydrogen sulfate (PIN)' as functional-class esters; a partial ester keeps the ranks of its
+    acid ('hydrogen'/'dihydrogen' of the name are the acid hydrogens), and every group below the class 9 esters is
+    cited as a prefix of its organyl group ('2-acetamidoethyl hydrogen sulfate', not 'N-[2-(sulfooxy)ethyl]acetamide').
 
-    The tri- and diester are ranked with the esters (after ``phosphonate_diester``) only when
-    the functional-class name of ``rules.phosphorus.name_phosphate_ester`` can be built for
-    the molecule: the class is OFFERED, not returned. A suffix-less functional-class
-    principal group that cannot be built would demote the next class's suffix to a prefix
-    ('propan-2-ol' to '2-hydroxy...propane'), so a phosphate ester the namer declines
-    keeps the head order. A phosphorus ring atom is a cyclic ester, named as a heterocycle
-    (the same note of Table 4.1), and is not ranked here. Only a head group below
-    ``phosphonate_diester`` is outranked: the acids, the carboxylic and sulfonic esters, the
-    amides and the groups between keep their head rank. Table 4.1 puts the esters (class 9)
-    above the amides (class 11), but that placement of the phosphate esters was not measured,
-    so the amides stay ahead of them (follow-up of lane L4).
+    Decided in the final round of lane/l17: a PARTIAL ester ('dihydrogen phosphate', 'hydrogen sulfate') is an ESTER of
+    class 9 ranked by its acid, not an acid of class 7 above the carbamate and the carboxylic esters (the reading that the
+    free hydrogen is a free acid group). "When anions are different, two methods are used" (the Blue Book:
+    31831): "The seniority order of anions is corresponding to that of acids (see seniority order of acids in ", the
+    anion of a partial ester ('hydrogen sulfate') being one of the anions; "Esters of mononuclear noncarbon
+    oxoacids" (:35916): "Partial acid esters of polybasic acids are named by citing alkyl groups... followed by the word
+    'hydrogen'", an ester name; and the Blue Book's own phosphatidylethanolamine, (:55180), a partial phosphate
+    ester beside two carboxylic esters, is named on the carboxylic esters with the phosphate as a prefix
+    ('(2R)-3-{[(2-aminoethoxy)hydroxyphosphoryl]oxy}propane-1,2-diyl dihexadecanoate'). The free acid group that outranks
+    an ester is the one of a carboxylic or sulfonic acid, a suffix ('5-butoxy-2-methyl-5-oxopentanoic acid (PIN)',
+    ,:31935), which the free hydrogen of a phosphorus or sulfur oxoacid ester is not. So the carbamate (7b) is the
+    parent beside a partial phosphate or sulfate ester (7d) and the carboxylic ester (7a) too: 'methyl [4-(phosphonooxy)
+    phenyl]carbamate', 'methyl 3-(sulfooxy)propanoate'; the order of the acids is the ``ESTER_ACID_ORDER`` of this module.
 
-    A molecule whose ester outranks the head but cannot be offered is named on the head
-    group; that name is not the PIN, and the label rule for it is the phosphoryl-oxy prefix
-    test of ``rules.pin_vocabulary.non_pin_vocabulary`` (a name decides it, so it does not
-    depend on which tier built the name).
+    The class is OFFERED, not returned: it is ranked above the head group only when the functional-class name of
+    :func:`orthonym.rules.phosphorus.name_phosphate_ester` (or its sulfur and pnictogen siblings) can be built for
+    the molecule. A suffix-less functional-class principal group that cannot be built would demote the next class's
+    suffix to a prefix ('propan-2-ol' to '2-hydroxy...propane'), so an ester the namer declines keeps the head order.
+    A central atom in a ring is a cyclic ester, named as a heterocycle (the same note of Table 4.1), and is not
+    ranked here. Only a head group below the esters of the carboxylic and sulfonic acids (the last of them,
+    ``sulfinic_ester``) is outranked: the acids, the carboxylic and sulfonic esters and the anhydrides keep their head
+    rank, as does a molecule that has a carbamate (carbamic acid is a carbonic acid, class 7b, senior to these). A head
+    group that is only a cyclic ester (``head_matches``: a lactone, a sultone) is a pseudoketone, class 16
+    "Cyclic anhydrides, esters and amides are named as pseudoketones",:29314), and is outranked like a ketone:
+    '2-(2-oxooxolan-3-yl)ethyl hydrogen sulfate'.
+
+    A molecule whose ester outranks the head but cannot be offered is named on the head group; that name is not the
+    PIN, and the label rule for it is the phosphoryl-oxy prefix test of
+    ``rules.pin_vocabulary.non_pin_vocabulary`` (a name decides it, so it does not depend on which tier built the name).
 
     Only for a whole molecule (``is_top_level_naming``): a fragment named inside another name
     keeps the substitutive principal group that name needs, because a functional-class name
@@ -1219,10 +1269,11 @@ def _promoted_phosphate_ester(mol, functional_groups, head_name):
     4,5-pentol name with an N-(2-hydroxytetracosanoyl) group becomes the skeletal-replacement
     form with a '3-hydroxy-3-oxo-4-(2,3,4,5,6-pentahydroxycyclohexyl)-2,4-dioxa-3-phosphabutyl'
     group; both are systematic_verified): the fragment case needs its own measurement."""
-    if head_name is None or head_name in _PHOSPHATE_ESTER_PROMOTED:
+    if head_name is None or head_name in _OXOACID_ESTERS_PROMOTED:
         return None
-    if not any(functional_groups.get(n) for n in _PHOSPHATE_ESTER_PROMOTED):
-        return None                          # no phosphate ester: the head answer, at no cost
+    candidates = [n for n in _OXOACID_ESTERS_PROMOTED if functional_groups.get(n)]
+    if not candidates or functional_groups.get("carbamate"):
+        return None                          # no oxoacid ester (or a carbamate, the senior ester): the head answer
     # Only a whole molecule: a fragment named inside another name (a decomposition fragment, a
     # substituent's capped fragment) keeps the substitutive principal group its enclosing name
     # needs, because a functional-class name ('X Y hydrogen phosphate') cannot take the
@@ -1231,24 +1282,23 @@ def _promoted_phosphate_ester(mol, functional_groups, head_name):
     if not is_top_level_naming():
         return None
     try:
-        floor = SENIORITY_ORDER.index("phosphonate_diester")
-        if SENIORITY_ORDER.index(head_name) <= floor:
+        floor = SENIORITY_ORDER.index("sulfinic_ester")
+        if SENIORITY_ORDER.index(head_name) <= floor and not (
+                head_name in _RING_ESTER_CLASSES and head_matches
+                and all(_is_ring_ester(mol, m) for m in head_matches)):
             return None
     except ValueError:
         return None
-    for fg_name in _PHOSPHATE_ESTER_PROMOTED:
+    if id(mol) in _OXOACID_OFFER_ACTIVE:
+        return None
+    for fg_name in candidates:
         matches = functional_groups.get(fg_name)
-        if not matches:
-            continue
-        if id(mol) in _PHOSPHATE_OFFER_ACTIVE:
-            return None
-        from .phosphorus import phosphate_ester_offered
-        _PHOSPHATE_OFFER_ACTIVE.add(id(mol))
+        _OXOACID_OFFER_ACTIVE[id(mol)] = (fg_name, matches)
         try:
-            if phosphate_ester_offered(mol, matches):
+            if _oxoacid_ester_offered(mol, fg_name, matches):
                 return fg_name, matches
         finally:
-            _PHOSPHATE_OFFER_ACTIVE.discard(id(mol))
+            _OXOACID_OFFER_ACTIVE.pop(id(mol), None)
     return None
 
 
@@ -1271,8 +1321,73 @@ def get_principal_group(
         Returns (None, ) if no suffix-capable group found
     """
     head = _head_principal_group(mol, functional_groups)
-    promoted = _promoted_phosphate_ester(mol, functional_groups, head[0])
+    head = senior_carboxamide_group(mol, functional_groups, head)   # one class of amides, the parent by /
+    head = _senior_pseudoester_group(mol, functional_groups, head)  # a pseudoester ranks as an ester, by its acid
+    promoted = _promoted_oxoacid_ester(mol, functional_groups, head[0], head[1])
     return promoted if promoted is not None else head
+
+
+#: the groups of class 7a (carboxylic acids and their imidic and chalcogen analogues) that a pseudoester of a carboxylic acid
+#: is ranked against: the esters of the carboxylic acid itself, by their acid, the esters of its analogues below them
+_ANALOGUE_ESTER_CLASSES = ("iminoester", "thioester", "selenoester", "telluroester")
+
+#: Molecules (by ``id``) whose pseudoester offer is being built right now (the functional-class name is made through the
+#: nested naming of the free acid, which may ask for the principal group of the same molecule again)
+_PSEUDOESTER_OFFER_ACTIVE: set = set()
+
+
+def _senior_pseudoester_group(mol, functional_groups, head):
+    """``head``, or the pseudoester group when the pseudoester is the senior ester of the molecule.
+
+     "Definitions" (the Blue Book): "Pseudoesters are compounds having the generic formula R-E(=O)x(OZ)...
+    Z is not a carbon atom but an element from the following list: B, Al, In, Ga, Tl, Si, Ge, Sn, Pb, N(cyclic), P, As, Sb,
+    Bi. Pseudoesters are ranked as esters in the seniority order of classes (see." Class 9 of Table 4.1 (:18182)
+    ranks the esters among themselves by their acid, and "Esters cited as prefixes" (:31696) cites the ester of
+    the junior acid as a prefix of the name of the senior one. The pseudoester ranked after every other ester of the order
+    of ``SENIORITY_ORDER`` (a convention for the groups that stand alone), so the acetate of a molecule that also holds the
+    trimethylsilyl ester of a benzoic acid was its principal group, and the silyl ester a prefix, spelled
+    '4-{oxo[(trimethylsilyl)oxy]methyl}phenyl acetate'. The two compare as the esters of ``rules.ester_seniority`` do, the
+    acid component (the senior acid is the ring acid, the longer chain, the more substituted); the esters of the
+    analogues of the carboxylic acid (the imidic and chalcogen ones,:18172) are junior to the ester of the acid itself.
+    The ester of ``head`` keeps its place on a tie. The pseudoester is OFFERED, as the oxoacid esters are
+    (:func:`_promoted_oxoacid_ester`): a functional-class name that cannot be built would demote the next group to a prefix.
+    Only for a whole molecule, as there."""
+    pseudo = [m for m in functional_groups.get("pseudoester") or [] if len(m) >= 4 and not _is_ring_ester(mol, m)]
+    if not pseudo or head[0] is None or id(mol) in _PSEUDOESTER_OFFER_ACTIVE:
+        return head
+    if head[0] != "ester" and head[0] not in _ANALOGUE_ESTER_CLASSES:
+        return head
+    from ..assembly.fragment_naming import is_top_level_naming
+    if not is_top_level_naming():
+        return head
+    if head[0] == "ester":
+        from .ester_seniority import ester_seniority_key
+        acyclic = [m for m in head[1] if not _is_ring_ester(mol, m)]
+        if not acyclic or min(ester_seniority_key(mol, m)[0] for m in pseudo) >= min(
+                ester_seniority_key(mol, m)[0] for m in acyclic):
+            return head                 # the acid component only: the alcohol side of a pseudoester is no organyl chain
+    if not _pseudoester_offered(mol, pseudo):
+        return head
+    return "pseudoester", pseudo
+
+
+def _pseudoester_offered(mol, matches) -> bool:
+    """True when the functional-class name of the pseudoester of ``matches`` can be built
+    (:func:`orthonym.rules.esters.name_noncarbon_ester`, the producer of its handler). Memoised for the naming call
+    (``assembly.memo``), keyed on the atom order of the molecule and the matches."""
+    from ..assembly.memo import cache_or_compute
+    from rdkit import Chem
+
+    def build():
+        from .esters import name_noncarbon_ester
+        _PSEUDOESTER_OFFER_ACTIVE.add(id(mol))
+        try:
+            return bool(name_noncarbon_ester(mol, matches[0], tuple(matches[1:])))
+        except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
+            return False
+        finally:
+            _PSEUDOESTER_OFFER_ACTIVE.discard(id(mol))
+    return bool(cache_or_compute("pseudoester_offer", (Chem.MolToSmiles(mol, canonical=False), tuple(matches)), build))
 
 
 #: The amide classes a ring amide (a lactam) is perceived as; the lactam is a pseudoketone (class 16).
@@ -1291,15 +1406,65 @@ def _head_principal_group(
     nitrile, an aldehyde or an amide of the chain (classes 11 to 15,:18162-18188) is senior to it. The order of
     ``SENIORITY_ORDER`` ranks the ring amide among the amides, so those groups were demoted to prefixes
     ('1-(2-hydrazinyl-2-oxoethyl)pyrrolidin-2-one'). The ring amides step aside, and a group senior to the ketone
-    that remains is the principal group; with none the ring amide keeps its place."""
+    that remains is the principal group; with none the ring amide keeps its place. A cyclic ester (a lactone, a sultone,
+    a cyclic phosphate) is a heterocycle (:func:`_is_ring_ester`, Table 4.1 class 9 note,:18182) and steps aside in the
+    same way."""
     ring = {cls: [m for m in functional_groups.get(cls) or [] if _is_ring_amide(mol, m)]
             for cls in _RING_AMIDE_CLASSES}
+    for cls in _RING_ESTER_CLASSES:
+        ring[cls] = [m for m in functional_groups.get(cls) or [] if _is_ring_ester(mol, m)]
     if any(ring.values()):
         rest = {k: ([m for m in v if m not in ring[k]] if k in ring else v) for k, v in functional_groups.items()}
         group, matches = _first_principal_group(mol, rest)
-        if group is not None and SENIORITY_ORDER.index(group) < SENIORITY_ORDER.index("ketone"):
+        if (group is not None and SENIORITY_ORDER.index(group) < SENIORITY_ORDER.index("ketone")
+                and (group != "ester" or _acyclic_ester_offered(mol, matches))):
             return group, matches
     return _first_principal_group(mol, functional_groups)
+
+
+#: Molecules (by ``id``) whose acyclic carboxylic ester is being offered right now (the owners of the functional-class
+#: name are named through the substituent namer, which may ask for the principal group of the same molecule again)
+_ESTER_OFFER_ACTIVE: set = set()
+
+
+def _acyclic_ester_offered(mol, matches) -> bool:
+    """True when the functional-class name of the acyclic carboxylic ester of ``matches`` can be built
+    (:func:`orthonym.rules.esters.name_ester`, the producer of the ester handlers): the offer behind the step-aside of a
+    lactone for an acyclic ester. class 9 "Esters" (the Blue Book): "functional class names are given
+    to noncyclic esters; lactones and other cyclic esters are named as heterocycles; see 16 below". An ester whose
+    functional-class name cannot be built (the alcohol component a polycyclic lactone) would be the principal group of a
+    name that does not cite it, or cites it as a prefix of a ring parent with no ester suffix to carry it, so the lactone
+    keeps its place and the ester is cited as an acyloxy prefix of the ring parent, as it was. Memoised for the naming
+    call (``assembly.memo``), keyed on the atom order of the molecule and the matches."""
+    if id(mol) in _ESTER_OFFER_ACTIVE or not matches:
+        return False
+    from ..assembly.memo import cache_or_compute
+    from rdkit import Chem
+
+    def build():
+        from .esters import name_ester
+        _ESTER_OFFER_ACTIVE.add(id(mol))
+        try:
+            return any(name_ester(mol, m) for m in matches)
+        except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
+            return False
+        finally:
+            _ESTER_OFFER_ACTIVE.discard(id(mol))
+    return bool(cache_or_compute("acyclic_ester_offer", (Chem.MolToSmiles(mol, canonical=False), tuple(matches)), build))
+
+
+def _is_ring_ester(mol, match) -> bool:
+    """An ester match whose acid atom (``match[0]``) is bonded to an ester oxygen -O-C by a ring bond: a cyclic ester
+    (a lactone, a sultone, a cyclic phosphate), named as a heterocycle. class 9 "Esters" (the Blue Book):
+    "functional class names are given to noncyclic esters; lactones and other cyclic esters are named as heterocycles; see
+    16 below", and class 16 (:18189): "See Classes 8, 9, 11 and 13, on lactones, lactams, anhydrides, imides"."""
+    centre = mol.GetAtomWithIdx(match[0])
+    for bond in centre.GetBonds():
+        o = bond.GetOtherAtom(centre)
+        if (o.GetAtomicNum() == 8 and bond.GetBondTypeAsDouble() == 1.0 and bond.IsInRing() and o.GetDegree() == 2
+                and any(n.GetIdx() != centre.GetIdx() and n.GetAtomicNum() in (6, 16) for n in o.GetNeighbors())):
+            return True
+    return False
 
 
 def _is_ring_amide(mol, match) -> bool:
@@ -1496,6 +1661,38 @@ def seniority_index(fg_name: str, mol=None, matches=None) -> int:
     imidic, imidothioic, imidoselenoic or imidotelluroic acid, and two groups of one rank share an
     index. Without them the group is the O acid's. Every other name is its own place."""
     return SENIORITY_ORDER.index(rank_group(mol, fg_name, matches))
+
+
+#: class 9 "Esters" (the Blue Book) rank by the acid they are esters of: "Esters cited as
+#: prefixes" (:31696) keeps the ester of the senior acid as the parent and cites the other as a prefix ('ethyl 2-[(ethoxy-
+#: carbonyl)oxy]-4,4-dimethyl-3-oxopentanoate (PIN)', the carbonic ester in the prefix of the carboxylic one; 'methyl 4-
+#: (phenoxysulfinothioyl)naphthalene-1-carboxylate (PIN)', that of a sulfur acid), "Seniority for numbering follows that
+#: for acids". The order of the acids is class 7 of Table 4.1 (:18170ff) and: class 7a "CLASS 7a.
+#: ACIDS EXPRESSED BY SUFFIXES", carboxylic with its imidic and chalcogen analogues, sulfonic, sulfinic...) > class 7b
+#: "CLASS 7b. CARBON ACIDS WITH NO SUBSTITUTABLE HYDROGEN ATOMS": carbonic acid, to which carbamic acid belongs,
+#: > class 7c, phosphonic, phosphinic, arsonic...) > class 7d, phosphoric, sulfuric,...). The
+#: functional-group keys of the esters of each class, senior class first; the one reader is:func:`ester_acid_rank`.
+ESTER_ACID_ORDER = (
+    ("7a", frozenset({"ester", "iminoester", "thioester", "selenoester", "telluroester", "pseudoester",
+                      "sulfonic_ester", "sulfinic_ester"})),
+    ("7b", frozenset({"carbamate", "carbamimidate"})),
+    ("7c", frozenset({"phosphonate_diester", "phosphinate_ester", "arsinate_ester", "stibinate_ester"})),
+    ("7d", frozenset({"phosphate_triester", "phosphate_diester", "phosphate_monoester", "phosphite_triester",
+                      "sulfate_diester", "sulfate_monoester"})),
+)
+
+
+#: the ester classes (:data:`ESTER_ACID_ORDER`) whose ring form, a lactone, a sultone or a cyclic phosphate, is a heterocycle
+_RING_ESTER_CLASSES = tuple(sorted({g for _, groups in ESTER_ACID_ORDER for g in groups}))
+
+
+def ester_acid_rank(fg_name: str) -> Optional[int]:
+    """The place of the acid of the class-9 ester group ``fg_name`` in:data:`ESTER_ACID_ORDER` (0 is the senior class);
+    None for a group that is not an ester there."""
+    for rank, (_, groups) in enumerate(ESTER_ACID_ORDER):
+        if fg_name in groups:
+            return rank
+    return None
 
 
 def compare_seniority(fg1: str, fg2: str) -> int:

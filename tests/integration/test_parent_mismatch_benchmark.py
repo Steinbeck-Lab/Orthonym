@@ -338,10 +338,21 @@ _PIN_TIER_TARGETS = {
 # Tests for compounds expected to be fixed by a phase
 # ---------------------------------------------------------------------------
 
+# Rows named with the OPSIN validity gate on, as they ship. With the gate off the generator's name for the row is
+# '(2S)-2-acetamido-4-methylpentanamide', the amide parent chosen by ("The principal chain has the greater
+# number of skeletal atoms", the Blue Book) with the N-substituent of its nitrogen (an N-acyl dipeptide amide with
+# the indolylethenyl group) dropped, a name that the gate rejects and the cascade never ships (lane l17, item 7,
+# 113d76c6ce; the amide producers, ``rules.amides.name_amide`` and ``assembly.composer._assemble_amide_name``, return the bare
+# parent when an N-substituent has no name). The shipped name
+# holds the indole in the N-substituent of the amide parent.
+_GATE_ON_ROWS = frozenset({"Peptide with indole - fixed by decomposition improvements"})
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "smiles,expected_parent_substring,description",
-    EXPECTED_FIXED,
+    [pytest.param(*row, marks=pytest.mark.opsin_gate) if row[2].split(":")[0].strip() in _GATE_ON_ROWS else row
+     for row in EXPECTED_FIXED],
     ids=[
         d.split(":")[0].strip().replace(" ", "_")
         + f"_{i:02d}"
