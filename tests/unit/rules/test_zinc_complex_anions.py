@@ -204,9 +204,11 @@ def test_no_name_of_a_bare_zincate_is_built_by_a_second_producer():
 # ---- the other metals and the other assemblies are not moved (START literals, computed on the start tree)
 
 START_ROWS = {
+    # no metal: named at best-effort since program 7 (2026-11-06) by its components, read back to the drawing
+    # (rules.adducts._component_adduct_name; "names of individual compounds", the Blue Book)
     "N.N.O": (
         ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
+        ('ammonia—water (2/1)', 'systematic_verified', False, None)),
     # carbon-free: no PIN since 2026-11-02 (changed asserted labels, were pin_verified at both tiers;
     # the Blue Book "... and that also contain at least one carbon atom in their structure";:2058)
     "[NH4+].[Cl-]": (

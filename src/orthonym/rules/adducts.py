@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..data.multipliers import multiplier_table
+from ..errors import is_failure_name
 from .adduct_class import component_class_key
 # The names of the atom, the ions and the isotopes of a metal are the producer of
 # ``rules/metal_atoms.py`` (one home); the adduct components read them from there.
@@ -931,10 +932,35 @@ def _element_word(atom) -> Optional[str]:
     return f"({isotope}{symbol}){word}" if isotope else word
 
 
+def _gated_hydrogen_components(mol) -> Dict[str, str]:
+    """The hydrogen components and the ammonia that ``mol`` may take: dihydrogen, the hydride ion beside metals
+    admitted to ``CARBANION_SALTS`` and ammonia beside no metal or beside metals admitted to ``AMMINE``
+    (``_hydrogen_components``, ``metal_atoms.ammine_component_names``): a metal the table does not admit is never
+    composed with a hydride or an ammonia."""
+    return {**_hydrogen_components(mol), **ammine_component_names(mol)}
+
+
+def _hydride_component_word(smi: str, frag, gated: Dict[str, str]) -> Optional[str]:
+    """The name of a neutral one-atom component that carries hydrogen, beside the bare atoms of an element set
+    ('[AlH3].[Fe]' -> 'alumane—iron (1/1)'): the name of the table ('water', 'methane'), a hydrogen
+    component or ammonia that ``gated`` admits (``_gated_hydrogen_components``), or the name of the mononuclear
+    parent hydride ('alumane', 'stannane': ``rules.mononuclear_hydrides``); None otherwise."""
+    atom = frag.GetAtomWithIdx(0)
+    if atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() == 0:
+        return None
+    if smi in SINGLE_ATOM_COMPONENT_NAMES:
+        return SINGLE_ATOM_COMPONENT_NAMES[smi]
+    if smi in HYDROGEN_COMPONENT_NAMES:
+        return gated.get(smi)
+    from .mononuclear_hydrides import name_mononuclear_hydride
+    return name_mononuclear_hydride(frag)
+
+
 def _element_set_name(components: List[Tuple[str, int]], frag_mols, mol) -> Optional[str]:
     """The name of a drawing of two or more different bare atoms and nothing else (an alloy or an element set,
     ``[Fe].[Ni]``): the element names joined by em dashes in alphanumerical order, with the proportions,
-    'iron—nickel (1/1)'; None for any other drawing, and for a name that OPSIN does not read back to exactly the
+    'iron—nickel (1/1)'; a one-atom hydride beside at least one bare atom takes the name of that hydride
+    (``_hydride_component_word``: 'alumane—iron (1/1)'); None for any other drawing, and for a name that OPSIN does not read back to exactly the
     drawn atoms (``_parse_reproduces_depiction``). A neutral atom takes its element name here, never the radical
     name of its parent hydride ('chlorine', not 'chloranyl'): the components of an adduct are cited by "the names
     of individual compounds" "Mixed organic – inorganic adducts", the Blue Book), and OPSIN 2.9.0
@@ -943,15 +969,21 @@ def _element_set_name(components: List[Tuple[str, int]], frag_mols, mol) -> Opti
     adducts",:3763). The name is the best-effort tier's (the caller's ``general_fallback_unverified``) and is
     recorded as no PIN: a compound without carbon has a preselected name at most "PRESELECTED NAMES",
     :2062), and an inorganic adduct has no PIN either."""
-    words = []
+    words, bare = [], False
+    gated = _gated_hydrogen_components(mol)
     for smi, count in components:
         frag = frag_mols[smi]
         if frag.GetNumAtoms() != 1:
             return None
         word = _element_word(frag.GetAtomWithIdx(0))
+        bare = bare or word is not None
+        if word is None:
+            word = _hydride_component_word(smi, frag, gated)
         if word is None:
             return None
         words.append((word, count))
+    if not bare:
+        return None
     # alphanumerical order of the element names; a nuclide symbol in front does not count
     name = _assemble_adduct_name(sorted(words, key=lambda w: (w[0].split(")")[-1], w[0])))
     if not _parse_reproduces_depiction(name, mol):
@@ -967,6 +999,98 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 general_fallback: bool = False,
                 allow_aromatic_general: bool = False,
                 general_fallback_unverified: bool = False) -> Optional[str]:
+    """:func:`_name_adduct_body`; when it names nothing, a drawing of one-atom components with at least one bare atom
+    is named as an element set at the best-effort tier (``_element_set_name``: 'iron—nickel (1/1)', 'alumane—iron
+    (1/1)'). After the body, so that no adduct it names changes ('zinc—water (1/1)')."""
+    name = _name_adduct_body(mol, canonical_smiles, style, general_fallback=general_fallback,
+                             allow_aromatic_general=allow_aromatic_general,
+                             general_fallback_unverified=general_fallback_unverified)
+    if name is not None or not general_fallback_unverified:
+        return name
+    components = split_components(mol)
+    if components is None or len(components) < 2:
+        return None
+    frag_mols = {smi: Chem.MolFromSmiles(smi) for smi, _ in components}
+    if any(fm is None for fm in frag_mols.values()):
+        return None
+    return (_element_set_name(components, frag_mols, mol)
+            or _component_adduct_name(components, frag_mols, mol, style))
+
+
+def _one_atom_component_word(smi: str, frag, gated: Dict[str, str]) -> Optional[str]:
+    """The name of a component with at most one heavy atom: the table ('water'), a hydrogen component or
+    ammonia that ``gated`` admits, a bare atom or a monoatomic ion ('bromide', 'sodium(1+)':
+    ``metal_atoms.lone_atom_name``) or a mononuclear parent hydride ('silane'); None otherwise."""
+    if smi in SINGLE_ATOM_COMPONENT_NAMES:
+        return SINGLE_ATOM_COMPONENT_NAMES[smi]
+    if smi in HYDROGEN_COMPONENT_NAMES:
+        return gated.get(smi)
+    from .metal_atoms import lone_atom_name_and_basis
+    name, on_parent_hydride = lone_atom_name_and_basis(frag)
+    if name and on_parent_hydride and frag.GetAtomWithIdx(0).GetFormalCharge():
+        return None             # a one-atom p-block ion keeps the adduct name of its drawing, never 'boranetriylium'
+    return name or _hydride_component_word(smi, frag, gated)
+
+
+def _component_adduct_name(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:
+    """The last name of a mixture at the best-effort tier, after:func:`_name_adduct_body` and the element set:
+    every component named alone (a component of more than one heavy atom by the single-component pipeline at the
+    best-effort tier, charged ones included; one of at most one heavy atom by:func:`_one_atom_component_word`),
+    cited in the order (``component_sort_key``) with the proportions. "Names are formed by citing the names of
+    individual compounds" "Mixed organic – inorganic adducts", the Blue Book). The name ships only when
+    OPSIN reads it back to exactly the drawn structure, charges and hydrogens included
+    (``_parse_reproduces_depiction``; a reader that balances the charges of the components fails it), and it is no
+    PIN: "preferred IUPAC names cannot be assigned to mixed adducts"). None for a mixture of one component
+    only, or when a component has no name."""
+    if len(components) < 2:
+        return None
+    from ..validation.radical_identity import radical_profile
+    if radical_profile(mol):
+        return None             # OPSIN 2.9.0 reads no adduct with a radical component, even with -r
+    from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
+    key = (Chem.MolToSmiles(mol), style, _naming_context(), renaming_state())
+    return cached_nested_call("component_adduct", key,
+                              lambda: _component_adduct_name_once(components, frag_mols, mol, style),
+                              replay_budgets=False)
+
+
+def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:
+    """:func:`_component_adduct_name` once per naming: the words of the components of at most one heavy atom first
+    (cheap; any one without a name ends it), then the names of the others."""
+    from orthonym.assembly.fragment_naming import own_hang_budgets
+    ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
+    gated = _gated_hydrogen_components(mol)
+    words: Dict[str, str] = {}
+    for smi, _count in ordered:
+        frag = frag_mols[smi]
+        if frag.GetNumHeavyAtoms() <= 1:
+            word = _one_atom_component_word(smi, frag, gated)
+            if not word:
+                return None
+            words[smi] = word
+    for smi, _count in ordered:
+        if smi in words:
+            continue
+        with own_hang_budgets():
+            word = _name_component(smi, style, general_fallback=True, allow_aromatic_general=True,
+                                   general_fallback_unverified=True, charged_ok=True, ions_ok=True)
+        if not word or is_failure_name(word):
+            return None
+        words[smi] = word
+    name = _assemble_adduct_name([(words[smi], count) for smi, count in ordered])
+    if not _parse_reproduces_depiction(name, mol):
+        return None
+    from orthonym.metrics.provenance import record_non_pin_label
+    record_non_pin_label(name, rule="P-14.8.2",
+                         detail="a mixture named by its components has no preferred IUPAC name")
+    return name
+
+
+def _name_adduct_body(mol, canonical_smiles: Optional[str] = None,
+                      style: str = "pin", *,
+                      general_fallback: bool = False,
+                      allow_aromatic_general: bool = False,
+                      general_fallback_unverified: bool = False) -> Optional[str]:
     """Name an all-neutral multi-component input per, or None.
 
     Fail-closed refusals (return None; the dispatch cascade then falls
@@ -993,10 +1117,6 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     frag_mols = {smi: Chem.MolFromSmiles(smi) for smi, _ in components}
     if any(fm is None for fm in frag_mols.values()):
         return None
-    if general_fallback_unverified:
-        element_set = _element_set_name(components, frag_mols, mol)
-        if element_set is not None:
-            return element_set
     # Breadth Job 2: the mixed organic-inorganic widening runs at the best-effort
     # tier only, the Blue Book: no PIN for a mixed organic-inorganic
     # adduct), and only for an assembly with an inorganic component: a metal atom,

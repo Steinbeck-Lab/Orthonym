@@ -22,6 +22,10 @@ ROWS = [
     ("[La].[Eu]", "europium—lanthanum (1/1)"),                          # alphanumerical order of the names
     ("[57Fe].[Ni]", "(57Fe)iron—nickel (1/1)"),                         # nuclide symbol before the name
     ("[Si].[Ti].[Zr]", "silicon—titanium—zirconium (1/1/1)"),
+    # a one-atom hydride beside a bare atom takes the name of its parent hydride
+    ("[AlH3].[Fe]", "alumane—iron (1/1)"),
+    ("[Cr].[SeH2]", "chromium—selane (1/1)"),
+    ("[AlH3].[Cd].[Pt]", "alumane—cadmium—platinum (1/1/1)"),
 ]
 
 
@@ -39,7 +43,7 @@ def test_pin_tier_declines(smiles, _expected):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("[Fe][Ni]", None),                         # bonded atoms: not an element set
-    ("[AlH3].[Fe]", None),                      # an atom with hydrogen is a parent hydride, not an element
+    ("O.[Zn]", "zinc—water (1/1)"),             # the adduct code names it first, as before
     ("[Ag].[Ag].[Ag]", None),                   # one element only: no adduct
     ("[Zn+2].[Cl-].[Cl-]", "zinc dichloride"),  # ions: the salt producers' name, unchanged
 ])

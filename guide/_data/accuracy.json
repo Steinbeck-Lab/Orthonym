@@ -21,7 +21,7 @@
        "best_effort": {"named": 1993, "declined": 4, "unreadable": 3, "timed_out": 0}, "wrong": 0},
       {"set": "Drug-like PubChem 2,000", "molecules": 2000,
        "pin": {"named": 1008, "declined": 977, "unreadable": 14, "timed_out": 1},
-       "best_effort": {"named": 1959, "declined": 41, "unreadable": 0, "timed_out": 0}, "wrong": 0}
+       "best_effort": {"named": 1961, "declined": 39, "unreadable": 0, "timed_out": 0}, "wrong": 0}
     ]
   }
 }

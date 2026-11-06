@@ -413,10 +413,10 @@ def test_the_scope_function_reads_the_table(monkeypatch):
 
 # Lane LONE (2026-11-01) names every lone atom and monoatomic ion ('zinc(1-)', and the salt 'sodium zinc(1-)' at the
 # best-effort tier), so [Zn-] and [Zn-].[Na+] are no longer failures: two zinc anions with no cation, alone and beside
-# sodium, are the zinc inputs that no producer names at any tier
+# sodium, were the zinc inputs that no producer names at any tier; beside sodium they are named at best-effort since
+# program 7 (2026-11-06) by their components ('sodium(1+)—zinc(1-) (1/2)', test_component_adduct.py)
 @pytest.mark.parametrize("smiles, message", [("[Zn-].[Zn-]", "zinc compound (not supported)"),
-                                             ("[Zn]=[Zn]", "zinc compound (not supported)"),
-                                             ("[Zn-].[Zn-].[Na+]", "sodium compound (not supported)")])
+                                             ("[Zn]=[Zn]", "zinc compound (not supported)")])
 def test_the_named_rows_of_a_zinc_failure_carry_the_label_at_every_tier(smiles, message):
     """name_tiered, the call that asks for the label (``on_failure="label"``), ``raise_on_limit`` and
     ``classify_limit`` agree: UNNAMEABLE at the default and at the best-effort tier; the call returns the
