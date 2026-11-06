@@ -8,7 +8,6 @@ or "4H-pyran" instead of HW systematic "oxine" (which OPSIN cannot parse).
 a phase Plan 03: OPSIN Format Fixes - Heterocycle Naming
 """
 
-import os
 import subprocess
 import pytest
 from orthonym import name_compound
@@ -47,20 +46,10 @@ def opsin_parse(name: str) -> str:
 class TestOxineToPyran:
     """Test that 6-membered O unsaturated heterocycles produce pyran names, not oxine."""
 
-    def test_2h_pyran_no_oxine(self):
-        """2H-pyran should NOT contain 'oxine'."""
-        name = name_compound("C1=CC=COC1")
-        assert "oxine" not in name.lower(), f"Name contains 'oxine': {name}"
-
     def test_2h_pyran_correct_name(self):
         """2H-pyran canonical SMILES should produce '2H-pyran'."""
         name = name_compound("C1=CC=COC1")
         assert name == "2H-pyran", f"Expected '2H-pyran', got '{name}'"
-
-    def test_4h_pyran_no_oxine(self):
-        """4H-pyran should NOT contain 'oxine'."""
-        name = name_compound("C1=COC=CC1")
-        assert "oxine" not in name.lower(), f"Name contains 'oxine': {name}"
 
     def test_34_dihydro_2h_pyran(self):
         """3,4-dihydro-2H-pyran should be named correctly."""

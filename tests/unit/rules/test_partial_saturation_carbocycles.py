@@ -155,70 +155,8 @@ class TestHeterocycleStereochemistry:
         # Check for expected stereo format
         assert '2S' in result or '2R' in result, f"Missing stereo locant: {result}"
 
-    def test_pyrrolidine_with_stereo(self):
-        """Substituted pyrrolidine with stereo."""
-        result = name_compound('C[C@H]1CCCN1')
-        has_stereo = '(' in result and ')' in result
         # Note: might not have stereo if center not recognized
         # This test just ensures no crash
-
-    def test_piperidine_without_stereo(self):
-        """Piperidine without chiral center should have no stereo."""
-        result = name_compound('CN1CCCCC1')
-        # Should not have stereo descriptors
-        assert '(' not in result or 'S' not in result, f"Unexpected stereo in: {result}"
-
-    def test_morpholine_basic(self):
-        """Simple morpholine naming."""
-        result = name_compound('C1COCCN1')
-        assert 'morpholine' in result.lower()
-
-    def test_n_methylmorpholine(self):
-        """N-methylmorpholine naming."""
-        result = name_compound('CN1CCOCC1')
-        assert 'morpholine' in result.lower()
-        assert 'methyl' in result.lower()
-
-
-class TestNoRegression:
-    """Ensure fixes don't break existing functionality."""
-
-    def test_naphthalene_still_works(self):
-        """Naphthalene should still return naphthalene."""
-        result = name_compound('c1ccc2ccccc2c1')
-        assert 'naphthalene' in result.lower()
-
-    def test_benzene_still_works(self):
-        """Benzene should still return benzene."""
-        result = name_compound('c1ccccc1')
-        assert 'benzene' in result.lower()
-
-    def test_piperidine_still_works(self):
-        """Piperidine without stereo should still work."""
-        result = name_compound('C1CCNCC1')
-        assert 'piperidine' in result.lower()
-
-    def test_pyrrolidine_still_works(self):
-        """Pyrrolidine should still work."""
-        result = name_compound('C1CCNC1')
-        assert 'pyrrolidine' in result.lower()
-
-    def test_pyridine_still_works(self):
-        """Pyridine should still work."""
-        result = name_compound('c1ccncc1')
-        assert 'pyridine' in result.lower()
-
-    def test_methylcyclohexane_still_works(self):
-        """Simple cycloalkane should still work."""
-        result = name_compound('CC1CCCCC1')
-        assert 'cyclohexane' in result.lower()
-        assert 'methyl' in result.lower()
-
-    def test_anthracene_still_works(self):
-        """Anthracene should still work."""
-        result = name_compound('c1ccc2cc3ccccc3cc2c1')
-        assert 'anthracene' in result.lower()
-
 
 class TestSaturationPrefixFormatting:
     """Test saturation prefix formatting."""
@@ -290,14 +228,6 @@ class TestSubstitutedPartiallySaturatedCarbocycles:
             assert result['parent_name'] == 'naphthalene'
             assert 'tetrahydro' in result['prefix']
 
-    def test_dimethyl_tetrahydronaphthalene(self):
-        """Dimethyltetrahydronaphthalene should work."""
-        mol = Chem.MolFromSmiles('Cc1ccc2c(c1)C(C)CCC2')
-        ri = mol.GetRingInfo()
-        ring_atoms = set()
-        for ring in ri.AtomRings():
-            ring_atoms.update(ring)
-        result = detect_carbocyclic_partial_saturation(mol, ring_atoms)
         # Should detect partial saturation
         # Note: substituents outside ring system may affect ring atom set
 

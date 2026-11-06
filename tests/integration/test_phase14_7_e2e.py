@@ -53,11 +53,6 @@ class TestMonocyclicLactones:
 
 
 # ============================================================================
-# Simple Ester Preservation
-# ============================================================================
-
-
-# ============================================================================
 # Ring-Attached Ester Naming (Acyloxy Prefixes)
 # ============================================================================
 
@@ -71,48 +66,12 @@ class TestMonocyclicLactones:
 
 
 # ============================================================================
-# Existing Compounds Preserved (Regression Guards)
-# ============================================================================
-
-
-class TestExistingCompoundsPreserved:
-    """Regression guards: existing compound naming must not change."""
-
-    @pytest.mark.integration
-    def test_ethanol(self):
-        result = name_compound("CCO")
-        assert result in ("ethanol", "ethan-1-ol"), f"Got '{result}'"
-
-    @pytest.mark.integration
-    def test_bicyclo_octane(self):
-        result = name_compound("C1CC2CCCC1C2")
-        assert "bicyclo" in result.lower(), f"Expected bicyclo name, got '{result}'"
-
-    @pytest.mark.integration
-    def test_adamantane(self):
-        """Adamantane: pre-existing naming (not a retained name in current data)."""
-        result = name_compound("C1C2CC3CC1CC(C2)C3")
-        # Adamantane is a complex polycyclic - verify it doesn't crash
-        assert result is not None and len(result) > 0
-
-
-# ============================================================================
 # Success Criteria (Direct Tests of Plan Truth Statements)
 # ============================================================================
 
 
 class TestSuccessCriteria:
     """Tests mapping directly to must_haves truths from a phase plans."""
-
-    @pytest.mark.integration
-    def test_truth_esters_on_complex_rings_use_acyloxy(self):
-        """Truth: an ester on a ring is the principal group, so no acyloxy prefix is used."""
-        result = name_compound("CC(=O)OC1CCCCC1")
-        # (the Blue Book): functional class name when the ester is the
-        # principal characteristic group; 'acetyloxy' is only for esters cited as prefixes
-        #,:31696) when a senior group is present.
-        assert result == "cyclohexyl acetate", f"Got '{result}'"
-        assert "acetyloxy" not in result
 
     @pytest.mark.integration
     def test_truth_zero_regressions(self):

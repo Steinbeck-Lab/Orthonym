@@ -21,13 +21,6 @@ import pytest
 from orthonym.namer import name_compound
 
 
-@pytest.fixture()
-def _validity_gate_on(monkeypatch):
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
-
 @pytest.mark.unit
 class TestAM6Sulfonamido:
     @pytest.mark.parametrize("smiles,expected", [
@@ -46,7 +39,7 @@ class TestAM6Sulfonamido:
     def test_protected(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_n_alkyl_sulfonamido_is_the_amido_prefix(self, _validity_gate_on):
+    def test_n_alkyl_sulfonamido_is_the_amido_prefix(self, opsin_gate):
         """change-asserted-value (lane/l17, item 12 a performance pass, ``; it already failed at c302d83df4): the PIN tier failed
         closed ('unknown') for an N-alkylated sulfonamido group. "Substituents of the types -NH-CO-R and -NH-SO2-R"
         (the Blue Book): "Method (1) generates preferred IUPAC names", '(N-cyclopropylmethanesulfonamido)acetic acid'
@@ -168,7 +161,7 @@ class TestCyanoaminoPrefix:
         ("OC(=O)c1ccc(NC#N)cc1", "4-(cyanoamino)benzoic acid"),
         ("Oc1ccc(NC#N)cc1", "4-(cyanoamino)phenol"),
     ])
-    def test_cyanoamino_is_enclosed(self, _validity_gate_on, smiles, expected):
+    def test_cyanoamino_is_enclosed(self, opsin_gate, smiles, expected):
         assert name_compound(smiles) == expected
 
 
@@ -183,5 +176,5 @@ class TestFailClosed:
         # is a W2E-P1AM Task-6 heal, no longer a fail-closed case.
         "CC(=N)NCCC(=O)O",  # N-attached amidine sibling (separate row)
     ])
-    def test_stays_unknown(self, _validity_gate_on, smiles):
+    def test_stays_unknown(self, opsin_gate, smiles):
         assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin")

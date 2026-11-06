@@ -55,6 +55,7 @@ import re
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.read_back import same_hydron_sites
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -155,23 +156,6 @@ SAME_DESCRIPTOR = [
 ]
 
 
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-
-
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _exact(name, smiles):
-    from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name, smiles)
-    return bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
-
-
 def _named_in_every_spelling(spellings, name):
     jar_or_skip()
     from orthonym import Orthonym
@@ -181,7 +165,7 @@ def _named_in_every_spelling(spellings, name):
         for namer in namers:
             r = namer.name_tiered(smiles)
             assert (r["name"], r["tier"]) == (name, "pin_verified"), (smiles, r)
-    assert _exact(name, spellings[0]), name
+    assert same_hydron_sites(name, spellings[0]), name
 
 
 def _cited_locants(name):

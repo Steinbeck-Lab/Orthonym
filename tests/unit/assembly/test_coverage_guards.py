@@ -5,7 +5,6 @@
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.namer import name_compound
 

@@ -19,8 +19,8 @@ Every name asserted here is read back by a FRESH OPSIN call (``assert_full_rt``,
 import pytest
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate  # the names below are built with the validity gate on
 
@@ -30,7 +30,7 @@ PYRROLIDINONE = "C1(C)CCC(=O)N1"
 
 
 def _best_effort(smiles):
-    return Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)["name"]
+    return tier_row(smiles, "best-effort")["name"]
 
 
 @pytest.mark.parametrize("smiles,expected", [

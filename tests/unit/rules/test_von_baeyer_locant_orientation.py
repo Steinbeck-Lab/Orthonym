@@ -32,13 +32,6 @@ or heteroatom-bearing cages.
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 # --------------------------------------------------------------------------
 # (c) -- principal characteristic group gets the lowest locant.

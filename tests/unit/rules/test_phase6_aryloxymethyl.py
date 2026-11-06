@@ -1,21 +1,5 @@
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
-from orthonym import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    o = opsin_parse(name)
-    if not o:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
+from tests.support.read_back import same_key
 
 
 @pytest.mark.opsin_gate
@@ -49,7 +33,7 @@ def test_nitrophenoxymethyl_oxirane_names(namer):
     smi = "O=[N+]([O-])c1ccc(OCC2CO2)cc1"
     name = namer.name(smi)
     assert name == "[(4-nitrophenoxy)methyl]oxirane", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -68,7 +52,7 @@ def test_plain_aryloxymethyl_unchanged(namer, smi, expected):
     smi_ = smi
     name = namer.name(smi_)
     assert name == expected, name
-    assert _full_rt(smi_, name), name
+    assert same_key(smi_, name), name
 
 
 @pytest.mark.opsin_gate
@@ -87,4 +71,4 @@ def test_plain_aryloxymethyl_unchanged(namer, smi, expected):
 def test_benzyloxy_and_cyclohexyloxy_stay_bare(namer, smi, expected):
     name = namer.name(smi)
     assert name == expected, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name

@@ -1,7 +1,5 @@
 import pytest
 from rdkit import Chem
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from orthonym.jvm_bridge import opsin_stdout
 from tests.support.jars import jar_or_skip
@@ -9,6 +7,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.pin_tiers import tier_row
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -19,35 +18,13 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "[O]c1ccc(O)cc1",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
 
 
 def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 def _radical_rt(name: str, target_smiles: str) -> bool:
@@ -67,7 +44,7 @@ def _radical_rt(name: str, target_smiles: str) -> bool:
 
 def _name_be(smiles: str):
     with jvm_slots(1, purpose="test-radical"):
-        r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        r = tier_row(smiles, "best-effort")
     return r.get("name")
 
 

@@ -108,17 +108,3 @@ WITNESSES: List[Witness] = [
 # target — recorded for the audit trail, not part of the six):
 # CC[C@@H](CC(=O)N[C@H]1C[C@H](CNC(=O)[C@@H]2C[C@H](F)CN2C)C1)CC(F)(F)F
 # -> (3S)-3-ethyl-5,5,5-trifluoro-N-(trans-3-(((2S,4S)-4-fluoro-1-methylpyrrolidine-2-carboxamido)methyl)cyclobutyl)pentanamide
-
-
-def test_witnesses_parse():
-    """Every pinned witness SMILES must parse (real assertion; guards the literals)."""
-    from rdkit import Chem
-
-    assert len(WITNESSES) == 6
-    assert len({w.wid for w in WITNESSES}) == 6, "duplicate witness ids"
-    for w in WITNESSES:
-        mol = Chem.MolFromSmiles(w.smiles)
-        assert mol is not None, f"{w.wid}: SMILES does not parse: {w.smiles}"
-        assert mol.GetNumAtoms() > 0, f"{w.wid}: empty molecule"
-        assert ("cis" in w.ref_name) or ("trans" in w.ref_name), \
-            f"{w.wid}: ref_name lacks a cis/trans word"

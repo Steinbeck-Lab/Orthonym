@@ -5,7 +5,6 @@ Tests that cleave_and_cap produces valid H-capped and OH-capped
 fragment SMILES from a molecule and bond info list.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.decomposition.bond_cleavage import find_cleavable_bonds

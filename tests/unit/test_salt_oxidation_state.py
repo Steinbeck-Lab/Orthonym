@@ -13,13 +13,6 @@ cation-as-parent '-aminium' naming), tracked as a follow-on — NOT this fix.
 """
 import pytest
 
-from orthonym import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [

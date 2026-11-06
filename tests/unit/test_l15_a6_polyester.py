@@ -16,10 +16,10 @@ under, not by the two carbons of '1-(R-methyl)-2-X-ethyl'.
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from orthonym.decomposition import bond_cleavage, engine
 from orthonym.rules.ester_seniority import ester_seniority_key
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -34,21 +34,17 @@ _CASES = [
 ]
 
 
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
-
-
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("smiles,name", _CASES)
 def test_polyester_alcohol_component_by_seniority(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
 
 @pytest.mark.parametrize("smiles,name", _CASES)
 def test_the_pin_tier_labels_the_senior_ester_name_a_pin(smiles, name):
-    assert _row(smiles, "pin")["tier"] == "pin_verified"
+    assert tier_row(smiles, "pin")["tier"] == "pin_verified"
 
 
 def _split_name(smiles):
@@ -97,7 +93,7 @@ def test_the_substituted_benzoic_acid_is_senior_to_the_unsubstituted_one():
     substituted, = (m for c, m in esters.items() if c == 1)
     plain, = (m for c, m in esters.items() if c != 1)
     assert ester_seniority_key(mol, substituted) < ester_seniority_key(mol, plain)
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == ("phenyl 3-(benzoyloxy)benzoate", "pin_verified"), row
 
 
@@ -178,7 +174,7 @@ def test_the_pyranopyranone_octenoate_keeps_its_name_beside_a_lactone(tier):
     which reads back, below the PIN. UNVERIFIED: that the multivalent group of a ring system that carries a lactone
     ('6-oxooctahydropyrano[3,2-b]pyran-3,8-diyl') is read as one parent; the book prints no such row. The PIN-tier
     abstention is the fail-closed direction."""
-    row = _row(_LACTONE_ROW, tier)
+    row = tier_row(_LACTONE_ROW, tier)
     if tier == "pin":
         assert row["tier"] == "abstain" and not row["is_pin"], row
         return
@@ -197,7 +193,7 @@ def test_a_ring_acid_word_never_drops_the_chain_ester_beside_it():
                    if any(n.GetIsAromatic() for n in mol.GetAtomWithIdx(m[0]).GetNeighbors()))
     assert name_ester(mol, ring_ester) is None
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert (row["name"], row["tier"]) == ("methyl 4-(3-methoxy-3-oxopropyl)benzoate", "pin_verified"), row
 
 

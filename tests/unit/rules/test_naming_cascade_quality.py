@@ -4,7 +4,6 @@ a phase-03 Tasks 2-4: Verify cycloalkyl retained names, FRAGMENT_NAME_CACHE
 entries, and Tier 5 descriptive fallback for compound substituents.
 """
 
-import pytest
 from rdkit import Chem
 from orthonym import name_compound
 

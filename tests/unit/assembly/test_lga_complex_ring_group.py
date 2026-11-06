@@ -32,6 +32,7 @@ from orthonym.assembly import complex_ring_group as G
 from orthonym.jvm_budget import jvm_slots
 from orthonym.tiers import emit_tier_flags
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -142,7 +143,7 @@ def test_row_4_is_the_pin_at_the_default_best_effort_tier_too():
     # spent its hang budget on a ring substituent taken for part of a cage: the name came from a later
     # producer in a non-PIN spelling ('2,7,2',7'-tetra(pyren-1-yl)spiro[fluorene-9,9'-fluorene]')
     with jvm_slots(1, purpose="lga-test"):
-        row = Orthonym(style="pin", **emit_tier_flags("best-effort")).name_tiered(ROW_4)
+        row = tier_row(ROW_4, "best-effort")
     assert (row["name"], row["tier"]) == ("2,2',7,7'-tetra(pyren-1-yl)-9,9'-spirobi[fluorene]", "pin_verified"), row
 
 

@@ -15,10 +15,10 @@ byte-verified allowance degrades to the systematic '...ethanal' (never a wrong n
 Every emitted name here OPSIN-round-trips to the input (0-wrong).
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 # The measure's flags — bare Orthonym under-emits and would mislead.
 _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
@@ -28,11 +28,6 @@ _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
 @pytest.fixture(scope="module")
 def engine():
     return Orthonym(**_FLAGS)
-
-
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -45,7 +40,7 @@ def test_substituted_acetaldehyde_retained_pin(engine, smiles, expected):
     assert got == expected, f"{smiles}: got {got!r}"
     # 0-wrong: the emitted PIN must OPSIN-round-trip to the input structure.
     rt = opsin_parse(got)
-    assert rt and _inchikey(rt) == _inchikey(smiles), f"RT failed for {got!r}"
+    assert rt and key_or_none(rt) == key_or_none(smiles), f"RT failed for {got!r}"
 
 
 @pytest.mark.parametrize("smiles,expected", [

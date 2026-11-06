@@ -18,7 +18,6 @@ import shutil
 
 import pytest
 
-from orthonym.validation import atom_coverage
 from orthonym.validation.atom_coverage import (
     _opsin_cli_stdout,
     _parse_name_with_opsin_uncached,

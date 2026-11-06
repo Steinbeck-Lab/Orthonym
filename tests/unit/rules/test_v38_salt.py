@@ -27,15 +27,10 @@ Determinism on `CanonicalRankAtoms`. 0-wrong ABSOLUTE (RT-verify or abstain).
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import name_compound
 from orthonym.rules.salts import name_salt, _reattach_protons_to_acids
-
-
-def _ik(smiles: str):
-    m = Chem.MolFromSmiles(smiles)
-    return inchi.MolToInchiKey(m) if m is not None else None
+from tests.support.read_back import key_or_none
 
 
 def _rt_ik(name: str):
@@ -43,11 +38,11 @@ def _rt_ik(name: str):
     not parse). Mirrors the project's headline round-trip metric."""
     from orthonym.namer import _validity_gate_name_to_smiles
     smi = _validity_gate_name_to_smiles(name)
-    return _ik(smi) if smi else None
+    return key_or_none(smi) if smi else None
 
 
 def _rt_matches(name: str, input_smiles: str) -> bool:
-    return bool(name) and _rt_ik(name) == _ik(input_smiles)
+    return bool(name) and _rt_ik(name) == key_or_none(input_smiles)
 
 
 # ---------------------------------------------------------------------------

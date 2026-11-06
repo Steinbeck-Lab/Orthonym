@@ -1,21 +1,6 @@
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
-from orthonym import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    o = opsin_parse(name)
-    if not o:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
+from tests.support.read_back import same_key
 
 
 @pytest.mark.opsin_gate
@@ -24,7 +9,7 @@ def test_acyloxymethyl_ring_methyl_ester(namer):
     name = namer.name(smi)
     assert name == "methyl 2-[(acetyloxy)methyl]cyclohexane-1-carboxylate", name
     assert " methyl " not in name  # no stray-space token
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -33,7 +18,7 @@ def test_ring_acyloxy_direct(namer):
     smi = "COC(=O)c1ccc(OC(C)=O)cc1"
     name = namer.name(smi)
     assert name and "unknown" not in name, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -42,7 +27,7 @@ def test_topological_acyl_never_wrong(namer):
     smi = "O=C1CCCCCCCCCCCOC1"  # a macrolactone (oxacyclotridecan-2-one class)
     name = namer.name(smi)
     if name and "unknown" not in name:
-        assert _full_rt(smi, name), name
+        assert same_key(smi, name), name
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +55,7 @@ _EXPECTED_WITNESS_NAME = "methyl 2-[(acetyloxy)methyl]cyclohexane-1-carboxylate"
 def test_ring_acid_detection_is_smiles_order_invariant(namer, smi):
     name = namer.name(smi)
     assert name == _EXPECTED_WITNESS_NAME, (smi, name)
-    assert _full_rt(smi, name), (smi, name)
+    assert same_key(smi, name), (smi, name)
 
 
 @pytest.mark.opsin_gate
@@ -79,7 +64,7 @@ def test_ring_acid_detection_stable_under_rdkit_canonicalization(namer, smi):
     canonical = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
     name = namer.name(canonical)
     assert name == _EXPECTED_WITNESS_NAME, (canonical, name)
-    assert _full_rt(canonical, name), (canonical, name)
+    assert same_key(canonical, name), (canonical, name)
 
 
 @pytest.mark.opsin_gate
@@ -90,6 +75,6 @@ def test_chain_acid_principal_with_ring_non_principal_never_fabricates(namer):
     # the correct name or an honest abstention.
     smi = "COC(=O)CCCCCCCCOC(=O)C1CCCCC1"
     name = namer.name(smi)
-    assert not name or "unknown" in name or _full_rt(smi, name), name
+    assert not name or "unknown" in name or same_key(smi, name), name
     if name:
         assert "hexadecan" not in name, name

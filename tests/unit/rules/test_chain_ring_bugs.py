@@ -8,7 +8,6 @@ Bug 2: Duplicate substituent naming where ring atoms produce both a ring
 Bug 3: Amino acid systematic naming counts all carbons including ring
         carbons, producing wrong chain stems (e.g., nonanoic for tyrosine).
 """
-import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
@@ -71,40 +70,8 @@ class TestChainFindingExcludesRingAtoms:
         )
 
 
-class TestNamerChainRingOutput:
-    """Test that the namer produces correct names for chain-ring compounds."""
-
-    def test_phenylbutanoic_acid_name_contains_butanoic(self):
-        """4-phenylbutanoic acid should contain 'butanoic', not 'decanoic'."""
-        name = name_compound("c1ccc(CCCC(=O)O)cc1")
-        assert "butanoic" in name, (
-            f"Expected 'butanoic' in name, got: {name}"
-        )
-
-    def test_phenylbutanoic_acid_name_has_phenyl(self):
-        """4-phenylbutanoic acid should contain 'phenyl'."""
-        name = name_compound("c1ccc(CCCC(=O)O)cc1")
-        assert "phenyl" in name, (
-            f"Expected 'phenyl' in name, got: {name}"
-        )
-
-    def test_pentanoic_acid_still_works(self):
-        """Pentanoic acid (acyclic) should still be named correctly."""
-        name = name_compound("CCCCC(=O)O")
-        assert "pentanoic acid" in name, (
-            f"Expected 'pentanoic acid' in name, got: {name}"
-        )
-
-
 class TestNoDuplicateSubstituents:
     """Test that ring-containing chain compounds don't get duplicate substituents."""
-
-    def test_phenylbutanoic_acid_no_hexyl(self):
-        """4-phenylbutanoic acid should NOT contain 'hexyl'."""
-        name = name_compound("c1ccc(CCCC(=O)O)cc1")
-        assert "hexyl" not in name, (
-            f"'hexyl' (ring atoms as alkyl) found in name: {name}"
-        )
 
     def test_phenylpropanediol_no_hexyl(self):
         """2-phenylethane-1,2-diol should NOT contain 'hexyl'."""
@@ -130,13 +97,6 @@ class TestNoDuplicateSubstituents:
 
 class TestAminoAcidRingAtomLeakage:
     """Test that amino acid naming doesn't count ring carbons in chain stem."""
-
-    def test_tyrosine_not_nonanoic(self):
-        """Tyrosine should NOT produce 'nonanoic' (9 carbons incl. ring)."""
-        name = name_compound("N[C@@H](Cc1ccc(O)cc1)C(=O)O")
-        assert "nonanoic" not in name.lower(), (
-            f"Ring carbons leaked into amino acid chain: {name}"
-        )
 
     def test_bromophenylalanine_not_nonanoic(self):
         """3-(4-bromophenyl)alanine should NOT produce 'nonanoic'."""

@@ -7,7 +7,6 @@ existing default-tier or D1-table output. This test file must NEVER regress
 for the life of the D2 (flag-tier coordination additive namer) build -- it is
 the guard that proves D2 is fully isolated from the 0-wrong default tier.
 """
-import pytest
 
 from orthonym import name_compound, Orthonym
 from orthonym.cli import _emit_tier_flags, main

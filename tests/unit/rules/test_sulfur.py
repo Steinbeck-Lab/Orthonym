@@ -1,6 +1,5 @@
 """Unit tests for sulfur compound naming."""
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.sulfur import (

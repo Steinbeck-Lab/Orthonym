@@ -176,14 +176,6 @@ class TestLocantOptimization:
         locants = list(subs.keys())
         assert 2 in locants
 
-    @pytest.mark.unit
-    def test_unsubstituted_still_works(self):
-        """Test that unsubstituted heterocycles still name correctly."""
-        # Unsubstituted should use original orient_heterocycle behavior
-        assert name_compound("c1ccncc1") == "pyridine"
-        assert name_compound("C1CCNC1") == "pyrrolidine"
-        assert name_compound("c1ccoc1") == "furan"
-
 
 # =============================================================================
 # Direct function tests

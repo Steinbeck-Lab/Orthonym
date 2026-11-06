@@ -19,13 +19,6 @@ Gold rows (def_id / SMILES / expected PIN / Blue Book rule):
 
 import pytest
 
-from orthonym import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 @pytest.mark.unit
 def test_propylhydroxylamine_perceived(namer):

@@ -33,6 +33,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import key_or_empty as _key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -47,21 +48,9 @@ DEFAULT_TIER_DECLINES = frozenset({
     # '[Fr+].[NH2-]' left this set on 2026-10-30: the PIN path names it 'francium amide' pin_verified, as
     # caesium amide and rubidium amide (a carbon-free salt: since 2026-11-02 declined at the default tier, ``_pin_row``)
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 pytestmark = [pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return Chem.MolToInchiKey(mol) if mol is not None else ""
 
 
 def _carbon_free(smiles):
@@ -74,7 +63,7 @@ def _pin_row(smiles):
     # "that also contain at least one carbon atom in their structure";:2058 "... the label 'preselected name'
     # is added to appropriate names"): the strict path's row is asserted, and best-effort gives the same name
     if (smiles in DEFAULT_TIER_DECLINES or _carbon_free(smiles)) and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     return Orthonym().name_tiered(smiles)
 
 

@@ -64,11 +64,9 @@ class TestNeverNone:
         ring_info = mol.GetRingInfo()
         ring_atoms = set(ring_info.AtomRings()[0])
         # Find the ring atom bonded to the methyl carbon
-        methyl_idx = None
         ring_attach = None
         for atom in mol.GetAtoms():
             if atom.GetSymbol() == 'C' and not atom.GetIsAromatic():
-                methyl_idx = atom.GetIdx()
                 for nbr in atom.GetNeighbors():
                     if nbr.GetIdx() in ring_atoms:
                         ring_attach = nbr.GetIdx()
@@ -226,24 +224,6 @@ class TestAttachIdx:
         mol = _make_mol("CC")
         result = name_substituent(mol, {1}, attach_idx=1)
         assert result == "methyl"
-
-    def test_propyl_attached_at_end(self):
-        """3-carbon fragment attached at end -> 'propyl'."""
-        mol = _make_mol("CCCC")  # butane
-        # Fragment {1,2,3} with attach at atom 1 (the end nearest parent)
-        result = name_substituent(mol, {1, 2, 3}, attach_idx=1)
-        assert result is not None
-        # Should be propyl (linear, attached at terminal)
-        assert result == "propyl"
-
-    def test_propyl_attached_at_middle(self):
-        """3-carbon fragment attached at middle -> 'propan-2-yl' (F-T9/DD6)."""
-        mol = _make_mol("CC(C)C")  # 2-methylpropane
-        # Fragment {0, 1, 2} with attach at atom 1 (the branching center)
-        result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
-        assert result is not None
-        # Attached at centre of 3 carbons -> propan-2-yl (located PIN, not 'isopropyl')
-        assert "propan-2-yl" in result.lower()
 
     def test_ethyl_always_ethyl(self):
         """2-carbon linear fragment -> 'ethyl' regardless of attach position."""

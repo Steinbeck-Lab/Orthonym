@@ -24,16 +24,11 @@ import pytest
 
 import orthonym.assembly.substituent_naming as substituent_naming
 import orthonym.rules.benzene as benzene
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.assembly.group14_chalcogen_prefix import UNHANDLED
+from tests.support.pin_tiers import tier_row
+from tests.support.pin_tiers import name_and_tier
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _tiered(smiles: str):
-    row = Orthonym().name_tiered(smiles)
-    return row["name"], row["tier"]
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -53,7 +48,7 @@ def _tiered(smiles: str):
     ("OCCO[Ge](C)(C)C", "2-[(trimethylgermyl)oxy]ethan-1-ol"),
 ])
 def test_a_silyl_or_germyl_ether_prefix_on_a_chain_or_ring(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -63,7 +58,7 @@ def test_a_silyl_or_germyl_ether_prefix_on_a_chain_or_ring(smiles, expected):
     ("OC(=O)c1ccc(S[Si](C)(C)C)cc1", "4-[(trimethylsilyl)sulfanyl]benzoic acid"),
 ])
 def test_the_chalcogen_analogues_take_the_sulfanyl_family(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -76,7 +71,7 @@ def test_the_chalcogen_analogues_take_the_sulfanyl_family(smiles, expected):
     ("OC(=O)c1ccc(O[Si](C)(C)C(C)(C)C)cc1", "4-{[tert-butyldi(methyl)silyl]oxy}benzoic acid"),
 ])
 def test_a_silyl_ether_prefix_on_a_benzene_parent(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -87,7 +82,7 @@ def test_a_silyl_ether_prefix_on_a_benzene_parent(smiles, expected):
     ("OCCOC(C)(C)C", "2-tert-butoxyethan-1-ol"),
 ])
 def test_the_controls_keep_their_names(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 # The prefix route is the carbon parent's: "The senior parent structure has the maximum number of substituents
@@ -111,7 +106,7 @@ def test_the_controls_keep_their_names(smiles, expected):
     "OCCS[Ge](C)(C)O",
 ])
 def test_the_silane_or_germane_is_the_parent_where_the_carbon_side_is_not_senior(smiles):
-    name, tier = _tiered(smiles)
+    name, tier = name_and_tier(smiles)
     assert tier != "pin_verified", (smiles, name)
 
 
@@ -120,14 +115,14 @@ def test_the_silane_or_germane_is_the_parent_where_the_carbon_side_is_not_senior
     ("OCCO[Si](Cl)(C)C", "2-{[chlorodi(methyl)silyl]oxy}ethan-1-ol"),   # a halogen on the silicon is no group
 ])
 def test_the_senior_parent_controls(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 def test_a_stereocentre_in_the_group_leaves_the_name_to_the_old_path():
     """The group is not named here, so the generic cascade runs as before: the best-effort name keeps its label."""
     smiles = "OCCO[Si](C)(C)[C@H](C)CC"
-    assert _tiered(smiles)[1] == "abstain"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    assert name_and_tier(smiles)[1] == "abstain"
+    row = tier_row(smiles, "best-effort")
     assert row["tier"] == "pin_unverified", row
 
 
@@ -136,7 +131,7 @@ def test_a_stereocentre_in_the_group_leaves_the_name_to_the_old_path():
     "OCCO[Si](C)(C)[C@H](C)CC",         # a stereocentre in the group: the group is not named without it
 ])
 def test_a_group_the_namer_declines_is_not_guessed(smiles):
-    name, tier = _tiered(smiles)
+    name, tier = name_and_tier(smiles)
     assert tier == "abstain", (smiles, name)
 
 
@@ -145,4 +140,4 @@ def test_the_tests_fail_without_the_hooks(monkeypatch):
     monkeypatch.setattr(substituent_naming, "group14_chalcogen_prefix", lambda *a, **k: UNHANDLED)
     monkeypatch.setattr(benzene, "ring_group14_chalcogen_substituent", lambda *a, **k: None)
     for smiles in ("OCCO[Si](C)(C)C", "OC(=O)c1ccc(O[Si](C)(C)C)cc1"):
-        assert _tiered(smiles)[1] == "abstain", smiles
+        assert name_and_tier(smiles)[1] == "abstain", smiles

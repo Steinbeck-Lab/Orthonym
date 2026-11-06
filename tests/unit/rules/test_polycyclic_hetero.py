@@ -342,7 +342,6 @@ class TestPrefixFormattingRules:
         # Should use multiplicative prefix, not repeated single prefixes
         assert 'dioxa' in prefix
         # Should NOT have "oxa-" appearing twice separately
-        count_separate = prefix.count('oxa-')
         # The "dioxa" should appear once, not "oxa-" appearing twice
         assert prefix.count('-oxa-') <= 1  # May appear at most once as part of compound
 

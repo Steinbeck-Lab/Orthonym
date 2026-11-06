@@ -24,6 +24,7 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.perception.ions import get_ion_sites
 from orthonym.rules import charged_router, olate_anions
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -70,15 +71,10 @@ PIN_ROWS = ENOLATE_ROWS + IMIDATE_ROWS + AMINOXIDE_ROWS
 TIERS = ["pin", "best-effort"]
 
 
-def _row(smiles, tier):
-    engine = Orthonym(style="pin", **(_emit_tier_flags(tier) if tier != "pin" else {}))
-    return engine.name_tiered(smiles)
-
-
 @pytest.mark.parametrize("tier", TIERS)
 @pytest.mark.parametrize("smiles, pin", PIN_ROWS)
 def test_the_anion_is_named_on_its_group(smiles, pin, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (pin, "pin_verified"), row
     assert name_is_rt_exact(row["name"], smiles), row
 
@@ -130,7 +126,7 @@ ACETYLACETONATE_SALTS = [
 
 @pytest.mark.parametrize("smiles, name, tier", ACETYLACETONATE_SALTS)
 def test_the_acetylacetonate_salts_take_the_olate_and_the_label_of_their_metal(smiles, name, tier):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, tier), row
     assert row["is_pin"] is (tier == "pin_verified"), row
     assert name_is_rt_exact(row["name"], smiles), row
@@ -140,7 +136,7 @@ def test_a_neutral_amine_oxide_and_the_neutral_imidic_acid_keep_their_names():
     # the oxide drawn N+-O- is the amine oxide of, never the aminoxide anion
     for smiles, name in [("C[N+](C)(C)[O-]", "N,N-dimethylmethanamine N-oxide"),
                          ("CC(=N)O", "ethanimidic acid"), ("CN(C)O", "N-hydroxy-N-methylmethanamine")]:
-        row = _row(smiles, "pin")
+        row = tier_row(smiles, "pin")
         assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -170,8 +166,6 @@ KEEPS_OLATE = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles, name", RETAINED_ALKOXIDES + KEEPS_OLATE, ids=lambda v: v)
 def test_retained_alkoxide_words(smiles, name):
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified", row

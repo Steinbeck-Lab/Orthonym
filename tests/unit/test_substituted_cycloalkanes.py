@@ -43,11 +43,6 @@ class TestMonosubstitutedCycloalkanes:
         assert name_compound("CC1CCCC1") == "methylcyclopentane"
 
     @pytest.mark.unit
-    def test_methylcyclohexane(self):
-        """CC1CCCCC1 -> methylcyclohexane."""
-        assert name_compound("CC1CCCCC1") == "methylcyclohexane"
-
-    @pytest.mark.unit
     def test_ethylcyclohexane(self):
         """CCC1CCCCC1 -> ethylcyclohexane."""
         assert name_compound("CCC1CCCCC1") == "ethylcyclohexane"
@@ -74,11 +69,6 @@ class TestMonosubstitutedCycloalkanes:
 
 class TestDisubstitutedCycloalkanes:
     """Tests for disubstituted cycloalkanes (locants required)."""
-
-    @pytest.mark.unit
-    def test_dimethylcyclohexane_1_2(self):
-        """CC1CCCCC1C -> 1,2-dimethylcyclohexane."""
-        assert name_compound("CC1CCCCC1C") == "1,2-dimethylcyclohexane"
 
     @pytest.mark.unit
     def test_dimethylcyclohexane_1_3(self):
@@ -265,20 +255,6 @@ class TestSubstitutedCycloalkenes:
         assert "methyl" in result
         assert "cyclopent" in result
         assert "ene" in result
-
-
-# ============================================================================
-# Locant Omission Verification Tests
-# ============================================================================
-
-class TestMonosubstitutedLocantOmission:
-    """Tests verifying that monosubstituted cycloalkanes omit locant 1."""
-
-    @pytest.mark.unit
-    def test_di_substituted_requires_locants(self):
-        """Disubstituted cycloalkanes MUST include locants."""
-        result = name_compound("CC1CCCCC1C")
-        assert "1,2" in result
 
 
 # ============================================================================

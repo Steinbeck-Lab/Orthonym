@@ -5,6 +5,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.validation.key_blind_double_bonds import _key_blind_bonds, key_blind_double_bond_verdict
+from tests.support.pin_tiers import tier_row
 
 
 def test_the_amidine_configuration_is_invisible_to_the_key():
@@ -40,10 +41,8 @@ def test_the_pin_path_refuses_the_opposite_configuration():
 @pytest.mark.opsin_gate
 def test_a_salt_whose_name_omits_the_configuration_keeps_its_name():
     """Review fix: refusing an omission lost this salt's only name at best-effort; it keeps the name it had."""
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     smiles = "CN/C(NCc1ccccc1)=[NH+]\\C.CN/C(NCc1ccccc1)=[NH+]\\C.O=S(=O)([O-])[O-]"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "bis(N-benzyl-N',N''-dimethylguanidinium) sulfate", row
 
 
@@ -82,7 +81,5 @@ def test_the_prefix_descriptor_belongs_to_the_one_ring_amidine(smiles, descripto
 
 @pytest.mark.opsin_gate
 def test_two_ring_amidines_keep_the_name_without_a_descriptor():
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("OC(=O)c1cc(C(N)=NC)ccc1/C(N)=N/C")
+    row = tier_row("OC(=O)c1cc(C(N)=NC)ccc1/C(N)=N/C", "best-effort")
     assert row["name"] == "2,5-bis(N'-methylcarbamimidoyl)benzoic acid", row

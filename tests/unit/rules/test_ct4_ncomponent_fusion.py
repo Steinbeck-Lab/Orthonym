@@ -10,6 +10,7 @@ abstain).
 Every emission is OPSIN-round-trip-gated on the FULL InChIKey (0-wrong by
 construction). Fresh process per naming probe (feedback_spy_before_you_refute).
 """
+import functools
 import json
 import subprocess
 import sys
@@ -20,6 +21,7 @@ import pytest
 _THIS = __file__
 
 
+@functools.lru_cache(maxsize=None)
 def _name_one(smiles):
     """Name ONE smiles in a FRESH subprocess at best-effort tier; return
     {name, tier, rt} where rt is the full-InChIKey OPSIN round-trip verdict."""

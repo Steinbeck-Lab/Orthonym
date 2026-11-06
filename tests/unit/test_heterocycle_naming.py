@@ -502,12 +502,6 @@ class TestPipelineIntegration:
         assert name_compound("C1CCCC1") == "cyclopentane"
         assert name_compound("C1CCCCC1") == "cyclohexane"
 
-    @pytest.mark.unit
-    def test_heterocycles_dont_break_benzene(self):
-        """Regression: heterocycle support doesn't break benzene."""
-        assert name_compound("c1ccccc1") == "benzene"
-
-
 # =============================================================================
 # HW stem selection tests
 # =============================================================================

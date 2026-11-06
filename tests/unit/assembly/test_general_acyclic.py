@@ -8,7 +8,6 @@ InnerDispatchResult.
 Per internal notes + RESEARCH: first-wave NamingResult emits tree=None.
 Full tree IR population deferred to + phases.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.assembly.handlers.general_acyclic import (

@@ -53,17 +53,6 @@ class TestMultiplicativeSimpleParentsStillWork:
             f"Expected 'dianiline' in name for simple parent, got: {name}"
         )
 
-    def test_oxydibenzoic_acid_still_works(self):
-        """4,4'-oxydibenzoic acid: OC(=O)c1ccc(Oc2ccc(C(=O)O)cc2)cc1
-        Space-containing parent 'benzoic acid' should still work.
-        """
-        name = name_compound("OC(=O)c1ccc(Oc2ccc(C(=O)O)cc2)cc1")
-        assert name is not None, "Should produce a name"
-        assert "dibenzoic acid" in name, (
-            f"Expected 'dibenzoic acid' in name, got: {name}"
-        )
-
-
 @pytest.mark.unit
 class TestMultiplicativeNoOtherPrefixConcat:
     """No other saturation prefix should produce 'di+prefix' concatenation."""

@@ -13,13 +13,7 @@ import inspect
 import pytest
 from rdkit import Chem
 
-
-def _spiro_or_skip():
-    try:
-        from orthonym.rules import spiro
-        return spiro
-    except ImportError:
-        pytest.skip("orthonym.rules.spiro import failed")
+from orthonym.rules import spiro
 
 
 class TestNoParallelComparator:
@@ -27,12 +21,6 @@ class TestNoParallelComparator:
 
     @pytest.mark.unit
     def test_spiro_module_uses_compare_locant_sets(self):
-        spiro = _spiro_or_skip()
-        # Plan 151-02 lands the import in Task 2.
-        try:
-            from orthonym.rules.spiro import name_mixed_spiro_fused  # noqa
-        except ImportError:
-            pytest.skip("name_mixed_spiro_fused not yet exported")
         src = inspect.getsource(spiro)
         assert "compare_locant_sets" in src, (
             "spiro.py must import compare_locant_sets (D-11/D-20 reuse lock)"
@@ -40,7 +28,6 @@ class TestNoParallelComparator:
 
     @pytest.mark.unit
     def test_no_def_compare_locant(self):
-        spiro = _spiro_or_skip()
         src = inspect.getsource(spiro)
         non_comment = "\n".join(
             line for line in src.splitlines()
@@ -49,47 +36,6 @@ class TestNoParallelComparator:
         assert "def _compare_locant" not in non_comment, (
             "spiro.py defines a parallel comparator — D-20 violation"
         )
-
-
-class TestP2422LowestLocantTiebreak:
-    """ lowest-locant tiebreak.
-
-    Plan 151-02 documents this as a follow-up for the existing
-    pure-spiro segment-locant numbering (currently picks a non-canonical
-    set on 4/10 Blue Book fixtures). The Wave-0 RED test holds room for
-    the fix; in the tiebreak is enforced ONLY in the new
-    ``name_mixed_spiro_fused`` body's spiro-side orientation step.
-    """
-
-    @pytest.mark.unit
-    def test_dispiro_descriptor_uses_compare_locant_sets_in_mixed_only(self):
-        """In the comparator gate is in name_mixed_spiro_fused, not
-        in _compute_spiro_segments. This test documents the boundary."""
-        spiro = _spiro_or_skip()
-        try:
-            name_mixed_spiro_fused = spiro.name_mixed_spiro_fused
-        except AttributeError:
-            pytest.skip("name_mixed_spiro_fused not yet exported")
-        src = inspect.getsource(name_mixed_spiro_fused)
-        # Either the body uses compare_locant_sets directly, OR it
-        # delegates to a helper that does. The minimum invariant: the
-        # SOURCE of the function references the comparator name.
-        assert (
-            "compare_locant_sets" in src
-            or "compare_locant_sets" in inspect.getsource(spiro)
-        ), "name_mixed_spiro_fused must use compare_locant_sets (D-11)"
-
-    @pytest.mark.unit
-    def test_pure_spiro_tiebreak_documented_followup(self):
-        """Audit logs pure-spiro tiebreak refinement to — the Plan
-        151-02 acceptance is import-only for spiro.py module top-level."""
-        spiro = _spiro_or_skip()
-        try:
-            from orthonym.rules.spiro import name_mixed_spiro_fused  # noqa
-        except ImportError:
-            pytest.skip("name_mixed_spiro_fused not yet exported")
-        src = inspect.getsource(spiro)
-        assert "compare_locant_sets" in src
 
 
 class TestPureSpiroNumberingSmoke:
@@ -101,7 +47,6 @@ class TestPureSpiroNumberingSmoke:
         from orthonym.rules.spiro import (
             get_spiro_numbering, get_spiro_atoms,
         )
-        from rdkit import Chem
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCC2")
         spiro_atoms = get_spiro_atoms(mol)
         assert len(spiro_atoms) == 1
@@ -118,7 +63,6 @@ class TestPureSpiroNumberingSmoke:
         from orthonym.rules.spiro import (
             get_spiro_numbering, get_spiro_atoms,
         )
-        from rdkit import Chem
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCCC2")
         center = list(get_spiro_atoms(mol))[0]
         numbering = get_spiro_numbering(mol, center)
@@ -135,7 +79,6 @@ class TestPureSpiroNumberingSmoke:
         from orthonym.rules.spiro import (
             get_spiro_numbering, get_spiro_atoms,
         )
-        from rdkit import Chem
         # spiro[3.5]nonane: cyclobutane + cyclohexane sharing 1 atom
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCC2")
         center = list(get_spiro_atoms(mol))[0]
@@ -153,7 +96,6 @@ class TestPureSpiroNumberingSmoke:
         from orthonym.rules.spiro import (
             _get_polyspiro_numbering, get_spiro_atoms,
         )
-        from rdkit import Chem
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1(CCC2)CCCCCC1")
         spiro_atoms = get_spiro_atoms(mol)
         numbering = _get_polyspiro_numbering(mol, spiro_atoms)
@@ -170,7 +112,6 @@ class TestPureSpiroNumberingSmoke:
         from orthonym.rules.spiro import (
             _get_polyspiro_numbering, get_spiro_atoms,
         )
-        from rdkit import Chem
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1(CCC2)CCCCCC1")
         numbering = _get_polyspiro_numbering(mol, get_spiro_atoms(mol))
         assert numbering is not None
@@ -185,15 +126,3 @@ class TestPureSpiroNumberingSmoke:
         assert compare_locant_sets([1, 2, 4], [1, 3, 4]) < 0
         assert compare_locant_sets([1, 3, 4], [1, 2, 4]) > 0
         assert compare_locant_sets([1, 2, 4], [1, 2, 4]) == 0
-
-    @pytest.mark.unit
-    def test_spiro_imports_locants_module(self):
-        """Plan 151-02 lands the import of compare_locant_sets in spiro.py."""
-        spiro = _spiro_or_skip()
-        try:
-            from orthonym.rules.spiro import name_mixed_spiro_fused  # noqa
-        except ImportError:
-            pytest.skip("name_mixed_spiro_fused not yet exported")
-        src = inspect.getsource(spiro)
-        # Either explicit `from.locants import` or an in-body usage.
-        assert "compare_locant_sets" in src

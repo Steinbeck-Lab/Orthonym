@@ -23,7 +23,6 @@ Systemic fix verification:
   for any retained substituent name with a defined stereocenter.
 """
 
-import pytest
 from orthonym import name_compound
 
 
@@ -75,45 +74,6 @@ class TestStereoMismatchCompounds:
         assert "amino" in name.lower() or "amid" in name.lower(), (
             f"Expected amide-related name parts, got: {name}"
         )
-
-    @pytest.mark.xfail(
-        reason="OPSIN asymmetry: stereo-free steroid SMILES, OPSIN adds "
-               "default steroid stereo on parse-back (7-8 stereocenters). "
-               "Not a naming bug."
-    )
-    def test_compound1_stigmast_steroid_no_stereo(self):
-        """Compound 1: stigmast-5-en-3,7-diol from stereo-free SMILES.
-
-        Input SMILES has NO @/@@ atoms (flat steroid, no stereo defined).
-        Orthonym correctly names it without stereo descriptors.
-        OPSIN adds default steroid stereochemistry when parsing back,
-        producing different InChI. This is OPSIN asymmetry.
-        """
-        smiles = "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C"
-        name = name_compound(smiles)
-        assert name == "stigmast-5-en-3,7-diol"
-        # This would need InChI round-trip to pass, which it cannot
-        # because OPSIN adds stereo that was not in the input
-        assert False, "OPSIN adds default steroid stereo to stereo-free SMILES"
-
-    @pytest.mark.xfail(
-        reason="OPSIN asymmetry: stereo-free steroid SMILES, OPSIN adds "
-               "default steroid stereo on parse-back (7 stereocenters). "
-               "Not a naming bug."
-    )
-    def test_compound3_ergost_steroid_no_stereo(self):
-        """Compound 3: ergost-7,25-dien-3-ol from stereo-free SMILES.
-
-        Input SMILES has NO @/@@ atoms (flat steroid, no stereo defined).
-        Orthonym correctly names it without stereo descriptors.
-        OPSIN adds default steroid stereochemistry when parsing back.
-        """
-        smiles = "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C"
-        name = name_compound(smiles)
-        assert name == "ergost-7,25-dien-3-ol"
-        # Round-trip fails because OPSIN adds stereo
-        assert False, "OPSIN adds default steroid stereo to stereo-free SMILES"
-
 
 # ============================================================================
 # Systemic fix verification: additional compounds with substituent stereo

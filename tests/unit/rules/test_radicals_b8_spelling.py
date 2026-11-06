@@ -7,19 +7,10 @@ import pytest
 
 from tests.support.default_tier import assert_default_tier_declines, strict_path_row
 from tests.support.pin_tiers import is_carbon_free
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.jvm_budget import jvm_slots
-from orthonym.jvm_bridge import opsin_stdout
-from tests.support.jars import jar_or_skip
-
-
-def _strict_rt(name: str, smiles: str) -> bool:
-    jar = jar_or_skip()
-    txt, _ = opsin_stdout(name, allow_radicals=True, jar_path=jar)
-    parsed = Chem.MolFromSmiles((txt or "").strip())
-    return parsed is not None and Chem.MolToSmiles(parsed) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+from tests.support.read_back import same_canonical_smiles
 
 
 ROWS = [
@@ -64,4 +55,4 @@ def test_radical_pin_spelling(smiles, expected):
             row = Orthonym(style="pin").name_tiered(smiles)
     assert row["name"] == expected
     assert row["tier"] != "abstain"
-    assert _strict_rt(expected, smiles)
+    assert same_canonical_smiles(expected, smiles)

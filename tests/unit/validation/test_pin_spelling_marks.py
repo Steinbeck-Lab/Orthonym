@@ -14,13 +14,9 @@
   after the alphabetized prefixes.
 """
 import pytest
-from rdkit import Chem
 
-from orthonym.validation.pin_spelling import check_pin_spelling, registered_rules
-
-
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
+from orthonym.validation.pin_spelling import registered_rules
+from tests.support.read_back import spelling_rules
 
 
 def test_the_rules_are_registered():
@@ -62,7 +58,7 @@ def test_the_rules_are_registered():
      "P-14.5"),
 ])
 def test_a_spelling_that_breaks_the_rule_fails(smiles, name, rule):
-    assert rule in _rules(smiles, name)
+    assert rule in spelling_rules(smiles, name)
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -104,14 +100,14 @@ def test_a_spelling_that_breaks_the_rule_fails(smiles, name, rule):
      "7-[difluoro(methylidene-λ3-iodanyl)methyl]-2,5-dimethyl-3,4-dihydro-1λ3-iodocine"),
 ])
 def test_book_pins_pass(smiles, name):
-    assert _rules(smiles, name) == []
+    assert spelling_rules(smiles, name) == []
 
 
 def test_a_run_of_terminal_prefixes_on_a_mononuclear_parent_is_not_read():
     # (:7272) wants the second and further substituents enclosed, but the book also
     # prints '(R)-bromo(chloro)fluoromethane (PIN)' (:44645); the gate protects
     # 'bromodichlorofluoromethane' (gold_pins.json STEREO-06): the check abstains on such a run
-    assert _rules("C(Br)(Cl)(Cl)F", "bromodichlorofluoromethane") == []
+    assert spelling_rules("C(Br)(Cl)(Cl)F", "bromodichlorofluoromethane") == []
 
 
 def test_prefixes_differing_only_in_stereodescriptors_are_not_ordered():
@@ -121,4 +117,4 @@ def test_prefixes_differing_only_in_stereodescriptors_are_not_ordered():
               "[C@@H](Cl)[C@H](C)Cl")
     name = ("(s)-{[(1R,2R)-1,2-dichloropropyl][(1S,2R)-1,2-dichloropropyl]amino}"
             "{[(1R,2S)-1,2-dichloropropyl][(1S,2S)-1,2-dichloropropyl]amino}methanol")
-    assert not {"P-14.5", "P-14.5.4"} & set(_rules(smiles, name))
+    assert not {"P-14.5", "P-14.5.4"} & set(spelling_rules(smiles, name))

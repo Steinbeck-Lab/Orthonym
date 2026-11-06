@@ -15,6 +15,8 @@ order of their hashes, so the name was '1-[(6R)-...]-3-[(6S)-...]' or '3-[(6R)-.
 (5 of 6 runs of the default seed gave the second). Principle 4 (the contributor guide, Determinism): the same input always yields
 the same output.
 """
+import functools
+import json
 import os
 import subprocess
 import sys
@@ -54,10 +56,11 @@ def test_g_key_cites_r_before_s_under_every_hash_seed():
     assert {r.stdout.strip() for r in outs.values()} == {"((1,), (3,)) ((3,), (1,))"}, {s: r.stdout for s, r in outs.items()}
 
 
-_NAME_ROW = r"""
-import sys
+_NAME_ROWS = r"""
+import json, sys
 from orthonym.cli import _tiered_namer
-print(_tiered_namer("pin", sys.argv[2]).name_tiered(sys.argv[1]).get("name"))
+pairs = json.loads(sys.argv[1])
+print(json.dumps([_tiered_namer("pin", tier).name_tiered(row).get("name") for row, tier in pairs]))
 """
 
 #: (:48163, "Relative configuration: the stereodescriptors 'cis' and 'trans'"): "'cis' arrangements of
@@ -82,10 +85,10 @@ CIS_TRANS_NAME = "[1-(cis-4-chlorocyclohexyl)-3-(trans-4-chlorocyclohexyl)imidaz
 ], ids=["imidazolidinylidene-best-effort", "imidazolidinylidene-pin", "cis-trans-best-effort",
         "chloroethyl-pin", "chloroethyl-best-effort"])
 def test_the_ring_prefixes_get_the_one_name_under_every_hash_seed(row, tier, name):
-    """ (g), (j): the R group (the cis group) takes locant 1, whatever the hash seed (a fresh process per seed)."""
+    """ (g), (j): the R group (the cis group) takes locant 1, whatever the hash seed (a fresh process per
+    seed, ``_names``)."""
     jar_or_skip("opsin")
-    outs = {seed: _run(_NAME_ROW, seed, row, tier) for seed in SEEDS}
-    names = {s: r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr[-300:] for s, r in outs.items()}
+    names = {seed: _names(seed)[(row, tier)] for seed in SEEDS}
     assert set(names.values()) == {name}, names
 
 
@@ -99,6 +102,23 @@ FIXED_NUMBERING_ROW = "OCC1N([C@H](C)Cl)CC(C)N1[C@@H](C)Cl"
 FIXED_NUMBERING_NAME = "{3-[(1R)-1-chloroethyl]-1-[(1S)-1-chloroethyl]-4-methylimidazolidin-2-yl}methanol"
 
 
+#: every (row, tier) pair the tests below name
+_PAIRS = ((ROW, "best-effort"), (ROW, "pin"), (CIS_TRANS_ROW, "best-effort"), (CHLOROETHYL_ROW, "pin"),
+          (CHLOROETHYL_ROW, "best-effort"), (FIXED_NUMBERING_ROW, "pin"), (FIXED_NUMBERING_ROW, "best-effort"))
+
+
+@functools.lru_cache(maxsize=None)
+def _names(seed):
+    """(row, tier) -> name, from ONE fresh process under ``seed`` that names every pair (the order of the pairs
+    alternates with the seed, so no pair is always named first); a failed child gives its stderr for each pair."""
+    pairs = _PAIRS if seed % 2 else _PAIRS[::-1]
+    r = _run(_NAME_ROWS, seed, json.dumps(pairs))
+    lines = r.stdout.strip().splitlines()
+    if r.returncode or not lines:
+        return {pair: r.stderr[-300:] for pair in pairs}
+    return dict(zip(pairs, json.loads(lines[-1])))
+
+
 @pytest.mark.unit
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
@@ -106,7 +126,6 @@ def test_the_r_group_is_cited_first_at_the_higher_locant_under_every_hash_seed(t
     """ (:22597), (:3517): the one name under every seed, and OPSIN reads it back to the input."""
     from tests.support.rt_assert import name_is_rt_exact
     jar_or_skip("opsin")
-    outs = {seed: _run(_NAME_ROW, seed, FIXED_NUMBERING_ROW, tier) for seed in SEEDS}
-    names = {s: r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr[-300:] for s, r in outs.items()}
+    names = {seed: _names(seed)[(FIXED_NUMBERING_ROW, tier)] for seed in SEEDS}
     assert set(names.values()) == {FIXED_NUMBERING_NAME}, names
     assert name_is_rt_exact(FIXED_NUMBERING_NAME, FIXED_NUMBERING_ROW)

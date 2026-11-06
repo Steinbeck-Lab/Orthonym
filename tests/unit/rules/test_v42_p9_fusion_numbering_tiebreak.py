@@ -27,7 +27,6 @@ import json
 import subprocess
 import sys
 
-import pytest
 
 _THIS = __file__
 

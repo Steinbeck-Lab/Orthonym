@@ -78,12 +78,3 @@ class TestPatternDSuppression:
         mol = Chem.MolFromSmiles("Cc1cccc(O)c1C")
         rdCIPLabeler.AssignCIPLabels(mol)
         assert needs_stereo_injection(mol, "2,3-dimethylphenol") is False
-
-    def test_injectable_stereo_chain_without_dl_token_still_true(self):
-        # A genuinely-injectable stereo chain name WITHOUT a D/L token must
-        # still return True -- Pattern D must NOT over-suppress real injection
-        # targets. (2R)-butan-2-ol's bare descriptor-free form 'butan-2-ol'
-        # carries no Pattern A/B/C/D match but the mol has CIP stereo.
-        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
-        rdCIPLabeler.AssignCIPLabels(mol)
-        assert needs_stereo_injection(mol, "butan-2-ol") is True

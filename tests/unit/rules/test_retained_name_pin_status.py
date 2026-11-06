@@ -40,13 +40,6 @@ verbatim as non-preferred by **** (``:24256``).
 """
 import pytest
 
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 class TestPinsNowEmitted:
     @pytest.mark.parametrize("smiles,expected,authority", [
@@ -75,7 +68,6 @@ class TestPinsNowEmitted:
         got = namer.name("Oc1ccc(O)cc1")
         assert got == "benzene-1,4-diol", got
         assert "quinol" not in got
-
 
 
 class TestTheSuffixPromotionHalf:

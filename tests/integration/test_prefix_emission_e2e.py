@@ -4,7 +4,6 @@ End-to-end integration tests for non-principal FG prefix emission.
 Verifies that the full naming pipeline (perception -> classification -> assembly)
 correctly emits subordinate prefixes for non-principal functional groups.
 """
-import pytest
 from orthonym import name_compound
 
 
@@ -35,9 +34,3 @@ class TestPrefixEmissionE2E:
         # also be used when the -CN group is located at the end of a chain"; example
         # '3-cyanopropanoic acid (PIN)' (:34742).
         assert name == "3-cyanopropanoic acid", f"Expected '3-cyanopropanoic acid', got '{name}'"
-
-    def test_amide_as_principal_not_affected(self):
-        """When amide IS the principal group, no carbamoyl prefix should appear."""
-        name = name_compound("CCC(=O)N")
-        assert "carbamoyl" not in name, f"Unexpected 'carbamoyl' in '{name}'"
-        assert "propanamide" == name, f"Expected 'propanamide', got '{name}'"

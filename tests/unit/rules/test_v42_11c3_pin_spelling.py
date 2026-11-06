@@ -29,22 +29,16 @@ recorded in task-11C3-report.md.
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 from orthonym.rules.lambda_convention import LAMBDA
 from tests.support.jars import jar_or_none
+from tests.support.read_back import key_or_none
 
 _OPSIN_JAR = jar_or_none()
 _OPSIN_OK = shutil.which("java") is not None and _OPSIN_JAR is not None
-
-
-def _ikey(smi):
-    m = Chem.MolFromSmiles(smi)
-    return Chem.MolToInchiKey(m) if m is not None else None
 
 
 def _name_general_fallback(smiles: str) -> str:
@@ -234,4 +228,4 @@ def test_targets_roundtrip(smiles):
     from orthonym.validation.opsin_roundtrip import opsin_parse
     name = name_compound(smiles)
     osmi = opsin_parse(name)
-    assert osmi and _ikey(osmi) == _ikey(smiles), f"{name} did not round-trip"
+    assert osmi and key_or_none(osmi) == key_or_none(smiles), f"{name} did not round-trip"

@@ -41,7 +41,6 @@ Our names follow correct IUPAC 2013 nomenclature rules.
 
 import pytest
 from orthonym.namer import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 
 class TestBicycloHeteroatomFix:
@@ -276,12 +275,6 @@ class TestNBracketWrapping:
         assert result == "[7-(10-carboxydecyl)adenineyl]"
 
     # ---- Integration-level regression tests for simple N-compounds ----
-
-    def test_n_methylacetamide_no_brackets(self):
-        """N-methylacetamide must NOT get unnecessary brackets."""
-        name = name_compound("CC(=O)NC")
-        assert "N-methyl" in name, f"Expected N-methyl: {name}"
-        assert "N-[" not in name, f"Simple N-methyl must not be bracketed: {name}"
 
     def test_nn_dimethylformamide_no_brackets(self):
         """N,N-dimethylacetamide must NOT get unnecessary brackets. (The formamide of

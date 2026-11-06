@@ -9,7 +9,6 @@ Source: 151-02-PLAN.md tasks 1b/2; internal notes-B.md; IUPAC.
 """
 from __future__ import annotations
 
-import os
 
 import pytest
 from rdkit import Chem
@@ -18,18 +17,8 @@ from orthonym.rules.spiro import (
     is_spiro_system,
     name_spiro_system,
     get_spiro_atoms,
+    get_spiro_iupac_locants,
 )
-
-
-def _spiro_lazy_supplier_import():
-    """Lazy import: until Task 2 lands, get_spiro_iupac_locants does
-    not exist; tests that depend on it skip with a clear marker."""
-    try:
-        from orthonym.rules.spiro import get_spiro_iupac_locants
-        return get_spiro_iupac_locants
-    except ImportError:
-        pytest.skip("get_spiro_iupac_locants not yet exported "
-                    "(Task 2 GREEN gate)")
 
 
 class TestDispiro:
@@ -89,7 +78,6 @@ class TestDispiro:
     @pytest.mark.unit
     def test_dispiro_supplier_full_coverage(self):
         """get_spiro_iupac_locants returns map covering ALL ring atoms (Pitfall 7)."""
-        get_spiro_iupac_locants = _spiro_lazy_supplier_import()
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1(CCC2)CCCCCC1")
         loc = get_spiro_iupac_locants(mol)
         assert loc is not None
@@ -102,7 +90,6 @@ class TestDispiro:
     @pytest.mark.unit
     def test_pure_spiro_supplier_full_coverage_45_decane(self):
         """get_spiro_iupac_locants on monospiro spiro[4.5]decane."""
-        get_spiro_iupac_locants = _spiro_lazy_supplier_import()
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCC2")
         loc = get_spiro_iupac_locants(mol)
         assert loc is not None
@@ -115,19 +102,16 @@ class TestDispiro:
     @pytest.mark.unit
     def test_pure_spiro_supplier_returns_none_on_non_spiro(self):
         """Supplier returns None on non-spiro inputs."""
-        get_spiro_iupac_locants = _spiro_lazy_supplier_import()
         mol = Chem.MolFromSmiles("C1CCCCC1")  # cyclohexane
         assert get_spiro_iupac_locants(mol) is None
 
     @pytest.mark.unit
     def test_pure_spiro_supplier_returns_none_on_mixed(self):
         """Supplier returns None on mixed-spiro/fused (defers to mixed handler)."""
-        get_spiro_iupac_locants = _spiro_lazy_supplier_import()
         mol = Chem.MolFromSmiles("C1CCC2(CC1)Cc1ccccc12")  # spiro-indane
         # is_spiro_system returns False on this; therefore supplier returns None.
         assert is_spiro_system(mol) is False
         assert get_spiro_iupac_locants(mol) is None
-
 
 
 class TestPolyspiroPrefixesTable:

@@ -13,7 +13,6 @@ injection mechanism. The tests read the message, so they capture at DEBUG.
 
 import logging
 import pytest
-import re
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 

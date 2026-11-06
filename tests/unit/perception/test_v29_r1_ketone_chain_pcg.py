@@ -41,9 +41,7 @@ that already encode exactly this for RINGS (``parent_selection.py:265`` -- "the
 bonded-to-ring relaxation is invalid and mis-parented every aryl ketone").
 """
 
-import os
 import subprocess
-import tempfile
 
 import pytest
 from rdkit import Chem
@@ -95,16 +93,10 @@ def _opsin_formula(name: str):
     from tests.support.jars import jar_or_skip
 
     jar = jar_or_skip()
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
-        fh.write(name + "\n")
-        path = fh.name
-    try:
-        out = subprocess.run(
-            ["java", "-jar", jar, "-osmi", path],
-            capture_output=True, text=True, timeout=300,
-        ).stdout.strip()
-    finally:
-        os.unlink(path)
+    out = subprocess.run(
+        ["java", "-jar", jar, "-osmi"], input=name + "\n",
+        capture_output=True, text=True, timeout=300,
+    ).stdout.strip()
     if not out:
         return None
     mol = Chem.MolFromSmiles(out.splitlines()[0].strip())

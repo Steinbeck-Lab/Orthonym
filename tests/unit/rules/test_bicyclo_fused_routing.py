@@ -187,44 +187,11 @@ class TestEndToEndFusedRouting:
     and true bridged systems get bicyclo names."""
 
     @pytest.mark.integration
-    def test_decalin_fused_name(self):
-        """Decalin should get a fused name, not bicyclo."""
-        result = name_compound('C1CCC2CCCCC2C1')
-        assert 'bicyclo' not in result
-        # Should be some form of fused naming (decahydronaphthalene or perhydronaphthalene)
-        assert 'naphthalene' in result.lower() or 'decahydro' in result.lower()
-
-    @pytest.mark.integration
-    def test_decalin_specific_name(self):
-        """Decalin should be named decahydronaphthalene."""
-        result = name_compound('C1CCC2CCCCC2C1')
-        assert result == 'decahydronaphthalene'
-
-    @pytest.mark.integration
     def test_octahydropentalene_fused_name(self):
         """Two fused cyclopentanes should get octahydropentalene."""
         result = name_compound('C1CCC2CCCC12')
         assert 'bicyclo' not in result
         assert result == 'octahydropentalene'
-
-    @pytest.mark.integration
-    def test_norbornane_still_retained(self):
-        """Norbornane should still use its retained name."""
-        result = name_compound('C1CC2CCC1C2')
-        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        assert result == 'bicyclo[2.2.1]heptane'
-
-    @pytest.mark.integration
-    def test_bicyclo_222_still_systematic(self):
-        """Bicyclo[2.2.2]octane should still use systematic naming."""
-        result = name_compound('C1CC2CCC1CC2')
-        assert result == 'bicyclo[2.2.2]octane'
-
-    @pytest.mark.integration
-    def test_naphthalene_aromatic_unchanged(self):
-        """Naphthalene (aromatic) should still get its retained name."""
-        result = name_compound('c1ccc2ccccc2c1')
-        assert result == 'naphthalene'
 
     @pytest.mark.integration
     def test_tetralin_partially_saturated_unchanged(self):

@@ -23,17 +23,13 @@ import re
 
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 #: an 'N-' locant opening the name, behind a stereodescriptor block '(2S)-' or an ester word ('methyl N-...')
 _FLOATS_N = re.compile(r"^(\([^)]*\)-)?(N-|[a-z]+ N-)")
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # (smiles, the PIN) -- every name read back whole by OPSIN to the input's full InChIKey, spelled as the book spells it
@@ -60,7 +56,7 @@ _TARGETS = [
 def test_a_tertiary_acyl_nitrogen_with_a_ring_on_the_acyl_is_the_amido_prefix(smiles, name, tier):
     """ (the Blue Book), method (1): the prefix is the complete name of the amide with the final 'e'
     changed to 'o'; '2-(N-methylpropanamido)benzene-1-sulfonic acid (PIN)' (:33040)."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -88,7 +84,7 @@ _NH_AMINO_ACIDS = [
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("smiles,name", _NH_ANALOGS + _NH_AMINO_ACIDS)
 def test_the_secondary_acyl_nitrogen_of_the_same_ring_is_named_as_well(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -107,7 +103,7 @@ _POSITIVES = [
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("smiles,name", _POSITIVES)
 def test_the_acyls_named_before_keep_their_names(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -115,7 +111,7 @@ def test_the_acyls_named_before_keep_their_names(smiles, name, tier):
 @pytest.mark.parametrize("tier", ["valid", "complete"])
 def test_the_wider_tiers_below_best_effort_name_the_glycine_target_the_same(tier):
     smiles, name = _TARGETS[0]
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -125,7 +121,7 @@ def test_no_wider_tier_name_cites_a_bare_n_acyl_on_a_parent_without_a_nitrogen_s
     of an N-substituted amide is that of its amide suffix,:32774); the acid, ester or ring parent
     of the molecule has no nitrogen suffix: the best-effort name is no 'N-[(...)acetyl](methylamino)acetic acid'."""
     for tier in ("valid", "complete", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert not _FLOATS_N.match(row["name"]), (tier, row)
 
 
@@ -135,7 +131,7 @@ def test_a_float_on_a_retained_residue_is_not_displaced_by_a_name_that_is_not_in
     name. The wider tier's own name of that peptide is the last-resort floor ('...-1,5-dioxopentyl]-2-carboxypyrrolidine'),
     in no PIN form, and the float stays."""
     smiles = "CC[C@H](C)[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N1CCC[C@@H]1C(=O)O"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (
         "N-[(2S,3S)-2-amino-3-methylpentanoyl]glutamyl-D-proline", "systematic_verified"), row
     assert_full_rt(row["name"], smiles)
@@ -205,7 +201,7 @@ _RENAMED_AT_BEST_EFFORT = [
 
 @pytest.mark.parametrize("smiles,name,label", _RENAMED_AT_BEST_EFFORT)
 def test_the_peptide_rows_the_refusal_cache_renames_keep_their_read_back_at_best_effort(smiles, name, label):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, label), row
     assert_full_rt(row["name"], smiles)
 
@@ -221,7 +217,7 @@ def test_a_depsipeptide_cites_no_n_on_a_parent_without_a_nitrogen_suffix_at_the_
     none. The best-effort engine, with the unverified opt-in, names the sub-molecule with the last-resort floor
     ('1-oxopentane'): the engine of the tier below (complete) builds the name, and the float is withdrawn at both."""
     smiles, name = _DEPSIPEPTIDE
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
     assert not _FLOATS_N.match(row["name"]), row
     assert_full_rt(row["name"], smiles)
@@ -293,7 +289,7 @@ _PASS_3_ROWS = [
 @pytest.mark.parametrize("smiles,valid_name,complete_name", _PASS_3_ROWS)
 def test_the_pass_3_rows_keep_their_names_at_valid_and_complete(smiles, valid_name, complete_name, tier):
     expected = valid_name if tier == "valid" or complete_name is _SAME else complete_name
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == expected, row
     assert row["tier"] != "abstain", row
 
@@ -358,7 +354,7 @@ def test_the_acid_name_of_a_second_cooh_is_not_turned_into_the_amido_prefix_of_t
     the Blue Book, "changing the final letter 'e' in the complete name of the amide to 'o'") is the prefix of
     another molecule, the round trip voided that candidate and the molecule fell to the last-resort chain
     '...-1-oxa-6,9,12-triazahexadec-1-ene'. The prefix is the name of the amide of THIS acyl only where OPSIN reads it so."""
-    row = _row(_ASP_LEU_MET_LEU, "best-effort")
+    row = tier_row(_ASP_LEU_MET_LEU, "best-effort")
     assert row["tier"] == "systematic_verified", row
     assert "triaza" not in row["name"], row
     assert_full_rt(row["name"], _ASP_LEU_MET_LEU)

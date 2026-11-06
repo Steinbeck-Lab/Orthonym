@@ -19,16 +19,16 @@ oracle) to the input's full InChIKey.
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.rules.isotopes import (
     _decorate_uniform_multiplier,
     _escalate_for_unit_descriptor,
     _multiplied_unit_slots,
 )
 from tests.support.rt_assert import _independent_parse, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key as _key
 
 DPPC_14C2 = (
     "CCCCCCCCCCCCCCC[14C](=O)OC[C@H](COP(=O)(O)OCC[N+](C)(C)C)O[14C](=O)CCCCCCCCCCCCCCC"
@@ -64,10 +64,6 @@ CONTROLS = [
 ]
 
 
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
-
-
 @pytest.mark.opsin_gate
 class TestPerUnitDescriptors:
     @pytest.mark.parametrize("smiles,name,key", UNIFORM)
@@ -96,7 +92,7 @@ class TestPerUnitDescriptors:
             "2-[({(R)-2,3-bis[(1-14C)hexadecanoyloxy]propoxy}hydroxyphosphoryl)oxy]-"
             "N,N,N-trimethylethan-1-aminium"
         )
-        r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(DPPC_14C2)
+        r = tier_row(DPPC_14C2, "best-effort")
         assert (r["name"], r["tier"]) == (expected, "systematic_verified"), r
         parsed = _independent_parse(expected)
         assert parsed is not None
@@ -107,7 +103,7 @@ class TestPerUnitDescriptors:
         # 'dimethyl sulfoxide' is the functional-class name; the PIN is
         # '(methanesulfinyl)methane', so the name built on it is below the PIN.
         smi = "[2H]C([2H])([2H])S(=O)C([2H])([2H])[2H]"
-        r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smi)
+        r = tier_row(smi, "best-effort")
         assert r["name"] == "di[(2H3)methyl] sulfoxide" and r["tier"] == "systematic_verified"
         assert Orthonym(style="pin").name_tiered(smi)["tier"] == "abstain"
 
@@ -124,7 +120,7 @@ class TestPerUnitDescriptors:
         # wrong count does not read back.
         smi = "[2H]C(=O)N(C([2H])([2H])[2H])C([2H])([2H])[2H]"
         name = "N,N-di[(2H3)methyl](2H1)formamide"
-        got = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smi)
+        got = tier_row(smi, "best-effort")
         assert (got["name"], got["tier"]) == (name, "systematic_verified"), got
         assert name_is_rt_exact(name, smi)
         assert not name_is_rt_exact("N,N-di[(2H2)methyl](2H1)formamide", smi)

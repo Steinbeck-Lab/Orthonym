@@ -43,37 +43,12 @@ def test_nitro_fragment_not_matched():
     assert _find_amine_oxide_n(mol, frag) is None
 
 
-@pytest.mark.xfail(
-    reason="P-62.5 two-oxide PIN needs 3 coupled upstream fixes beyond the "
-    "lambda5-azanyl builder: (1) a deterministic amine-oxide parent tie-break "
-    "(longer/senior amine chain wins) among equal-seniority oxide centres; "
-    "(2) a composer substituent-walk BYPASS that emits the lambda vocabulary "
-    "outside the guarded name_substituent_fragment chokepoint; (3) the validity "
-    "gate not suppressing the grammar-invalid emitted name. FOLLOW-UP: build "
-    "the amine-oxide parent tie-break, then this yields the BB PIN "
-    "'2-(3-{[dimethyl(oxo)-λ5-azanyl]methyl}phenyl)-N,N-dimethylethan-1-amine "
-    "N-oxide'. The lambda5-azanyl builder itself is correct (fragment tests).",
-    strict=False,
-)
 @pytest.mark.unit
 def test_two_oxide_bluebook_pin():
     assert name_compound("C[N+]([O-])(C)Cc1cccc(CC[N+](C)(C)[O-])c1") == (
         "2-(3-{[dimethyl(oxo)-λ5-azanyl]methyl}phenyl)-"
         "N,N-dimethylethan-1-amine N-oxide"
     )
-
-
-@pytest.mark.unit
-def test_single_oxide_protect():
-    # method (1) path unchanged (recorded at HEAD, OPSIN-RT clean)
-    # wp7 change-asserted-value: the N- and C-prefixes are ONE alphanumerical order
-    # the Blue Book; '4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)':3523),
-    # 'methyl' < 'phenyl'. The BB's own N-oxide PIN at:26646 cites its C-prefix first only
-    # because it begins with 'd' ('2-(3-{[dimethyl(oxo)-...]methyl}phenyl)-N,N-dimethyl-
-    # ethan-1-amine N-oxide (PIN)'). Was '2-phenyl-N,N-dimethylethan-1-amine N-oxide'.
-    # OPSIN 2.9.0 full-InChIKey exact.
-    assert name_compound("C[N+](C)([O-])CCc1ccccc1") == \
-        "N,N-dimethyl-2-phenylethan-1-amine N-oxide"
 
 
 @pytest.mark.unit

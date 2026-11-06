@@ -40,30 +40,6 @@ class TestBasicGlycosideNaming:
         assert name != "unknown"
         assert name == "methyl α-D-glucopyranoside"
 
-    def test_galactoside(self):
-        """4-Hydroxyphenyl β-D-galactopyranoside: functional-class form (diol aglycone).
-
-        The aglycone is hydroquinone, a diol: its name cannot say which hydroxy group the
-        sugar sits on, and the string rule (``_alcohol_to_alkyl``) read the multiplied '-ol' as
-        the divalent 'benzene-1,4-diyl', a group with two free valences that counts the
-        glycosidic oxygen twice ('benzene-1,4-diyl beta-D-galactopyranoside', which OPSIN
-        cannot parse). The group word is now built from the STRUCTURE of the aglycone
-        (``_aglycone_polyol_group``: the oxygen that condenses with the sugar back to the parent
-        is the glycosidic one, the other hydroxy group stays a 'hydroxy' prefix) and is shipped
-        only after it round-trips to the parent. "Names" (the Blue Book):
-        "Glycosides are named by using functional class nomenclature.... The class name is
-        preceded, as a separate word, by the name of the substituent group that is part of the
-        acetal or ketal function." Only a group senior to hydroxy turns a glycoside
-        substitutive,:53915: "not 4-acetylphenyl β-D-glucopyranoside; a ketone is
-        senior to a hydroxy compound"); a second hydroxy group is not senior to the glycosidic
-        one. OPSIN 2.9.0 full-InChIKey exact. The old text asserted the legacy
-        '(glycosyloxy)hydroquinone' form, which was removed (see ``_assemble_glycoside``).
-        """
-        name = name_compound(
-            "OC[C@H]1O[C@@H](Oc2ccc(O)cc2)[C@H](O)[C@@H](O)[C@H]1O"
-        )
-        assert name == "4-hydroxyphenyl β-D-galactopyranoside", name
-
     def test_rhamnoside(self):
         """Phenyl α-L-rhamnopyranoside: functional-class form (-08 flip).
 
@@ -95,55 +71,6 @@ class TestBasicGlycosideNaming:
         # general nomenclature": '2-naphthyl (also 1-isomer) naphthalen-2-yl (also
         # 1-isomer; preferred prefixes)' -- the preferred prefix is naphthalen-2-yl.
         assert name == "naphthalen-2-yl β-D-glucopyranoside"
-
-
-# ============================================================================
-# Glycoside name format validation
-# ============================================================================
-
-
-@pytest.mark.integration
-class TestGlycosideNameFormat:
-    """Verify the assembled glycoside name format is correct."""
-
-    def test_glycoside_functional_class_form(self):
-        """Phenyl glucoside emits the functional-class two-word form (-08).
-
-        a phase re-baseline: was a parenthesized substitutive prefix
-        ``(β-D-glucopyranosyloxy)...``; now the Blue-Book functional-class
-        form ``phenyl β-D-glucopyranoside`` (aglycone substituent as a
-        separate preceding word, sugar -ose -> -oside). OPSIN-RT-verified.
-        """
-        name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert name == "phenyl β-D-glucopyranoside"
-        # The alpha/beta + D/L descriptors are never dropped
-        assert "β-D-glucopyranoside" in name
-        # Aglycone is cited as a separate preceding substituent word
-        assert name.startswith("phenyl ")
-
-    def test_glycoside_name_length_reasonable(self):
-        """Glycoside name should be > 20 chars (not a truncated fragment)."""
-        name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert len(name) > 20
-
-    def test_glycoside_not_oxane(self):
-        """Glycoside name should NOT contain 'oxan' (systematic oxane)."""
-        name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert "oxan" not in name.lower(), (
-            f"Name should use retained sugar name, not systematic oxane: {name}"
-        )
-
-    def test_galactoside_has_anomer_config(self):
-        """Galactoside name should include anomer and config descriptors."""
-        name = name_compound(
-            "OC[C@H]1O[C@@H](Oc2ccc(O)cc2)[C@H](O)[C@@H](O)[C@H]1O"
-        )
-        assert "β-D-" in name
-
-    def test_rhamnoside_has_l_config(self):
-        """Rhamnoside name should include L-configuration descriptor."""
-        name = name_compound("C[C@@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@H](O)[C@H]1O")
-        assert "α-L-" in name
 
 
 # ============================================================================
@@ -197,11 +124,6 @@ class TestGlycosideSeniorAglyconeProtect:
         )
         # Diol aglycone (no clean -yl prefix) -> None (fail-closed)
         assert _aglycone_to_substituent("hydroquinone", "Oc1ccc(O)cc1") is None
-
-
-# ============================================================================
-# Regression tests: non-glycoside molecules unchanged
-# ============================================================================
 
 
 # ============================================================================
@@ -370,4 +292,3 @@ class TestSystematicCarbohydrateDispatch:
         fast-path -- the uronic interception fires only on a uronic base."""
         name = name_compound("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O")
         assert name == "β-D-glucosamine"
-

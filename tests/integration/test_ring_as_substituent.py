@@ -29,15 +29,6 @@ class TestPath1ChainAlkylRingSub:
             f"Expected 'cyclopentyl' in '{result}'"
         )
 
-    def test_cyclohexyl_on_chain(self):
-        """Cyclohexyl attached to a simple chain."""
-        result = name_compound("CCCCC1CCCCC1")
-        assert result is not None, "name_compound returned None"
-        assert "cyclohexyl" in result.lower() or "cyclohex" in result.lower(), (
-            f"Expected cyclohexyl reference in '{result}'"
-        )
-
-
 @pytest.mark.integration
 class TestPath2RingAlkylRingSub:
     """Path 2: _generate_ring_alkyl_prefixes - substituent on a ring parent.

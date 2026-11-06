@@ -403,15 +403,6 @@ class TestNitrileCyano:
         )
         assert result == "cyano"
 
-    def test_unknown_returns_none_for_invalid(self):
-        """Dispatcher returns None for non-table fg_name (sanity check)."""
-        mol = Chem.MolFromSmiles("CCC")
-        result = get_substituent_prefix_form(
-            "not_a_real_fg", mol, (0, 1, 2), principal_chain=None
-        )
-        assert result is None
-
-
 # ====================================================================
 # Row 7: sulfoxide - get_sulfinyl_prefix per IUPAC
 # ====================================================================

@@ -5,7 +5,6 @@ Tests the _identify_functionalized_chain and _detect_chain_functional_group
 functions that detect chains with functional groups attached to benzene rings.
 """
 
-import pytest
 from rdkit import Chem
 from orthonym.rules.benzene import (
     get_benzene_substituents,

@@ -28,7 +28,6 @@ from rdkit.Chem import inchi
 # main tree's src in the child and tested the wrong code.
 PROJ = str(Path(__file__).resolve().parents[2])
 _SRC = os.path.join(PROJ, "src")
-sys.path.insert(0, _SRC)
 from orthonym.jvm_flags import java_cmd  # noqa: E402
 from tests.support.jars import jar_or_skip
 

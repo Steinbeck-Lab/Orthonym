@@ -39,9 +39,8 @@ through the engine (``tests.support.rt_assert``), and the PIN tier is asserted t
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym, name_compound
+from orthonym import name_compound
 from orthonym.assembly import fragment_naming as fn
-from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from orthonym.metrics.provenance import best_effort_request_ctx
 from orthonym.rules import ring_cluster
@@ -49,6 +48,7 @@ from orthonym.rules import spiro as _spiro
 from orthonym.rules import vonbaeyer_universal as vbu
 from tests.support.opsin_marks import needs_phane_opsin, release_capabilities
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -187,7 +187,7 @@ def test_the_pin_tier_still_declines_these_cages(smiles):
 def test_the_names_of_the_cages_are_labelled_below_the_pin():
     with jvm_slots(1, purpose="l4-aromatic-cages"):
         for smiles in (META_BRIDGED, SPIRO_STEREO, LAMBDA5_SPIRO):
-            row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+            row = tier_row(smiles, "best-effort")
             assert row["is_pin"] is False and row["tier"] in ("systematic_verified", "best_effort"), row
 
 

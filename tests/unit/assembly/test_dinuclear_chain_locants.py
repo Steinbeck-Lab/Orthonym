@@ -43,7 +43,6 @@ never claims it).
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym.assembly.composition_primitives import (
@@ -53,6 +52,7 @@ from orthonym.assembly.composition_primitives import (
     dinuclear_chain_length,
 )
 from orthonym.tiers import emit_tier_flags
+from tests.support.read_back import key as _key
 
 pytestmark = pytest.mark.unit
 
@@ -64,10 +64,6 @@ def _pin():
 
 def _best_effort():
     return Orthonym(style="pin", **emit_tier_flags("best-effort"))
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 # --------------------------------------------------------------------------- #

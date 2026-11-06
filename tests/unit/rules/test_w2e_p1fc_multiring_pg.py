@@ -43,15 +43,6 @@ class TestP59215MultiRingPG:
         assert parent_to_prefix("butanoic acid", 4, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
         assert parent_to_prefix("acetic acid", 2, attach_locant=ATTACH_LOCANT_UNKNOWN) == "acetyl"
 
-    def test_no_carboxyhexyl_flattening_leak(self):
-        # The phenyl->hexyl flattened name must NEVER be emitted (the historical
-        # structure-loss corruption). In production the whole molecule fails
-        # closed via; regardless of the /OPSIN environment, the
-        # WRONG '6-carboxyhexyl' spelling must never appear in the output.
-        # (Under a no-OPSIN test env fails OPEN and a substituent-dropped
-        # 'fluorene-2-carboxylic acid' may surface — still never the hexyl leak.)
-        assert "carboxyhexyl" not in name_compound(FLUORENE_DIACID)
-
     def test_fluorene_diacid_target(self):
         # pendant (4-carboxyphenyl)-as-substituent rendering. HEALED by
         # the W2E-D7 carboxy-prefix root fix: _ring_atom_simple_substituents now

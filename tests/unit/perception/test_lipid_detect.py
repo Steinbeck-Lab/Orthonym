@@ -9,7 +9,6 @@ WAVE 0 CONTRACT: imports the not-yet-built `detect_lipid_backbone` INSIDE each
 test body so `pytest --collect-only` succeeds; RED at run time until Wave 1.
 """
 
-import pytest
 from rdkit import Chem
 
 

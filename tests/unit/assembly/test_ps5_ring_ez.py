@@ -14,7 +14,6 @@ RDLogger.logger().setLevel(RDLogger.ERROR)
 
 from orthonym.namer import Orthonym
 from orthonym.assembly.general_engine import name_general
-from orthonym.perception.stereo import assign_stereochemistry
 from orthonym.rules.stereochemistry import (
     count_defined_stereo_elements, count_expressed_stereo_descriptors,
 )

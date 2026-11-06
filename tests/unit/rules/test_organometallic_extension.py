@@ -26,13 +26,10 @@ import pytest
 
 from orthonym import name_compound, errors
 
-try:
-    from rdkit import Chem
-    _RDKIT = True
-except Exception:  # pragma: no cover
-    _RDKIT = False
+from rdkit import Chem
 
 from orthonym.jvm_bridge import opsin_available, opsin_stdout
+from tests.support.pin_tiers import tier_row
 
 
 # (input SMILES, expected best-effort name) -- names ABSTAINED before M1.
@@ -92,15 +89,12 @@ def test_hard_tail_abstains(smiles):
 def test_the_bonded_magnesium_chloride_is_named_through_its_ions():
     """A bonded drawing of a metal admitted to the ionic-drawing mechanism is named through that drawing, with the
     label below the PIN (the contributor guide scope: a name reached through another drawing is systematic_verified)."""
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     assert name_compound("Cl[Mg]Cl") == "magnesium dichloride"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("Cl[Mg]Cl")
+    row = tier_row("Cl[Mg]Cl", "best-effort")
     assert (row["name"], row["tier"], row["is_pin"]) == ("magnesium dichloride", "systematic_verified", False), row
 
 
 @pytest.mark.roundtrip
-@pytest.mark.skipif(not _RDKIT, reason="RDKit required")
 @pytest.mark.parametrize("smiles,expected", _TARGETS + _CONTROLS)
 def test_target_round_trips_via_opsin_radicals(smiles, expected):
     """0-wrong: every emitted name OPSIN-`-r` round-trips to the input skeleton

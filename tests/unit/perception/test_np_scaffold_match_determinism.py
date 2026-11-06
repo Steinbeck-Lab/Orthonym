@@ -18,7 +18,7 @@ import random
 import pytest
 from rdkit import Chem
 
-from tests.support.np_producer import np_namer, np_producer_only  # noqa: F401
+from tests.support.np_producer import np_namer
 
 
 def _respell(smiles: str, seed: int) -> str:

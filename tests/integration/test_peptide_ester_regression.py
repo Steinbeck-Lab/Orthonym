@@ -10,20 +10,17 @@ Bug 2: Ring-containing acid portions of esters were linearized
   - Methyl indole-3-carboxylate -> "methyl nonanoate" (WRONG)
 """
 
-import pytest
 from rdkit import Chem
 from orthonym.namer import name_compound
 from orthonym.rules.amino_acids import (
     count_peptide_bonds,
     is_peptide,
-    detect_amino_acid,
     name_amino_acid,
 )
 from orthonym.rules.esters import (
     acid_fragment_has_ring,
     get_ring_acid_name,
     parse_ester_fragments,
-    name_ester,
     find_ester_match,
 )
 

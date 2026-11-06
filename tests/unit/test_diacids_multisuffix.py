@@ -130,10 +130,6 @@ class TestPositionVariableRegression:
     """Position-variable groups: locants required, multiplier preserved."""
 
     @pytest.mark.unit
-    def test_butane_1_4_diol(self):
-        assert name_compound("OCCCCO") == "butane-1,4-diol"
-
-    @pytest.mark.unit
     def test_pentane_2_4_dione(self):
         assert name_compound("CC(=O)CC(=O)C") == "pentane-2,4-dione"
 

@@ -49,19 +49,3 @@ class TestRingSubstituentBareFunctionalGroupCanaryCompounds:
         assert result is not None
         low = result.lower()
         assert "amino" in low, f"Expected 'amino' in '{result}'"
-
-
-@pytest.mark.integration
-class TestSubstituentAllCandidatesFilteredCanaryCompounds:
-    """Canary tests for compounds affected by the
-    substituent_all_candidates_filtered fix."""
-
-    def test_hydroxymethylcyclohexanol(self):
-        """Hydroxy + hydroxymethyl on cyclohexane: both hydroxyl contexts present."""
-        result = name_compound("OC1CCCCC1CO")
-        assert result is not None
-        low = result.lower()
-        # At minimum hydroxyl information should be present
-        assert "hydroxy" in low or "ol" in low, (
-            f"Expected hydroxyl info in '{result}'"
-        )

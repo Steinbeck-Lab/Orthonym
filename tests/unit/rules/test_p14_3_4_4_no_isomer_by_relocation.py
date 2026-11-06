@@ -73,13 +73,6 @@ evidences the SPELLING and not a PIN endorsement.
 """
 import pytest
 
-from orthonym import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 # --------------------------------------------------------------------------- #
 # 1. THE LICENCE FIRES — every row is a Blue Book verbatim PIN or its direct #

@@ -21,9 +21,10 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
+
+from orthonym.rules import spiro
 from rdkit import Chem
 from tests.support.jars import jar_or_none
 
@@ -76,21 +77,6 @@ def _opsin_parse_one(name: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Lazy imports — until Task 2 lands, the four new functions don't exist.
-# ---------------------------------------------------------------------------
-
-def _import_or_skip(symbol: str):
-    try:
-        from orthonym.rules import spiro
-    except ImportError:
-        pytest.skip(f"orthonym.rules.spiro import failed")
-    if not hasattr(spiro, symbol):
-        pytest.skip(f"orthonym.rules.spiro.{symbol} not yet exported "
-                    f"(Task 2 GREEN gate — RED scaffold)")
-    return getattr(spiro, symbol)
-
-
-# ---------------------------------------------------------------------------
 # Fixture loaders.
 # ---------------------------------------------------------------------------
 
@@ -119,7 +105,7 @@ class TestIsMixedSpiroFusedTruePositives:
     @pytest.mark.unit
     def test_minimal_spiro_indane_is_mixed(self):
         """Spiro-indane (pure-aromatic fused part attached via spiro): MIXED."""
-        is_mixed_spiro_fused = _import_or_skip("is_mixed_spiro_fused")
+        is_mixed_spiro_fused = spiro.is_mixed_spiro_fused
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCc1ccccc12")
         # 3 rings: cyclohexane spiro to 5-membered C-ring fused to benzene.
         # n_spiro=1, n_rings=3, n_rings > n_spiro+1 -> mixed.
@@ -128,7 +114,7 @@ class TestIsMixedSpiroFusedTruePositives:
     @pytest.mark.unit
     def test_spiro_oxindole_like_is_mixed(self):
         """Spiro-isoindolone: 3 rings, 1 spiro -> MIXED."""
-        is_mixed_spiro_fused = _import_or_skip("is_mixed_spiro_fused")
+        is_mixed_spiro_fused = spiro.is_mixed_spiro_fused
         mol = Chem.MolFromSmiles("O=C1NC2(CCCCC2)C2=CC=CC=C12")
         # 3 rings, 1 spiro centre between cyclohexane and isoindoline.
         assert is_mixed_spiro_fused(mol) is True
@@ -148,7 +134,7 @@ class TestIsMixedSpiroFusedAntiCanary:
         ids=lambda f: f["fixture_id"] if isinstance(f, dict) else "no-id",
     )
     def test_natural_products_not_mixed_spiro_fused(self, fixture):
-        is_mixed_spiro_fused = _import_or_skip("is_mixed_spiro_fused")
+        is_mixed_spiro_fused = spiro.is_mixed_spiro_fused
         mol = Chem.MolFromSmiles(fixture["smiles"])
         assert mol is not None, fixture["fixture_id"]
         assert is_mixed_spiro_fused(mol) is False, (
@@ -168,7 +154,7 @@ class TestPureSpiroContractPreserved:
     @pytest.mark.unit
     def test_spiro45decane_still_pure_spiro(self):
         from orthonym.rules.spiro import is_spiro_system
-        is_mixed_spiro_fused = _import_or_skip("is_mixed_spiro_fused")
+        is_mixed_spiro_fused = spiro.is_mixed_spiro_fused
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCCC2")
         assert is_spiro_system(mol) is True
         # Mutually exclusive with mixed.
@@ -177,7 +163,7 @@ class TestPureSpiroContractPreserved:
     @pytest.mark.unit
     def test_dispiro_still_pure_spiro(self):
         from orthonym.rules.spiro import is_spiro_system
-        is_mixed_spiro_fused = _import_or_skip("is_mixed_spiro_fused")
+        is_mixed_spiro_fused = spiro.is_mixed_spiro_fused
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1(CCC2)CCCCCC1")
         assert is_spiro_system(mol) is True
         assert is_mixed_spiro_fused(mol) is False
@@ -201,14 +187,14 @@ class TestSeparablePartsNaming:
     @pytest.mark.unit
     def test_returns_none_on_pure_spiro(self):
         """name_mixed_spiro_fused(pure spiro) -> None (dispatch contract)."""
-        name_mixed_spiro_fused = _import_or_skip("name_mixed_spiro_fused")
+        name_mixed_spiro_fused = spiro.name_mixed_spiro_fused
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCCC2")
         assert name_mixed_spiro_fused(mol) is None
 
     @pytest.mark.unit
     def test_returns_none_on_steroid(self):
         """Detect_natural_product short-circuit: morphinan -> None."""
-        name_mixed_spiro_fused = _import_or_skip("name_mixed_spiro_fused")
+        name_mixed_spiro_fused = spiro.name_mixed_spiro_fused
         mol = Chem.MolFromSmiles(
             "c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13"
         )
@@ -224,21 +210,19 @@ class TestSupplierCoverageInvariant:
 
     @pytest.mark.unit
     def test_get_mixed_spiro_fused_iupac_locants_signature(self):
-        get_msf_iupac_locants = _import_or_skip(
-            "get_mixed_spiro_fused_iupac_locants")
+        get_msf_iupac_locants = spiro.get_mixed_spiro_fused_iupac_locants
         # Signature smoke check — function must accept a mol.
         assert callable(get_msf_iupac_locants)
 
     @pytest.mark.unit
     def test_mixed_supplier_returns_none_on_non_mixed(self):
-        get_msf_iupac_locants = _import_or_skip(
-            "get_mixed_spiro_fused_iupac_locants")
+        get_msf_iupac_locants = spiro.get_mixed_spiro_fused_iupac_locants
         mol = Chem.MolFromSmiles("C1CCCCC1")  # cyclohexane
         assert get_msf_iupac_locants(mol) is None
 
     @pytest.mark.unit
     def test_pure_spiro_supplier_full_coverage(self):
-        get_spiro_iupac_locants = _import_or_skip("get_spiro_iupac_locants")
+        get_spiro_iupac_locants = spiro.get_spiro_iupac_locants
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCC2")  # spiro[4.5]decane
         loc = get_spiro_iupac_locants(mol)
         assert loc is not None
@@ -250,7 +234,7 @@ class TestSupplierCoverageInvariant:
 
     @pytest.mark.unit
     def test_pure_spiro_supplier_returns_none_on_non_spiro(self):
-        get_spiro_iupac_locants = _import_or_skip("get_spiro_iupac_locants")
+        get_spiro_iupac_locants = spiro.get_spiro_iupac_locants
         mol = Chem.MolFromSmiles("C1CCCCC1")
         assert get_spiro_iupac_locants(mol) is None
 
@@ -384,7 +368,7 @@ class TestCT3PendantRingOfferNotReturn:
         spiro-core-plus-pendant-ring molecule instead of a terminal None.
         The returned ring_atoms set is the CORE only (does not include the
         pendant ring's atoms — those are substituent territory)."""
-        name_mixed_spiro_fused = _import_or_skip("name_mixed_spiro_fused")
+        name_mixed_spiro_fused = spiro.name_mixed_spiro_fused
         # The (2-hydroxyphenyl)methylidene benzofuran-piperazine spiro.
         mol = Chem.MolFromSmiles(
             "O=C1N[C@@]2(Cc3ccccc3O2)C(=O)N/C1=C\\c1ccccc1O")

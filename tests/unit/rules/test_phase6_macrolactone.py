@@ -1,11 +1,7 @@
 import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
-from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
-
-@pytest.fixture(scope="module")
-def namer(): return Orthonym()
 
 def _rt(smi, name):
     o = opsin_parse(name)

@@ -26,13 +26,14 @@ Before the fix every one of these was spelled ``...ethanenitrile`` and labelled 
 (a non-PIN spelling carrying the PIN label). Every emitted name OPSIN-round-trips to the input.
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.assembly.composition_primitives import RETAINED_C2_PARENT_BY_SUFFIX
 from orthonym.cli import _emit_tier_flags
 from orthonym.rules.pin_vocabulary import non_pin_vocabulary
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key_or_none
 
 # the default-tier labels (pin_verified / is_pin) exist only with the OPSIN validity gate on
 pytestmark = pytest.mark.opsin_gate
@@ -82,11 +83,6 @@ CONTROLS = [
 ]
 
 
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
-
-
 @pytest.fixture(scope="module")
 def default_engine():
     return Orthonym()
@@ -109,7 +105,7 @@ def test_substituted_acetonitrile_is_the_pin_at_the_default_tier(default_engine,
     # a name is pin_verified only if it is the PIN
     assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
     rt = opsin_parse(row["name"])
-    assert rt and _inchikey(rt) == _inchikey(smiles), f"round trip failed for {row['name']!r}"
+    assert rt and key_or_none(rt) == key_or_none(smiles), f"round trip failed for {row['name']!r}"
 
 
 @pytest.mark.parametrize("smiles,expected", TARGETS)
@@ -147,7 +143,7 @@ def test_a_chain_stereo_double_bond_is_never_labelled_pin(default_engine, best_e
     assert b["name"] == "(2E)-2-(hydroxyimino)-2-phenylethanenitrile", b
     assert b["tier"] not in ("pin_verified", "pin_unverified") and not b["is_pin"], b
     rt = opsin_parse(b["name"])
-    assert rt and _inchikey(rt) == _inchikey(smi), b
+    assert rt and key_or_none(rt) == key_or_none(smi), b
 
 
 GLUCOSIDES = [
@@ -172,12 +168,11 @@ def test_glycoside_of_a_cyanohydrin_cites_its_prefixes_in_order(default_engine, 
     gave '(4-hydroxyphenyl)[(β-D-glucopyranosyloxy)]acetonitrile' (double marks, out of order)
     at pin_verified. It declines that shape; the structural route names the glycoside.:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes):
     the glycosyloxy prefix is a name, so the name is read at the best-effort tier, below the PIN."""
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == expected, row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     rt = opsin_parse(row["name"])
-    assert rt and _inchikey(rt) == _inchikey(smiles), row
+    assert rt and key_or_none(rt) == key_or_none(smiles), row
 
 
 def test_glycosyloxy_splice_declines_a_bare_enclosed_token_only():

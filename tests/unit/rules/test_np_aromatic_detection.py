@@ -8,7 +8,6 @@ The AROMATIC detection uses read-only bond type flags set during RDKit
 sanitization -- no Kekulization mutation is needed.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.natural_products import _find_scaffold_unsaturation
@@ -78,5 +77,3 @@ class TestAromaticBondDetection:
             "Mixed system should detect aromatic C-C bonds as ene"
         )
         assert len(result['ene']) <= 6
-
-

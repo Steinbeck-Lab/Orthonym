@@ -8,7 +8,6 @@ Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (PAH numbering FIXED)
 Source: a phase internal notes (tuple encoding); (function form).
 """
 
-import pytest
 from rdkit import Chem
 
 

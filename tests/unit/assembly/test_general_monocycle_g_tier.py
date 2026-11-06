@@ -22,7 +22,7 @@ from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.assembly.general_engine import name_general_monocycle
-from orthonym.cli import _emit_tier_flags
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate  # the names below are built with the validity gate on
 
@@ -33,7 +33,7 @@ METHANESULFONYL = "S(C)(=O)=O"        # 'methanesulfonyl' (m, 'a' before the 'y'
 
 
 def _name(smiles):
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     return row["name"], row["tier"]
 
 

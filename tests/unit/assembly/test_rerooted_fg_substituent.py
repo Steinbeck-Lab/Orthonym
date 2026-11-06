@@ -37,7 +37,6 @@ def test_fg_tier_off_on_default_path_byte_identical():
     # byte-identical). A carbonyl-bearing chain rooted at a terminal C declines.
     m = _mol('OCC(=O)CCCC')
     # attach at the terminal CH3 (last carbon)
-    c = [a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'C'][-1]
     # default path: FG tier gated off -> may still name via other tiers, but the
     # allow_functional deriver itself is inert unless invoked.
     res = _located_acyclic_alkyl_name(m, list(range(m.GetNumHeavyAtoms())), 0,

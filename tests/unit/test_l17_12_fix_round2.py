@@ -11,14 +11,10 @@ are pseudoketones, below every acyclic ester, so the ester of sulfuric or phosph
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 def _principal(smiles):
@@ -53,7 +49,7 @@ def test_an_oxoacid_ester_is_the_parent_beside_a_lactam_or_a_lactone(smiles, nam
     guard) as it was and ``_promoted_oxoacid_ester`` asking the head group alone, the best-effort tier names the old
     spelling and these rows fail."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(name, smiles)
@@ -99,14 +95,14 @@ def test_the_sultone_ring_prefix_is_the_hantzsch_widman_name(smiles, name):
     moves from systematic_verified (the replacement spelling is recorded as not a PIN) to pin_unverified (a name in the PIN
     form that the PIN tier does not build). Independent check: a fresh OPSIN call reads each new name to the input's full
     key. Mutation: with ``allow_lambda`` off in ``_book_monocycle_core_tail`` the old spelling returns and these rows fail."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == "pin_unverified" and not row["is_pin"], row
     assert_full_rt(name, smiles)
 
 
 def test_the_ring_name_of_the_sultone_is_the_namers_own():
-    row = _row("OCC1CCOS1(=O)=O", "pin")
+    row = tier_row("OCC1CCOS1(=O)=O", "pin")
     assert row["name"] == "3-(hydroxymethyl)-1,2λ6-oxathiolane-2,2-dione", row
 
 
@@ -133,7 +129,7 @@ def test_a_ketone_acyl_with_an_amido_prefix_is_named_by_the_acyl_name(smiles, na
     abstentions of the PIN tier -> the names above, pin_verified at both tiers. Independent check: a fresh OPSIN call.
     Mutation: with ``chain_amide_prefixes._is_ketone_acyl`` returning False the old spelling returns."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(name, smiles)
@@ -167,7 +163,7 @@ def test_the_cyano_prefix_of_a_chain_substituent_is_a_pin_prefix(smiles, name):
     column of the list; the last row is the unchanged control). Independent check: a fresh OPSIN call reads each name to the
     input's full key. Mutation: without Pass 1a of ``_name_polyfunctional_acyclic_substituent_impl`` the rows fail."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(name, smiles)
@@ -187,7 +183,7 @@ def test_a_carboxylic_ester_ranks_above_the_ester_of_sulfuric_acid():
     class 9 ester. The name is method (2); method (1), 'ethane-1,2-diyl acetate hydrogen sulfate' (PIN), is not read by OPSIN
     2.9.0 and is not built (``esters.record_polyol_mixed_anion_non_pin`` labels method (2) below the PIN)."""
     assert _principal("CC(=O)OCCOS(=O)(=O)O") == "ester"
-    row = _row("CC(=O)OCCOS(=O)(=O)O", "best-effort")
+    row = tier_row("CC(=O)OCCOS(=O)(=O)O", "best-effort")
     assert row["name"] == "2-(sulfooxy)ethyl acetate", row
     assert row["tier"] == "systematic_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], "CC(=O)OCCOS(=O)(=O)O")
@@ -214,7 +210,7 @@ def test_the_amide_of_a_chain_is_the_parent_of_a_cyclic_depsipeptide(smiles, nam
     step aside (``) these molecules were named on the ring with every group cited as a prefix and no suffix
     ('...-hexaoxo-...-1-oxa-...cyclononadecane', the amide an amido prefix), because the amide parent was not built; the
     amide-parent selection of item 7 (``, builds it."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == tier, row
     assert name.endswith("amide"), name      # the principal group is the suffix of the parent, not a prefix of a ring

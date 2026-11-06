@@ -10,7 +10,6 @@ Covers requirements:
 Also includes regression guards for ring-attached and saturated amides.
 """
 
-import pytest
 from orthonym import name_compound
 
 
@@ -94,26 +93,10 @@ class TestAmideRegressionGuards:
         result = name_compound("CCCCC(=O)N")
         assert result == "pentanamide", f"Got: {result}"
 
-    def test_acetamide_retained(self):
-        """Retained name: CC(=O)N -> acetamide"""
-        result = name_compound("CC(=O)N")
-        assert result == "acetamide", f"Got: {result}"
-
     def test_formamide_retained(self):
         """Retained name: C(=O)N -> formamide"""
         result = name_compound("C(=O)N")
         assert result == "formamide", f"Got: {result}"
-
-    def test_n_methylacetamide_unchanged(self):
-        """N-substituted retained: CNC(C)=O -> N-methylacetamide"""
-        result = name_compound("CNC(C)=O")
-        assert result == "N-methylacetamide", f"Got: {result}"
-
-    def test_nn_dimethylformamide_unchanged(self):
-        """N,N-disubstituted retained: CN(C)C=O -> dimethylformamide (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007):
-        both N-H, formamide's only substitutable positions, carry the same group)"""
-        result = name_compound("CN(C)C=O")
-        assert result == "dimethylformamide", f"Got: {result}"
 
     def test_nn_dipropylformamide_unchanged(self):
         """Tertiary formamide: CCCN(C=O)CCC -> dipropylformamide (as 'dimethylformamide

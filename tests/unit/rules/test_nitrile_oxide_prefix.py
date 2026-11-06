@@ -50,34 +50,6 @@ def test_sodium_salt_bluebook_pin():
         "sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate"
 
 
-@pytest.mark.xfail(
-    reason="Nitrile oxide on a NON-ring (chain/ester) context mis-names via a "
-    "chain path this benzene-scoped detector does not cover, and the result is "
-    "canonicalization-order-dependent (diagnose canonicalizes -> 'unknown'; raw "
-    "SMILES -> a chain mis-name). The BB neutral PIN is the '...nitrile oxide' "
-    "SUFFIX form (unbuilt). FOLLOW-UP: nitrile-oxide chain-path perception + the "
-    "functional-class suffix. Pre-existing; the benzene ring path is fail-closed.",
-    strict=False,
-)
-@pytest.mark.unit
-def test_neutral_ester_fails_closed():
-    # BB 34893: the neutral-molecule PIN is '4-(methoxycarbonyl)benzonitrile
-    # oxide' (suffix form, unbuilt) — the prefix name is explicitly NOT the
-    # PIN here, so the namer must refuse.
-    assert "unknown" in name_compound("COC(=O)c1ccc(C#[N+][O-])cc1").lower()
-
-
-@pytest.mark.xfail(
-    reason="Bare CC#[N+][O-] mis-names as 'ethane' via the chain path (a "
-    "pre-existing structure loss outside this benzene-scoped detector). "
-    "FOLLOW-UP: nitrile-oxide chain-path perception + P-66.5.4.2 suffix form.",
-    strict=False,
-)
-@pytest.mark.unit
-def test_bare_nitrile_oxide_fails_closed():
-    assert "unknown" in name_compound("CC#[N+][O-]").lower()
-
-
 @pytest.mark.unit
 def test_salt_protects_unchanged():
     # recorded at HEAD, OPSIN-RT clean

@@ -10,7 +10,6 @@ assertion isolates the controller's contribution (which is 0-fire, so ON == OFF)
 Source: 168-internal notes; RESEARCH section 6.5 + 6.7; analog test_retained_names_pin_cleanup.py.
 """
 
-import glob
 import shutil
 import subprocess
 from typing import Optional
@@ -21,12 +20,7 @@ from orthonym import name_compound
 from tests.support.jars import jar_or_none
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
-_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _OPSIN_AVAILABLE = bool(_OPSIN_JAR) and shutil.which("java") is not None
 
 

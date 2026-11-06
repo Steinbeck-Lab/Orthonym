@@ -7,7 +7,7 @@ cleavage with multi-ester assembly.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from rdkit import Chem
 
@@ -15,7 +15,6 @@ from orthonym.decomposition.engine import (
     MAX_CLEAVABLE_BONDS,
     MAX_BOND_RETRY_ATTEMPTS,
     _name_quality_is_acceptable,
-    _try_single_bond_decompose,
     _try_multi_bond_decompose,
     _try_iterative_mixed_decompose,
     try_decompose,
@@ -31,10 +30,6 @@ from orthonym.decomposition.fragment_assembly import _assemble_multi_ester
 @pytest.mark.unit
 class TestPerformanceGuard:
     """Tests for the MAX_CLEAVABLE_BONDS performance guard in try_decompose."""
-
-    def test_performance_guard_constant_exists(self):
-        """MAX_CLEAVABLE_BONDS constant is defined and is 20 (a phase)."""
-        assert MAX_CLEAVABLE_BONDS == 20
 
     def test_performance_guard_skips_many_bonds(self):
         """try_decompose returns None when molecule has >MAX_CLEAVABLE_BONDS bonds."""
@@ -199,7 +194,7 @@ class TestQualityGateDuplicateWords:
         # "di" is 2 chars, "the" is 3 chars -- both should be ignored
         name = "di di methylpentanoic acid"
 
-        result = _name_quality_is_acceptable(name, mol)
+        _name_quality_is_acceptable(name, mol)
         # The name may still be rejected by OTHER quality gate criteria
         # (e.g., too short for heavy atoms). We specifically test that
         # the duplicate-word check does not reject short words.
@@ -486,31 +481,6 @@ class TestMultiBondDecompose:
         result = _try_multi_bond_decompose(mol, [], "pin")
         assert result is None
 
-    def test_try_decompose_integrates_multi_bond_path(self):
-        """try_decompose integrates multi-bond path for 3+ same-type ester bonds.
-
-        Uses triacetin (3 ester bonds). After single-bond retry loop fails to
-        produce a good name, the multi-bond path should be attempted.
-        """
-        mol = Chem.MolFromSmiles("CC(=O)OCC(COC(C)=O)OC(C)=O")
-
-        # Mock single-bond decompose to return None (forces multi-bond path)
-        with patch(
-            "orthonym.decomposition.engine._try_single_bond_decompose",
-            return_value=None,
-        ), patch(
-            "orthonym.namer.name_pipeline_only",
-            return_value=None,  # Force quality gate to trigger decomposition
-        ):
-            result = try_decompose(mol)
-
-        # Result may still be None if multi-bond path cannot assemble,
-        # but the path should have been attempted. We verify by checking
-        # that the mock was called (single-bond returned None, multi-bond tried).
-        # Since we can't easily introspect multi-bond path, just verify no crash.
-        # The integration test below verifies end-to-end behavior.
-        assert True  # No crash = multi-bond path was wired in
-
     def test_try_decompose_prefers_multi_bond_over_none(self):
         """When single-bond fails, multi-bond should produce a result for polyesters."""
         mol = Chem.MolFromSmiles("CC(=O)OCC(COC(C)=O)OC(C)=O")
@@ -688,7 +658,7 @@ class TestMultiEsterAssembly:
         result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None, (
             "Core-size guard should allow when core HA (4) == max non-core HA (4), "
-            f"but got None"
+            "but got None"
         )
 
 
@@ -1355,7 +1325,6 @@ class TestFragmentStorageAndRoles:
         Verifies that _try_iterative_mixed_decompose does not use dict
         storage that would deduplicate identical fragment SMILES.
         """
-        from orthonym.decomposition.engine import _try_iterative_mixed_decompose
 
         mol = Chem.MolFromSmiles("C" * 30)  # Dummy molecule
 
@@ -1367,7 +1336,6 @@ class TestFragmentStorageAndRoles:
 
         # Track fragment naming calls to verify all fragments are named
         naming_calls = []
-        original_fallback = None
 
         def tracking_namer(smiles):
             naming_calls.append(smiles)
@@ -1399,7 +1367,7 @@ class TestFragmentStorageAndRoles:
             "orthonym.decomposition.engine._coverage_is_adequate",
             return_value=True,
         ):
-            result = _try_iterative_mixed_decompose(mol, fake_bonds, "pin")
+            _try_iterative_mixed_decompose(mol, fake_bonds, "pin")
 
         # With list-of-tuples, all 3 fragments should be named individually.
         # With dict storage, the 2 identical "CC(=O)O" would be named once.

@@ -365,7 +365,6 @@ def test_gate_real_coverage_blocks_partial_fragment():
 
     mol = Chem.MolFromSmiles("Oc1ccc(/C=C/CC)cc1")
     assert mol is not None
-    total_heavy = mol.GetNumHeavyAtoms()  # 11
 
     # Synthetic candidate with PARTIAL coverage: 6 of 11 atoms (ring only),
     # 6/11 = 0.545 < 0.99. Pre-fix gate (factors['atom_coverage']=0.99) would

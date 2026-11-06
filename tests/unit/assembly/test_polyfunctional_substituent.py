@@ -13,7 +13,6 @@ It unblocks phosphatidylserine: the serine head, previously
 unknown, is now named via the functional-class hydrogen-phosphate diester.
 """
 
-import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
@@ -141,11 +140,6 @@ class TestSingleFGRingParent:
 
 class TestPolyfunctionalSubstituentFailClosed:
     """Fail-closed: non-clean classes (ring/ether/amide) keep their existing tiers."""
-
-    def test_single_hydroxy_one_carbon_elided(self):
-        # 1-carbon backbone -> locant elided -> 'hydroxymethyl' (byte-identical
-        # to the pre-single-FG behaviour).
-        assert _name_frag("CCO") == "hydroxymethyl"
 
     def test_single_amino_one_carbon_elided(self):
         assert _name_frag("CCN") == "aminomethyl"

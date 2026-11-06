@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 
-from orthonym import Orthonym
 
 _SMILES = json.loads((Path(__file__).parent / "_macrocycle_smiles.json").read_text())
 

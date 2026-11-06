@@ -19,14 +19,9 @@ to its PIN '2-anilinoethane-1-peroxol'.
 import pytest
 
 import orthonym.rules.parent_selection as parent_selection
-from orthonym import Orthonym
+from tests.support.pin_tiers import name_and_tier
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _tiered(smiles: str):
-    row = Orthonym().name_tiered(smiles)
-    return row["name"], row["tier"]
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -46,7 +41,7 @@ def _tiered(smiles: str):
     ("OOCCNc1ccccc1", "2-anilinoethane-1-peroxol"),
 ])
 def test_the_chain_carbon_with_the_peroxol_is_the_parent(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -61,7 +56,7 @@ def test_the_chain_carbon_with_the_peroxol_is_the_parent(smiles, expected):
     ("OOC1CCCc2ccccc12", "1,2,3,4-tetrahydronaphthalene-1-peroxol"),  # the book's example,:27948
 ])
 def test_the_ring_peroxol_locant_follows_the_monosubstituted_ring_licence(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -70,11 +65,11 @@ def test_the_ring_peroxol_locant_follows_the_monosubstituted_ring_licence(smiles
     ("OCC1CC1", "cyclopropylmethanol"),
 ])
 def test_the_controls_keep_their_names(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 def test_the_tests_fail_without_the_skeletal_suffix(monkeypatch):
     """The mutation check: with the hydroperoxide off the list the ring is the parent again."""
     monkeypatch.setattr(parent_selection, "SKELETAL_SUFFIX_PGS",
                         parent_selection.SKELETAL_SUFFIX_PGS - {"hydroperoxide"})
-    assert _tiered("C1CC1COO") != ("cyclopropylmethaneperoxol", "pin_verified")
+    assert name_and_tier("C1CC1COO") != ("cyclopropylmethaneperoxol", "pin_verified")

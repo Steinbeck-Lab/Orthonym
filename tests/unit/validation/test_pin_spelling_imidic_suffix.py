@@ -10,16 +10,11 @@ esters ('imidate', 'imidothioate') were in the ending table already; the acids, 
 hydroximic acids use too,:30096), were not.
 """
 import pytest
-from rdkit import Chem
 
-from orthonym.validation.pin_spelling import check_pin_spelling
 from tests.support.pin_tiers import assert_pin_at_both_tiers
+from tests.support.read_back import spelling_rules
 
 pytestmark = pytest.mark.opsin_gate
-
-
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -31,7 +26,7 @@ def _rules(smiles, name):
     ("ON=C(O)CC=C", "N-hydroxybut-3-enimidic acid"),
 ])
 def test_the_suffix_of_an_unsaturated_imidic_acid_is_at_c1(smiles, name):
-    assert _rules(smiles, name) == []
+    assert spelling_rules(smiles, name) == []
 
 
 @pytest.mark.parametrize("smiles,pin", [

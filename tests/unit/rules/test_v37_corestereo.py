@@ -44,6 +44,7 @@ from orthonym import Orthonym, errors
 from orthonym.jvm_budget import jvm_slots
 from tests.support.jars import jar_or_skip
 from orthonym.assembly.retained_substitution import OpsinOracle
+from tests.support.read_back import key_or_none
 
 # These assertions are ABOUT the RT/validity gate (full-InChIKey round-trip), so
 # the OPSIN gate must be ON exactly as in production (the suite disables it by
@@ -76,11 +77,6 @@ def _complete(smi):
 def _pin(smi):
     with wall_clock_limit(90):
         return Orthonym(style="pin").name(smi)
-
-
-def _ik(smi):
-    m = Chem.MolFromSmiles(smi)
-    return inchi.MolToInchiKey(m) if m is not None else None
 
 
 def _rt_key(oracle, name):
@@ -139,7 +135,7 @@ class TestCoreStereoAlreadyCompletes:
         # byte-identical to the reference full-stereo name
         assert name == expected
         # and it denotes the RIGHT stereoisomer (full InChIKey round-trips)
-        assert _rt_key(_oracle, name) == _ik(smi)
+        assert _rt_key(_oracle, name) == key_or_none(smi)
 
     @pytest.mark.parametrize("smi,expected", _CANARIES)
     def test_core_stereo_is_deterministic(self, smi, expected):
@@ -158,16 +154,16 @@ class TestWrongStereoNeverRendered:
     D2 = "CN1[C@H]2CC[C@@H]1[C@@H](C(=O)O)[C@H](OC(=O)c1ccccc1)C2"
 
     def test_diastereomers_get_distinct_self_faithful_names(self, _oracle):
-        assert _ik(self.D1) != _ik(self.D2)          # genuinely different inputs
+        assert key_or_none(self.D1) != key_or_none(self.D2)          # genuinely different inputs
         n1, n2 = _complete(self.D1), _complete(self.D2)
         assert not errors.is_failure_name(n1)
         assert not errors.is_failure_name(n2)
         assert n1 != n2                              # distinct names
         # each name round-trips to its OWN input, never to the other epimer
-        assert _rt_key(_oracle, n1) == _ik(self.D1)
-        assert _rt_key(_oracle, n1) != _ik(self.D2)
-        assert _rt_key(_oracle, n2) == _ik(self.D2)
-        assert _rt_key(_oracle, n2) != _ik(self.D1)
+        assert _rt_key(_oracle, n1) == key_or_none(self.D1)
+        assert _rt_key(_oracle, n1) != key_or_none(self.D2)
+        assert _rt_key(_oracle, n2) == key_or_none(self.D2)
+        assert _rt_key(_oracle, n2) != key_or_none(self.D1)
 
 
 class TestConstitutionDefectNeverShipsWrong:
@@ -188,6 +184,6 @@ class TestConstitutionDefectNeverShipsWrong:
         # if it DID ship, it must be the right constitution (block-1 InChIKey)
         k = _rt_key(_oracle, name)
         assert k is not None, f"shipped an OPSIN-unparseable name: {name!r}"
-        in_b1 = _ik(self.SMI).split("-")[0]
+        in_b1 = key_or_none(self.SMI).split("-")[0]
         assert k.split("-")[0] == in_b1, (
             f"shipped a WRONG constitution: {name!r}")

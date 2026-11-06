@@ -12,7 +12,6 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.terminal_fragment import (
-    TerminalFragmentName,
     terminal_fragment_name,
 )
 from orthonym.assembly.naming_utils import apply_enclosing_marks

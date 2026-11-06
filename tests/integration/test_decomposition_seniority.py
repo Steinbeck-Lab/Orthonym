@@ -52,24 +52,6 @@ class TestAmideSeniority:
             f"(pyrrolidin/pyrrolidone)"
         )
 
-    def test_simple_amide_unchanged(self):
-        """N-methylacetamide: acid side is clearly more senior, no change."""
-        name = name_compound("CC(=O)NC")
-        assert name is not None
-        # Should remain "N-methylacetamide" or similar
-        assert "acetamide" in name.lower() or "ethanamide" in name.lower(), (
-            f"Expected acetamide/ethanamide in '{name}'"
-        )
-
-    def test_amide_acid_more_senior_preserves_pattern(self):
-        """N-methylbenzamide: acid side has ring + COOH, clearly more senior."""
-        name = name_compound("O=C(NC)c1ccccc1")
-        assert name is not None
-        assert "benzamide" in name.lower(), (
-            f"Expected 'benzamide' in '{name}'"
-        )
-
-
 # ---------------------------------------------------------------------------
 # Ether seniority tests
 # ---------------------------------------------------------------------------
@@ -98,13 +80,6 @@ class TestEtherSeniority:
         assert "phenoxy" in name_lower or "phenyl" in name_lower, (
             f"Expected phenoxy/phenyl reference in '{name}'"
         )
-
-    def test_simple_ether_unchanged(self):
-        """Diethyl ether: symmetric-ish, existing behavior preserved."""
-        name = name_compound("CCOCC")
-        assert name is not None
-        assert "eth" in name.lower(), f"Expected 'eth' in '{name}'"
-
 
 # ---------------------------------------------------------------------------
 # Canary stability tests

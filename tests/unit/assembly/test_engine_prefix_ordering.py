@@ -15,11 +15,10 @@ engine call only), and the key is asked with the engine's argument.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym.assembly import fragment_naming
 from orthonym.assembly.engine_prefix_ordering import engine_prefix_ordering
 from orthonym.assembly.substituent_enumerator import name_substituent_for_ordering
-from orthonym.cli import _emit_tier_flags
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate  # the names below are built with the validity gate on
 
@@ -85,5 +84,5 @@ def test_the_mark_holds_for_the_session_depth_of_the_engine_call_only():
      "1-(benzenesulfonyl)-4-[(benzylamino)(sulfanylidene)methyl]-1,4-diazepane"),
 ])
 def test_the_prefix_cited_first_takes_locant_1_in_the_engines_clean_context(smiles, expected):
-    name = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)["name"]
+    name = tier_row(smiles, "best-effort")["name"]
     assert name == expected

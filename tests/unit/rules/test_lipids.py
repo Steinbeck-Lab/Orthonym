@@ -9,7 +9,6 @@ test body (NOT at module level) so `pytest --collect-only` succeeds; they are
 RED at run time until Waves 1-4 build the subsystem.
 """
 
-import pytest
 
 from orthonym import name_compound
 

@@ -26,10 +26,10 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from tests.support.default_tier import declined_at_default
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 # Default tier (paper, Methods, "Tiers", L73: "The default configuration emits a name
 # only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -45,7 +45,7 @@ def _pin(smiles):
 
 
 def _be(smiles):
-    return Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    return tier_row(smiles, "best-effort")
 
 
 # Branch review fixes (2026-09-28): a name only the PIN tier's promotion re-run

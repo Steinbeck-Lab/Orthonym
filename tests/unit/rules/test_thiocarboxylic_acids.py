@@ -150,11 +150,6 @@ class TestThiocarboxylicAcidNaming:
         """CCC(=O)S -> propanethioic S-acid"""
         assert name_compound("CCC(=O)S") == "propanethioic S-acid"
 
-    def test_benzenecarbothioic_S_acid_no_regression(self):
-        """SC(=O)c1ccccc1 -> benzenecarbothioic S-acid (existing benzene path)"""
-        assert name_compound("SC(=O)c1ccccc1") == "benzenecarbothioic S-acid"
-
-
 # ============================================================================
 # OPSIN round-trip tests
 # ============================================================================

@@ -50,6 +50,7 @@ Fresh process per witness (warm-cache hazard, the contributor guide). Run ONLY t
     ``.venv/bin/python -m pytest tests/unit/rules/test_c_waveB_v36.py -q``
 (the whole suite deadlocks on an OPSIN pipe).
 """
+import functools
 import json
 import subprocess
 import sys
@@ -81,6 +82,7 @@ KIH_PLAIN_CANARIES = {
 }
 
 
+@functools.lru_cache(maxsize=None)
 def _cn_rt(smiles):
     """Best-effort name + OPSIN full-InChIKey round-trip, in a FRESH process."""
     out = subprocess.run(

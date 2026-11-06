@@ -20,7 +20,6 @@ from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data.natural_products import NAME_EXACT_NP_PARENTS, NATURAL_PRODUCT_DERIVATIVES
 from tests.support.default_tier import strict_path_row
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import _independent_parse
 
 pytestmark = pytest.mark.opsin_gate

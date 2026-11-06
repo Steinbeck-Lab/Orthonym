@@ -19,13 +19,14 @@ The default tier's verdict now reads OPSIN's own string as well (user decision 2
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi, rdCIPLabeler
+from rdkit.Chem import rdCIPLabeler
 
 from orthonym import Orthonym, namer
 from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from orthonym.metrics import provenance as pv
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -45,10 +46,6 @@ SERIES = [
     "CCOC(=O)C1=CN(C2C([C@@H]1C3=CC=CC=C3)(C4C2([C@@H](C(=CN4CC5=CC=CC=C5)C(=O)OCC)C6=CC=CC=C6)"
     "C(=O)OCC)C(=O)OCC)CC7=CC=CC=C7",
 ]
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 def _cip(smiles):

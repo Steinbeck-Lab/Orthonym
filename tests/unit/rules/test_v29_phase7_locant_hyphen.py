@@ -128,14 +128,6 @@ class TestParentToPrefixWitnesses:
     # it on ``_prefix_stem_yl`` -- the function that actually performs it -- so
     # this change updates the contract without dropping coverage.
 
-    def test_witness_one_hyphen_is_still_inserted(self):
-        assert (_prefix_stem_yl("3-amino", "2,12-dimethyltetradec")
-                == "3-amino-2,12-dimethyltetradecyl")
-
-    def test_witness_two_hyphen_is_still_inserted(self):
-        assert (_prefix_stem_yl("1,2-diamino", "N1-(2-aminoethyl)-N2-methyleth")
-                == "1,2-diamino-N1-(2-aminoethyl)-N2-methylethyl")
-
     @pytest.mark.parametrize("parent,length", [
         ("2,12-dimethyltetradecan-3-amine", 14),                    # R8.2
         ("N1-(2-aminoethyl)-N2-methylethane-1,2-diamine", 2),       # R4

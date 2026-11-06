@@ -16,7 +16,6 @@ Tested compounds: 25+ parent_mismatch entries from the benchmark.
 
 import pytest
 from orthonym import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -103,7 +102,7 @@ class TestEsterParentSelection:
         """Phenyl acetate: acyl on chain side."""
         name = name_compound("CC(=O)Oc1ccccc1")
         # Should produce a name reflecting chain ester
-        assert name != "", f"Empty name for phenyl acetate"
+        assert name != "", "Empty name for phenyl acetate"
         # Name should contain acetyl/ethanoyl reference
         assert "acet" in name.lower() or "ethano" in name.lower() or "oyloxy" in name, \
             f"Expected ester naming, got: {name}"
@@ -121,14 +120,14 @@ class TestEsterParentSelection:
         """p-Cresyl isobutyrate: ester linking ring to chain."""
         # Cc1ccc(OC(=O)C(C)C)cc1 -- parent_mismatch #17
         name = name_compound("Cc1ccc(OC(=O)C(C)C)cc1")
-        assert name != "", f"Empty name for cresyl isobutyrate"
+        assert name != "", "Empty name for cresyl isobutyrate"
         # At minimum, should produce a valid name
         assert len(name) > 5, f"Name too short: {name}"
 
     def test_ethyl_4_hydroxybenzoate(self):
         """Ethyl 4-hydroxybenzoate: acyl on ring, ring is parent."""
         name = name_compound("CCOC(=O)c1ccc(O)cc1")
-        assert name != "", f"Empty name for ethyl 4-hydroxybenzoate"
+        assert name != "", "Empty name for ethyl 4-hydroxybenzoate"
         # The ester should be named with ring as parent (acyl on ring)
         assert "ethyl" in name.lower(), f"Expected ethyl ester, got: {name}"
         assert "benzo" in name.lower() or "oate" in name.lower(), \
@@ -153,24 +152,6 @@ class TestChainScoringTiebreakers:
         name = name_compound("OC(=O)CC(C)CC(=O)O")
         assert "pentanedio" in name or "glutar" in name, \
             f"Expected diacid name, got: {name}"
-
-    @pytest.mark.opsin_gate
-    def test_dimethylcyclohexyl_pentanoic_acid(self):
-        """A cyclohexyl pentanoic acid where chain should be parent.
-
-        2026-09-26 (wp7) change-asserted-value: red since before the
-        pre-existing-failures plan (identical at 4e0e5c29b) -- the raw producer gives
-        the failure sentinel, and the name the sibling test below used to pin,
-        '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid', is a DIFFERENT
-        molecule (OPSIN 2.9.0: C15H29NO2 vs the input's C15H23NO4; the ketone, the
-        exocyclic C=C and the amide are gone). No PIN producer builds it (the same
-        molecule is a tier-contract row of test_stereo_benchmark, 'a phase-01'):
-        the tier contract is asserted, gate on -- the PIN tier fails closed and
-        best-effort names it RT-exact ('(1E)-1-[5-amino-3-(carboxymethyl)-5-oxo-
-        pentylidene]-3,5-dimethyl-2-oxocyclohexane')."""
-        from tests.support.rt_assert import assert_tier_contract
-        assert_tier_contract(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")
-
 
 # ---------------------------------------------------------------------------
 # Category D: Ring-vs-chain priority
@@ -217,10 +198,6 @@ class TestRingVsChainPriority:
 class TestNoRegressionsSimpleCompounds:
     """Verify basic naming is unchanged."""
 
-    def test_cyclohexanol(self):
-        name = name_compound("OC1CCCCC1")
-        assert "cyclohexan" in name, f"Expected cyclohexanol, got: {name}"
-
     def test_propan_1_ol(self):
         name = name_compound("CCCO")
         assert "propan" in name, f"Expected propanol, got: {name}"
@@ -248,7 +225,7 @@ class TestParentMismatchBenchmarkCompounds:
         """Isochromane derivative -- parent_mismatch #1 (T=0.396)."""
         # CCC[C@@H]1OCc2c(O)cccc2[C@H]1O
         name = name_compound("CCC[C@@H]1OCc2c(O)cccc2[C@H]1O")
-        assert name != "", f"Empty name"
+        assert name != "", "Empty name"
         assert "hydroxy" in name or "ol" in name, \
             f"Expected hydroxyl group in name, got: {name}"
         assert len(name) > 10, f"Name too short: {name}"
@@ -323,7 +300,7 @@ class TestParentMismatchBenchmarkCompounds:
     def test_sodium_glutamate(self):
         """Sodium glutamate -- parent_mismatch #35 (T=0.219)."""
         name = name_compound("[NH3+]C(CCC(=O)[O-])C(=O)[O-].[Na+]")
-        assert name != "" and name != "unknown", f"Failed to name sodium glutamate"
+        assert name != "" and name != "unknown", "Failed to name sodium glutamate"
         # Should recognize glutamic acid structure
         assert "glutam" in name or "amino" in name or "pentanedio" in name, \
             f"Expected glutamate naming, got: {name}"
@@ -331,7 +308,7 @@ class TestParentMismatchBenchmarkCompounds:
     def test_methyloxazole(self):
         """2-methyloxazole -- parent_mismatch #40 (T=0.185)."""
         name = name_compound("CC1=NCCO1")
-        assert name != "" and name != "unknown", f"Failed to name methyloxazole"
+        assert name != "" and name != "unknown", "Failed to name methyloxazole"
         assert "methyl" in name or "oxa" in name, \
             f"Expected heterocycle features, got: {name}"
 
@@ -351,7 +328,7 @@ class TestParentMismatchBenchmarkCompounds:
     def test_butanoyloxy_hydroxybutanoate(self):
         """Butanoyloxy hydroxybutanoate -- parent_mismatch #8 (T=0.351)."""
         name = name_compound("C[C@H](CC(=O)[O-])OC(=O)C[C@@H](C)O")
-        assert name != "" and name != "unknown", f"Failed to name compound"
+        assert name != "" and name != "unknown", "Failed to name compound"
         # Should have ester or acid features
         assert "butano" in name or "oyloxy" in name or "oate" in name, \
             f"Expected butanoyl/ester naming, got: {name}"
@@ -386,21 +363,21 @@ class TestImprovementTracking:
         name = name_compound("N[C@@H](Cc1ccc(Br)cc1)C(=O)O")
         old = "2-aminononanoic acid"
         assert name != old, f"Not improved: still {name}"
-        assert "phenyl" in name, f"Improvement: name has correct phenyl group"
+        assert "phenyl" in name, "Improvement: name has correct phenyl group"
 
     def test_phenyl_hydroxyketone_improved(self):
         """Phenyl hydroxyketone: hexyl removed from name."""
         name = name_compound("CC(=O)[C@H](O)c1ccccc1")
         old = "(1R)-1-hexyl-1-hydroxy-1-phenylpropan-2-one"
         assert name != old, f"Not improved: still {name}"
-        assert "hexyl" not in name, f"Improvement: hexyl removed"
+        assert "hexyl" not in name, "Improvement: hexyl removed"
 
     def test_phenyl_diol_improved(self):
         """Phenyl diol: hexyl removed from name."""
         name = name_compound("OC[C@H](O)c1ccccc1")
         old = "(2R)-2-hexyl-2-hydroxy-2-phenylethan-1-ol"
         assert name != old, f"Not improved: still {name}"
-        assert "hexyl" not in name, f"Improvement: hexyl removed"
+        assert "hexyl" not in name, "Improvement: hexyl removed"
 
     @pytest.mark.opsin_gate
     def test_dimethylcyclohexyl_pentanoic_acid_changed(self):

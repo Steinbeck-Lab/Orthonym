@@ -342,7 +342,6 @@ def test_no_size_guard():
     # Build chain manually: the longest chain is 10 atoms (5+5)
     # atoms 0-3 = first 4C, atom 4 = branch, atoms 35-39 = last 5C
     # Actually just identify the atoms properly
-    num_atoms = mol.GetNumAtoms()
 
     # Find the branching carbon (degree 3+)
     branch_atom = None
@@ -388,7 +387,6 @@ def test_no_size_guard():
     # Chain = branch_atom + two shortest branches
     chain = branches[0] + [branch_atom] + branches[1]
     parent_set = set(chain)
-    sub_atoms = branches[-1]  # longest branch = substituent
 
     results = discover_substituents(
         mol, parent_set, parent_type="chain", principal_chain=chain

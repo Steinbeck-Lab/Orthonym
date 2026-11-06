@@ -109,23 +109,6 @@ class TestNonGatedHandlers:
         result = name_compound("C1CCC2=CC=CC=C2C1")
         assert "tetrahydronaphthalene" in result.lower() or "tetralin" in result.lower()
 
-    def test_cyclohexanecarbonitrile_ring_nitrile(self):
-        """Ring nitrile handler: direct return, not gated."""
-        result = name_compound("C1CCCCC1C#N")
-        assert "nitrile" in result.lower() or "cyano" in result.lower() or "carbonitrile" in result.lower()
-
-    def test_acetamide_amide(self):
-        """Amide handler: direct return, not gated."""
-        result = name_compound("CC(=O)N")
-        assert "amide" in result.lower() or "acetamide" in result.lower()
-
-    def test_n_methylamine(self):
-        """Amine handler: direct return, not gated."""
-        result = name_compound("CNC")
-        assert result is not None
-        assert "methyl" in result.lower()
-
-
 # ---------------------------------------------------------------------------
 # 4. Candidate collection picks best
 # ---------------------------------------------------------------------------

@@ -6,7 +6,6 @@ orthonym.decomposition.engine.
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.decomposition.engine import (
     _coverage_is_adequate,
@@ -22,13 +21,11 @@ from orthonym.assembly.fragment_naming import (
     get_naming_depth,
     name_fragment_recursively,
 )
+from tests.support.read_back import mol as _mol
 
 
-def _mol(smiles: str):
-    """Helper to create RDKit Mol from SMILES."""
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"Invalid SMILES: {smiles}"
-    return mol
+#: these tests drive the fragment recursion outside a ``name`` scope (tests/conftest.py)
+pytestmark = pytest.mark.usefixtures("reset_naming_state_after")
 
 
 # ============================================================================
@@ -669,7 +666,7 @@ class TestPartialAssembly:
         to "must return None" -- see commit history for
         `decomposition/engine.py`'s `_try_multi_bond_decompose`.
         """
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
         from orthonym.decomposition.engine import _try_multi_bond_decompose
 
         # Create a molecule with 3 ester bonds (triester)
@@ -690,9 +687,7 @@ class TestPartialAssembly:
         ]
 
         # Mock _name_fragment_with_fallback: first two succeed, third fails
-        call_count = [0]
         def mock_name_frag(smiles):
-            call_count[0] += 1
             if smiles == "CC(=O)O":
                 return "acetic acid"
             if smiles == "CCO":
@@ -737,9 +732,7 @@ class TestPartialAssembly:
             {"smiles": "[invalid]", "side": "alkyl"},  # fail
         ]
 
-        call_count = [0]
         def mock_name_frag(smiles):
-            call_count[0] += 1
             if smiles == "CC(=O)O":
                 return "acetic acid"
             return None  # Others fail
@@ -832,7 +825,6 @@ class TestPartialAssembly:
             return None
 
         # Mock _name_covers_molecule to return False for "furan" on 15-HA fragment
-        original_covers = None
         def mock_covers(name, mol_obj):
             if name == "furan" and mol_obj and mol_obj.GetNumHeavyAtoms() == 15:
                 return False

@@ -56,34 +56,13 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C[C@@H](O)[C@H](N)C(=O)N[C@@H](CO)C(=O)N1CCC[C@@H]1C(=O)O",
     "C[C@H](NC(=O)[C@@H](N)[C@@H](C)O)C(=O)N1CCC[C@@H]1C(=O)O",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 pytestmark = pytest.mark.opsin_gate

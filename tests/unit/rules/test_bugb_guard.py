@@ -73,7 +73,6 @@ class TestBranchHandledFGsContract:
         """polyfunctional.py and composer.py must use the same BRANCH_HANDLED_FGS
         object from naming_utils, not define their own inline copies.
         """
-        import importlib
         import inspect
 
         # Verify naming_utils exports it

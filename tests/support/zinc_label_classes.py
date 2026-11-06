@@ -38,11 +38,6 @@ NON_PIN_CLASSES = (
 #: a drawing the classifier cannot place: a name of it must not be labelled a PIN until the audit places it
 UNPLACED = "UNPLACED"
 
-_METALS = frozenset({
-    "Li", "Na", "K", "Rb", "Cs", "Fr", "Be", "Mg", "Ca", "Sr", "Ba", "Ra", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
-    "Cu", "Zn", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au",
-    "Hg", "Al", "Ga", "In", "Tl", "Sn", "Pb", "Bi", "La", "Ce", "Pr", "Nd", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm",
-    "Yb", "Lu", "U", "Th"})
 
 _ACID_ANION = [Chem.MolFromSmarts(p) for p in (
     "[O-]-[#6]=[O,S]", "[S-]-[#6]=[O,S]",                 # carboxylate, dithiocarboxylate, thiocarboxylate

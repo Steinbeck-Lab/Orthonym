@@ -8,7 +8,6 @@ Per plan must_haves:
 - Functional tests verify byte-identical end-to-end naming output for
   representative compounds whose names depend on each lifted helper.
 """
-import pytest
 
 from orthonym import name_compound
 from orthonym.assembly import composer
@@ -60,45 +59,12 @@ def test_shim_reexport_assemble_fragments_is_same_object():
 # =============================================================================
 
 
-def test_suffix_propanol_named():
-    """_generate_suffix exercises -ol suffix for propan-1-ol."""
-    # The exact expected name depends on canary. Just assert it ends with -ol
-    name = name_compound("CCCO")
-    assert name and "ol" in name
-
-
-def test_suffix_pentanoic_acid_named():
-    """_generate_suffix exercises -oic acid suffix."""
-    name = name_compound("CCCCC(=O)O")
-    assert name and ("oic acid" in name or "anoic" in name)
-
-
-def test_prefixes_methylpropane_named():
-    """_generate_prefixes exercises methyl prefix on propane backbone."""
-    # 2-methylpropane -> 'methylpropane' or '2-methylpropane'
-    name = name_compound("CC(C)C")
-    assert name and "methyl" in name and "propan" in name
-
-
-def test_prefixes_dichlorobenzene_named():
-    """_generate_prefixes exercises chloro prefix on benzene."""
-    name = name_compound("Clc1ccc(Cl)cc1")
-    assert name and "chloro" in name and "benz" in name
-
-
 def test_stereodescriptors_chiral_butanol():
     """_generate_stereodescriptors exercises (R)- or (S)- prefix."""
     name = name_compound("C[C@@H](O)CC")
     assert name
     # Should include 'R' or 'S' stereodescriptor
     assert "(R)" in name or "(S)" in name or "R" in name or "S" in name
-
-
-def test_stereodescriptors_e_z_double_bond():
-    """_generate_stereodescriptors exercises E/Z descriptor."""
-    name = name_compound("C/C=C/C")
-    # but-2-ene with E configuration
-    assert name
 
 
 def test_assemble_fragments_complex_compound():

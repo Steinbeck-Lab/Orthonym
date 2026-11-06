@@ -6,12 +6,15 @@ a second, the in-process parse about a millisecond, and
 ``orthonym.jvm_bridge._opsin_stdout_uncached`` is defined to return exactly what that
 command writes to stdout for one name ("byte for byte", its docstring). So, in the PR
 run, this module answers such a call through the in-process JVM instead of starting a new
-one. ``tests/unit/validation/test_opsin_cli_inproc.py`` compares the two on 40 names.
+one. A ``-ostdinchikey`` call (OPSIN's own StdInChIKey of the name) is answered by the
+persistent JVM of ``tests/support/indep_oracle``, which makes the same OPSIN call
+(``NameToInchi.convertResultToStdInChIKey``). ``tests/unit/validation/test_opsin_cli_inproc.py``
+compares both with the command line on 40 names.
 
 Scope, so that a call is never served when its result could differ:
 
 * Only ``subprocess.run`` calls whose argv is ``java [jvm flags] -jar <the OPSIN jar the
-  suite resolves> [-r] (-osmi | -o smi)``, with ``input`` a ``str`` in text mode and the
+  suite resolves> [-r] (-osmi | -o smi | -ostdinchikey | -o stdinchikey)``, with ``input`` a ``str`` in text mode and the
   output captured. Every other call (other output modes, files, bytes mode, another jar,
   every other program) goes to the real ``subprocess.run`` unchanged.
 * Only when the immediate caller is test code (a file under ``tests/`` or ``tests_local/``).
@@ -62,7 +65,8 @@ def _suite_jar():
 
 
 def _opsin_smi_call(args):
-    """``(allow_radicals,)`` when ``args`` is a plain OPSIN SMILES call on the suite's jar."""
+    """``(allow_radicals, output)`` when ``args`` is a plain OPSIN SMILES or StdInChIKey call on the
+    suite's jar (``output`` 'smi' or 'stdinchikey')."""
     if not isinstance(args, (list, tuple)) or "-jar" not in args:
         return None
     argv = [str(a) for a in args]
@@ -74,20 +78,30 @@ def _opsin_smi_call(args):
             return None
     except (OSError, ValueError):
         return None
-    rest, radicals, smi, k = argv[i + 2:], False, False, 0
+    rest, radicals, output, k = argv[i + 2:], False, None, 0
     while k < len(rest):
         flag = rest[k]
         if flag == "-r":
             radicals = True
-        elif flag == "-osmi":
-            smi = True
-        elif flag == "-o" and k + 1 < len(rest) and rest[k + 1] == "smi":
-            smi = True
+        elif flag in ("-osmi", "-ostdinchikey") and output is None:
+            output = flag[2:]
+        elif flag == "-o" and k + 1 < len(rest) and rest[k + 1] in ("smi", "stdinchikey") and output is None:
+            output = rest[k + 1]
             k += 1
         else:
             return None
         k += 1
-    return (radicals,) if smi else None
+    return (radicals, output) if output else None
+
+
+def stdinchikey_stdout(name: str, radicals: bool):
+    """What ``-ostdinchikey`` writes for one name (the key, or nothing for a name OPSIN does not read,
+    then a newline), from the persistent JVM of ``indep_oracle``; None when it cannot answer."""
+    from tests.support import indep_oracle
+    got = indep_oracle.keys("", name, radicals)
+    if got is None or got[1] in ("", "ERR"):
+        return None
+    return "\n" if got[1] == "NOPARSE" else got[1] + "\n"
 
 
 def _caller_is_test_code(frame) -> bool:
@@ -119,7 +133,12 @@ def _serve(args, kwargs, frame):
         lines.pop()
     out = []
     for line in lines:
-        stdout, served = _opsin_stdout_uncached(line, call[0], jar)
+        if call[1] == "stdinchikey":
+            # the command line reads a name up to its first tab
+            stdout = stdinchikey_stdout(line.split("\t")[0], call[0])
+            served = stdout is not None
+        else:
+            stdout, served = _opsin_stdout_uncached(line, call[0], jar)
         if not served:
             return None          # the bridge cannot answer this one: run the real command
         out.append(stdout)

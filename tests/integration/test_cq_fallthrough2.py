@@ -21,6 +21,7 @@ trace-checked and drop 0 convertible molecules), completed. Offer-not-return,
 best-effort-gated, RT-gated: 0-wrong holds via the recovery's own OPSIN round-trip
 gate (a project rule), and PIN/complete output is byte-identical.
 """
+from tests.support.read_back import key_or_none
 import random
 from unittest.mock import patch
 
@@ -76,16 +77,11 @@ def _besteffort():
                      allow_aromatic_general=True)
 
 
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
-
-
 def _rt_inchikey_match(name, smiles):
     assert not is_failure_name(name), f"expected a real name, got {name!r}"
     osmi = opsin_parse(name)
     assert osmi is not None, f"OPSIN could not parse {name!r}"
-    return _inchikey(osmi) == _inchikey(smiles)
+    return key_or_none(osmi) == key_or_none(smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", WITNESSES)

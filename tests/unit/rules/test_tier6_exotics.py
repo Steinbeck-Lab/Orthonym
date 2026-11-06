@@ -25,13 +25,6 @@ from orthonym.rules.ring_substituents import (
 )
 
 
-@pytest.fixture
-def _validity_gate_on(monkeypatch):
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
-
 # ---------------------------------------------------------------------------
 # 6a — spiro unsaturation splice
 # ---------------------------------------------------------------------------
@@ -232,7 +225,7 @@ def test_pseudohalide_protections(smiles, expected):
 
 
 @pytest.mark.unit
-def test_carbonyl_dicyanide_retained_pin(_validity_gate_on):
+def test_carbonyl_dicyanide_retained_pin(opsin_gate):
     """ (Wave-2 completion C): functional-class IS the PIN for
     carbonic-acid nitriles -- retained exact-SMILES row, OPSIN-RT verified."""
     assert name_compound("O=C(C#N)C#N") == "carbonyl dicyanide"
@@ -277,7 +270,7 @@ def test_chalcogen_bridge_protections(smiles, expected):
 
 
 @pytest.mark.unit
-def test_s_attached_mixed_bridge_now_named(_validity_gate_on):
+def test_s_attached_mixed_bridge_now_named(opsin_gate):
     """ (item 2): -S-O-R now names via the (methoxysulfanyl) contraction
     (capability gain, OPSIN-RT verified 2026-09-04, ITEM2-VERIFICATION.md);
     was fail-closed pending the alkoxy contraction."""

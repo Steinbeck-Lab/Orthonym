@@ -29,11 +29,6 @@ from orthonym.namer import Orthonym
 from orthonym.perception.functional_groups import detect_functional_groups
 
 
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
 @pytest.fixture
 def gated_namer(monkeypatch):
     """A namer with the OPSIN validity gate ON (production behaviour).
@@ -310,9 +305,7 @@ def test_benzyl_case_names_correctly_even_without_the_opsin_gate(
     refusal is also what a broken producer yields. The historical wrong tokens
     stay asserted so the specific old leak cannot come back.
     """
-    import orthonym.namer as _namer
     from orthonym.errors import is_failure_name
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
     name = Orthonym().name(smiles)
     assert not is_failure_name(name), f"ungated output must name, got {name!r}"
     assert "methylbenzene" not in name and "toluene" not in name

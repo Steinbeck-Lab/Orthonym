@@ -37,25 +37,9 @@ Every name is read back by a FRESH OPSIN call and must give the input's key and 
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.read_back import same_hydron_sites
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-
-
-def _exact(name, smiles):
-    from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name, smiles)
-    return bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
 
 
 def _named(smiles, name):
@@ -63,7 +47,7 @@ def _named(smiles, name):
     from orthonym import Orthonym
     r = Orthonym(style="pin").name_tiered(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    assert _exact(name, smiles)
+    assert same_hydron_sites(name, smiles)
 
 
 ECTOINE = "(4S)-2-methyl-3,4,5,6-tetrahydropyrimidin-1-ium-4-carboxylate"

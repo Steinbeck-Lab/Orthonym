@@ -11,7 +11,6 @@ Key behavior:
 - Acid-side stereo continues to work (regression check)
 """
 
-import pytest
 from orthonym.namer import name_compound
 
 

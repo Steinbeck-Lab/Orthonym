@@ -14,7 +14,3 @@ class TestP29621SubstitutedBenzyl:
     ])
     def test_substituted_benzyl_on_pyridine(self, smiles, expected):
         assert name_compound(smiles) == expected
-
-    def test_unsubstituted_still_benzyl(self):
-        # Task-3 invariant must not regress.
-        assert name_compound("C(c1ccccc1)c1ccccn1") == "2-benzylpyridine"

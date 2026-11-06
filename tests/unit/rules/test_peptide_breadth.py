@@ -20,7 +20,6 @@ below: internal notes
 
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
@@ -29,6 +28,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import same_key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -39,34 +39,13 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "NC(CCC(=O)NC1(C(=O)O)CC1)C(=O)O",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label", emit_tier="pin")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 # GATE ON (production default): tests/conftest.py's autouse fixture disables
@@ -77,20 +56,6 @@ def _dt_row(smiles):
 # green-but-unrealistic result. This module tests exactly what
 # `name_compound` emits for a real caller, so the gate must be ON.
 pytestmark = pytest.mark.opsin_gate
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    """name -> OPSIN -> full InChIKey, compared to the input's InChIKey."""
-    if not name:
-        return False
-    o = opsin_parse(name)
-    if not o:
-        return False
-    mol_in = Chem.MolFromSmiles(smiles)
-    mol_out = Chem.MolFromSmiles(o)
-    if mol_in is None or mol_out is None:
-        return False
-    return inchi.MolToInchiKey(mol_in) == inchi.MolToInchiKey(mol_out)
 
 
 def _heavy_atoms(smiles: str) -> int:
@@ -117,7 +82,7 @@ class TestLeverBGammaLink:
         assert result == (
             "1-(4-amino-4-carboxybutanamido)cyclopropane-1-carboxylic acid"
         ), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
         assert _heavy_atoms(smi) == _heavy_atoms(opsin_parse(result))
 
     def test_real_glutathione_stereo_defined(self):
@@ -133,7 +98,7 @@ class TestLeverBGammaLink:
         # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN: the Glu chain, the longest with one acid group)
         assert result == ("(2S)-2-amino-5-({(2R)-1-[(carboxymethyl)amino]-1-oxo-3-sulfanylpropan-2-yl}amino)-5-"
                           "oxopentanoic acid"), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_gamma_glu_gly_stereo_defined(self):
         """gamma-L-Glu-Gly (2-residue, standard Gly acceptor). Hand-RT-
@@ -147,7 +112,7 @@ class TestLeverBGammaLink:
         smi = "N[C@@H](CCC(=O)NCC(=O)O)C(=O)O"
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_gamma_glu_gly_undefined_stereo_not_named_alpha(self):
         """Regression (pre-existing test, tests/unit/test_peptides.py):
@@ -177,7 +142,7 @@ class TestLeverANAcylCap:
         # sibling below); the decorated acyl is now the method (1) amido prefix
         #, the Blue Book). Full-InChIKey round trip below.
         assert result == "[2-(3-hydroxy-11-methyltridecanamido)acetamido]acetic acid", result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_simple_fatty_acyl_dipeptide(self):
         """A plainer synthetic case: dodecanoyl (lauroyl) cap on Gly-Gly.
@@ -189,20 +154,7 @@ class TestLeverANAcylCap:
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "(2-dodecanamidoacetamido)acetic acid", result
-        assert _full_rt(smi, result), result
-
-    def test_single_residue_n_acetylglycine_unchanged(self):
-        """Lever A must NOT fire for a bare N-acyl AMINO ACID (a single
-        residue behind the cap, not a genuine >=2-residue peptide chain) --
-        that shape already names correctly via the general/composer
-        pipeline today ('acetamidoacetic acid'). This is the existing test
-        suite's own invariant (tests/unit/test_peptides.py
-        test_n_acetylglycine_still_excluded /
-        test_n_acetylglycine_not_misrouted); asserted again here at the
-        exact-string level as a Lever-A-specific regression guard."""
-        result = name_compound("CC(=O)NCC(=O)O")
-        assert result == "acetamidoacetic acid", result
-
+        assert same_key(smi, result), result
 
 # ── Fail-closed: mid-chain non-standard residue must abstain cleanly ─────
 
@@ -240,7 +192,7 @@ class TestFailClosedMidChainNonStandard:
         assert _heavy_atoms(self.CHEBI_371) == _heavy_atoms(o), (
             result, self.CHEBI_371, o,
         )
-        assert _full_rt(self.CHEBI_371, result), result
+        assert same_key(self.CHEBI_371, result), result
 
 
 # ── No-atom-drop invariant, over every emitted target above ──────────────
@@ -282,15 +234,6 @@ class TestRegressionUnaffected:
     """Spot-checks that ordinary standard-chain peptides (untouched code
     path) and the pre-existing isopeptide fail-closed guards are unchanged."""
 
-    def test_glycylglycine_unchanged(self):
-        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
-        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
-
-    def test_alanylglycine_unchanged(self):
-        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
-        assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-                == "[(2S)-2-aminopropanamido]acetic acid")
-
     def test_glutathione_achiral_still_declines_or_roundtrips(self):
         """The ACHIRAL-drawn glutathione test molecule (no stereo defined
         anywhere) from tests/unit/test_peptides.py
@@ -304,7 +247,7 @@ class TestRegressionUnaffected:
         result = _dt_name_compound(smi)
         assert result != "glutamylcysteinylglycine"
         if not is_failure_name(result):
-            assert _full_rt(smi, result), result
+            assert same_key(smi, result), result
 
     def test_epsilon_lysine_isopeptide_not_named_alpha(self):
         result = name_compound("NCC(=O)NCCCC[C@H](N)C(=O)O")

@@ -11,16 +11,12 @@ branch is spelled as the PIN tier spells it ('4-[(2S)-2-phenylpropanoyl]cyclohex
 """
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _WIDER = ["valid", "complete", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 _RING_ACID_ACYL = [
@@ -43,7 +39,7 @@ _RING_ACID_ACYL = [
 def test_ring_acid_acyl_branch_at_valid_and_complete(smiles, name, tier):
     """ (:29886): the ring acid keeps 'carboxylic acid'; the branch is an acyl prefix, not 'carboxy' on a
     benzene parent."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert "carboxy" not in row["name"].replace("carboxylic", ""), row
     assert_full_rt(row["name"], smiles)
@@ -52,7 +48,7 @@ def test_ring_acid_acyl_branch_at_valid_and_complete(smiles, name, tier):
 @pytest.mark.parametrize("smiles,name", _RING_ACID_ACYL)
 def test_the_pin_tier_rows_are_unchanged(smiles, name):
     """The PIN tier already named these: its row is the one the wider tiers now give."""
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -60,7 +56,7 @@ def test_the_pin_tier_rows_are_unchanged(smiles, name):
 def test_a_chain_acid_with_a_ketone_keeps_its_name(tier):
     """Control: (:18169) acids above ketones, the chain acid '4-oxo-6-phenylhexanoic acid' (no ring acid, no
     ring-bearing acyl branch) is named as before."""
-    row = _row("OC(=O)CCC(=O)CCc1ccccc1", tier)
+    row = tier_row("OC(=O)CCC(=O)CCc1ccccc1", tier)
     assert (row["name"], row["tier"]) == ("4-oxo-6-phenylhexanoic acid", "pin_verified"), row
 
 
@@ -69,8 +65,8 @@ def test_a_branch_the_strict_producer_declines_keeps_the_wider_tier_name(tier):
     """Control: a spiro ring acid with an acyl branch has no PIN-tier name (the strict producer declines the branch);
     the wider tiers keep the systematic name they gave, read back whole."""
     smiles = "OC(=O)C1CCC2(CC1)CC(C(=O)Cc1ccccc1)C2"
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    row = _row(smiles, tier)
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (
         "2-(phenylacetyl)spiro[3.5]nonane-7-carboxylic acid", "systematic_verified"), row
     assert_full_rt(row["name"], smiles)

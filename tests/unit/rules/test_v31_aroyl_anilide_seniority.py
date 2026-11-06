@@ -23,7 +23,6 @@ from __future__ import annotations
 import pytest
 
 from orthonym.namer import name_compound
-from orthonym.errors import is_failure_name
 
 
 @pytest.mark.parametrize("smiles,expected", [

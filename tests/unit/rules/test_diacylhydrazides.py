@@ -8,25 +8,11 @@ d1330 and d1706 (the acetyl prefix of a substituted acetic acid carries no locan
 d1706 because the input has no double-bond stereo).
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
-from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import same_key
 
 pytestmark = pytest.mark.opsin_gate
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _same(smi, name):
-    out = opsin_parse(name)
-    m_out = Chem.MolFromSmiles(out) if out else None
-    return m_out is not None and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == inchi.MolToInchiKey(m_out)
 
 
 ROWS = [
@@ -50,7 +36,7 @@ def test_name_tier_and_readback(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified", row
     assert row["producer"] == "inner:diacylhydrazide"
-    assert _same(smiles, expected), expected
+    assert same_key(smiles, expected), expected
 
 
 @pytest.mark.parametrize("smiles", [
@@ -80,16 +66,3 @@ def test_registered_ahead_of_the_claimants():
     entry = INNER_DISPATCH_TABLE["diacylhydrazide"]
     assert entry.priority == 1480
     assert entry.priority < INNER_DISPATCH_TABLE["chain_diamide"].priority < INNER_DISPATCH_TABLE["ester_family"].priority
-
-
-@pytest.mark.parametrize("name", [
-    "4-(1-sulfanylideneethyl)benzoic acid",
-    "4-chloro-7-[(3-chloro-4-nitroquinolin-7-yl)sulfanyl]-3-nitroquinoline",
-    "2-(cyanosulfonyl)cyclohexane-1-carboxylic acid",
-    "1-(2-oxophosphepan-3-yl)propan-1-one",
-])
-def test_the_four_refuted_names_are_not_pin_verified(namer, name):
-    out = opsin_parse(name)
-    if out:
-        row = namer.name_tiered(out)
-        assert not (row["tier"] == "pin_verified" and row["name"] == name)

@@ -19,6 +19,7 @@ from rdkit.Chem import AllChem
 import orthonym
 import orthonym.input_mol as input_mol
 from orthonym import Orthonym, classify_limit, name_compound, name_with_tree
+from tests.support.read_back import mol as _mol
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -42,12 +43,6 @@ CALLS = {
 
 def _limit(found):
     return None if found is None else (found.code, found.message, found.smiles)
-
-
-def _mol(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, smiles
-    return mol
 
 
 def _written(mol):

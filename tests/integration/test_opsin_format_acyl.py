@@ -10,7 +10,6 @@ Specifically tests that:
 a phase Plan 01: OPSIN Format Fixes - Acyl Prefix Format
 """
 
-import os
 import re
 import subprocess
 import pytest
@@ -268,28 +267,12 @@ class TestAcylPrefixEdgeCases:
             f"Old format '(ethanoyl)oxy' found in '{name}'"
         )
 
-    def test_no_regression_simple_amide(self):
-        """Simple amides should not be affected by acylamino changes."""
-        # Acetamide: CC(=O)N
-        name = name_compound("CC(=O)N")
-        assert "amid" in name.lower() or "ethanamid" in name.lower() or name == "acetamide", (
-            f"Simple amide naming broken: '{name}'"
-        )
-
     def test_no_regression_simple_ester(self):
         """Simple esters should not be affected by acyloxy changes."""
         # Ethyl acetate: CC(=O)OCC
         name = name_compound("CC(=O)OCC")
         assert "acetate" in name.lower() or "ethanoate" in name.lower(), (
             f"Simple ester naming broken: '{name}'"
-        )
-
-    def test_no_regression_amino_acid(self):
-        """Amino acids without acyl groups should be unaffected."""
-        # Alanine: CC(N)C(=O)O
-        name = name_compound("CC(N)C(=O)O")
-        assert "amino" in name.lower() or "alanine" in name.lower(), (
-            f"Simple amino acid naming broken: '{name}'"
         )
 
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not found")

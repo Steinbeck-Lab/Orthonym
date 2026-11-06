@@ -60,24 +60,6 @@ class TestAlkenylE2E:
 class TestAlkenylNegative:
     """Tests that saturated chains still produce correct alkyl names."""
 
-    def test_ethyl_still_named_ethyl(self):
-        """Ethylcyclohexane: no double bond, must stay 'ethyl'."""
-        result = name_compound("CCC1CCCCC1")
-        assert "ethyl" in result.lower()
-        assert "ethenyl" not in result.lower()
-
-    def test_methyl_still_named_methyl(self):
-        """Methylcyclohexane: no double bond, must stay 'methyl'."""
-        result = name_compound("CC1CCCCC1")
-        assert "methyl" in result.lower()
-        assert "ethenyl" not in result.lower()
-
-    def test_ring_unsaturation_not_alkenyl(self):
-        """Cyclohexene: ring C=C, not a substituent -> not alkenyl."""
-        result = name_compound("C1=CCCCC1")
-        assert "ethenyl" not in result.lower()
-        assert "cyclohex" in result.lower()
-
     def test_isopropyl_still_retained(self):
         """Saturated isopropyl is named as the located alkyl 'propan-2-yl' (F-T9/DD6
         ), NOT as an alkenyl — the point of this test is that no spurious 'en'

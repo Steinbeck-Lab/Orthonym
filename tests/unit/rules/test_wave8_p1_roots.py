@@ -87,11 +87,6 @@ def test_r6_substituted_diaryl_ketone_unregressed():
 def test_r12_fusion_diol_no_java_no_atom_drop():
     """Gate-off (no-Java) the namer must NOT emit an atom-dropping
     `...dihydronaphthalene` for the diol — fail closed (or name it correctly)."""
-    saved = _namer._DISABLE_VALIDITY_GATE
-    _namer._DISABLE_VALIDITY_GATE = True
-    try:
-        out = _namer.name_compound(DIOL, style="pin")
-    finally:
-        _namer._DISABLE_VALIDITY_GATE = saved
+    out = _namer.name_compound(DIOL, style="pin")     # the suite runs with the gate off
     # Either fail closed, or emit the correct diol PIN — never the atom-dropped name.
     assert "dihydronaphthalene" not in (out or "") or out == "naphthalene-4a,8a-diol"

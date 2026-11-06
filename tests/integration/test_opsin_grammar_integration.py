@@ -24,11 +24,7 @@ Anti-patterns avoided:
     : an RT=1 -> RT=0 flip on canary is a phase-blocker.
 """
 
-import logging
-import os
 import statistics
-import subprocess
-from typing import List
 
 import pytest
 
@@ -40,24 +36,15 @@ pytest_benchmark = pytest.importorskip("pytest_benchmark")
 from orthonym.namer import Orthonym
 from orthonym.validation.opsin_grammar import OpsinGrammar
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 def _java_available() -> bool:
-    try:
-        subprocess.run(["java", "-version"], capture_output=True, timeout=10)
-        return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def _opsin_jar_path():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
+    return java_on_path()
 
 
 _SKIP = pytest.mark.skipif(
-    not _java_available() or _opsin_jar_path() is None,
+    not _java_available() or jar_or_none() is None,
     reason="Java + OPSIN JAR (v2.9.0) required",
 )
 
@@ -323,7 +310,6 @@ class TestWarningOnUnrepairable:
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
-        before_counts = sum(stats.values())
         _final_grammar_check(
             "bad weird unknown name",
             None,

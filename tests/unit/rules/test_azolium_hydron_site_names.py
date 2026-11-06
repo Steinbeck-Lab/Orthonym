@@ -26,6 +26,7 @@ name is read back by a FRESH OPSIN call and must give the input's fixed-H InChI.
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.read_back import same_hydron_sites
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -63,23 +64,6 @@ def _engine(tier):
             else Orthonym(style="pin", **_emit_tier_flags(tier)))
 
 
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-
-
-def _exact(name, smiles):
-    from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name, smiles)
-    return bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
-
-
 @pytest.mark.parametrize("tier", TIERS)
 @pytest.mark.parametrize("one,other,pin", PINS)
 def test_both_drawings_get_the_pin_with_the_lowest_prefix_locants(one, other, pin, tier):
@@ -88,7 +72,7 @@ def test_both_drawings_get_the_pin_with_the_lowest_prefix_locants(one, other, pi
     for smiles in (one, other):
         r = engine.name_tiered(smiles)
         assert (r["name"], r["tier"]) == (pin, "pin_verified"), (smiles, tier, r)
-        assert _exact(pin, smiles), (smiles, pin)
+        assert same_hydron_sites(pin, smiles), (smiles, pin)
 
 
 @pytest.mark.parametrize("tier", TIERS)
@@ -97,7 +81,7 @@ def test_the_nn_azolium_drawn_with_the_charge_on_the_nh_nitrogen_gets_the_pin(sm
     jar_or_skip()
     r = _engine(tier).name_tiered(smiles)
     assert (r["name"], r["tier"]) == (pin, "pin_verified"), (smiles, tier, r)
-    assert _exact(pin, smiles), (smiles, pin)
+    assert same_hydron_sites(pin, smiles), (smiles, pin)
 
 
 @pytest.mark.parametrize("one,other,pin", PINS)
@@ -160,4 +144,4 @@ def test_a_name_keeps_pin_verified_when_the_other_charge_form_has_no_name(smiles
     jar_or_skip()
     r = _engine(tier).name_tiered(smiles)
     assert (r["name"], r["tier"]) == (pin, "pin_verified"), (smiles, tier, r)
-    assert _exact(pin, smiles), (smiles, pin)
+    assert same_hydron_sites(pin, smiles), (smiles, pin)

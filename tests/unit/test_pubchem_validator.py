@@ -5,11 +5,8 @@ All tests use mocked HTTP calls -- no real PubChem API requests are made.
 """
 
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from orthonym.validation.pubchem_validator import (
     load_cache,

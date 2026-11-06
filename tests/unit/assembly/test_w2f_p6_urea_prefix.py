@@ -11,7 +11,6 @@ arg order ``(mol, fg, atoms, None)``. The real dispatcher is
 and FG detection is ``detect_functional_groups`` (not ``find_functional_groups``).
 This test uses the real API.
 """
-import pytest
 from rdkit import Chem
 from orthonym.assembly.substituent_prefix_forms import get_substituent_prefix_form
 from orthonym.perception.functional_groups import detect_functional_groups

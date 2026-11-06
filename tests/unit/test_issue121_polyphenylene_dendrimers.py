@@ -15,10 +15,10 @@ import sys
 import time
 
 import pytest
-from rdkit import Chem
 
 from orthonym import cli_time_limit
 from orthonym.opsin_capabilities import phane_enabled
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -64,10 +64,6 @@ def _row(smiles, *flags):
     assert done.returncode == 0, done.stderr[-2000:]
     run = json.loads(done.stdout.strip().splitlines()[-1])
     return run["seconds"], json.loads(run["out"]), run["status"]
-
-
-def _key(smiles):
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 def test_the_cage_analysis_is_never_asked_about_rings_joined_by_bonds(monkeypatch):

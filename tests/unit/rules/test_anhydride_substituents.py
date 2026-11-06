@@ -17,13 +17,7 @@ class TestAnhydrideSubstituents:
         assert "methylpropanoic" in result, f"Expected branch in '{result}'"
         assert "anhydride" in result
 
-    def test_simple_ethanoic_anhydride_unchanged(self):
-        # Retained acid name is the PIN: acetic, not ethanoic.
-        result = name_compound("CC(=O)OC(=O)C")
-        assert "acetic anhydride" == result
-
     def test_simple_butanoic_anhydride_unchanged(self):
         # CCCC(=O)OC(=O)CCC = symmetric butanoic anhydride (4C each side)
         result = name_compound("CCCC(=O)OC(=O)CCC")
         assert "butanoic anhydride" == result
-

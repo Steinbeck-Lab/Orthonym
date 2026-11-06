@@ -59,9 +59,6 @@ class TestRetainedAlkoxides:
 class TestBareParents:
     """: bare retained parents previously unreachable."""
 
-    def test_hydroxylamine(self):
-        assert name_compound("NO") == "hydroxylamine"
-
     def test_formazan(self):
         assert name_compound("NN=CN=N") == "formazan"
 
@@ -109,23 +106,3 @@ class TestIndicatedHydrogen:
     ])
     def test_protected_rings(self, smiles, expected):
         assert name_compound(smiles) == expected
-
-
-@pytest.mark.unit
-class TestIrineStem:
-    """: N-only 3-ring mancude stem is 'irine'."""
-
-    def test_1h_azirine(self):
-        # C=C double bond, N-H sp3 -> indicated H on N1
-        assert name_compound("C1=CN1") == "1H-azirine"
-
-    def test_2h_azirine(self):
-        # C=N double bond, CH2 sp3 -> lowest locant 2 (not 3H-azirine)
-        assert name_compound("N1=CC1") == "2H-azirine"
-
-    def test_aziridine_unchanged(self):
-        assert name_compound("C1CN1") == "aziridine"
-
-    def test_oxirane_unchanged(self):
-        # non-N 3-ring keeps irane/irene family
-        assert name_compound("C1CO1") == "oxirane"

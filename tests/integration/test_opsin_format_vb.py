@@ -14,27 +14,16 @@ computational bugs (wrong bridge lengths, impossible valencies) and
 are deferred to a phase/142.
 """
 
-import os
-import shutil
 import subprocess
 
 import pytest
 
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 def _java_available() -> bool:
     """Check if Java runtime is available."""
-    if not shutil.which("java"):
-        return False
-    try:
-        proc = subprocess.run(
-            ["java", "-version"],
-            capture_output=True, text=True, timeout=5,
-        )
-        return proc.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    return java_on_path()
 
 
 def _opsin_jar_path(version: str = "2.9.0"):

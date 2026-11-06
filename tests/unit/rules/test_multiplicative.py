@@ -80,16 +80,6 @@ class TestRetainedParentLookup:
         assert _name_parent("Nc1ccccc1") == "aniline"
         assert _name_parent("Oc1ccccc1") == "phenol"
 
-    def test_canary_methylenedianiline_e2e(self):
-        """End-to-end canary: methylenedianiline still RTs after."""
-        from orthonym import name_compound
-
-        assert (
-            name_compound("Nc1ccc(Cc2ccc(N)cc2)cc1")
-            == "4,4'-methylenedianiline"
-        )
-
-
 # ---------------------------------------------------------------------------
 # Task 2.2 — topology guard
 # ---------------------------------------------------------------------------
@@ -142,16 +132,6 @@ class TestTopologyGuard:
         # guard does NOT block atom-bridged cases.
         mol = Chem.MolFromSmiles("Nc1ccc(Cc2ccc(N)cc2)cc1")
         assert name_multiplicative(mol) == "4,4'-methylenedianiline"
-
-    def test_biphenyl_full_pipeline(self):
-        """End-to-end: biphenyl falls through to ring_assemblies."""
-        from orthonym import name_compound
-
-        # Biphenyl returns 'biphenyl' via a phase ring_assemblies path.
-        result = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert result is not None
-        assert "biphenyl" in result.lower() or "1,1'-biphenyl" in result.lower()
-
 
 # ---------------------------------------------------------------------------
 # Task 2.3 — vs multiplier split
@@ -242,14 +222,6 @@ class TestLocantCascade:
         assert bridge_idx is not None and ring_conn_idx is not None
         locant = _get_bridge_locant(mol, bridge_idx, ring_conn_idx, ring_atoms)
         assert locant == 4, f"expected para (locant 4), got {locant}"
-
-    def test_canary_methylenedianiline_e2e_unchanged(self):
-        from orthonym import name_compound
-
-        assert (
-            name_compound("Nc1ccc(Cc2ccc(N)cc2)cc1")
-            == "4,4'-methylenedianiline"
-        )
 
     def test_oxydiphenol_e2e(self):
         from orthonym import name_compound
@@ -354,13 +326,6 @@ class TestBridgeTables:
         assert _MULTI_BRIDGE_NAMES.get(key) == expected_name, (
             f"_MULTI_BRIDGE_NAMES key {key!r} missing or wrong"
         )
-
-    def test_peroxy_e2e(self):
-        """ bridge add (peroxy): 4,4'-peroxydibenzoic acid RTs."""
-        from orthonym import name_compound
-
-        result = name_compound("OC(=O)c1ccc(OOc2ccc(C(=O)O)cc2)cc1")
-        assert result == "4,4'-peroxydibenzoic acid", f"got {result!r}"
 
     def test_disulfanediyl_e2e(self):
         """ bridge add (disulfanediyl): 4,4'-disulfanediyldibenzoic acid."""

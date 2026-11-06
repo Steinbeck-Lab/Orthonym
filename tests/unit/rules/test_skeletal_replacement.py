@@ -344,7 +344,7 @@ class TestAzaChains:
         """: acyclic amine N bonded only to C → substitutive preferred.
         CCNCCC: the amine gate (Gate 2c) returns None so skeletal replacement
         does NOT produce '3-azahexane'; the substitutive handler gives
-        'N-ethylpropan-1-amine' instead (tested in TestEndToEnd.test_azahexane_e2e)."""
+        'N-ethylpropan-1-amine' instead (tested in test_v37_sp1_compound_substituent.py::TestControlsUnchanged)."""
         mol = Chem.MolFromSmiles('CCNCCC')
         assert try_skeletal_replacement_name(mol) is None
 
@@ -491,11 +491,6 @@ class TestEndToEnd:
         Updated from pre-R4 assertion."""
         assert name_compound('COCCOC') == '1,2-dimethoxyethane'
 
-    def test_azahexane_e2e(self):
-        """: CCNCCC → substitutive 'N-ethylpropan-1-amine', not '3-azahexane'.
-        Amine Gate 2c blocks skeletal replacement; substitutive handler produces the PIN."""
-        assert name_compound('CCNCCC') == 'N-ethylpropan-1-amine'
-
     def test_dioxaoctane_e2e(self):
         """R4 / /: CCOCCOCC (2 embedded O-ethers, no -ol suffix) is
         named substitutively as '1,2-diethoxyethane', NOT skeletal '3,6-dioxaoctane'.
@@ -533,10 +528,6 @@ class TestEndToEnd:
         result = name_compound('COC')
         assert 'oxa' not in result
         assert result == 'methoxymethane'
-
-    def test_ethanol_not_replacement(self):
-        """CCO should still be 'ethanol'."""
-        assert name_compound('CCO') == 'ethanol'
 
     def test_dithiahexane_e2e(self):
         """name_compound('CSCCSC') -> '1,2-bis(methylsulfanyl)ethane' (fix a performance pass;

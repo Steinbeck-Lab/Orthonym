@@ -3,21 +3,22 @@ Pytest configuration and shared fixtures for Orthonym.
 """
 
 import pytest
-import csv
 import os
 import warnings
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict
 
 from rdkit import Chem
 
 # Shared jar helpers (the jars live outside the repo; see orthonym.jars).
 # Re-exported here; tests import them from ``tests.support.jars``.
 from tests.support.jars import REQUIRE_JARS, jar_or_none, jar_or_skip, jar_unavailable  # noqa: F401
+# Fixtures every test can request: the natural-product and nucleoside producers on their own.
+from tests.support.np_producer import np_producer_only  # noqa: F401
+from tests.support.nucleoside_producer import nucleoside_producer_only  # noqa: F401
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 # ============================================================================
@@ -40,11 +41,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 @pytest.fixture
 def mol_from_smiles():
     """Factory fixture to create RDKit molecules from SMILES."""
-    def _create(smiles: str):
-        mol = Chem.MolFromSmiles(smiles)
-        assert mol is not None, f"Invalid SMILES: {smiles}"
-        return mol
-    return _create
+    from tests.support.read_back import mol
+    return mol
 
 
 @pytest.fixture
@@ -57,41 +55,12 @@ def canonical():
     return _canonicalize
 
 
-# ============================================================================
-# Test Data Fixtures
-# ============================================================================
-
-@pytest.fixture(scope="session")
-def test_data() -> List[Dict[str, str]]:
-    """Load test dataset from CSV if available."""
-    csv_path = PROJECT_ROOT / "test_data.csv"
-    
-    if not csv_path.exists():
-        return []
-    
-    data = []
-    with open(csv_path, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            # Handle different possible column names
-            smiles = row.get('smiles') or row.get('SMILES') or row.get('Smiles')
-            name = row.get('iupac_name') or row.get('name') or row.get('Name') or row.get('IUPAC')
-            if smiles and name:
-                data.append({'smiles': smiles, 'name': name})
-    
-    return data
-
-
-@pytest.fixture
-def quick_sample(test_data) -> List[Dict[str, str]]:
-    """First 500 compounds for quick testing."""
-    return test_data[:500]
-
-
-@pytest.fixture
-def medium_sample(test_data) -> List[Dict[str, str]]:
-    """First 5000 compounds for medium testing."""
-    return test_data[:5000]
+@pytest.fixture(scope="module")
+def namer():
+    """The default engine (``Orthonym``, the PIN tier), one per test module. A module that
+    needs another tier or other flags defines its own ``namer``."""
+    from orthonym import Orthonym
+    return Orthonym()
 
 
 # ============================================================================
@@ -130,12 +99,8 @@ def opsin_jar() -> str:
 @pytest.fixture
 def opsin_available(opsin_jar) -> bool:
     """Check if OPSIN is available for round-trip testing."""
-    import shutil
-
-    if not shutil.which("java"):
-        return False
-
-    return opsin_jar is not None
+    from tests.support.jars import java_on_path
+    return opsin_jar is not None and java_on_path()
 
 
 @pytest.fixture(scope="session")
@@ -163,7 +128,6 @@ def _opsin_parse_canary(opsin_jar) -> bool:
     if opsin_jar is None:
         return False
 
-    from rdkit import Chem
     from orthonym.validation.opsin_roundtrip import opsin_parse
 
     probe = opsin_parse("butan-2-ol")
@@ -199,110 +163,6 @@ def opsin_to_smiles(opsin_available, _opsin_parse_canary):
 
     return opsin_parse
 
-
-# ============================================================================
-# Compound Class Test Data
-# ============================================================================
-
-@pytest.fixture
-def simple_alkanes():
-    """Simple alkane test cases."""
-    return [
-        ("C", "methane"),
-        ("CC", "ethane"),
-        ("CCC", "propane"),
-        ("CCCC", "butane"),
-        ("CCCCC", "pentane"),
-        ("CCCCCC", "hexane"),
-        ("CCCCCCC", "heptane"),
-        ("CCCCCCCC", "octane"),
-        ("CCCCCCCCC", "nonane"),
-        ("CCCCCCCCCC", "decane"),
-    ]
-
-
-@pytest.fixture
-def branched_alkanes():
-    """Branched alkane test cases."""
-    return [
-        ("CC(C)C", "2-methylpropane"),
-        ("CC(C)CC", "2-methylbutane"),
-        ("CCC(C)C", "2-methylbutane"),
-        ("CC(C)(C)C", "2,2-dimethylpropane"),
-        ("CC(C)C(C)C", "2,3-dimethylbutane"),
-        ("CC(C)(C)CC", "2,2-dimethylbutane"),
-        ("CCC(CC)CC", "3-ethylpentane"),
-    ]
-
-
-@pytest.fixture
-def simple_alcohols():
-    """Simple alcohol test cases."""
-    return [
-        ("CO", "methanol"),
-        ("CCO", "ethanol"),
-        ("CCCO", "propan-1-ol"),
-        ("CC(O)C", "propan-2-ol"),
-        ("CCCCO", "butan-1-ol"),
-        ("CCC(O)C", "butan-2-ol"),
-        ("CC(C)O", "propan-2-ol"),
-        ("CC(C)CO", "2-methylpropan-1-ol"),
-    ]
-
-
-@pytest.fixture
-def simple_aldehydes():
-    """Simple aldehyde test cases."""
-    return [
-        ("C=O", "formaldehyde"),
-        ("CC=O", "acetaldehyde"),
-        ("CCC=O", "propanal"),
-        ("CCCC=O", "butanal"),
-        ("CCCCC=O", "pentanal"),
-    ]
-
-
-@pytest.fixture
-def simple_ketones():
-    """Simple ketone test cases."""
-    return [
-        ("CC(C)=O", "propan-2-one"),
-        ("CCC(C)=O", "butan-2-one"),
-        ("CCCC(C)=O", "pentan-2-one"),
-        ("CCC(CC)=O", "pentan-3-one"),
-    ]
-
-
-@pytest.fixture
-def simple_acids():
-    """Simple carboxylic acid test cases."""
-    return [
-        ("C(=O)O", "formic acid"),
-        ("CC(=O)O", "acetic acid"),
-        ("CCC(=O)O", "propanoic acid"),
-        ("CCCC(=O)O", "butanoic acid"),
-        ("CCCCC(=O)O", "pentanoic acid"),
-    ]
-
-
-@pytest.fixture
-def simple_heterocycles():
-    """Simple heterocycle test cases (retained names)."""
-    return [
-        ("c1ccoc1", "furan"),
-        ("c1ccsc1", "thiophene"),
-        ("c1cc[nH]c1", "pyrrole"),
-        ("c1ccncc1", "pyridine"),
-        ("C1CCOC1", "oxolane"),
-        ("C1CCNC1", "pyrrolidine"),
-        ("C1CCNCC1", "piperidine"),
-        ("C1COCCN1", "morpholine"),
-    ]
-
-
-# ============================================================================
-# Test Markers
-# ============================================================================
 
 # ============================================================================
 # A test MODULE must not change the ORTHONYM_* environment of the run.
@@ -385,26 +245,11 @@ def _worktree_import_guard(root=None):
 # trylast: after the faulthandler plugin's own pytest_configure, which this undoes in part.
 @pytest.hookimpl(trylast=True)
 def pytest_configure(config):
-    """Configure custom markers; snapshot the ORTHONYM_* environment; record reloads."""
+    """Register the markers pyproject.toml does not; snapshot the ORTHONYM_* environment."""
     _worktree_import_guard()
     _keep_hotspots_sigsegv_handler(config)
     _ORTHONYM_ENV_BEFORE_COLLECTION.clear()
     _ORTHONYM_ENV_BEFORE_COLLECTION.update(_orthonym_env())
-    _install_reload_recorder()
-    config.addinivalue_line(
-        "markers", "unit: Fast unit tests (<1s each)"
-    )
-    config.addinivalue_line(
-        "markers", "integration: Compound class integration tests"
-    )
-    config.addinivalue_line(
-        "markers", "roundtrip: Round-trip validation with OPSIN"
-    )
-    config.addinivalue_line(
-        "markers",
-        "slow: nightly-run tests: the full 100k validation suite and single "
-        "cases that take 20 s or more (the PR run uses -m 'not slow')"
-    )
     config.addinivalue_line(
         "markers",
         "real_opsin_cli: run this test with the real `java -jar opsin` command line "
@@ -550,68 +395,22 @@ def pytest_runtest_call(item):
 # 745d3ed6f), the hydrazinyl furan/thiophene scope guard, and
 # test_runtime_cache (a test-side session_depth leak).
 #
-# This guard names the leaker instead of letting a later, unrelated test fail:
+# The known state is the one ``orthonym.wallclock.leaked_naming_state`` reads (the
+# tier ContextVars, the request tier, the fragment counters, the memo scope and the
+# producers' re-entry guards). This guard names the leaker instead of letting a later, unrelated test fail:
 # after each test it checks the state, resets what leaked, and ERRORS the test
 # that left it behind. A leak from inside the engine is a defect (a name must
 # never depend on what the process named before), so it is reported, not
 # silently absorbed. Validated on two known positives: the pre-745d3ed6f engine
 # (one best-effort naming of [2H]C([2H])([2H])O leaves three ContextVars True)
 # and the pre-fix test_runtime_cache (session_depth 1).
-_NAMING_TIER_CTX = ("general_fallback_ctx", "best_effort_ctx",
-                    "allow_aromatic_general_ctx", "full_coverage_ctx")
-# The request tier (``provenance.best_effort_request_ctx``) is None outside a
-# request; a value left behind, False included, would set the tier of every later
-# call on the worker that reads it outside a request: the ring ceilings
-# (``vonbaeyer_universal.cage_caps``) and ``name_with_confidence``, which sets it
-# only when it is None.
-_NAMING_REQUEST_CTX = ("best_effort_request_ctx",)
-_NAMING_DEPTHS = ("session_depth", "name_call_depth")
-
-
-def _leaked_naming_state() -> dict:
-    """The non-default process-global naming state of the calling thread."""
-    import sys
-    leaked = {}
-    pv = sys.modules.get("orthonym.metrics.provenance")
-    if pv is not None:
-        for attr in _NAMING_TIER_CTX:
-            var = getattr(pv, attr, None)
-            if var is not None and var.get() not in (False, None):
-                leaked[attr] = var.get()
-        for attr in _NAMING_REQUEST_CTX:
-            var = getattr(pv, attr, None)
-            if var is not None and var.get() is not None:
-                leaked[attr] = var.get()
-    fn = sys.modules.get("orthonym.assembly.fragment_naming")
-    guard = getattr(fn, "_fragment_guard", None) if fn is not None else None
-    if guard is not None:
-        for attr in _NAMING_DEPTHS:
-            if getattr(guard, attr, 0):
-                leaked[attr] = getattr(guard, attr)
-        if getattr(guard, "visited", None):
-            leaked["visited"] = len(guard.visited)
-    return leaked
-
-
-def _reset_naming_state() -> None:
-    import sys
-    pv = sys.modules.get("orthonym.metrics.provenance")
-    if pv is not None:
-        for attr in _NAMING_TIER_CTX:
-            var = getattr(pv, attr, None)
-            if var is not None:
-                var.set(False)
-        for attr in _NAMING_REQUEST_CTX:
-            var = getattr(pv, attr, None)
-            if var is not None:
-                var.set(None)
-    fn = sys.modules.get("orthonym.assembly.fragment_naming")
-    guard = getattr(fn, "_fragment_guard", None) if fn is not None else None
-    if guard is not None:
-        for attr in _NAMING_DEPTHS:
-            setattr(guard, attr, 0)
-        guard.visited = set()
-        guard.cache = None
+@pytest.fixture
+def reset_naming_state_after():
+    """For a test that drives an engine internal (the fragment recursion) outside a ``name`` scope, which
+    would put the naming state back itself: reset it after the test, before the guard below reads it."""
+    yield
+    from orthonym.wallclock import reset_naming_state
+    reset_naming_state()
 
 
 @pytest.fixture(autouse=True)
@@ -621,58 +420,19 @@ def _naming_state_isolation():
     A state already leaked before this test started (by a test outside the
     guard's reach) is reset first, so this test does not inherit it.
     """
-    if _leaked_naming_state():
-        _reset_naming_state()
+    from orthonym.wallclock import leaked_naming_state, reset_naming_state
+    if leaked_naming_state():
+        reset_naming_state()
     yield
-    leaked = _leaked_naming_state()
+    leaked = leaked_naming_state()
     if leaked:
-        _reset_naming_state()
+        reset_naming_state()
         pytest.fail(
             f"the test left process-global naming state behind: {leaked}. Every "
             "later naming on this worker would have run with it (TRIAGE g8 C2). "
-            "Reset it in the test (try/finally, or a fixture), or fix the engine "
+            "Reset it in the test (the reset_naming_state_after fixture, for a test that drives an "
+            "engine internal outside name()), or fix the engine "
             "exit that leaked it.", pytrace=False)
-
-
-# ============================================================================
-# A module a test reloads must be put back before the next test.
-# ============================================================================
-# `importlib.reload` re-executes a module inside the same module object, so its
-# import-time reads of the environment and its classes are replaced for the rest
-# of the process; monkeypatch restoring the environment does not undo that. A test
-# that reloads a module under a changed environment and leaves it so makes every
-# later test on the worker run with the reloaded constants and see other class
-# objects (isinstance fails). Reload with `tests.support.module_reload.reloaded`,
-# which puts the module back. This guard records the namespace of every orthonym
-# module a test reloads (before its first reload in the test) and, after the test,
-# puts back any module that was left changed and ERRORS the test that left it.
-_RELOADED_MODULES: Dict[str, dict] = {}
-_ORIGINAL_RELOAD = None
-
-
-def _recording_reload(module):
-    """`importlib.reload`, recording an orthonym module's namespace first."""
-    name = getattr(module, "__name__", "") or ""
-    if (name == "orthonym" or name.startswith("orthonym.")) and name not in _RELOADED_MODULES:
-        _RELOADED_MODULES[name] = dict(vars(module))
-    return _ORIGINAL_RELOAD(module)
-
-
-def _install_reload_recorder() -> None:
-    global _ORIGINAL_RELOAD
-    import importlib
-    if _ORIGINAL_RELOAD is None:
-        _ORIGINAL_RELOAD = importlib.reload
-        importlib.reload = _recording_reload
-
-
-def pytest_unconfigure(config):
-    """Put `importlib.reload` back."""
-    global _ORIGINAL_RELOAD
-    import importlib
-    if _ORIGINAL_RELOAD is not None:
-        importlib.reload = _ORIGINAL_RELOAD
-        _ORIGINAL_RELOAD = None
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -705,119 +465,6 @@ def _real_opsin_cli_marker(request):
         yield
     finally:
         opsin_cli_inproc.SUSPENDED = False
-
-
-@pytest.fixture(autouse=True)
-def _module_reload_isolation():
-    """Error the test that reloads an orthonym module and leaves it changed."""
-    _RELOADED_MODULES.clear()
-    yield
-    import sys
-    left = []
-    for name, namespace in _RELOADED_MODULES.items():
-        module = sys.modules.get(name)
-        if module is None:
-            continue
-        live = vars(module)
-        if live.keys() != namespace.keys() or any(live[k] is not v for k, v in namespace.items()):
-            live.clear()
-            live.update(namespace)
-            left.append(name)
-    _RELOADED_MODULES.clear()
-    if left:
-        pytest.fail(
-            f"the test reloaded {', '.join(left)} and left the reloaded module in place "
-            "(its import-time settings and classes); every later test on this worker "
-            "would have run with it (TRIAGE 'Canary oxime -- test-order flake'). It was "
-            "put back. Reload with tests.support.module_reload.reloaded.", pytrace=False)
-
-
-# ============================================================================
-# An OPSIN oracle built for a jar a test simulated must not outlive the test.
-# ============================================================================
-# The validity gate keeps ONE OpsinOracle for the process (`namer._VALIDITY_ORACLE`;
-# the split gate keeps `group_splitting._DEFAULT_ORACLE` the same way). It is built
-# at its first use from the jar `_find_opsin_jar` names at that moment and is never
-# built again. A test that forces the jar absent (monkeypatch `_find_opsin_jar` ->
-# None, the `_force_jar_absent` pattern) and is the first test on its worker to reach
-# that oracle builds it with jar=None (an N-acyl ring amino acid such as captopril
-# reaches it through `fragment_acid_name_verified`, which asks OPSIN without checking
-# for the jar first). monkeypatch puts the resolver back, but the oracle keeps
-# jar=None. For the rest of the worker the gate runs again, every OPSIN answer is
-# 'unavailable', the gate fails closed on that, and simple molecules come out as
-# 'unknown organic compound' (438 failures in one worker's order; TRIAGE 'Unit suite
-# -- the unknown-organic-compound order leak'). The engine does the same outside the
-# tests after `orthonym.jars.fetch_all` in a process that started in reduced mode;
-# the engine fix (the oracle follows the jar resolution) is in namer.py and waits for
-# the lane merge (strict xfail in tests/unit/test_simulated_jar_isolation.py). Until
-# then this guard runs after each test's teardown (monkeypatch has been undone by
-# then). An orthonym module global that holds an OpsinOracle which the test replaced
-# with one built for another jar than the real one is put back: the object from
-# before the test if its jar is the real one, otherwise None (the next use builds it
-# again). The test is not failed: simulating a missing jar is what it is for, and the
-# resolver it patched was put back. Validated on the known positives in that section.
-_ORACLES_BEFORE_TEST: Dict[tuple, object] = {}
-
-
-def _module_oracles() -> Dict[tuple, object]:
-    """(module, attribute) -> value, for each orthonym module global that holds an OpsinOracle."""
-    import sys
-    found = {}
-    for name, module in list(sys.modules.items()):
-        if module is None or not (name == "orthonym" or name.startswith("orthonym.")):
-            continue
-        for attr, value in list(vars(module).items()):
-            # By class name, so an instance made before a reload of its module still counts.
-            if type(value).__name__ == "OpsinOracle" and hasattr(value, "_jar"):
-                found[(name, attr)] = value
-    return found
-
-
-def _real_opsin_jar():
-    """The jar this test process really has (None in reduced mode or without a jar)."""
-    try:
-        from orthonym.validation.opsin_roundtrip import _find_opsin_jar
-        return _find_opsin_jar()
-    except Exception:  # incl. orthonym.jars.JarUnavailable
-        return None
-
-
-def _put_back_simulated_jar_oracles() -> list:
-    """Put back each module-global OpsinOracle the test replaced with one built for
-    another jar than the real one; return the (module, attribute) pairs put back."""
-    import sys
-    changed = {key: value for key, value in _module_oracles().items()
-               if _ORACLES_BEFORE_TEST.get(key) is not value}
-    if not changed:
-        return []
-    real = _real_opsin_jar()
-    put_back = []
-    for (name, attr), oracle in changed.items():
-        if oracle._jar == real:
-            continue
-        before = _ORACLES_BEFORE_TEST.get((name, attr))
-        keep = before if before is not None and getattr(before, "_jar", None) == real else None
-        setattr(sys.modules[name], attr, keep)
-        put_back.append((name, attr))
-    return put_back
-
-
-@pytest.hookimpl(wrapper=True)
-def pytest_runtest_setup(item):
-    """Record the module-global OpsinOracles before any fixture of the test runs."""
-    global _ORACLES_BEFORE_TEST
-    _ORACLES_BEFORE_TEST = _module_oracles()
-    return (yield)
-
-
-@pytest.hookimpl(wrapper=True)
-def pytest_runtest_teardown(item, nextitem):
-    """After every finalizer of the test (monkeypatch undone), put back the oracles
-    built for a simulated jar."""
-    try:
-        return (yield)
-    finally:
-        _put_back_simulated_jar_oracles()
 
 
 @pytest.fixture(autouse=True)

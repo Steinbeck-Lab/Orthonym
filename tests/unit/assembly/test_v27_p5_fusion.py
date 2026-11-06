@@ -8,7 +8,6 @@ round-trips) and falls back to the VB polyene otherwise (0-wrong, non-regressing
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym, is_failure_name
 from orthonym.assembly.general_fusion import (
     name_fusion_parent, _affirmative_roundtrip,
 )

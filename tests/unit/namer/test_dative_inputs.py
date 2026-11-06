@@ -20,14 +20,14 @@ drawing.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym import namer as _namer
 from orthonym.assembly import metal_offer
-from orthonym.cli import _emit_tier_flags
 from orthonym.metrics import provenance as _provenance
 from orthonym.perception.metals import atom_and_charge_ledger_ok, dative_bond_split_sites
 from tests.support.default_tier import assert_default_tier_declines
 from tests.support.rt_assert import (assert_full_rt, name_is_rt_exact, smiles_without_dative_bonds)
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -46,14 +46,6 @@ DATIVE_PYRITHIONE = "c1cc[n+]2[O-]->[Zn]3(<-[O-][n+]4ccccc4[S]3)[S]c2c1"
 IONIC_PYRITHIONE = "[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Zn+2]"
 DATIVE_TC = "N->[Tc+2](<-N)(<-N)<-N"               # technetium, thorium and plutonium are not admitted to any mechanism
 DATIVE_PU = "Cl[Pu](Cl)(<-N)<-N"                   # (copper, nickel and platinum are admitted since 2026-10-30)
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
-
-
-def _key(smiles):
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 # ----------------------------------------------------------------------------- a key-less input
@@ -88,7 +80,7 @@ def test_the_drawing_as_written_gives_no_name_of_its_own(dative, monkeypatch):
     gate."""
     monkeypatch.setattr(metal_offer, "metal_dative_split_spelling_and_order", lambda smiles: None)
     for tier in ("best-effort", "pin"):
-        row = _row(dative, tier)
+        row = tier_row(dative, tier)
         assert row["tier"] == "abstain" and row["limit_code"] == "UNNAMEABLE", row
         assert row["verified"] == "unverified" and row["is_pin"] is False
 
@@ -110,16 +102,16 @@ def test_the_drawing_as_written_is_run_only_when_no_other_drawing_names(monkeypa
     name back against, is run only when the others name nothing and decline nothing with
     NO_VERIFIED_PIN."""
     calls = _count_ranks(monkeypatch)
-    assert _row(DATIVE_ACETATE, "best-effort")["name"] == "zinc diacetate"
+    assert tier_row(DATIVE_ACETATE, "best-effort")["name"] == "zinc diacetate"
     assert len(calls) == 1 and DATIVE_ACETATE not in calls                 # the split drawing only
     calls.clear()
-    assert _row(DATIVE_AMMINE_CHLORIDE, "best-effort")["name"]
+    assert tier_row(DATIVE_AMMINE_CHLORIDE, "best-effort")["name"]
     assert len(calls) == 2 and DATIVE_AMMINE_CHLORIDE not in calls         # the split and its ionic drawing
     calls.clear()
-    assert _row(DATIVE_ACETATE, "pin")["limit_code"] == "NO_VERIFIED_PIN"   # a decline that says a name exists
+    assert tier_row(DATIVE_ACETATE, "pin")["limit_code"] == "NO_VERIFIED_PIN"   # a decline that says a name exists
     assert len(calls) == 1 and DATIVE_ACETATE not in calls
     calls.clear()
-    row = _row(DATIVE_WATER, "pin")                                         # nothing to say: the drawing as written runs
+    row = tier_row(DATIVE_WATER, "pin")                                         # nothing to say: the drawing as written runs
     assert row["limit_code"] == "UNNAMEABLE" and DATIVE_WATER in calls
 
 
@@ -129,7 +121,7 @@ def test_a_dative_drawing_of_a_metal_not_admitted_is_declined(dative):
     assert metal_offer.metal_dative_split_spelling_and_order(dative) is None
     assert metal_offer.metal_offer_for(dative) is None
     for tier in ("best-effort", "pin"):
-        row = _row(dative, tier)
+        row = tier_row(dative, tier)
         assert row["tier"] == "abstain" and row["limit_code"] == "UNSUPPORTED_ELEMENT", row
         assert row["verified"] == "unverified" and row["is_pin"] is False
 
@@ -145,7 +137,7 @@ def test_a_dative_drawing_of_a_metal_not_admitted_is_declined(dative):
 def test_dative_split_is_verified_by_key_and_count(dative, split):
     """The name reads back to the key of the split drawing (a fresh OPSIN call), and the count of
     atoms and charges between the dative drawing and its split drawing holds."""
-    row = _row(dative, "best-effort")
+    row = tier_row(dative, "best-effort")
     assert row["name"] and row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert row["verified"] == "opsin_split", row                 # no claim of a comparison with the drawing as written
     assert_full_rt(row["name"], split)
@@ -155,7 +147,7 @@ def test_dative_split_is_verified_by_key_and_count(dative, split):
     sites = dative_bond_split_sites(before)
     assert atom_and_charge_ledger_ok(before, Chem.RenumberAtoms(after, _inverse(order)), sites, 0)
     assert _key(written) == _key(split)                          # the reference key is the split drawing's
-    declined = _row(dative, "pin")
+    declined = tier_row(dative, "pin")
     assert declined["tier"] == "abstain" and declined["is_pin"] is False
     assert declined["verified"] == "unverified"
 
@@ -170,9 +162,9 @@ def _inverse(order):
 def test_the_name_of_a_dative_drawing_is_the_name_of_its_ionic_drawing():
     """One compound, one name: the pyrithione chelate drawn with dative bonds, with covalent bonds
     and as ions (the chelate with covalent bonds: tests of ``test_metal_disconnect_rewrite``)."""
-    ionic = _row(IONIC_PYRITHIONE, "best-effort")["name"]
-    assert _row(DATIVE_PYRITHIONE, "best-effort")["name"] == ionic
-    assert _row(DATIVE_ACETATE, "best-effort")["name"] == _row(IONIC_ACETATE, "best-effort")["name"]
+    ionic = tier_row(IONIC_PYRITHIONE, "best-effort")["name"]
+    assert tier_row(DATIVE_PYRITHIONE, "best-effort")["name"] == ionic
+    assert tier_row(DATIVE_ACETATE, "best-effort")["name"] == tier_row(IONIC_ACETATE, "best-effort")["name"]
 
 
 # ----------------------------------------------------------------------------- the label
@@ -188,16 +180,16 @@ def test_a_dative_only_drawing_takes_its_label_from_the_split_not_from_m1(dative
     the dative drawing comes from the record, not from the name."""
     assert metal_offer.metal_disconnected_spelling_and_order(
         metal_offer.metal_dative_split_spelling_and_order(dative)[0]) is None
-    row = _row(dative, "best-effort")
+    row = tier_row(dative, "best-effort")
     assert row["name"] == expected and row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert row["verified"] == "opsin_split"
     assert_full_rt(row["name"], ionic)
-    declined = _row(dative, "pin")
+    declined = tier_row(dative, "pin")
     assert declined["tier"] == "abstain" and declined["is_pin"] is False, declined
     if dative == DATIVE_ACETATE:
         assert_default_tier_declines(dative)                      # NO_VERIFIED_PIN
         assert declined["spelling_failures"][0]["rule"] == RULE
-        twin = _row(ionic, "pin")
+        twin = tier_row(ionic, "pin")
         assert twin["tier"] == "pin_verified" and twin["is_pin"] is True and twin["name"] == expected
 
 
@@ -205,16 +197,16 @@ def test_a_dative_only_drawing_takes_its_label_from_the_split_not_from_m1(dative
 def test_the_flag_is_set_by_the_split_itself(dative, monkeypatch):
     """M1 switched off: the split drawing is still named, still labelled below the PIN and still
     declined at the default tier; the label does not depend on M1."""
-    with_m1 = _row(dative, "best-effort")
+    with_m1 = tier_row(dative, "best-effort")
     monkeypatch.setattr(metal_offer, "metal_disconnected_spelling_and_order", lambda smiles: None)
-    row = _row(dative, "best-effort")
+    row = tier_row(dative, "best-effort")
     assert row["name"] and row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert row["verified"] == "opsin_split"
     assert_full_rt(row["name"], smiles_without_dative_bonds(dative))
     if dative == DATIVE_ACETATE:
         assert row["name"] == with_m1["name"] == "zinc diacetate"
         assert row["spelling_failures"][0]["rule"] == RULE
-    default = _row(dative, "pin")
+    default = tier_row(dative, "pin")
     assert default["tier"] == "abstain" and default["is_pin"] is False
 
 
@@ -290,7 +282,7 @@ def test_a_dative_split_that_changes_a_charge_is_rejected_by_the_count(monkeypat
 
     monkeypatch.setattr(metal_offer, "_DATIVE_KIND", metal_offer._DATIVE_KIND._replace(rewrite=moved))
     assert metal_offer.metal_dative_split_spelling_and_order(DATIVE_ACETATE) is None
-    row = _row(DATIVE_ACETATE, "best-effort")
+    row = tier_row(DATIVE_ACETATE, "best-effort")
     assert row["tier"] == "abstain" and row["limit_code"] == "UNNAMEABLE"
 
 

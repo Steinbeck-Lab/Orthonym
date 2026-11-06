@@ -17,7 +17,7 @@ from orthonym import name_compound
 # === OPSIN Setup ===
 
 from pathlib import Path
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 OPSIN_JAR = jar_or_none()
@@ -25,16 +25,7 @@ OPSIN_JAR = jar_or_none()
 
 def _opsin_available() -> bool:
     """Check if OPSIN CLI JAR is available and Java is installed."""
-    if OPSIN_JAR is None:
-        return False
-    try:
-        proc = subprocess.run(
-            ["java", "-version"],
-            capture_output=True, text=True, timeout=5
-        )
-        return proc.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    return OPSIN_JAR is not None and java_on_path()
 
 
 def _opsin_parse(name: str) -> str:

@@ -12,7 +12,7 @@ multiplicative nomenclature``).
 import pytest
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -49,7 +49,7 @@ def test_the_other_oxyl_names_are_unchanged(smiles, expected):
 def test_a_stereo_prefix_keeps_the_assembly_below_the_pin():
     # the stereodescriptor inside the prefix has no derived PIN placement yet: named at a general tier only
     smiles = "C(=C/C(=O)[O])\\C(=O)[O]"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     # the parentheses of a stereodescriptor count in the nesting order, so the enclosure of the central group is the
     # bracket (``### **** Multiple types of enclosing marks``, ****, the Blue Book); the
     # lexical spelling check agrees, and it rejects the double parentheses this test used to expect

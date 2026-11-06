@@ -18,14 +18,10 @@ on the book's row). The label asks the one reading of the rule of the spelling c
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # ---- Part A: the polyol of a method (2) name is one multivalent organyl group ---------------------------------------
@@ -54,7 +50,7 @@ def test_the_polyol_of_a_method_two_name_is_one_multivalent_group(smiles, one_gr
 def test_the_book_row_of_unequal_arms_keeps_its_pin_beside_the_item_two_label():
     """ (:31899): the name of the unequal-arms polyol, acetate and propanoate, is the substitutive PIN; the
     label of method (2) (``rules.esters.record_split_polyol_mixed_anion_non_pin``) is the rule of a multivalent group only."""
-    row = _row("CCC(=O)OCCc1ccccc1COC(C)=O", "pin")
+    row = tier_row("CCC(=O)OCCc1ccccc1COC(C)=O", "pin")
     assert row["name"] == "2-{2-[(acetyloxy)methyl]phenyl}ethyl propanoate", row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
 
@@ -70,7 +66,7 @@ def test_an_ester_of_a_polyol_of_no_one_group_is_the_substitutive_pin(smiles, na
     (PIN)'): the name cites the junior ester as an acyloxy prefix, whichever route (the ester route of the pipeline or the
     split of the decomposition) built it."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(name, smiles)
@@ -83,7 +79,5 @@ def test_an_ester_of_a_polyol_of_no_one_group_is_the_substitutive_pin(smiles, na
 def test_the_method_two_names_of_a_multivalent_polyol_stay_below_the_pin(smiles):
     """The PIN of these is method (1), '1,4-phenylene acetate dichloroacetate' (:31840), which OPSIN 2.9.0 does not read;
     the best-effort tier names them by method (2), below the PIN."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and not row["is_pin"] and row["tier"] != "pin_verified", row
-
-

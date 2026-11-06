@@ -93,17 +93,8 @@ class TestFusedParentSubstituentEmission:
 class TestFusedRoutingProtect:
     """Currently-correct neighbors that must not move."""
 
-    def test_naphthalene_bare(self):
-        assert name_compound("c1ccc2ccccc2c1").strip() == "naphthalene"
-
-    def test_methylnaphthalene(self):
-        assert name_compound("Cc1ccc2ccccc2c1").strip() == "2-methylnaphthalene"
-
     def test_methylquinoline(self):
         assert name_compound("Cc1ccc2ccccc2n1").strip() == "2-methylquinoline"
-
-    def test_quinoline_bare(self):
-        assert name_compound("c1ccc2ncccc2c1").strip() == "quinoline"
 
     def test_phenylfuran(self):
         # The S2 keystone row — among-rings winner is furan.

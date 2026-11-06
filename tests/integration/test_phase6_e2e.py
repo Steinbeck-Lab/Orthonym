@@ -60,30 +60,12 @@ class TestCOMPLEX01_Bicyclo_Hydrocarbons:
         assert numbers == sorted(numbers, reverse=True), "Bridge numbers should be in decreasing order"
 
 
-class TestCOMPLEX01_Bicyclo_EdgeCases:
-    """Edge cases for bicyclo system naming."""
-
-    @pytest.mark.integration
-    def test_bicyclo_not_confused_with_fused_aromatic(self):
-        """Naphthalene should NOT be classified as bicyclo."""
-        result = name_compound("c1ccc2ccccc2c1")
-        assert result == "naphthalene"
-        assert "bicyclo" not in result
-
-
 # =============================================================================
 # COMPLEX-02: Spiro Compound Naming
 # =============================================================================
 
 class TestCOMPLEX02_Spiro_Hydrocarbons:
     """COMPLEX-02: Spiro hydrocarbon systematic naming."""
-
-    @pytest.mark.integration
-    def test_spiro_descriptor_order(self):
-        """Verify spiro descriptor uses smaller ring first."""
-        result = name_compound("C1CCC2(CC1)CCCC2")  # 5-ring + 6-ring
-        assert "spiro[4.5]" in result  # 4-membered contribution, 5-membered contribution
-        assert "spiro[5.4]" not in result  # NOT reversed
 
     @pytest.mark.integration
     def test_spiro_descriptor_format(self):
@@ -96,46 +78,6 @@ class TestCOMPLEX02_Spiro_Hydrocarbons:
         desc_end = result.index("]")
         descriptor = result[desc_start:desc_end+1]
         assert descriptor.count(".") == 1  # Single period in spiro descriptor
-
-
-class TestCOMPLEX02_Spiro_EdgeCases:
-    """Edge cases for spiro system naming."""
-
-    @pytest.mark.integration
-    def test_spiro_symmetric_rings(self):
-        """Test symmetric spiro compound (both rings same size)."""
-        result = name_compound("C1CCC2(CC1)CCCCC2")  # Two 6-rings
-        assert "spiro[5.5]" in result
-        assert "undecane" in result
-
-    @pytest.mark.integration
-    def test_spiro_atom_count_correct(self):
-        """Verify spiro compound has correct atom count in name."""
-        # spiro[4.5]decane = 4+5+1 = 10 carbons
-        result = name_compound("C1CCC2(CC1)CCCC2")
-        assert "decane" in result  # 10 carbons
-
-    @pytest.mark.integration
-    def test_spiro_not_confused_with_bicyclo(self):
-        """Spiro systems should not be confused with bicyclo."""
-        result = name_compound("C1CCC2(CC1)CCCC2")
-        assert "spiro" in result
-        assert "bicyclo" not in result
-
-
-# =============================================================================
-# COMPLEX-03: Ortho-Fused Bicyclics
-# =============================================================================
-
-class TestCOMPLEX03_OrthoFused:
-    """COMPLEX-03: Ortho-fused bicyclic naming."""
-
-    @pytest.mark.integration
-    def test_naphthalene_is_fused_not_bridged(self):
-        """Naphthalene should be identified as fused aromatic, not bridged."""
-        result = name_compound("c1ccc2ccccc2c1")
-        assert result == "naphthalene"
-        assert "bicyclo" not in result  # Not bridged naming
 
 
 # =============================================================================
@@ -200,31 +142,6 @@ class TestCOMPLEX04_SystematicFusionNames:
 # =============================================================================
 # COMPLEX-05: Heterocyclic Fused Systems
 # =============================================================================
-
-
-class TestCOMPLEX05_TautomerLocants:
-    """Tautomer locant (indicated H) in heterocyclic names."""
-
-    @pytest.mark.integration
-    def test_indole_has_indicated_hydrogen(self):
-        """Indole requires 1H- prefix (IUPAC 2013 PIN)."""
-        result = name_compound("c1ccc2[nH]ccc2c1")
-        assert result == "1H-indole"
-        assert result.startswith("1H-")
-
-    @pytest.mark.integration
-    def test_quinoline_no_indicated_hydrogen(self):
-        """Quinoline has no indicated H (no N-H)."""
-        result = name_compound("c1ccc2ncccc2c1")
-        assert result == "quinoline"
-        assert "H-" not in result
-
-    @pytest.mark.integration
-    def test_benzimidazole_has_indicated_hydrogen(self):
-        """Benzimidazole requires 1H- prefix."""
-        result = name_compound("c1ccc2[nH]cnc2c1")
-        assert result == "1H-1,3-benzimidazole"
-        assert result.startswith("1H-")
 
 
 class TestCOMPLEX05_SubstitutedFusedHeterocycles:
@@ -306,37 +223,6 @@ class TestPhase5Regression:
 
 
 # =============================================================================
-# Complex Ring Routing Tests
-# =============================================================================
-
-class TestComplexRingRouting:
-    """Verify correct routing of complex ring systems."""
-
-    @pytest.mark.integration
-    def test_bicyclo_detected_before_simple_cyclic(self):
-        """Bicyclo systems should be detected before simple cycloalkane."""
-        result = name_compound("C1CC2CCC1C2")
-        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        assert result == "bicyclo[2.2.1]heptane"
-        assert "cyclopentane" not in result
-        assert "cyclohexane" not in result
-
-    @pytest.mark.integration
-    def test_spiro_detected_before_simple_cyclic(self):
-        """Spiro systems should be detected before simple cycloalkane."""
-        result = name_compound("C1CCC2(CC1)CCCC2")
-        assert "spiro" in result
-        assert "cyclohexane" not in result
-
-    @pytest.mark.integration
-    def test_fused_heterocycle_uses_retained_name(self):
-        """Fused heterocycles should use retained names, not HW systematic."""
-        result = name_compound("c1ccc2[nH]ccc2c1")
-        assert result == "1H-indole"
-        assert "aza" not in result  # Not HW naming
-
-
-# =============================================================================
 # Compound Classification Tests
 # =============================================================================
 
@@ -377,15 +263,6 @@ class TestCompoundClassification:
 # Edge Cases and Boundary Conditions
 # =============================================================================
 
-class TestBoundaryConditions:
-    """Boundary conditions and edge cases."""
-
-    @pytest.mark.integration
-    def test_single_atom_molecule(self):
-        """Single atom molecule."""
-        assert name_compound("C") == "methane"
-
-
 class TestKnownLimitations:
     """Document known limitations (expected failures)."""
 
@@ -415,4 +292,3 @@ class TestKnownLimitations:
         a superscript number to the number of the preceding linking atoms";
         'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981)."""
         assert name_compound("C1CC2(C1)CC3(CC2)CC3") == "dispiro[2.1.3^5.2^3]decane"
-

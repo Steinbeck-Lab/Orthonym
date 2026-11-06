@@ -10,14 +10,10 @@ molecule.
 """
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 _ACYCLIC_PINS = [
@@ -40,7 +36,7 @@ def test_the_n_substituted_sulfonamido_and_urea_prefixes_of_an_acyclic_parent(sm
     name that held no sulfonyl ('3-(methylamino)propanoic acid') and the one that dropped the methyl of the proximal
     nitrogen ('3-(carbamoylamino)propanoic acid') described another molecule and never shipped."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(name, smiles)
@@ -51,9 +47,7 @@ def test_a_thiourea_with_a_substituted_proximal_nitrogen_is_not_named_with_a_los
     (the molecule is left to the producers that name it whole), never emitted for another molecule."""
     smiles = "NC(=S)N(C)CCC(=O)O"
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] != "3-(carbamothioylamino)propanoic acid", row
         if row["name"] and row["tier"] != "abstain":
             assert_full_rt(row["name"], smiles)
-
-

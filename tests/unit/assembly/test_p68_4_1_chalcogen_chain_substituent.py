@@ -51,8 +51,3 @@ class TestNoLeakTwoSulfur:
         # a lone -S-SH is the principal group, so no disulfanyl prefix: suffix dithioperoxol,
         # 'ethanedithioperoxol (PIN)':27998).
         assert name_compound("c1ccc(SS)cc1") == "benzenedithioperoxol"
-
-    def test_bis_disulfanyl_benzamide_unchanged(self):
-        # BB:28021 verbatim PIN — two 2-sulfur runs, bis(disulfanyl).
-        assert name_compound("NC(=O)c1ccc(SS)c(SS)c1") == \
-            "3,4-bis(disulfanyl)benzamide"

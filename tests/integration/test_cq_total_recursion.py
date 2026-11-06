@@ -24,6 +24,7 @@ from rdkit import Chem
 from orthonym.namer import Orthonym
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 pytestmark = [pytest.mark.integration, pytest.mark.roundtrip,
               pytest.mark.opsin_gate]
@@ -62,16 +63,11 @@ def _besteffort():
                      allow_aromatic_general=True)
 
 
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
-
-
 def _rt_inchikey_match(name, smiles):
     assert not is_failure_name(name), f"expected a real name, got {name!r}"
     osmi = opsin_parse(name)
     assert osmi is not None, f"OPSIN could not parse {name!r}"
-    return _inchikey(osmi) == _inchikey(smiles)
+    return key_or_none(osmi) == key_or_none(smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", B1_CONVERTS)

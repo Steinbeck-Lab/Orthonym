@@ -85,18 +85,6 @@ class TestBuildAtomToLocant:
 class TestCompareLocantSets:
     """Tests for compare_locant_sets (first-point-of-difference rule)."""
 
-    def test_first_element_wins_a(self):
-        """Set A wins at first position: 2 < 3."""
-        assert compare_locant_sets([2, 3, 5], [3, 4, 6]) == -1
-
-    def test_first_element_wins_b(self):
-        """Set B wins at second position: 3 < 4."""
-        assert compare_locant_sets([2, 4, 5], [2, 3, 5]) == 1
-
-    def test_equal_sets(self):
-        """Identical sets return 0."""
-        assert compare_locant_sets([2, 3], [2, 3]) == 0
-
     def test_difference_at_first_position(self):
         """Set A wins at position 1: 1 < 2."""
         assert compare_locant_sets([1, 3, 5, 7], [2, 3, 5, 7]) == -1

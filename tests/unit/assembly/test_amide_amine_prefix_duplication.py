@@ -25,19 +25,14 @@ necessarily spelled by that branch's own name.
 import pytest
 from rdkit import Chem
 
-import orthonym.namer as _namer
 from orthonym import Orthonym
 
 
 @pytest.fixture(scope="module")
 def namer():
     # The defect lives with the validity gate OFF: with it on, merely
-    # suppresses the wrong name. Judge the generator, not the gate. The flag is
-    # put back when the module ends, so a later module is not named with the gate
-    # off.
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(_namer, "_DISABLE_VALIDITY_GATE", True)
-        yield Orthonym(style="pin")
+    # suppresses the wrong name. Judge the generator, not the gate.
+    return Orthonym(style="pin")   # the suite runs every test without the opsin_gate marker with the gate off
 
 
 def _name(namer, smiles):

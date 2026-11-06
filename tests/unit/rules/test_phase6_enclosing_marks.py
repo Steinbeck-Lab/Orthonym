@@ -9,11 +9,6 @@ from orthonym.validation.opsin_roundtrip import opsin_parse
 
 
 @pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-@pytest.fixture(scope="module")
 def be():
     return Orthonym(general_fallback=True, general_fallback_unverified=True,
                      allow_aromatic_general=True)

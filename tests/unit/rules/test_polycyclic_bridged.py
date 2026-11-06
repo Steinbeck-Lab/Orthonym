@@ -19,8 +19,6 @@ from orthonym.rules.polycyclic_bridged import (
     is_tricyclo_system,
     find_all_bridgeheads,
     get_ring_atoms,
-    find_all_bridge_paths,
-    find_main_ring,
     analyze_polycyclic_system,
     get_ring_heteroatoms,
     get_heteroatom_prefix,

@@ -38,29 +38,11 @@ from __future__ import annotations
 import pytest
 from rdkit import Chem
 
-# Wave-0 / RED state: the new module
-# (src/orthonym/rules/polycyclic_von_baeyer.py) does not exist yet.
-# Plan 151-01 Task 2 implements it. We defer the import to test bodies
-# so pytest collection succeeds (≥30 tests collected) and individual
-# tests fail with a clear ModuleNotFoundError until Task 2 lands. This
-# matches the audit-first cadence per internal notes.
-
-def _vb_import():
-    """Lazy import of the new module so pytest collection works in RED state."""
-    from orthonym.rules import polycyclic_von_baeyer as mod  # noqa: WPS433
-    return mod
-
-
-def is_higher_polycyclo(mol):  # type: ignore[no-redef]
-    return _vb_import().is_higher_polycyclo(mol)
-
-
-def name_higher_polycyclo(mol):  # type: ignore[no-redef]
-    return _vb_import().name_higher_polycyclo(mol)
-
-
-def get_higher_polycyclo_iupac_locants(mol):  # type: ignore[no-redef]
-    return _vb_import().get_higher_polycyclo_iupac_locants(mol)
+from orthonym.rules.polycyclic_von_baeyer import (
+    get_higher_polycyclo_iupac_locants,
+    is_higher_polycyclo,
+    name_higher_polycyclo,
+)
 
 
 def _ring_atoms(mol) -> set[int]:

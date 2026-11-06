@@ -19,21 +19,19 @@ Coverage:
 - a phase: Peptides, NP esters, multiplicative nomenclature
 """
 
-import os
 import shutil
 import subprocess
 
 import pytest
 from rdkit import Chem
 
-from orthonym import name_compound
 from tests.support.jars import jar_or_none
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import assert_tier_contract
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.pin_tiers import tier_row
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -42,35 +40,13 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset()      # lane DT5 (2026-11-01): the one row left, see _LARGE_POLYCYCLE_BLOCKED
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 # Rows whose PIN the PIN tier cannot build (pre-existing-failures plan, Task 4).
@@ -833,10 +809,8 @@ class TestPseudoasymmetricBestEffort:
     @pytest.mark.integration
     @pytest.mark.opsin_gate
     def test_pseudoasymmetric_best_effort(self):
-        from orthonym import Orthonym
-        from orthonym.cli import _emit_tier_flags
         smiles = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
-        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        be = tier_row(smiles, "best-effort")
         # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
         assert be["name"] == "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane", be
         assert be["tier"] == "pin_unverified" and be["is_pin"] is False, be

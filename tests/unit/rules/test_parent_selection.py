@@ -36,7 +36,6 @@ class TestIsPrincipalGroupOnChain:
         mol = Chem.MolFromSmiles('c1ccc(CCCC(=O)O)cc1')
         # Chain atoms: 4 carbons of butyl chain (indices 6-9 in SMILES)
         # Find the chain atoms excluding ring
-        ring_atoms = set(range(6))  # benzene atoms 0-5
         # Butyl chain carbons are 6, 7, 8, 9
         chain_atoms = [6, 7, 8, 9]
 
@@ -61,7 +60,6 @@ class TestIsPrincipalGroupOnChain:
     def test_phenylacetic_acid_pg_on_short_chain(self):
         """Carboxylic acid on 2-carbon chain attached to benzene."""
         mol = Chem.MolFromSmiles('c1ccc(CC(=O)O)cc1')
-        ring_atoms = set(range(6))  # benzene atoms 0-5
         # Find chain atoms (CH2-COOH)
         chain_atoms = [6, 7]  # CH2 and C(=O)
 

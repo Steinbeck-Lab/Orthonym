@@ -32,22 +32,16 @@ classes / a likely gold-integrity issue — see task-11C2-report.md):
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 from orthonym.data import pin_policy
 from tests.support.jars import jar_or_none
+from tests.support.read_back import key_or_none
 
 _OPSIN_JAR = jar_or_none()
 _OPSIN_OK = shutil.which("java") is not None and _OPSIN_JAR is not None
-
-
-def _ikey(smi):
-    m = Chem.MolFromSmiles(smi)
-    return Chem.MolToInchiKey(m) if m is not None else None
 
 
 def _name_general_fallback(smiles: str) -> str:
@@ -125,7 +119,7 @@ def test_spiro_piperidine_roundtrips():
     from orthonym.validation.opsin_roundtrip import opsin_parse
     name = name_compound("c1ccc2c(c1)Oc1ccccc1C21CCNCC1")
     osmi = opsin_parse(name)
-    assert osmi and _ikey(osmi) == _ikey("c1ccc2c(c1)Oc1ccccc1C21CCNCC1")
+    assert osmi and key_or_none(osmi) == key_or_none("c1ccc2c(c1)Oc1ccccc1C21CCNCC1")
 
 
 # ---------------------------------------------------------------------------
@@ -148,4 +142,4 @@ def test_hydrazinyl_roundtrips():
     name = _name_general_fallback("NNC(=O)CC(=O)O")
     from orthonym.validation.opsin_roundtrip import opsin_parse
     osmi = opsin_parse(name)
-    assert osmi and _ikey(osmi) == _ikey("NNC(=O)CC(=O)O")
+    assert osmi and key_or_none(osmi) == key_or_none("NNC(=O)CC(=O)O")

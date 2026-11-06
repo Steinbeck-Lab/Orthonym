@@ -20,14 +20,13 @@ P, and s". The Blue Book's own analogue is "13-norgermacrane (1R,4s,7S)-4-ethyl-
 tie to the input atom order, giving '(1S,4s,7R)'.
 """
 import pytest
-from rdkit import Chem
 
-from orthonym import Orthonym, name_compound
-from orthonym.cli import _emit_tier_flags
+from orthonym import Orthonym
 from orthonym.namer import (
     _drop_pseudoasymmetric_tokens,
     _pseudoasymmetric_name_verified,
 )
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -114,7 +113,6 @@ def test_verifier_fails_closed_on_mixed_codes():
 def test_the_pin_tier_gives_germacrane_its_systematic_name():
     # NPL 2026-11-01: 'germacrane' is a parent, no PIN INTRODUCTION, the Blue Book); the PIN tier
     # offers the systematic name, shipped constitution-only because OPSIN reads no lowercase 4s
-    from orthonym import Orthonym
     row = Orthonym().name_tiered(GERMACRANE)
     assert (row["name"], row["tier"]) == (GERMACRANE_SYSTEMATIC, "pin_unverified"), row
 
@@ -137,7 +135,7 @@ def test_best_effort_emits_the_systematic_name_for_every_spelling(smiles):
     # the same structure, so every spelling gets the list name (independent check: the
     # systematic name reads back to the input below; mutation: the label assertion fails
     # on the commit before).
-    be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    be = tier_row(smiles, "best-effort")
     # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
     assert be["name"] == GERMACRANE_SYSTEMATIC, be
     assert be["tier"] == "pin_unverified" and be["is_pin"] is False, be

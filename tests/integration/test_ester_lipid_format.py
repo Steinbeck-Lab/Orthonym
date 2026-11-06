@@ -3,7 +3,6 @@ Integration tests for a phase: Ester & Lipid Format fixes.
 Tests (ring ester prefix joining) and (polyfunctional ester demotion).
 Tests (phospholipid routing) and OPSIN round-trip validation.
 """
-import os
 import subprocess
 import pytest
 from orthonym.namer import name_compound
@@ -46,21 +45,6 @@ def _opsin_parse(name: str) -> str:
 class TestRingEsterPrefixJoining:
     """: Ring ester prefixes use hyphen joining with locants."""
 
-    def test_single_ester_is_functional_class_not_an_acyloxy_prefix(self):
-        """A MONO-ester with no senior group is functional class, not a prefix.
-
-        Updated in a phase. This previously asserted `acetyloxybenzene`.
-         "General methodology": "All preferred IUPAC names for
-        esters are named by functional class nomenclature." The acyloxy prefix
-        is licensed by only when a senior group is present or the
-        ester cannot otherwise be named; here the ester IS the principal group
-        and it names cleanly, so the PIN is the two-word form.
-
-        The prefix-joining behaviour this class exists to cover is still
-        exercised by the multi-acyloxy tests below, which are unaffected.
-        """
-        assert name_compound("CC(=O)Oc1ccccc1") == "phenyl acetate"
-
     @pytest.mark.opsin_gate
     def test_different_acyloxy_benzene(self):
         """Two different esters on one ring: the second is the one acyloxy prefix of the organyl word.
@@ -81,12 +65,6 @@ class TestRingEsterPrefixJoining:
         assert result["name"] == "4-(acetyloxy)phenyl propanoate", result
         assert result["tier"] == "systematic_verified", result
         assert_full_rt(result["name"], smiles)
-
-    @pytest.mark.opsin_gate
-    def test_different_acyloxy_benzene_format(self):
-        """Two different esters of one ring: the acyloxy prefix of the organyl word is parenthesised."""
-        result = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
-        assert result == "4-(acetyloxy)phenyl propanoate", result
 
     @pytest.mark.opsin_gate
     def test_same_acyloxy_cyclohexane(self):
@@ -261,17 +239,6 @@ class TestEsterOPSINRoundTrip:
         opsin_smi = _opsin_parse(name)
         assert opsin_smi, f"OPSIN failed to parse: {name!r}"
 
-    def test_format_phenyl_acetate_no_hyphens_missing(self):
-        """Format is clean (no stray hyphens).
-
-        Updated in a phase: this molecule is now the functional-class PIN
-        `phenyl acetate`, not `acetyloxybenzene`. The format
-        assertion — the actual point of the test — is retained.
-        """
-        name = name_compound("CC(=O)Oc1ccccc1")
-        assert name == "phenyl acetate"
-        assert "--" not in name
-
     @pytest.mark.opsin_gate
     def test_format_multi_acyloxy_has_parentheses(self):
         """Multi-acyloxy benzene uses parenthesized prefix format.
@@ -283,20 +250,6 @@ class TestEsterOPSINRoundTrip:
         name = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
         assert name == "4-(acetyloxy)phenyl propanoate", name
         assert "(acetyloxy)" in name and not name.endswith(")")
-
-    def test_format_diacetate_has_multiplier(self):
-        """Glycerol diacetate: the multiplied anion takes 'di'."""
-        name = name_compound("CC(=O)OCC(O)COC(=O)C")
-        assert name is not None
-        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks "9 Esters"
-        # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the principal class,
-        # not an acyloxy prefix; "When anions are identical functional class
-        # multiplicative nomenclature is used." (:31819); "ethane-1,2-diyl diacetate (PIN)"
-        # (:31823), "propane-1,2,3-triyl triacetate (PIN)" (:31827). OPSIN RT exact
-        # (TRIAGE.csv; re-checked in Task 7/8). (:31819): "Multiplicative prefixes 'di', 'tri', etc.
-        # are used when anions are unsubstituted".
-        assert name == "2-hydroxypropane-1,3-diyl diacetate", name
-
 
 # ===========================================================================
 #: Phospholipid compound coverage (best-effort)

@@ -20,6 +20,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.assembly import strict_ring_prefix
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
@@ -220,12 +221,11 @@ def test_t3_the_default_tier_ships_the_pin(rid, smiles, expected):
 def test_t3_a_glycoside_is_declined_at_the_default_tier():
     # d200 left T3_ROWS relabel 2026-10-31): the 'α-L-rhamnopyranosyloxy' prefix is a name and
     #:50943 gives no PIN in Chapter, so the default tier declines; the best-effort tier gives the name
-    from orthonym.cli import _emit_tier_flags
     smiles = 'C[C@@H]1O[C@@H](Oc2cccc3c2C(=O)c2ccc(C[C@@](C)(O)CC(=O)O)c(O)c2C3=O)[C@H](O)[C@H](O)[C@H]1O'
     name = ('(3R)-3-hydroxy-4-[1-hydroxy-5-(α-L-rhamnopyranosyloxy)-9,10-dioxo-9,10-dihydroanthracen-2-yl]'
             '-3-methylbutanoic acid')
     assert _row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
     assert_full_rt(row["name"], smiles)
 

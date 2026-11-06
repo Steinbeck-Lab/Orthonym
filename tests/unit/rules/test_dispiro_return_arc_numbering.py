@@ -29,11 +29,11 @@ by the round-trip gate — the assertion here is the stronger RT-CORRECT).
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import name_compound
 from orthonym.namer import _validity_gate_name_to_smiles as n2s
 from orthonym.rules.spiro import name_spiro_system
+from tests.support.read_back import key_or_none
 
 
 # input SMILES -> (a reference name, only for documentation)
@@ -49,11 +49,6 @@ WITNESSES = [
     "CN1CC11COC11CC1",      # 1-methyl-7-oxa-1-azadispiro[2.0.2.2]octane
     "CC1OC2(CC2)C11CN1",    # 8-methyl-7-oxa-1-azadispiro[2.0.2.2]octane
 ]
-
-
-def _inchikey(smi):
-    m = Chem.MolFromSmiles(smi)
-    return inchi.MolToInchiKey(m) if m is not None else None
 
 
 def _besteffort(smi):
@@ -73,7 +68,7 @@ def test_class_b_dispiro_cage_roundtrips(smi):
         f"{smi}: best-effort abstained (return-arc numbering must let it emit)")
     rebuilt = n2s(name)
     assert rebuilt, f"{smi}: emitted name {name!r} did not parse through OPSIN"
-    assert _inchikey(rebuilt) == _inchikey(smi), (
+    assert key_or_none(rebuilt) == key_or_none(smi), (
         f"{smi}: {name!r} round-trips to a DIFFERENT molecule "
         f"({rebuilt}) — descriptor/locant inconsistency")
 
@@ -88,7 +83,7 @@ def test_bare_dispiro_descriptor_consistent_locant():
     smi = "C1CC11COC11CCC1"
     name = _besteffort(smi)
     assert name == "8-oxadispiro[2.0.3^4.2^3]nonane", name
-    assert _inchikey(n2s(name)) == _inchikey(smi)
+    assert key_or_none(n2s(name)) == key_or_none(smi)
 
 
 @pytest.mark.unit

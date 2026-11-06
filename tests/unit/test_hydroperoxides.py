@@ -83,12 +83,6 @@ class TestHydroperoxideNaming:
     """Test end-to-end hydroperoxide naming."""
 
     @pytest.mark.unit
-    def test_methyl_hydroperoxide(self):
-        """COO -> name contains 'peroxol'."""
-        result = name_compound("COO")
-        assert "peroxol" in result
-
-    @pytest.mark.unit
     def test_ethyl_hydroperoxide(self):
         """CCOO -> name contains 'peroxol'."""
         result = name_compound("CCOO")

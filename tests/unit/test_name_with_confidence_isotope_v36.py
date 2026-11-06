@@ -17,14 +17,6 @@ These tests pin the mirrored hook: decorator success returns the DECORATED name
 the unlabeled skeleton), and a non-isotope input is byte-identical (the
 has_isotopes gate makes the hook a no-op).
 """
-import pytest
-
-from orthonym import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 def test_isotope_label_not_dropped_and_roundtrips(namer):

@@ -18,10 +18,12 @@ from orthonym.assembly.fragment_naming import (
     _get_visited,
     start_naming_session,
     end_naming_session,
-    get_naming_depth,
     name_fragment_recursively,
-    FRAGMENT_NAME_CACHE,
 )
+
+
+#: these tests drive the fragment recursion outside a ``name`` scope (tests/conftest.py)
+pytestmark = pytest.mark.usefixtures("reset_naming_state_after")
 
 
 _DEPTHS = ("session_depth", "name_call_depth")

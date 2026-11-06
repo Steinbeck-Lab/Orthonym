@@ -59,7 +59,6 @@ from orthonym.assembly.naming_utils import (
     needs_brackets,
     strip_italicized_structural_prefix,
 )
-from orthonym.errors import is_failure_name, is_refusal_sentinel
 from orthonym.namer import Orthonym
 
 
@@ -71,8 +70,6 @@ def ungated_namer(monkeypatch):
     asserted in the mode where nothing downstream can suppress a wrong producer
     output. Both defects in this module were leaking in exactly that mode.
     """
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
     return Orthonym()
 
 
@@ -233,7 +230,6 @@ def test_alkoxy_prefix_fails_closed_on_a_revoked_contraction(monkeypatch):
     from rdkit import Chem
     from orthonym.assembly.handlers import hydroxylamine as H
 
-    monkeypatch.setattr(H, "name_substituent_fragment", None, raising=False)
     mol = Chem.MolFromSmiles("CCC(C)ONC")
     o_idx = [a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "O"][0]
     r_c = [nb.GetIdx() for nb in mol.GetAtomWithIdx(o_idx).GetNeighbors()
@@ -578,5 +574,3 @@ def test_the_tripwire_actually_fires(tmp_path):
     assert "for skip in ('tert-', 'sec-'):" in lines
     assert "return any(c in nm for c in '-()[]')" in lines
     assert len(hits) == 5, hits
-
-

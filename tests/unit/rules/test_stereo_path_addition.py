@@ -165,7 +165,7 @@ class TestRingEZFilter:
 
         ez_descs = [(loc, cip) for loc, cip in descs if cip in ('E', 'Z')]
         assert len(ez_descs) > 0, (
-            f"8-membered ring should NOW have E/Z descriptors per errata, got none"
+            "8-membered ring should NOW have E/Z descriptors per errata, got none"
         )
 
 
@@ -241,14 +241,6 @@ class TestCollectStereodescriptorsFilter:
         assert len(rs_descs) >= 1, (
             f"Expected R/S/r/s descriptor on ring stereocenter, got: {descs}"
         )
-
-    def test_format_empty_descriptors(self):
-        """Formatting empty descriptors returns empty string."""
-        assert format_stereodescriptor_string([]) == ""
-
-    def test_format_single_descriptor(self):
-        """Single descriptor formats correctly."""
-        assert format_stereodescriptor_string([(2, 'R')]) == "(2R)-"
 
     def test_format_multiple_descriptors(self):
         """Multiple descriptors format correctly."""

@@ -96,15 +96,9 @@ def test_tier4_substituted_numbering(smiles, expected):
 # autouse-DISABLES the validity gate, so re-enable it to assert production output.
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def _validity_gate_on(monkeypatch):
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
 
 @pytest.mark.unit
-def test_pentahelicene_names_as_fusion_pin(_validity_gate_on):
+def test_pentahelicene_names_as_fusion_pin(opsin_gate):
     # PIN = dibenzo[c,g]phenanthrene (round-trip verified, 0-wrong); [5]helicene
     # has no retained helicene name (series starts at 6 rings,.
     assert name_compound("c1ccc2c(c1)ccc1ccc3ccc4ccccc4c3c12") == \

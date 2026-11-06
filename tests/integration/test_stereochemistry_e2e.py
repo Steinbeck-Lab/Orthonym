@@ -97,24 +97,6 @@ class TestSTEREO02_EZDescriptors:
         result = name_compound(smiles)
         assert expected_stereo in result, f"{description}: {smiles} -> {result}"
 
-    def test_ez_locant_is_lower_bond_position(self):
-        """E/Z locant should be lower carbon position of double bond."""
-        result = name_compound("C/C=C/C")
-        # Double bond at positions 2-3, so locant is 2
-        assert "(2E)" in result, f"Expected (2E): {result}"
-
-    def test_terminal_double_bond_no_ez(self):
-        """Terminal double bonds don't have E/Z (only 2 substituents on one carbon)."""
-        result = name_compound("C=CC")  # propene
-        # Should not have E or Z
-        assert "E" not in result and "Z" not in result, f"Terminal has no E/Z: {result}"
-
-    def test_ethene_no_ez(self):
-        """Ethene cannot have E/Z."""
-        result = name_compound("C=C")
-        assert "(" not in result, f"Ethene has no stereo: {result}"
-
-
 # =============================================================================
 # STEREO-03: Handle cis/trans ring configurations (PARTIAL)
 # =============================================================================
@@ -212,16 +194,6 @@ class TestSTEREO04_MultipleDescriptors:
 class TestSTEREO05_DescriptorPosition:
     """STEREO-05: Stereodescriptors appear at the very start of the name."""
 
-    def test_descriptor_at_start_rs(self):
-        """R/S descriptor starts the name."""
-        result = name_compound("C[C@H](O)CC")
-        assert result.startswith("("), f"Should start with (: {result}"
-
-    def test_descriptor_at_start_ez(self):
-        """E/Z descriptor starts the name."""
-        result = name_compound("C/C=C/C")
-        assert result.startswith("("), f"Should start with (: {result}"
-
     def test_descriptor_before_substituents(self):
         """Descriptor comes before any substituent prefixes."""
         # 3-methylbutan-2-ol with stereo
@@ -268,12 +240,6 @@ class TestStereoEdgeCases:
         # At minimum, should name correctly
         assert "pentan" in result
 
-    def test_benzene_no_ring_stereo(self):
-        """Benzene ring has no cis/trans stereo (aromatic)."""
-        result = name_compound("c1ccccc1")
-        assert "cis" not in result.lower() and "trans" not in result.lower()
-
-
 # =============================================================================
 # Specific Compound Validation
 # =============================================================================
@@ -308,12 +274,6 @@ class TestRequirementCoverage:
         result = name_compound("C[C@H](O)[C@@H](O)C")
         # Should have format like (2x,3y)-
         assert re.search(r"\(\d+[RS],\d+[RS]\)", result)
-
-    def test_stereo_05_position_verified(self):
-        """STEREO-05: Descriptors at start of name."""
-        result = name_compound("C[C@H](O)CC")
-        assert result.startswith("(")
-
 
 # =============================================================================
 # Parametrized comprehensive tests

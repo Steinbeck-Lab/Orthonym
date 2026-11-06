@@ -25,14 +25,12 @@ isolated from the (OPSIN-heavy, hang-prone) real ring engine. This also
 exercises the flagged emission through both the gate-disabled (T4) and the
 gate-active (constitution-granularity) branches.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.namer import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from orthonym.assembly.general_engine import GeneralEngineResult
-from orthonym.validation.e1_certificate import E1Verdict
 
 
 def _mk(tier, *, disable_gate=True):

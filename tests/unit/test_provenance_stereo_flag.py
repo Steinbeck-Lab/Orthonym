@@ -6,7 +6,6 @@ string stays a clean, OPSIN-parseable constitutional IUPAC name (an appended
 """
 import json
 
-import pytest
 
 from orthonym.namer import Orthonym
 from orthonym.cli import _emit_tier_flags

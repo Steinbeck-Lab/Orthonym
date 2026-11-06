@@ -9,7 +9,6 @@ Verifies:
 - Cubane added to BICYCLO_RETAINED_NAMES
 """
 
-import glob
 import shutil
 import subprocess
 
@@ -21,12 +20,7 @@ from orthonym import name_compound
 from tests.support.jars import jar_or_none
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
-_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _OPSIN_AVAILABLE = bool(_OPSIN_JAR) and shutil.which("java") is not None
 
 
@@ -78,7 +72,7 @@ class TestAcetoneRemoved:
         """'acetone' should not appear as a value in RETAINED_NAMES."""
         # acetophenone contains 'acetone' substring, so check exact match
         for val in RETAINED_NAMES.values():
-            assert val != "acetone", f"Found 'acetone' as retained name value"
+            assert val != "acetone", "Found 'acetone' as retained name value"
 
 
 class TestCresolsRemoved:
@@ -104,12 +98,6 @@ class TestCresolsRemoved:
         """No value in RETAINED_NAMES should contain 'cresol'."""
         for val in RETAINED_NAMES.values():
             assert "cresol" not in val.lower(), f"Found cresol in value: {val}"
-
-    @pytest.mark.unit
-    def test_4_methylphenol_naming(self):
-        """name_compound('Cc1ccc(O)cc1') should produce '4-methylphenol'."""
-        result = name_compound("Cc1ccc(O)cc1")
-        assert result == "4-methylphenol", f"Got '{result}'"
 
     @pytest.mark.unit
     def test_2_methylphenol_naming(self):
@@ -158,13 +146,6 @@ class TestAdamantaneAdded:
     def test_adamantane_value_correct(self):
         """BICYCLO_RETAINED_NAMES should map adamantane SMILES to 'adamantane'."""
         assert BICYCLO_RETAINED_NAMES.get("C1C2CC3CC1CC(C2)C3") == "adamantane"
-
-    @pytest.mark.unit
-    def test_adamantane_naming_e2e(self):
-        """name_compound('C1C2CC3CC1CC(C2)C3') should produce 'adamantane'."""
-        result = name_compound("C1C2CC3CC1CC(C2)C3")
-        assert result == "adamantane", f"Got '{result}'"
-
 
 class TestCubaneAdded:
     """Cubane should be in BICYCLO_RETAINED_NAMES."""

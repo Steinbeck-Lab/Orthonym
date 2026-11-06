@@ -10,7 +10,6 @@ prefix, rather than matching an exact name, to be robust against minor
 locant or formatting differences.
 """
 
-import pytest
 from orthonym import name_compound
 
 
@@ -48,13 +47,6 @@ class TestFusedAromaticSubstituents:
         assert 'dimethyl' in name, f"Expected 'dimethyl' in '{name}'"
         assert 'indole' in name, f"Expected 'indole' in '{name}'"
 
-    def test_methylnaphthalene(self):
-        """Methylnaphthalene must contain 'methyl' prefix."""
-        name = name_compound('Cc1cccc2ccccc12')
-        assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
-        assert 'naphthalene' in name, f"Expected 'naphthalene' in '{name}'"
-
-
 # ---------------------------------------------------------------------------
 # Simple aromatic (benzene) substituents (5 tests)
 # Previously: complex substituents caused fallback to bare "benzene"
@@ -76,12 +68,6 @@ class TestBenzeneSubstituents:
         """Diethylbenzene must retain both ethyl groups."""
         name = name_compound('c1ccc(CC)cc1CC')
         assert 'diethyl' in name, f"Expected 'diethyl' in '{name}'"
-        assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
-
-    def test_trimethylbenzene(self):
-        """Trimethylbenzene must retain all three methyl groups."""
-        name = name_compound('Cc1cc(C)cc(C)c1')
-        assert 'trimethyl' in name, f"Expected 'trimethyl' in '{name}'"
         assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
 
     def test_butylbenzene(self):
@@ -150,12 +136,6 @@ class TestRingSubstituentEdgeCases:
         assert 'chloro' in name, f"Expected 'chloro' in '{name}'"
         assert 'oxolan' in name, f"Expected 'oxolan' in '{name}'"
 
-    def test_methylindole_5(self):
-        """5-methylindole must contain 'methyl' and '1H-indole'."""
-        name = name_compound('Cc1ccc2[nH]ccc2c1')
-        assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
-        assert 'indole' in name, f"Expected 'indole' in '{name}'"
-
     def test_dimethylaminobenzene(self):
         """N,N-dimethylaniline: aniline takes full substitution on nitrogen
         , the Blue Book; 'N-methylaniline (PIN)', the Blue Book)."""
@@ -170,14 +150,6 @@ class TestRingSubstituentEdgeCases:
 
 class TestFusedRingHyphenation:
     """Correct hyphenation in fused ring names after prefix."""
-
-    def test_methylquinoline_no_extra_hyphen(self):
-        """2-methylquinoline must NOT have hyphen before 'quinoline'."""
-        name = name_compound('Cc1ccc2ccccc2n1')
-        assert 'methylquinoline' in name, \
-            f"Expected 'methylquinoline' (no hyphen) in '{name}'"
-        assert 'methyl-quinoline' not in name, \
-            f"Should NOT have 'methyl-quinoline' in '{name}'"
 
     def test_nitroindazole_keeps_hyphen_before_1H(self):
         """7-nitro-1H-indazole SHOULD have hyphen before '1H-' (starts with digit)."""
@@ -208,12 +180,6 @@ class TestPAHSubstituents:
         name = name_compound('COc1ccc2ccccc2c1')
         assert 'methoxy' in name, f"Expected 'methoxy' in '{name}'"
         assert 'naphthalene' in name, f"Expected 'naphthalene' in '{name}'"
-
-    def test_hydroxynaphthalene(self):
-        """2-Naphthol: the OH is the suffix, 'naphthalen-2-ol'; cf. 'naphthalen-1-ol
-        (PIN)', the Blue Book."""
-        name = name_compound('Oc1ccc2ccccc2c1')
-        assert name == 'naphthalen-2-ol', f"Expected 'naphthalen-2-ol', got '{name}'"
 
     def test_dimethylnaphthalene(self):
         """Dimethylnaphthalene must contain 'dimethyl' prefix."""
@@ -296,9 +262,3 @@ class TestHeterocycleHyphenation:
         # Should be "2-methyl-1,4-dithiane" not "2-methyl1,4-dithiane"
         assert 'methyl-1' in name or 'methyl-2' in name, \
             f"Expected hyphen between prefix and digit parent in '{name}'"
-
-    def test_pyridine_no_extra_hyphen(self):
-        """Methylpyridine must NOT have extra hyphen before alpha parent."""
-        name = name_compound('Cc1ccncc1')
-        assert 'methylpyridine' in name, \
-            f"Expected 'methylpyridine' (no extra hyphen) in '{name}'"

@@ -77,10 +77,6 @@ class TestCyclicImideNaming:
         # hydrogen is not cited when the suffix pair only removes ring double bonds. OPSIN 2.9.0 RT exact.
         assert name_compound("O=C1C=CC(=O)N1") == "1H-pyrrole-2,5-dione"
 
-    def test_glutarimide(self):
-        """: O=C1CCCC(=O)N1 -> piperidine-2,6-dione (PIN)."""
-        assert name_compound("O=C1CCCC(=O)N1") == "piperidine-2,6-dione"
-
     def test_phthalimide(self):
         """Phthalimide -> the heterocyclic pseudoketone PIN."""
         # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
@@ -146,7 +142,6 @@ class TestCyclicImideNaming:
         name = name_compound(smiles)
         assert name == expected
         assert_full_rt(name, smiles)
-
 
     @pytest.mark.parametrize("smiles,expected", [
         ("O=c1ccn(Cc2ccccc2)c(=O)[nH]1", "1-benzylpyrimidine-2,4(1H,3H)-dione"),

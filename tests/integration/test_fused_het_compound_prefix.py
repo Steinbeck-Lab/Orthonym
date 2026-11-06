@@ -8,9 +8,7 @@ like "(5-methyl-1H-indol-3-yl)".
 Tests verify requirement.
 """
 
-import subprocess
 import pytest
-from pathlib import Path
 from rdkit import Chem
 
 from orthonym.data.fused_heterocycles import (

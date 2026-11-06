@@ -28,16 +28,14 @@ which the check (``validation/spelling/checks_assembly.py``) withdraws from the 
 molecule had no PIN at all. Round-trip exactness is no evidence of the spelling: OPSIN reads the names
 below, their rivals with higher locants and the substitutive names back to one structure.
 
-The tests of the engine (``needs_wiring``) need the call of ``detect_hydro_ring_assembly`` in
-``namer.py`` (``proposals/R2A-namer-hydro-assembly.patch``); without it they are expected failures and
-the producer is exercised on its own.
+The tests of the engine reach the producer through the call of ``detect_hydro_ring_assembly`` in
+``classify_parts.py``.
 
 An isotope-labelled molecule is named through its isotope-stripped skeleton, and the label is spliced into
 the skeleton's name, the Blue Book "before the part of the compound that is isotopically
 substituted"). The splice cannot enter a name of this producer (the labels of the primed component need a
 primed locant, and there is no slot between the hydro prefixes and a locant set that carries a prime), so the
-namer runs the decorator inside ``hydro_assembly_withheld`` and the molecule keeps the producers it had
-(``needs_label_wiring``: the second hunk of the same patch).
+namer runs the decorator inside ``hydro_assembly_withheld`` and the molecule keeps the producers it had.
 """
 import random
 
@@ -50,9 +48,9 @@ from orthonym.perception.rings import get_ring_systems
 from orthonym.rules import ring_assemblies
 from orthonym.rules.ring_assemblies import detect_hydro_ring_assembly
 from orthonym.validation.opsin_roundtrip import OpsinUnavailable
-from tests.support.hydro_wiring import needs_label_wiring, needs_wiring
 from tests.support.pin_tiers import assert_pin_at_both_tiers
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -278,7 +276,6 @@ ENGINE = [r for r in ROWS if r[0] in (
     "piperidin-1-yl-pyridine", "butyl-on-hydro-ring", "methoxy-methyl", "chloro", "bifuran", "bipyrrole")]
 
 
-@needs_wiring
 @pytest.mark.parametrize("_id,smiles,pin", ENGINE, ids=[r[0] for r in ENGINE])
 def test_the_engine_ships_the_pin_at_both_tiers(_id, smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
@@ -294,8 +291,7 @@ def test_cyclohexylbenzene_is_unchanged_and_the_exception_stays_substitutive():
 def test_a_molecule_the_producer_declines_keeps_a_name_that_reads_back(smiles):
     # the group is out of scope for the producer: the producers the molecule had still name it at the
     # best-effort tier, and the name still reads back to the structure (best-effort never goes down)
-    from orthonym.cli import _emit_tier_flags
-    best = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    best = tier_row(smiles, "best-effort")
     assert best["name"] and name_is_rt_exact(best["name"], smiles), best
 
 
@@ -313,9 +309,8 @@ LABELLED_CHAIN = [("13C on a substituent chain", "[13CH3]CCc1ccc(cc1)C1=CCCCC1")
 def _assert_labelled_molecule_is_named(smiles):
     # the name that ships carries the label: the full InChIKey of the read-back, isotope layer included, is
     # the input's
-    from orthonym.cli import _emit_tier_flags
     from orthonym.errors import is_failure_name
-    best = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    best = tier_row(smiles, "best-effort")
     assert best["name"] and not is_failure_name(best["name"]), best
     assert_full_rt(best["name"], smiles)
     pin = Orthonym(style="pin").name_tiered(smiles)
@@ -323,7 +318,6 @@ def _assert_labelled_molecule_is_named(smiles):
         assert_full_rt(pin["name"], smiles)    # what the PIN tier ships is the molecule too
 
 
-@needs_label_wiring
 @pytest.mark.parametrize("_id,smiles", LABELLED_RING, ids=[x[0] for x in LABELLED_RING])
 def test_a_ring_label_keeps_a_name_at_the_best_effort_tier(_id, smiles):
     # the skeleton of a labelled molecule is named without the hydro producer: a name of the producer takes
@@ -336,7 +330,6 @@ def test_a_substituent_label_keeps_a_name_at_the_best_effort_tier(_id, smiles):
     _assert_labelled_molecule_is_named(smiles)
 
 
-@needs_wiring
 def test_a_labelled_molecule_does_not_change_what_the_next_molecule_is_named():
     # the withheld state is the decorator's alone: it is not left set (a name never depends on what the
     # process named before), and no classification of the labelled skeleton is kept for the unlabelled one

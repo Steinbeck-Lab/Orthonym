@@ -16,17 +16,24 @@ Test coverage:
 """
 from __future__ import annotations
 
+import functools
 import json
 import subprocess
 import sys
 
-import pytest
 
 from orthonym import Orthonym
 
 
-def _run_cli(args, expected_returncode=0):
-    """Helper: run ``python -m orthonym`` with args; return (stdout, stderr, rc).
+def _run_cli(args):
+    """Helper: run ``python -m orthonym`` with args; return (stdout, stderr, rc). Each distinct argv runs
+    once per test process (``_run_cli_once``): the tests read the output and change nothing."""
+    return _run_cli_once(tuple(args))
+
+
+@functools.lru_cache(maxsize=None)
+def _run_cli_once(args):
+    """Run ``python -m orthonym`` with ``args`` (a tuple).
 
     Sets PYTHONPATH=src to use the worktree codebase (matches the canary
     harness pattern).
@@ -39,7 +46,7 @@ def _run_cli(args, expected_returncode=0):
     # Ensure the worktree src/ is on the path so the CLI uses our code.
     env["PYTHONPATH"] = os.path.join(cwd, "src") + os.pathsep + env.get("PYTHONPATH", "")
     result = subprocess.run(
-        [sys.executable, "-m", "orthonym"] + args,
+        [sys.executable, "-m", "orthonym", *args],
         capture_output=True,
         text=True,
         env=env,

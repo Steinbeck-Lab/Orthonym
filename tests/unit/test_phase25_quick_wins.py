@@ -1,5 +1,4 @@
 """Tests for a phase quick-win naming fixes."""
-import pytest
 from orthonym import name_compound
 
 

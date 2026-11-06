@@ -79,8 +79,6 @@ def _organyl(smiles, hub_symbol='As'):
 def ungated_namer(monkeypatch):
     """A namer with the OPSIN validity gate explicitly DISABLED, so the
     producer's own output is asserted with nothing downstream able to rescue it."""
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
     return Orthonym()
 
 

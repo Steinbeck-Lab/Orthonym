@@ -8,18 +8,13 @@ Every name is read back by a FRESH OPSIN call that does not go through the engin
 (tests.support.rt_assert._independent_parse) and compared by full InChIKey.
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.assembly.naming_utils import locant_sort_key
 from tests.support.rt_assert import _independent_parse
+from tests.support.read_back import key_or_empty as _key
 
 pytestmark = [pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return Chem.MolToInchiKey(mol) if mol is not None else ""
 
 
 def test_fusion_locant_sorts_after_its_numeral():

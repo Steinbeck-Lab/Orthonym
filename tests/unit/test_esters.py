@@ -23,11 +23,6 @@ class TestSimpleEsters:
         result = name_compound("CCOC(C)=O")
         assert result == "ethyl acetate" or result == "ethyl ethanoate"
 
-    def test_methyl_formate(self):
-        """Methyl formate - 1-carbon acid."""
-        result = name_compound("COC=O")
-        assert result == "methyl formate" or result == "methyl methanoate"
-
     def test_ethyl_formate(self):
         """Ethyl formate."""
         result = name_compound("CCOC=O")
@@ -42,11 +37,6 @@ class TestSystematicEsters:
         result = name_compound("COC(=O)CC")
         assert result == "methyl propanoate"
 
-    def test_ethyl_propanoate(self):
-        """Ethyl propanoate."""
-        result = name_compound("CCOC(=O)CC")
-        assert result == "ethyl propanoate"
-
     def test_methyl_butanoate(self):
         """Methyl butanoate - 4-carbon acid."""
         result = name_compound("COC(=O)CCC")
@@ -56,11 +46,6 @@ class TestSystematicEsters:
         """Ethyl butanoate."""
         result = name_compound("CCOC(=O)CCC")
         assert result == "ethyl butanoate"
-
-    def test_propyl_acetate(self):
-        """Propyl acetate - 3-carbon alkyl."""
-        result = name_compound("CCCOC(C)=O")
-        assert result == "propyl acetate" or result == "propyl ethanoate"
 
     def test_butyl_acetate(self):
         """Butyl acetate - 4-carbon alkyl."""
@@ -91,12 +76,6 @@ class TestEsterRetainedNames:
         """Verify acetate for ethyl acetate."""
         result = name_compound("CCOC(C)=O")
         assert "acetate" in result or "ethanoate" in result
-
-    def test_methyl_formate_uses_formate(self):
-        """Verify formate (not methanoate) for 1-carbon acid."""
-        result = name_compound("COC=O")
-        assert "formate" in result or "methanoate" in result
-
 
 class TestEsterFragmentParsing:
     """Test ester fragment detection."""

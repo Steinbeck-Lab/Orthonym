@@ -17,14 +17,9 @@ Changed asserted values, none: every row is new.
 """
 import pytest
 
-from orthonym import Orthonym
+from tests.support.pin_tiers import name_and_tier
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _tiered(smiles: str):
-    row = Orthonym().name_tiered(smiles)
-    return row["name"], row["tier"]
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -47,7 +42,7 @@ def _tiered(smiles: str):
     ("CC(C)[Se+](C)C", "dimethyl(propan-2-yl)selanium"),
 ])
 def test_a_branched_or_substituted_carbon_group_on_the_chalcogen_cation(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -60,4 +55,4 @@ def test_a_branched_or_substituted_carbon_group_on_the_chalcogen_cation(smiles, 
     ("C[O+](C)C(=O)C1CCCCC1", "(cyclohexanecarbonyl)di(methyl)oxidanium"),   #:41480
 ])
 def test_the_controls_keep_their_names(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")

@@ -6,7 +6,6 @@ and glycosidic bonds while excluding lactones, lactams, carbamates,
 and ureas.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.decomposition.bond_cleavage import find_cleavable_bonds

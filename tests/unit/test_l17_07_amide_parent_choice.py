@@ -29,20 +29,16 @@ import random
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.assembly.n_acyl_amido import parent_amide_is_senior
 from orthonym.rules.amide_parent import amide_parent_key, parent_amide_is_junior, senior_carboxamide_group
 from orthonym.rules.seniority import get_principal_group
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # (smiles, the PIN, the criterion that makes the named amide the parent)
@@ -72,7 +68,7 @@ _TARGETS = [
 @pytest.mark.parametrize("smiles,name,rule", _TARGETS)
 def test_the_senior_amide_is_the_parent(smiles, name, rule, tier):
     """The named amide is the parent by the criterion of the row; the name is a PIN read back whole by OPSIN."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, (rule, row)
     assert row["tier"] == "pin_verified", (rule, row)
     assert_full_rt(row["name"], smiles)
@@ -93,7 +89,7 @@ _CONTROLS = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _CONTROLS)
 def test_the_group_of_the_junior_amide_stays_a_prefix(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -112,7 +108,7 @@ _N_SUBSTITUENT_GROUPS = [
 def test_a_group_of_the_n_substituent_is_cited_once(smiles, name, tier):
     """ (the Blue Book): R-CO-NHR' is named by citing R' as a prefix preceded by the locant N: the
     groups R' holds are part of its name."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
@@ -124,7 +120,7 @@ def test_the_pin_tier_does_not_name_the_amido_prefix_form(smiles):
               "CCCC(=O)N(C)C(C)C(N)=O": "2-(N-methylbutanamido)propanamide",
               "NC(=O)CNC(=O)c1ccccc1": "2-benzamidoacetamide"}[smiles]
     for tier in _TIERS:
-        assert _row(smiles, tier)["name"] != junior
+        assert tier_row(smiles, tier)["name"] != junior
 
 
 # --- the choice --------------------------------------------------------------------------------------------------------
@@ -227,7 +223,7 @@ def test_the_p44_4_1_criteria_choose_the_parent_before_the_prefix_count(smiles, 
     """The parent is the chain the criterion of the row prefers; the PIN is read back whole by OPSIN. Before the criteria of
      were applied the name cited the senior amide as the prefix of the junior one, or put the N-substituted
     nitrogen's chain first and shipped 'N-(4-amino-4-oxobut-2-en-1-yl)-N-methylbut-3-enamide' as a PIN."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, (rule, row)
     assert row["tier"] == "pin_verified", (rule, row)
     assert_full_rt(row["name"], smiles)
@@ -239,7 +235,7 @@ def test_the_p44_4_1_criteria_choose_the_parent_before_the_prefix_count(smiles, 
 ])
 def test_no_tier_ships_the_junior_parent_as_a_pin(smiles, junior):
     for tier in _TIERS:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert not (row["name"] == junior and row["tier"] == "pin_verified"), row
 
 
@@ -331,12 +327,12 @@ def test_three_amides_are_never_named_on_the_junior_acetamide_as_a_pin(smiles):
     propanamido]acetamide', a pin_verified name of a junior parent. The PIN tier declines; the best-effort tier names the
     senior propanamide (with the tier it earns) and never the acetamide as a PIN."""
     for tier in _TIERS:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert not (row["tier"] == "pin_verified" and (row["name"] or "").endswith("acetamide")), row
         if row["tier"] != "abstain":
             assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    best = _row(smiles, "best-effort")
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    best = tier_row(smiles, "best-effort")
     assert best["name"] and best["name"].endswith("-N-methylpropanamide"), best
     assert best["name"].startswith("N-"), best
 
@@ -348,7 +344,7 @@ def test_three_amides_are_never_named_on_the_junior_acetamide_as_a_pin(smiles):
 ])
 def test_three_amides_name_the_senior_parent_as_a_pin(smiles, name):
     for tier in _TIERS:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name and row["tier"] == "pin_verified", row
         assert_full_rt(row["name"], smiles)
 
@@ -360,7 +356,7 @@ def test_the_bracketed_n_substituent_row_is_spelled_with_its_locants():
     each N-substituent is cited with N and enclosed alone. It was
     '(4-chlorophenoxy)[N-(3-methylbutyl)](N-{...})acetamide', a name no tier labels a PIN."""
     smiles = "CC1=CN=C(S1)NC(=O)CN(CCC(C)C)C(=O)COC2=CC=C(C=C2)Cl"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == ("2-(4-chlorophenoxy)-N-(3-methylbutyl)-N-{2-[(5-methyl-1,3-thiazol-2-yl)amino]-2-oxoethyl}"
                            "acetamide"), row
     assert row["tier"] != "pin_verified", row
@@ -375,7 +371,7 @@ def test_of_two_ring_carboxamides_the_senior_ring_system_is_the_parent(tier):
     carbocycles: the pyridine ring is senior to the benzene ring, so the pyridine-4-carboxamide is the parent. The two
     ring carboxamides tied under the key and the primary amide won ('4-(pyridine-4-carboxamido)benzamide')."""
     smiles = "NC(=O)c1ccc(NC(=O)c2ccncc2)cc1"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == "N-(4-carbamoylphenyl)pyridine-4-carboxamide", row
     assert row["tier"] == "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -410,7 +406,7 @@ def test_of_two_ring_carboxamides_of_one_ring_system_p45_2_chooses_the_parent(sm
     """ "CRITERIA RELATED TO NUMBER AND LOCATION OF SUBSTITUENT GROUPS" (:21596): the two benzamides (two pyridine-4-
     carboxamides) tie under, so the criteria of and decide. The tie kept the head of
     SENIORITY_ORDER (the primary amide) and shipped '4-benzamidobenzamide' as the PIN of the first row."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, (rule, row)
     assert row["tier"] == "pin_verified", (rule, row)
     assert_full_rt(row["name"], smiles)
@@ -448,7 +444,7 @@ def test_the_parent_with_more_carboxamide_groups_outranks_a_senior_ring(smiles, 
     benzene with two carboxamides is the parent although the pyridine, the pyrrolidine or the thiophene is the senior ring
      (a)). The pyridine-4-carboxamide was the parent and its N-substituent, the benzene with two groups, was cited
     as 'N-(3,5-dicarbamoylphenyl)': no PIN and a name the PIN tier declined."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -463,7 +459,7 @@ def test_a_pyridine_carboxamide_is_never_the_pin_parent_of_a_benzene_dicarboxami
     """: the benzene-1,3-dicarboxamide is the parent (the PIN is 'N1-(4-carbamoylpyridin-3-yl)benzene-1,3-
     dicarboxamide',, which the ring diamide producers do not build). No tier names the molecule on the pyridine
     as a PIN; the best-effort tier names it, read back whole, below the PIN."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] != junior or row["tier"] != "pin_verified", row
     if tier == "pin":
         assert row["tier"] != "pin_verified", row
@@ -496,7 +492,7 @@ def test_the_amide_of_a_fused_ring_outranks_the_benzamide_and_is_never_cited_as_
     carboxamide of a fused parent (the carbamoyl prefix: 'N-methylquinoline-2-carboxamide' is no name of it either), so the PIN
     tier declines; the best-effort tier keeps a name read back whole, labelled below the PIN, and it is not the
     junior-parent name that was shipped as a PIN."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["tier"] != "pin_verified", row
     if tier == "best-effort":
         assert row["name"] and row["name"] != junior, row

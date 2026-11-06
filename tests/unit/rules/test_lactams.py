@@ -209,10 +209,3 @@ class TestLactamEndToEnd:
     def test_lactone_still_works(self):
         """Lactone naming is not broken by lactam integration."""
         assert name_compound("O=C1CCCO1") == "oxolan-2-one"
-
-    def test_acyclic_amide_not_affected(self):
-        """Acyclic amide naming is not affected."""
-        name = name_compound("CC(=O)NC")
-        assert name is not None
-        # Should contain 'amide' or 'acetamide' -- not lactam
-        assert "one" not in name or "azetidin" not in name

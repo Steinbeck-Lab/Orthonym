@@ -10,16 +10,11 @@ The macrolactone namer wrote '1-oxacyclotridec-3,5-dien-2-one' (no 'a'). A singl
 multiplying prefix and takes no 'a': '1-oxacyclotridec-3-en-2-one'.
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym.rules.lactones import name_lactone_ring
 from tests.support.rt_assert import _independent_parse
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
+from tests.support.read_back import key as _key
 
 
 # (smiles, name): a multiplied ene takes the connecting 'a'.

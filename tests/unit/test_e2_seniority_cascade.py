@@ -11,17 +11,11 @@ deferred (see E2-SUMMARY); their non-regression invariants are asserted here.
 """
 import pytest
 
-from orthonym import Orthonym
 from orthonym.assembly.substituent_naming import (
     _located_acyclic_alkyl_name,
     _attach_is_chain_terminus,
 )
 from rdkit import Chem
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # ---------------------------------------------------------------------------

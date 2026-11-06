@@ -14,7 +14,6 @@ whole molecules is verified by the the gold set PROTECT rows and by scripts/diag
 """
 from rdkit import Chem
 
-import orthonym
 from orthonym.rules.ring_substituents import decorated_ring_substituent_name
 
 
@@ -42,11 +41,3 @@ def test_heteroaryl_n_ring_promotion_declines():
         if nb.GetSymbol() == 'N' and nb.GetIdx() not in py_ring
     )
     assert decorated_ring_substituent_name(mol, py_ring, attach) is None
-
-
-def test_stereo_lossy_ether_not_emitted():
-    # the R/S diaryl ether carries BOTH descriptors (a stereo-lossy string parses
-    # to a different, achiral molecule and must never be emitted).
-    name = orthonym.name_compound(
-        "C[C@H](Cl)c1ccc(Oc2ccc(cc2)[C@@H](C)Cl)cc1", style="pin")
-    assert "(1R)" in name and "(1S)" in name

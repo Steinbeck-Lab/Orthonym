@@ -32,13 +32,6 @@ a wrong output can unmask something worse. The suffix form had to be BUILT.
 """
 import pytest
 
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 class TestNewSuffixForms:
     @pytest.mark.parametrize("smiles,expected,authority", [

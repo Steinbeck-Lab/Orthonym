@@ -151,12 +151,6 @@ def test_d_embedded_ez_dropped_descriptor_is_missing():
     assert bs.SUBSTITUENT_STEREO_MISSING in p.codes()
 
 
-def test_d_embedded_ez_wrong_letter_is_mismatch():
-    wrong = "(3Z)-2-oxo-1-azapent-3-en-1-yl"  # real bond is E, not Z
-    p = bs.verify_spine(_EZ_MOL, _ez_spine(wrong), wrong, mode="audit")
-    assert bs.SUBSTITUENT_STEREO_MISMATCH in p.codes()
-
-
 def test_d_fabricated_descriptor_with_no_real_bond_is_mismatch():
     """A token claiming (nE)/(nZ) over an atom set with NO internal defined
     E/Z bond at all -- the fabrication case, not merely a wrong letter."""

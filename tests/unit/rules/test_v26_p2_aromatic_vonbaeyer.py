@@ -23,7 +23,6 @@ strings + a complete E1 atom partition (deterministic, gate-independent);
 (b) full-namer RT tests re-enable via ``production_gate`` (skips
 without Java) and round-trip via a private stdin-batch OPSIN helper.
 """
-import glob
 import shutil
 import subprocess
 
@@ -38,7 +37,7 @@ from orthonym.rules.vonbaeyer_universal import (
 )
 from orthonym.rules.polycyclic import VonBaeyerAnalyzer
 from orthonym.validation.e1_certificate import verify_certificate
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 pytestmark = pytest.mark.unit
@@ -218,16 +217,11 @@ _RT_CASES = (AROMATIC_FUSED_CASES + BENZO7_FUSION_CASES + BENZO7_ENGINE_CASES[1:
              + BENZO_HETERO_FUSION_CASES)
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 @pytest.fixture
 def production_gate(monkeypatch):
     """Re-enable the production OPSIN validity gate (the suite autouse
     fixture disables it). Skips when Java/OPSIN are unavailable."""
-    if not shutil.which("java") or _find_opsin_jar() is None:
+    if not java_on_path() or jar_or_none() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
     monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", False)
 
@@ -237,7 +231,7 @@ def opsin_roundtrip():
     """name -> canonical SMILES via ONE OPSIN JVM (stdin batch). Skips without
     Java/OPSIN. The conftest ``opsin_to_smiles`` fixture is broken (passes the
     name as a positional CLI arg -> read as a file path -> always None)."""
-    jar = _find_opsin_jar()
+    jar = jar_or_none()
     if not shutil.which("java") or jar is None:
         pytest.skip("OPSIN/Java not available")
     names = [name for _s, name in _RT_CASES]

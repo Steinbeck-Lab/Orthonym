@@ -17,7 +17,6 @@ and for the caller's molecule; every other group keeps the chain it had.
 Every name is read back by OPSIN's own StdInChIKey against RDKit's key of the input.
 """
 import random
-import re
 
 import pytest
 from rdkit import Chem
@@ -26,6 +25,7 @@ from orthonym import Orthonym, namer
 from orthonym.perception import chains
 from orthonym.perception.chains import find_principal_chain
 from tests.unit.namer.leads_l1_support import opsin_key, rdkit_key
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -170,8 +170,7 @@ def test_the_n_substituent_chain_of_a_secondary_amide_is_no_senior_chain():
     smiles = "COc1cc([C@H](Cc2ccccc2)NC(C)=O)oc(=O)c1"
     amide = "N-[(1S)-1-(4-methoxy-2-oxo-2H-pyran-6-yl)-2-phenylethyl]acetamide"
     assert opsin_key(amide) == rdkit_key(smiles)
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (amide, "pin_unverified"), row
     f, default = _features(smiles)
     assert f.principal_group == "secondary_amide"

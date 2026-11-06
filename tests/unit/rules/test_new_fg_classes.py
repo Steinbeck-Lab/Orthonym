@@ -7,7 +7,6 @@ Each new FG class requires:
   4. Suffix form in SUFFIX_FORMS (seniority.py)
   5. Prefix form in PREFIX_FORMS (seniority.py)
 """
-import pytest
 from rdkit import Chem
 from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.rules.seniority import SENIORITY_ORDER, SUFFIX_FORMS, PREFIX_FORMS

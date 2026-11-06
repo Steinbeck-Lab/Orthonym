@@ -32,13 +32,6 @@ wrong site — the fifth off-path choke point in this phase.
 """
 import pytest
 
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 class TestTheTwoTablesAgree:
     def test_terminal_group_tables_are_consistent(self):

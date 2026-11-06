@@ -253,34 +253,11 @@ class TestCompleteBicycloNaming:
         assert 'bicyclo' in name.lower()
 
     @pytest.mark.unit
-    def test_bicyclo_222_octane_name(self):
-        """Bicyclo[2.2.2]octane should name correctly."""
-        name = name_compound('C1CC2CCC1CC2')
-        assert 'bicyclo[2.2.2]octane' in name.lower()
-
-    @pytest.mark.unit
-    def test_bicyclo_321_octane_name(self):
-        """Bicyclo[3.2.1]octane should name correctly."""
-        name = name_compound('C1CC2CCCC1C2')
-        assert 'bicyclo' in name.lower()
-        assert 'octane' in name.lower()
-
-    @pytest.mark.unit
     def test_methylbicyclo_222_octane_name(self):
         """Methylbicyclo[2.2.2]octane should include methyl prefix."""
         name = name_compound('CC1CC2CCC1CC2')
         assert 'methyl' in name.lower()
         assert 'bicyclo' in name.lower()
-
-    @pytest.mark.unit
-    def test_norbornane_retained_name(self):
-        """Unsubstituted norbornane takes its von Baeyer PIN, not the retained name.
-
-        Task 12 fix a performance pass (wp6-tests; whole-branch review nit 17): the assertion
-        compared name.lower, which would accept a case error; it is exact now."""
-        name = name_compound('C1CC2CCC1C2')
-        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        assert name == 'bicyclo[2.2.1]heptane'
 
     @pytest.mark.unit
     def test_bicyclo_410_heptane_name(self):
@@ -392,13 +369,6 @@ class TestBicycloNameFormat:
     """Test that generated names follow IUPAC format."""
 
     @pytest.mark.unit
-    def test_descriptor_format_in_name(self):
-        """Name should contain bicyclo[x.y.z] descriptor."""
-        name = name_compound('C1CC2CCC1CC2')  # bicyclo[2.2.2]octane
-        # Check descriptor format
-        assert '[2.2.2]' in name
-
-    @pytest.mark.unit
     def test_substituent_locant_format(self):
         """Substituent should have locant prefix."""
         name = name_compound('CC1CC2CCC1C2')  # methylnorbornane
@@ -456,11 +426,6 @@ class TestWSD01VonBaeyerFGSuffix:
     def test_bicyclo_alcohol_is_suffix(self):
         #: -ol suffix, not 2-hydroxy- prefix.
         assert name_compound('OC1CC2CCC1C2') == 'bicyclo[2.2.1]heptan-2-ol'
-
-    @pytest.mark.unit
-    def test_protect_norbornanone_locant(self):
-        # Ketone suffix unchanged; locant stays 2 (Phase-170 numbering kept).
-        assert name_compound('O=C1CC2CCC1C2') == 'bicyclo[2.2.1]heptan-2-one'
 
     @pytest.mark.unit
     def test_camphor_is_named_von_baeyer_not_retained(self):

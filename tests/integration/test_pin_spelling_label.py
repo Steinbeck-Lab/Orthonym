@@ -21,12 +21,10 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.namer import _default_tier_emits
 from orthonym.validation.pin_spelling import check_pin_spelling
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.default_tier import (
     assert_best_effort_gives,
     assert_default_tier_declines,
     default_tier_row,
-    strict_path_row,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]

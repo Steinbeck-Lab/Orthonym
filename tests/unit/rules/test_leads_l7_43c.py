@@ -15,11 +15,10 @@ An acyl isocyanate is a different class, the Blue Book; example
 :23138 'CH3-CO-NCO acetyl isocyanate (PIN; '): functional class, unchanged.
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from tests.support.rt_assert import _independent_parse
+from tests.support.read_back import key as _key
 
 # (smiles, PIN) -- each used to be named 'R isocyanate' / 'R isothiocyanate'.
 ARYL = [
@@ -44,10 +43,6 @@ CONTROLS = [
     ("S=C=NCc1ccccc1", "(isothiocyanatomethyl)benzene"),
     ("CC(=O)N=C=O", "acetyl isocyanate"),                  # acyl: (BB:23138)
 ]
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 @pytest.mark.opsin_gate

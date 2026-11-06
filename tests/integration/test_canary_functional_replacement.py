@@ -20,7 +20,7 @@ References:
 - scripts/verify_frn_canary.py (parallel three-tier harness)
 """
 import csv
-import os
+import functools
 import re
 import subprocess
 from pathlib import Path
@@ -126,14 +126,9 @@ def test_tier_a_name_string_equality(row):
     )
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 def _opsin_parse(name):
     """Invoke OPSIN CLI on a single name; return generated SMILES or None."""
-    jar = _find_opsin_jar()
+    jar = jar_or_none()
     if jar is None:
         pytest.skip("OPSIN jar not available")
     try:
@@ -152,6 +147,34 @@ def _opsin_parse(name):
         return first
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
+
+
+@functools.lru_cache(maxsize=None)
+def _tier_b_names_and_parses():
+    """row id -> (the PIN-style name, OPSIN's SMILES of it or None), for every Tier-B row: the rows are named
+    once and the names read in ONE OPSIN run (one output line per input line, ``aligned_batch_lines``); a run
+    whose lines do not line up with the names falls back to one OPSIN run per name."""
+    from orthonym import name_compound
+    from orthonym.jvm_flags import aligned_batch_lines, java_cmd
+    jar = jar_or_none()
+    if jar is None:
+        pytest.skip("OPSIN jar not available")
+    rows = [p.values[0] for p in TIER_B_PARAMS]
+    names = [name_compound(r['smiles'], style="pin") for r in rows]
+    lines = None
+    if names and not any("\n" in n for n in names):
+        try:
+            r = subprocess.run(java_cmd("-jar", jar, "-o", "smi", "-a"), input="\n".join(names) + "\n",
+                               capture_output=True, text=True, timeout=300)
+            if r.returncode == 0:
+                lines = aligned_batch_lines(r.stdout, len(names), where="FRN Tier-B batch")
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+    if lines is None:
+        parses = [_opsin_parse(n) for n in names]
+    else:   # the same reading as ``_opsin_parse``: an empty line or a warning line is no parse
+        parses = [s if s not in ("", "OPSIN: warning") else None for s in (ln.strip() for ln in lines)]
+    return {r['id']: (n, s) for r, n, s in zip(rows, names, parses)}
 
 
 def _inchi_l1_connectivity(smiles):
@@ -181,9 +204,7 @@ def test_tier_b_opsin_round_trip(row):
     Per a phase precedent: Phase-163.1-backlog fixtures produce honest
     failures here too (their Tier-A name is wrong, so OPSIN-RT cannot match).
     """
-    from orthonym import name_compound
-    actual_name = name_compound(row['smiles'], style="pin")
-    opsin_smiles = _opsin_parse(actual_name)
+    actual_name, opsin_smiles = _tier_b_names_and_parses()[row['id']]
     if row['id'] in _PHASE_163_1_BACKLOG_TIER_B and (
         opsin_smiles is None or
         _inchi_l1_connectivity(opsin_smiles) !=

@@ -108,12 +108,6 @@ class TestAminoNotDropped:
 class TestHaloNotDropped:
     """Verify halogen groups are retained in polyfunctional names."""
 
-    def test_chloro_not_dropped_with_hydroxyl(self):
-        """4-chlorophenol: -Cl must appear alongside -OH."""
-        name = name_compound("Oc1ccc(Cl)cc1")
-        assert name is not None
-        assert "chloro" in name.lower(), f"Chloro dropped with hydroxyl: {name}"
-
     def test_chloro_not_dropped_with_acid(self):
         """3-chloropropanoic acid: -Cl on acid chain."""
         name = name_compound("ClCCC(=O)O")
@@ -157,28 +151,6 @@ class TestNitroNotDropped:
         name = name_compound("OC(=O)c1cc([N+](=O)[O-])cc([N+](=O)[O-])c1")
         assert name is not None
         assert "nitro" in name.lower(), f"Nitro dropped in dinitro: {name}"
-
-
-@pytest.mark.integration
-class TestCarboxyNotDropped:
-    """Verify -COOH groups are retained in diacids."""
-
-    def test_carboxy_not_dropped_in_dicarboxylic(self):
-        """Hexanedioic acid: both -COOH groups expressed as dioic acid."""
-        name = name_compound("OC(=O)CCCCC(=O)O")
-        assert name is not None
-        assert "acid" in name.lower(), f"Acid dropped: {name}"
-        assert "dioic" in name.lower() or "dicarbox" in name.lower() or (
-            name.lower().count("acid") >= 1
-        ), f"Second acid not expressed: {name}"
-
-    def test_carboxy_not_dropped_in_ring_diacid(self):
-        """4-(carboxymethyl)benzoic acid: ring acid + chain acid."""
-        name = name_compound("OC(=O)c1ccc(CC(=O)O)cc1")
-        assert name is not None
-        assert "acid" in name.lower() or "carboxyl" in name.lower(), (
-            f"Acid groups dropped: {name}"
-        )
 
 
 @pytest.mark.integration

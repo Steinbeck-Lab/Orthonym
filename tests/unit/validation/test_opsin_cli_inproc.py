@@ -3,7 +3,7 @@
 The PR run answers the test code's ``java -jar opsin -osmi`` calls through
 ``orthonym.jvm_bridge._opsin_stdout_uncached`` (tests/support/opsin_cli_inproc.py).
 That is only sound if the two give the same bytes, so this test runs ONE real
-``java -jar`` call per mode over 40 names (valid names, names OPSIN rejects, names that
+``java -jar`` call per mode (``-osmi`` and ``-ostdinchikey``) over 40 names (valid names, names OPSIN rejects, names that
 only parse with radicals allowed) and compares every output line with the in-process
 answer, and with what ``subprocess.run`` returns when the shim is active.
 """
@@ -34,8 +34,8 @@ NAMES = [
 ]
 
 
-def _compare_one_mode(jar, radicals):
-    argv = java_cmd("-jar", jar, *(["-r"] if radicals else []), "-osmi")
+def _compare_one_mode(jar, radicals, output="-osmi"):
+    argv = java_cmd("-jar", jar, *(["-r"] if radicals else []), output)
     text = "\n".join(NAMES) + "\n"
 
     real = opsin_cli_inproc.REAL_RUN(argv, input=text, capture_output=True, text=True, timeout=180)
@@ -45,17 +45,21 @@ def _compare_one_mode(jar, radicals):
 
     in_process = []
     for name in NAMES:
-        stdout, served = _opsin_stdout_uncached(name, radicals, jar)
+        if output == "-ostdinchikey":
+            stdout = opsin_cli_inproc.stdinchikey_stdout(name.split("\t")[0], radicals)
+            served = stdout is not None
+        else:
+            stdout, served = _opsin_stdout_uncached(name, radicals, jar)
         assert served, f"the in-process path did not answer {name!r} (radicals={radicals})"
         assert stdout.endswith("\n") and stdout.count("\n") == 1, repr(stdout)
         in_process.append(stdout[:-1])
-    assert in_process == real_lines, f"radicals={radicals}"
+    assert in_process == real_lines, f"radicals={radicals}, {output}"
 
     # the shim's own path: what subprocess.run returns for this call from test code
     before = opsin_cli_inproc.SERVED
     shimmed = subprocess.run(argv, input=text, capture_output=True, text=True, timeout=180)
     assert shimmed.returncode == 0
-    assert shimmed.stdout == real.stdout, f"radicals={radicals}"
+    assert shimmed.stdout == real.stdout, f"radicals={radicals}, {output}"
     served_by_shim = 0 if opsin_cli_inproc.forced_real() else 1
     assert opsin_cli_inproc.SERVED == before + served_by_shim, "unexpected shim use"
 
@@ -65,12 +69,13 @@ def test_in_process_opsin_equals_cli():
     jar = jar_or_skip()
     for radicals in (False, True):
         _compare_one_mode(jar, radicals)
+        _compare_one_mode(jar, radicals, "-ostdinchikey")
 
     # another output mode and another program are never answered in process
     before = opsin_cli_inproc.SERVED
-    inchikey = subprocess.run(java_cmd("-jar", jar, "-ostdinchikey"), input="benzene\n",
-                              capture_output=True, text=True, timeout=180)
-    assert inchikey.returncode == 0
-    assert inchikey.stdout.strip() == "UHOVQNZJYSORNB-UHFFFAOYSA-N", inchikey.stdout
+    inchi = subprocess.run(java_cmd("-jar", jar, "-ostdinchi"), input="benzene\n",
+                           capture_output=True, text=True, timeout=180)
+    assert inchi.returncode == 0
+    assert inchi.stdout.strip() == "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H", inchi.stdout
     assert subprocess.run(["echo", "x"], capture_output=True, text=True).stdout == "x\n"
     assert opsin_cli_inproc.SERVED == before

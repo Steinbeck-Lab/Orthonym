@@ -24,7 +24,6 @@ from orthonym.assembly.naming_utils import (
 from orthonym.assembly.substituent_naming import (
     ATTACH_LOCANT_UNKNOWN,
     _is_linear_alkyl,
-    name_substituent_fragment,
     parent_to_prefix,
 )
 
@@ -93,15 +92,6 @@ class TestBranchedAlkylDetection:
         """4-ethyloctane: ethyl substituent is linear."""
         result = name_compound("CCCC(CC)CCCC")
         assert result == "4-ethyloctane"
-
-    @pytest.mark.integration
-    def test_3_ethyl_2_methylpentane(self):
-        """Both ethyl and methyl are simple linear subs on pentane."""
-        result = name_compound("CCC(CC)C(C)CC")
-        # Should have ethyl and methyl, not a compound sub
-        assert "ethyl" in result
-        assert "methyl" in result
-
 
 # ============================================================================
 # Category 3: Enclosing Marks

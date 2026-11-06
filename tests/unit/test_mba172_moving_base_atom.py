@@ -16,14 +16,8 @@ MBA pattern (AUTONOM / the Blue Book):
 
 import pytest
 
-from orthonym import Orthonym
 from orthonym.assembly.substituent_naming import (
     ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # --- — absorbed-aldehyde substituent prefix carries the correct oxo locant ---

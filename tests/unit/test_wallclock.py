@@ -11,7 +11,6 @@ TIMEOUT row.
 """
 from __future__ import annotations
 
-import ast
 import json
 import os
 import signal
@@ -24,15 +23,13 @@ from pathlib import Path
 import pytest
 
 from orthonym.wallclock import (
-    NAMING_DEPTHS,
-    NAMING_REQUEST_CTX,
-    NAMING_TIER_CTX,
     REFIRE_INTERVAL_S,
     WallClockTimeout,
     clear_leaked_naming_state,
     leaked_naming_state,
     wall_clock_limit,
 )
+from tests.support.pin_tiers import tier_row
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -228,12 +225,10 @@ def test_wall_clock_timeout_propagates_out_of_name_tiered(monkeypatch):
 
 
 def test_wall_clock_timeout_propagates_at_the_best_effort_tier(monkeypatch):
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
 
     fired = _cut_off_candidate_search(monkeypatch, WallClockTimeout)
     with pytest.raises(WallClockTimeout):
-        Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(_VB_CAGE)
+        tier_row(_VB_CAGE, "best-effort")
     assert fired
     assert leaked_naming_state() == {}
 
@@ -337,22 +332,6 @@ def test_a_finished_naming_leaves_the_known_state_idle(tier):
                    _VB_CAGE, "CCOC(=O)c1ccccc1", "O=C1CCCN1"):
         namer.name_tiered(smiles)
         assert leaked_naming_state() == {}, smiles
-
-
-def test_the_known_state_includes_the_test_suite_guard_set():
-    """The test suite's isolation guard (tests/conftest.py) and the tools' check read
-    the same ContextVars and counters."""
-    tree = ast.parse((REPO / "tests" / "conftest.py").read_text())
-    found = {}
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and len(node.targets) == 1 and \
-                isinstance(node.targets[0], ast.Name) and \
-                node.targets[0].id in ("_NAMING_TIER_CTX", "_NAMING_REQUEST_CTX",
-                                       "_NAMING_DEPTHS"):
-            found[node.targets[0].id] = ast.literal_eval(node.value)
-    assert found == {"_NAMING_TIER_CTX": NAMING_TIER_CTX,
-                     "_NAMING_REQUEST_CTX": NAMING_REQUEST_CTX,
-                     "_NAMING_DEPTHS": NAMING_DEPTHS}
 
 
 # ---------------------------------------- the record of which code built the name

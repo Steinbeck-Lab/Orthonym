@@ -20,7 +20,7 @@ from orthonym.rules.organometallics import (
     select_ligand_naming,
     assemble_organometallic_name,
 )
-from orthonym.data.organometallics import METAL_NAMES, LIGAND_NAMES, LIGAND_ETA_DEFAULTS
+from orthonym.data.organometallics import METAL_NAMES, LIGAND_NAMES
 from orthonym.perception.metals import detect_metal_complex
 
 

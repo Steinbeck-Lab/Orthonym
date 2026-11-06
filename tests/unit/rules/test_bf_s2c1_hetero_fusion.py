@@ -16,6 +16,7 @@ from rdkit import Chem
 
 from orthonym.rules.bridged_fused_pin import hetero_fusion, parents
 from tests.support.opsin_marks import release_opsin_only
+from tests.support.pin_tiers import tier_row
 
 
 def _skeleton(smiles):
@@ -398,12 +399,11 @@ def test_a_cyclophane_shaped_reading_on_a_produced_parent_is_declined(smiles, wh
 @pytest.mark.opsin_gate
 def test_a_cyclophane_shaped_compound_keeps_its_best_effort_name():
     from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     from orthonym.jvm_budget import jvm_slots
     from tests.support.rt_assert import name_is_rt_exact
     smiles = CYCLOPHANE_SHAPED[0][0]
     with jvm_slots(1, purpose="s2c1-phane"):
         pin = Orthonym().name_tiered(smiles)
-        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        be = tier_row(smiles, "best-effort")
     assert pin["tier"] == "abstain"
     assert "etheno" not in be["name"] and name_is_rt_exact(be["name"], smiles), be["name"]

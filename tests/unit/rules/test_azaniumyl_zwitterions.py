@@ -16,10 +16,11 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.perception.ions import get_ion_sites
 from orthonym.rules import azaniumyl_zwitterions, charged_router
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.pin_tiers import tier_row as _row
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -45,11 +46,6 @@ PIN_ROWS = [
 ]
 
 TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    engine = Orthonym(style="pin", **(_emit_tier_flags(tier) if tier != "pin" else {}))
-    return engine.name_tiered(smiles)
 
 
 @pytest.mark.parametrize("tier", TIERS)
@@ -110,7 +106,7 @@ def test_a_declined_shape_is_never_named_wrong(smiles):
 #: maintainers' ruling of 2026-11-01: ship the carboxylate parent with 'phosphonatooxy' below the PIN and record the gap here.
 def test_the_phosphoserine_zwitterion_is_named_below_the_pin_until_the_book_decides_the_parent():
     smiles = "[NH3+][C@H](COP(=O)([O-])[O-])C(=O)[O-]"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == ("(2R)-2-azaniumyl-3-(phosphonatooxy)propanoate", "systematic_verified"), row
     assert name_is_rt_exact(row["name"], smiles), row
     assert Orthonym(style="pin").name_tiered(smiles)["tier"] == "abstain"

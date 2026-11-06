@@ -1,6 +1,5 @@
 """End-to-end tests for sulfur compound naming."""
 
-import pytest
 from orthonym import name_compound
 
 

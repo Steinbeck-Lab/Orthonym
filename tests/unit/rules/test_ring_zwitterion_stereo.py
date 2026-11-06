@@ -55,19 +55,10 @@ not see every centre).
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import fixed_h as _fixed_h, key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
 def _stereo_aware(smiles, parsed, partial=False):
@@ -195,11 +186,9 @@ def test_l_proline_zwitterion_is_the_ring_azanium_carboxylate():
     (ruling R6, RULINGS-ANION.md), so the retained name no longer stands in front of it. The name is OPSIN
     full-InChIKey exact and carries the PIN label at both tiers."""
     jar_or_skip()
-    from orthonym import Orthonym
     from tests.support.rt_assert import _independent_parse
     smiles = "O=C([O-])[C@@H]1CCC[NH2+]1"
-    from orthonym.cli import _emit_tier_flags
-    r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    r = tier_row(smiles, "best-effort")
     assert r["name"] == "(2S)-pyrrolidin-1-ium-2-carboxylate" and r["tier"] == "pin_verified", r
     assert _key(_independent_parse("(2S)-pyrrolidin-1-ium-2-carboxylate", smiles)) == _key(smiles)
 

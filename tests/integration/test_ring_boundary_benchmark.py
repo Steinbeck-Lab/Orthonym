@@ -105,24 +105,3 @@ class TestRingSubstituentPreservation:
         assert name is not None
         assert "phenyl" in name.lower(), \
             f"Missing phenyl substituent: {name}"
-
-
-class TestBenchmarkMetricsBaseline:
-    """Document post-fix benchmark baseline metrics as assertions.
-
-    These are not strict equality checks (benchmark results can vary with
-    unrelated code changes) but establish minimum performance floors.
-    """
-
-    @pytest.mark.slow
-    def test_inchi_rt_floor(self):
-        """InChI RT match should not drop below pre-fix baseline (103)."""
-        # This test requires running the full benchmark; mark as slow.
-        # Post-fix value: 104. Pre-fix: 103.
-        pytest.skip("Benchmark metric floor - run with -m slow")
-
-    @pytest.mark.slow
-    def test_substituent_loss_ceiling(self):
-        """Substituent loss should not increase above pre-fix baseline (148)."""
-        # Post-fix value: 146. Pre-fix: 148.
-        pytest.skip("Benchmark metric ceiling - run with -m slow")

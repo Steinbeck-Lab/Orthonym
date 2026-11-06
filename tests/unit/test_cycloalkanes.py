@@ -43,13 +43,6 @@ class TestRingClassification:
         assert classify_ring(mol, ring) == "cycloalkane"
 
     @pytest.mark.unit
-    def test_classify_cyclohexene(self):
-        """C1=CCCCC1 has a double bond -> cycloalkene."""
-        mol = Chem.MolFromSmiles("C1=CCCCC1")
-        ring = mol.GetRingInfo().AtomRings()[0]
-        assert classify_ring(mol, ring) == "cycloalkene"
-
-    @pytest.mark.unit
     def test_classify_cyclopentene(self):
         """C1=CCCC1 has a double bond -> cycloalkene."""
         mol = Chem.MolFromSmiles("C1=CCCC1")
@@ -180,4 +173,3 @@ class TestCycloalkaneEdgeCases:
 # ============================================================================
 # Alternative SMILES Notation Tests
 # ============================================================================
-

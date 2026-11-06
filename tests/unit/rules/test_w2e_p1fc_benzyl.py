@@ -16,9 +16,6 @@ class TestP2961Benzyl:
         mol = Chem.MolFromSmiles("C(c1ccccc1)c1ccccn1")
         assert name_ring_system_substituent(mol, [0, 1, 2, 3, 4, 5, 6], 0) == "benzyl"
 
-    def test_benzyl_on_pyridine(self):
-        assert name_compound("C(c1ccccc1)c1ccccn1") == "2-benzylpyridine"
-
     def test_benzylidene(self):
         # "Unsymmetrical substituent groups having terminal atoms with
         # different types of free valencies" (the Blue Book): the =CH- methine

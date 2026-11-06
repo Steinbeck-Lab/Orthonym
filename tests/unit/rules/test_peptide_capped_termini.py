@@ -40,15 +40,14 @@ namer), so that unrelated path is unaffected.
 
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
-from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import same_key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -63,54 +62,19 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CC[C@H](C)[C@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CCCNC(=N)N)NC(=O)[C@@H](NC(=O)[C@H](C)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CCSC)NC(=O)[C@H](CCC(N)=O)NC(=O)[C@H](CCCCN)NC(=O)[C@H](CO)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CC(=O)O)NC(=O)[C@H](CO)NC(=O)[C@@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)CNC(=O)[C@H](CCC(=O)O)NC(=O)CNC(=O)[C@@H](N)Cc1c[nH]cn1)[C@@H](C)O)[C@@H](C)O)C(C)C)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CC(N)=O)C(=O)NCC(=O)NCC(=O)N1CCC[C@H]1C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)NCC(=O)N[C@@H](C)C(=O)N1CCC[C@H]1C(=O)N1CCC[C@H]1C(=O)N[C@@H](CO)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(N)=O",
     "CC[C@H](C)[C@H](NC)C(=O)N[C@@H](CO)C(=O)N1CCC[C@H]1C(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](C)C(=O)N[C@@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](C(N)=O)C(C)C",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label", emit_tier="pin")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 # GATE ON (production default) -- see test_peptide_breadth.py's identical
 # rationale: this module tests exactly what `name_compound` emits for a
 # real caller.
 pytestmark = pytest.mark.opsin_gate
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    """name -> OPSIN -> full InChIKey, compared to the input's InChIKey."""
-    if not name:
-        return False
-    o = opsin_parse(name)
-    if not o:
-        return False
-    mol_in = Chem.MolFromSmiles(smiles)
-    mol_out = Chem.MolFromSmiles(o)
-    if mol_in is None or mol_out is None:
-        return False
-    return inchi.MolToInchiKey(mol_in) == inchi.MolToInchiKey(mol_out)
 
 
 # ── C-terminal primary amide (real backlog witnesses) ────────────────────
@@ -145,7 +109,7 @@ class TestCTerminalAmide:
         result = _dt_name_compound(self.ILE_TO_PHE_NH2)
         assert not is_failure_name(result), result
         assert result.endswith("phenylalaninamide"), result
-        assert _full_rt(self.ILE_TO_PHE_NH2, result), result
+        assert same_key(self.ILE_TO_PHE_NH2, result), result
 
     def test_leucinamide_cterm(self):
         result = _dt_name_compound(self.ILE_TO_LEU_NH2)
@@ -158,10 +122,10 @@ class TestCTerminalAmide:
         # spelling. The handler prefers a substitutive name because it is the PIN (decision A, method (1),
         #:32998); one that breaks a rule of the PIN spelling is offered after the peptide name,:54158), exactly as
         # the Phe witness above, whose general path builds no substitutive name at all. Independent check: the structure
-        # carries the two amide groups on one chain (RDKit, below) and ``_full_rt`` reads the name back with OPSIN to the
+        # carries the two amide groups on one chain (RDKit, below) and ``same_key`` reads the name back with OPSIN to the
         # input's full InChIKey. Mutation: the test fails at the lane start, which names the amido name.
         assert result.endswith("leucinamide") and result.startswith("isoleucyl"), result
-        assert _full_rt(self.ILE_TO_LEU_NH2, result), result
+        assert same_key(self.ILE_TO_LEU_NH2, result), result
         asn_chain = Chem.MolFromSmarts("[NX3;H2][CX3](=O)[CH2][CX4][CX3](=O)[NX3;H1]")
         assert Chem.MolFromSmiles(self.ILE_TO_LEU_NH2).HasSubstructMatch(asn_chain)
 
@@ -182,13 +146,13 @@ class TestCTerminalAmide:
         # atoms"; the amides are one class, so both amide chains are candidates, and the alanine chain
         # (CH3-CH(NH2)-CO, three atoms) has more skeletal atoms than the glycine chain (CH2-CO, two). cites the
         # amido prefix only "when a group having preference for citation as a principal characteristic group is present".
-        # Independent check: ``_full_rt`` (OPSIN, outside the engine) reads the new name back to the input's full InChIKey,
+        # Independent check: ``same_key`` (OPSIN, outside the engine) reads the new name back to the input's full InChIKey,
         # and the same rule gives the mirrored 2-(2-chloro-N-methylacetamido)propanamide of lane/l15 A9 its longer chain.
         # Mutation: the assertion fails at the lane start, which names the old string.
         # What would make it wrong: a book rule that ranks a primary amide above a secondary one inside the one class (none
         # found; example (5),:21730, takes the N-methylpropanamide as the parent beside a primary amide).
         assert result == "(2S)-2-amino-N-(2-amino-2-oxoethyl)propanamide", result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_giant_30_residue_lysinamide_cterm_and_perf(self):
         """The exact HA=342, ~30-residue giant-peptide witness from
@@ -223,7 +187,7 @@ class TestCTerminalAmide:
         elapsed = time.time() - t0
         assert not is_failure_name(result), result
         assert result.endswith("lysinamide"), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
         assert elapsed < 30, f"took {elapsed:.1f}s, expected low single digits"
 
 
@@ -243,7 +207,7 @@ class TestNMethylNTerminus:
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "[(2S)-2-(methylamino)propanamido]acetic acid", result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_real_backlog_composed_n_methyl_and_c_amide(self):
         """Real 10-residue backlog witness with BOTH caps at once: a mono-
@@ -269,7 +233,7 @@ class TestNMethylNTerminus:
         assert not is_failure_name(result), result
         # change-asserted-value (lane/l17 item 7): was '(2S)-N-methylisoleucyl...valinamide'; the orphan leading '(2S)', the
         # descriptor of the C-terminal valine hoisted to the front by the parent that was the CONH2 end, is gone now that the
-        # parent amide is chosen by / (rules.amide_parent). MACHINE-CONFIRMED: ``_full_rt`` below reads the new name
+        # parent amide is chosen by / (rules.amide_parent). MACHINE-CONFIRMED: ``same_key`` below reads the new name
         # back to the input's full InChIKey (every residue is L, which OPSIN reads from the retained names), and the old
         # name read back alike, so neither spelling lost a stereocentre. UNVERIFIED: that the book prefers the name without
         # the leading descriptor (the book gives no peptide name of this kind); it rests on the retained residue names
@@ -279,7 +243,7 @@ class TestNMethylNTerminus:
             "serylleucylvalinamide"
         ), result
         assert result.endswith("valinamide"), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
 
 # ── Side-chain-acid / side-chain-amide trap: must abstain, never misplace ─
@@ -360,7 +324,7 @@ class TestRegressionUnaffected:
         assert not is_failure_name(result), result
         assert "N-methyl" not in result, result
         assert not result.endswith("amide"), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_single_residue_n_acetylglycine_unchanged(self):
         result = name_compound("CC(=O)NCC(=O)O")

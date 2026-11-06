@@ -21,6 +21,8 @@ import pytest
 
 from orthonym.validation.protonation_identity import protonation_site_verdict
 from tests.support.jars import jar_or_skip
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import fixed_h as _fixed_h
 
 pytestmark = pytest.mark.unit
 
@@ -149,12 +151,6 @@ def _std_key(smi):
     return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
 _WRONG_CHARGE_SITE = [
     # 'sodium 2-(carboxymethyl)benzoate' for the salt of the CH2 carboxylate
     # method (1), the Blue Book: "the free acid is cited as a
@@ -267,7 +263,7 @@ def test_wrong_charge_site_name_never_ships(smiles, old_name):
     for kw in ({}, _emit_tier_flags("best-effort")):
         r = Orthonym(style="pin", **kw).name_tiered(smiles)
         assert r["name"] != old_name, r
-    be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    be = tier_row(smiles, "best-effort")
     parsed = _independent_parse(be["name"], smiles)
     assert parsed and _std_key(parsed) == _std_key(smiles) and _fixed_h(parsed) == _fixed_h(smiles), be
 

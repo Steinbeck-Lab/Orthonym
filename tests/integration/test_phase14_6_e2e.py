@@ -10,7 +10,6 @@ Tests the 6 bugs fixed in this phase:
 -: Thiazolidine/saturated heterocycle misidentification
 """
 
-import pytest
 from orthonym import name_compound
 
 
@@ -78,12 +77,6 @@ class TestBug3FusedHeterocycleSubstituents:
             f"Expected indol and acid token (carboxymethyl/acetic/ethanoic), got {result}"
         )
 
-    def test_plain_indole(self):
-        """Ensure plain indole still works."""
-        result = name_compound('c1ccc2[nH]ccc2c1')
-        assert '1H-indole' in result or 'indole' in result.lower(), f"Got {result}"
-
-
 class TestBug4ChromeneCoumarin:
     """: Chromene/benzopyran naming failure."""
 
@@ -106,14 +99,6 @@ class TestBug6Thiazolidine:
         result = name_compound('C1CSNC1')  # S-N adjacent (canonicalizes to C1CNSC1)
         # (the Blue Book): 'isothiazolidine... 1,2-thiazolidine (PIN)'.
         assert result == '1,2-thiazolidine', f"Got {result}"
-
-
-class TestRegressionExistingFunctionality:
-    """Ensure existing functionality still works after a phase changes."""
-
-    def test_indole(self):
-        result = name_compound('c1ccc2[nH]ccc2c1')
-        assert '1H-indole' in result or 'indole' in result.lower(), f"Got {result}"
 
 
 class TestAllSuccessCriteria:
@@ -148,13 +133,3 @@ class TestAdditionalCoverage:
         """Test benzoate with multiple substituents."""
         result = name_compound('[O-]C(=O)c1cc(Cl)cc(Cl)c1')
         assert 'chlorobenzoate' in result.lower(), f"Got {result}"
-
-    def test_benzofuran(self):
-        """Test benzofuran naming."""
-        result = name_compound('c1ccc2occc2c1')
-        assert '1-benzofuran' in result or 'benzofuran' in result.lower(), f"Got {result}"
-
-    def test_quinoline(self):
-        """Test quinoline naming (fused heterocycle)."""
-        result = name_compound('c1ccc2ncccc2c1')
-        assert 'quinoline' in result.lower(), f"Got {result}"

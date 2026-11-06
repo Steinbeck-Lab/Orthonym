@@ -54,3 +54,9 @@ def jar_or_skip(kind: str = "opsin") -> str:
     if path is None:
         jar_unavailable(reason)
     return path
+
+
+def java_on_path() -> bool:
+    """True when a ``java`` command is on PATH (no JVM is started to find out)."""
+    import shutil
+    return shutil.which("java") is not None

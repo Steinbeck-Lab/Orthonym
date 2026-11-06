@@ -6,7 +6,6 @@ SSSR iteration order. Tests run each merge operation 20 times to catch
 non-deterministic behavior.
 """
 
-import pytest
 from rdkit import Chem
 from orthonym.perception.rings import get_ring_systems
 

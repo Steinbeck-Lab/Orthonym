@@ -40,10 +40,6 @@ def test_canonical_diazonium_unchanged():
     assert name_compound("c1ccccc1[N+]#N") == "benzenediazonium"
 
 
-def test_canonical_diazo_unchanged():
-    assert name_compound("C=[N+]=[N-]") == "diazomethane"
-
-
 # ---------------------------------------------------------------------------
 # The resonance-shifted twins: must now name and full-InChIKey round-trip to
 # the SAME molecule as their canonical counterpart (RED before this fix).

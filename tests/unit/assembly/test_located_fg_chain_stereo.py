@@ -13,7 +13,6 @@ with the general-fallback flags (the PIN/default path is unaffected - a separate
 byte-identity check covers that).
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.validation import opsin_roundtrip_check

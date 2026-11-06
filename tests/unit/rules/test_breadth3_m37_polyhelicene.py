@@ -14,13 +14,9 @@ from orthonym import Orthonym
 from orthonym.tiers import emit_tier_flags
 from orthonym.data.polycyclic_data import POLYCYCLIC_DATA
 from tests.support.rt_assert import _independent_parse
+from tests.support.read_back import key_or_empty as _key
 
 pytestmark = [pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return Chem.MolToInchiKey(mol) if mol is not None else ""
 
 
 @pytest.mark.parametrize("smiles,expected", [

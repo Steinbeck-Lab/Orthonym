@@ -26,11 +26,11 @@ Classes (causing commit -> fix):
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym.decomposition.fragment_assembly import _assemble_phosphodiester
 from orthonym.rules.ions import _parent_acid_suffix_multiplicity
 from tests.support.rt_assert import assert_full_rt, name_best_effort, name_is_rt_exact
+from tests.support.read_back import key as _key
 
 
 def _be(smiles):
@@ -125,10 +125,6 @@ WRONG_SITE_SALTS = [
      "5-azaniumyl-13-imino-9-[2-(methoxycarbonyl)phenyl]-2-oxatricyclo[8.4.0.0^3,8]"
      "tetradeca-1(14),3(8),4,6,9,11-hexaene chloride"),
 ]
-
-
-def _key(smi):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
 @pytest.mark.parametrize("smiles,old", WRONG_SITE_SALTS,

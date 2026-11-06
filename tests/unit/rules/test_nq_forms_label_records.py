@@ -17,6 +17,7 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.metrics import provenance as prov
 from orthonym.rules.pin_vocabulary import non_pin_vocabulary
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 
 def _records(fn):
@@ -126,8 +127,7 @@ def test_the_mc2_demotion_does_not_touch_the_pin_controls(smiles, pin_name):
 # systematic name) instead of 'systematic_verified'.
 @pytest.mark.opsin_gate
 def test_a_formyl_branch_on_a_disubstituted_amide_is_recorded_too():
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
-        "CC(=O)CC(=O)OCCN(C)C=O")
+    row = tier_row("CC(=O)CC(=O)OCCN(C)C=O", "best-effort")
     # lane/l17 item 12 (change-asserted-value; quote:, the Blue Book, "Method (1) generates preferred
     # IUPAC names", '4-formamidobenzoic acid (PIN)':33000; independent check: ``name_is_rt_exact`` below; mutation: the
     # row names '2-[formyl(methyl)amino]ethyl 3-oxobutanoate', systematic_verified, at lane/l17 4cadfc641a): the chain
@@ -176,6 +176,6 @@ def test_the_floor_records_an_unlicensed_a_chain():
 
 @pytest.mark.opsin_gate
 def test_the_urea_with_an_unlicensed_a_chain_is_never_labelled_a_pin():
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(TRITHIA)
+    row = tier_row(TRITHIA, "best-effort")
     assert row.get("name") and name_is_rt_exact(row["name"], TRITHIA), row
     assert row["tier"] == "systematic_verified", row

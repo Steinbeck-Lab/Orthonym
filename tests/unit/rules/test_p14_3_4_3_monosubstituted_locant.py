@@ -41,7 +41,6 @@ the XPASS forces someone to check the spelling.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym.assembly.locant_omission import (
     _one_substituent_removed,
     forced_locant_scope,
@@ -50,17 +49,7 @@ from orthonym.assembly.locant_omission import (
     l3_monosubstituted_locant_omitted,
     l3_one_kind_of_substitutable_h,
 )
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _mol(smiles):
-    m = Chem.MolFromSmiles(smiles)
-    assert m is not None, f"test fixture SMILES did not parse: {smiles}"
-    return m
+from tests.support.read_back import mol as _mol
 
 
 def _atoms_except(mol, *symbols):

@@ -50,13 +50,9 @@ from orthonym.rules.parent_selection import (
     _count_pg_on_ring,
     bridging_group_reaches,
 )
+from tests.support.pin_tiers import name_and_tier
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _tiered(smiles: str):
-    row = Orthonym().name_tiered(smiles)
-    return row["name"], row["tier"]
 
 
 def _spellings(smiles: str, n: int = 8, seed: int = 11):
@@ -87,7 +83,7 @@ def _spellings(smiles: str, n: int = 8, seed: int = 11):
     ("CN(C)Cc1ccccc1Cl", "(2-chlorophenyl)-N,N-dimethylmethanamine"),
 ])
 def test_the_one_carbon_parent_is_the_carbon_with_most_prefixes(smiles, expected):
-    name, tier = _tiered(smiles)
+    name, tier = name_and_tier(smiles)
     assert (name, tier) == (expected, "pin_verified")
 
 
@@ -97,7 +93,7 @@ def test_the_one_carbon_parent_is_the_carbon_with_most_prefixes(smiles, expected
 def test_the_name_does_not_depend_on_how_the_smiles_is_written(smiles):
     """The parent was chosen by the order of the atoms: 'CN(C)Cc1ccccc1' declined, 'CN(C)C'
     was named; 'CNCc1ccccc1' declined, 'C(NC)c1ccccc1' was named."""
-    names = {_tiered(s) for s in _spellings(smiles)}
+    names = {name_and_tier(s) for s in _spellings(smiles)}
     assert len(names) == 1, names
 
 
@@ -116,14 +112,14 @@ def test_the_name_does_not_depend_on_how_the_smiles_is_written(smiles):
     ("CN(C)C", "N,N-dimethylmethanamine"),
 ])
 def test_a_longer_chain_or_no_ring_keeps_its_name(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles", ["CCN(C)Cc1ccccc1", "CCNCc1ccccc1", "CCCN(CC)Cc1ccccc1"])
 def test_the_longer_chain_is_the_parent_in_every_spelling(smiles):
     """The ethane chain lost to the ring in a tie when the benzylic carbon had the lower index:
     'C(N(CC)C)c1ccccc1' and 'C(NCC)c1ccccc1' declined."""
-    assert len({_tiered(s) for s in _spellings(smiles)}) == 1
+    assert len({name_and_tier(s) for s in _spellings(smiles)}) == 1
 
 
 # ----: the ring bonded to the nitrogen is the parent ----------------------------------
@@ -140,12 +136,12 @@ def test_the_longer_chain_is_the_parent_in_every_spelling(smiles):
 def test_the_ring_on_the_nitrogen_is_the_parent(smiles, expected):
     """ (:26249): the ring is preferred; the carbon of the chain that the match kept
     (tert-butyl, isopropyl, the CH of a 1-phenylethyl) decided it before, by its index."""
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles", ["CC(C)(C)Nc1ccccc1", "CC(C)Nc1ccccc1", "CC(c1ccccc1)Nc1ccccc1"])
 def test_the_ring_is_the_parent_in_every_spelling(smiles):
-    assert len({_tiered(s) for s in _spellings(smiles)}) == 1
+    assert len({name_and_tier(s) for s in _spellings(smiles)}) == 1
 
 
 @pytest.mark.parametrize("smiles, chain_parent_name", [
@@ -156,7 +152,7 @@ def test_a_chain_parent_name_over_a_ring_is_never_shipped_as_the_pin(smiles, cha
     """Where no producer builds the ring-parent name, the chain-parent name is no PIN,
     :26249) and the default tier declines it: main shipped these as pin_verified. The best-effort
     tier keeps a name that reads back, labelled below the PIN."""
-    name, tier = _tiered(smiles)
+    name, tier = name_and_tier(smiles)
     assert not (name == chain_parent_name and tier == "pin_verified")
     best_effort = Orthonym(general_fallback=True, general_fallback_unverified=True,
                            allow_aromatic_general=True).name_tiered(smiles)

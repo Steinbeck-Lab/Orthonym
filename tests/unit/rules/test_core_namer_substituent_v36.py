@@ -31,6 +31,7 @@ Every witness below was A/B-verified with ``scripts/an A/B check`` to ABSTAIN at
 HEAD and to NAME + round-trip with the fix. Fresh process per witness
 (warm-cache hazard -- the contributor guide).
 """
+import functools
 import json
 import subprocess
 import sys
@@ -65,6 +66,7 @@ WITNESSES = list(FUSED_HETEROCYCLE_WITNESSES)
 COMPOSER_WIRING_SMILES = "CC1CCC2(CC1)CCCCC2"
 
 
+@functools.lru_cache(maxsize=None)
 def _cn_rt(smiles):
     """Best-effort name + OPSIN full-InChIKey round-trip, in a FRESH process.
 

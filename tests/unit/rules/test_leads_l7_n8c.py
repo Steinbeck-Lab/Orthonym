@@ -26,13 +26,13 @@ SMILES convention for sandwich complexes.
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _emit_tier_flags
 from orthonym.namer import Orthonym, _validity_gate_name_to_smiles
 from orthonym.errors import is_failure_name
 from orthonym.rules.organometallics import (
     organometallic_charge_conserved,
     stated_charge,
 )
+from tests.support.pin_tiers import tier_row
 
 # (smiles, net charge) -- every one used to ship a neutral-complex name.
 CHARGED = [
@@ -172,7 +172,7 @@ HG_SULFONATE_NAME = "(4-sulfonatophenyl)mercury chloride"
 
 
 def _best_effort(smiles):
-    return Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    return tier_row(smiles, "best-effort")
 
 
 def _round_trips_exactly(smiles, name):

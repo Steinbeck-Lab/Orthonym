@@ -59,23 +59,12 @@ Blue Book evidence, all verified by line:
 from pathlib import Path
 
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.assembly.locant_omission import l3_one_kind_of_substitutable_h
+from tests.support.read_back import mol as _mol
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _mol(smiles):
-    m = Chem.MolFromSmiles(smiles)
-    assert m is not None, f"test fixture SMILES did not parse: {smiles}"
-    return m
 
 
 # --------------------------------------------------------------------------- #
@@ -406,5 +395,3 @@ def test_fragment_boundary_observation_reads_the_visited_set():
         assert locant_scope_is_a_name_component() is True
     finally:
         visited.discard("O=C(O)C(Cl)C(=O)O")
-
-

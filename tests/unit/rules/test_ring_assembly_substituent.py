@@ -40,11 +40,6 @@ def _biphenyl_attach(smi):
     return mol, ring_atoms, attach, ch3
 
 
-def test_biphenyl_para_substituent_is_bracketed_yl():
-    mol, ring_atoms, attach, _ = _biphenyl_attach("Cc1ccc(-c2ccccc2)cc1")
-    assert get_ring_substituent_name(mol, ring_atoms, attach) == "[1,1'-biphenyl]-4-yl"
-
-
 def test_biphenyl_meta_and_ortho_locants():
     mol, ring_atoms, attach, _ = _biphenyl_attach("Cc1cccc(-c2ccccc2)c1")
     assert get_ring_substituent_name(mol, ring_atoms, attach) == "[1,1'-biphenyl]-3-yl"

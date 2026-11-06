@@ -256,7 +256,6 @@ class TestBridgeIdentification:
         """Each bridge info dict should contain required fields."""
         # This tests the structure of bridge info
         # Expected fields: atoms, length, start_locant, end_locant, element
-        required_fields = {'atoms', 'length'}  # Minimum required
         # When we have a real bridged fused system, verify these fields exist
         # For now, just verify the function signature works
         smiles = "c1ccc2ccccc2c1"

@@ -12,7 +12,6 @@ Key findings from research:
   _generate_stereodescriptors when features.stereocenters is populated
 """
 
-import pytest
 from orthonym.namer import name_compound
 
 

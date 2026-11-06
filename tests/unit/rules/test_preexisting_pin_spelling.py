@@ -12,13 +12,8 @@ per the Blue Book.
 """
 import pytest
 
-from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from tests.support.rt_assert import name_best_effort, name_is_rt_exact
-from tests.support.default_tier import (  # noqa: E402
-    declined_pin_row,
-    default_tier_rule_applies,
-)
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -26,38 +21,20 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset()
 # The plasmalogen choline row below has no default-tier name since the nitrogen with three methyl groups is spelled as the
 # '-aminiumyl' PIN there, the Blue Book; ruling of 2026-11-01): its route builds the 'hydroxyphosphoryl'
 # form with the OPSIN-readable 'trimethylazaniumyl', which the best-effort tier names, so the row reads that name.
 #... whose best-effort name is another one (it reads back exactly). The tropane ester
 # 'CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1' was one; since DT4 F2 the default tier emits its PIN.
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+    from orthonym import name_compound
     return name_compound(smiles, on_failure="label")
 
 
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+    from orthonym import Orthonym
     return Orthonym(style="pin").name_tiered(smiles)
 
 

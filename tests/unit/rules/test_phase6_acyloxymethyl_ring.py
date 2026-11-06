@@ -1,21 +1,5 @@
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
-from orthonym import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    o = opsin_parse(name)
-    if not o:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
+from tests.support.read_back import same_key
 
 
 @pytest.mark.opsin_gate
@@ -23,7 +7,7 @@ def test_acetoxymethyl_cyclohexanecarboxylic_acid(namer):
     smi = "CC(=O)OCC1CCCCC1C(=O)O"
     name = namer.name(smi)
     assert name == "2-[(acetyloxy)methyl]cyclohexane-1-carboxylic acid", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -41,7 +25,7 @@ def test_mirror_shape_methoxycarbonyl_ring_diacid_monoester(namer):
     smi = "COC(=O)C1CCCCC1C(=O)O"
     name = namer.name(smi)
     assert name == "2-(methoxycarbonyl)cyclohexane-1-carboxylic acid", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -51,4 +35,4 @@ def test_mirror_shape_ethyl_isopropyl_fail_closed(namer):
     # absolute) even though it isn't yet rescued.
     for smi in ["CCOC(=O)C1CCCCC1C(=O)O", "CC(C)OC(=O)C1CCCCC1C(=O)O"]:
         name = namer.name(smi)
-        assert (not name) or ("unknown" in name) or _full_rt(smi, name), name
+        assert (not name) or ("unknown" in name) or same_key(smi, name), name

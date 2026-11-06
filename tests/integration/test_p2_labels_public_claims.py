@@ -30,9 +30,9 @@ table key of that exact name, and a FRESH OPSIN call (``tests.support.rt_assert.
 _independent_parse``) reads nothing for the name, so no label may claim an OPSIN
 read-back for it.
 """
+import functools
+
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
@@ -45,21 +45,19 @@ from tests.unit.rules.test_d1_coordination_v36 import (
     FIXTURES,
     HEME_B,
 )
+from tests.support.read_back import key_or_empty as _key
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
 TIERS = ["pin", "valid", "complete", "best-effort"]
 
 
+@functools.lru_cache(maxsize=None)
 def _row(smiles, tier):
+    """The row of ``smiles`` at ``tier``, named once per test process (no test here patches the engine)."""
     if tier == "pin":
         return Orthonym(style="pin").name_tiered(smiles)
     return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return inchi.MolToInchiKey(mol) if mol is not None else ""
 
 
 def _assert_identity_label(fx, row):

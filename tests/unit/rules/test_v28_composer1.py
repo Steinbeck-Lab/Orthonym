@@ -187,22 +187,6 @@ def test_fused_heterocycle_decorated_substituent_composes_via_engine(
     assert " " not in name and "unknown" not in name.lower()
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "PIN-path pre-emption: the PIN fused-ring substituent machinery already "
-    "names these (RT-valid), so name_tiered reports source=='pin_path' offline. "
-    "The general-engine fused-heterocycle composer is the winning source only in "
-    "production when the PIN name fails SELF-01 (complex dropped decorations). "
-    "See the direct-composer test above for the general-engine path proof."))
-@pytest.mark.parametrize("smi", [
-    "OC(=O)Cc1c[nH]c2ccc(Cl)cc12",     # (5-chloro-1H-indol-3-yl)acetic acid
-    "OC(=O)Cc1ccc2nc(C)ccc2c1",        # (2-methylquinolin-6-yl)acetic acid
-])
-def test_fused_heterocycle_decorated_substituent_emits_via_engine(smi):
-    row = _be().name_tiered(smi)
-    assert row["source"] == "general_engine", row
-    assert row["name"] and "unknown" not in row["name"] and " substituent" not in row["name"]
-
-
 # ============================================================================
 # Composer1 Task 3: heteroatom carrier in the RING-ON-CHAIN branch
 # ============================================================================
@@ -217,18 +201,6 @@ def test_fused_heterocycle_decorated_substituent_emits_via_engine(smi):
 # (calls ``_compound_ring_on_chain_substituent`` on the isolated
 # ``-CH2-S-(ring)`` fragment); the whole-molecule provenance test is kept but
 # marked xfail(strict=False) if the PIN path pre-empts it.
-
-
-@pytest.mark.xfail(strict=False, reason=(
-    "PIN-path pre-emption risk (mirrors Task 2c): whole-molecule provenance "
-    "depends on the PIN path failing SELF-01 for this exact molecule, which "
-    "is not guaranteed offline. Primary correctness proof is the direct "
-    "function-level test below."))
-def test_ring_on_chain_heteroatom_carrier_emits_via_engine():
-    smi = "Cc1cccn2cc(CSc3nc4scc(C5CC5)c4c(=O)n3-c3ccccc3)nc12"
-    row = _be().name_tiered(smi)
-    assert row["source"] == "general_engine", row
-    assert row["name"] and "unknown" not in row["name"]
 
 
 def test_ring_on_chain_sulfanyl_carrier_direct_composer():

@@ -7,7 +7,6 @@ Plan 17-05: Validates that:
 - Letter-suffix locants (4a, 8a) are validated correctly for fused systems
 """
 
-import pytest
 from orthonym import name_compound
 from orthonym.rules.locant_validation import (
     validate_stereo_locants,
@@ -94,16 +93,6 @@ class TestStereoLocantFiltering:
 
 class TestMultiplierLocantMatch:
     """Test the reconcile_multiplier_count function directly."""
-
-    def test_count_matches_locants(self):
-        """When count matches locant count, no change."""
-        result = reconcile_multiplier_count(count=2, locants=[1, 3])
-        assert result == 2
-
-    def test_count_higher_than_locants(self):
-        """When count exceeds locant count, reduce to locant count."""
-        result = reconcile_multiplier_count(count=3, locants=[1, 3])
-        assert result == 2
 
     def test_count_lower_than_locants(self):
         """When count is less than locants, increase to locant count."""

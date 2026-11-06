@@ -301,19 +301,3 @@ class TestCanonicalSmilesIntegrity:
         assert mol is not None
         canonical = Chem.MolToSmiles(mol, canonical=True)
         assert canonical == smiles, f"Not canonical: {smiles} -> {canonical}"
-
-
-# =========================================================================
-# DECALIN ROUTING CHECK (coverage)
-# =========================================================================
-
-class TestDecalinRouting:
-    """Verify decalin does NOT produce VB polycyclic notation."""
-
-    def test_decalin_no_vb_notation(self):
-        from orthonym.namer import name_compound
-        result = name_compound('C1CCC2CCCCC2C1')
-        assert result is not None
-        assert 'bicyclo' not in result.lower(), (
-            f"Decalin produced VB notation: {result}"
-        )

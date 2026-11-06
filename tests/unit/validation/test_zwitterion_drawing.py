@@ -12,9 +12,9 @@ zwitterion, a PIN at every tier (ruling R6, RULINGS-ANION.md). (:54518) names th
 """
 import pytest
 
-from orthonym import Orthonym, name_compound
-from orthonym.cli import _emit_tier_flags
+from orthonym import name_compound
 from orthonym.validation.zwitterion_drawing import named_as_neutral
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -49,7 +49,7 @@ def test_no_structure_or_no_name_is_not_a_zwitterion_drawing():
     ("C[N+]1=CC=CC=C1C([O-])=O", "1-methylpyridin-1-ium-2-carboxylate", "pin_verified"),
 ])
 def test_the_label_of_a_zwitterion_drawing_at_the_best_effort_tier(smiles, name, label):
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, label)
 
 

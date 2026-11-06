@@ -74,16 +74,10 @@ Blue Book, ``the Blue Book Blue Book`` (every pointer re-opened with
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym
 from orthonym.rules.mononuclear_hydrides import (
     _HETERONE_DIONE_STEMS,
     name_heterone,
 )
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # (SMILES, expected PIN, Blue Book provenance)

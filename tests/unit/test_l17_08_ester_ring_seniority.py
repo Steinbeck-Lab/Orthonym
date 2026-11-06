@@ -21,16 +21,12 @@ spiro[4.5]decane-2-carboxylate) and to the canonical order of the atoms (furan a
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit]
 
 _ESTER = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 def _senior(smiles):
@@ -71,7 +67,7 @@ _BOOK = [
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("smiles,name", _BOOK)
 def test_the_book_rows_keep_their_parent(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name and row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
 
@@ -104,7 +100,7 @@ _ALCOHOL_RINGS = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,name,criterion", _ACID_RINGS + _ALCOHOL_RINGS)
 def test_the_parent_is_the_ester_of_the_senior_ring_at_best_effort(smiles, name, criterion):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, (criterion, row)
     assert_full_rt(row["name"], smiles)
 
@@ -113,7 +109,7 @@ def test_the_parent_is_the_ester_of_the_senior_ring_at_best_effort(smiles, name,
 @pytest.mark.parametrize("smiles,name,criterion", _ACID_RINGS + _ALCOHOL_RINGS)
 def test_the_pin_tier_names_the_senior_ring_or_nothing(smiles, name, criterion):
     """The PIN tier never gives the junior ring as the parent: the name of the senior ring, or no name."""
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["tier"] == "abstain" or row["name"] == name, (criterion, row)
     if row["tier"] != "abstain":
         assert_full_rt(row["name"], smiles)
@@ -132,7 +128,7 @@ _SPELLINGS = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,name", _SPELLINGS)
 def test_every_spelling_gives_the_same_parent(smiles, name):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 

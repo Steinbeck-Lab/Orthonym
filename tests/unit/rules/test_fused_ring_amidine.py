@@ -20,6 +20,7 @@ from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.rules.seniority import get_principal_group, without_ring_skeleton_amidine
 from tests.support.jars import jar_or_skip
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -104,7 +105,5 @@ def test_the_best_effort_tier_gives_the_same_name(smiles, name):
     """The fusion name is the PIN, so the wider tier keeps it and does not fall back to the von
     Baeyer '1,8-diazabicyclo[5.4.0]undec-7-ene' it gave before."""
     jar_or_skip()
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row

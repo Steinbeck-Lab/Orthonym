@@ -1,23 +1,8 @@
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
-from orthonym import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
 from orthonym.assembly.composer import _build_bicyclo_substituent_prefix
 from orthonym.rules.bicyclo import get_bicyclo_ring_atoms, get_bicyclo_substituents
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    o = opsin_parse(name)
-    if not o:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
+from tests.support.read_back import same_key
 
 
 def test_build_bicyclo_substituent_prefix_isopropyl_not_n_propyl():
@@ -48,7 +33,7 @@ def test_isopropyl_norbornane_not_misnamed(namer):
     # must never emit the n-propyl form; either the correct propan-2-yl name or abstain.
     assert "2-propyl" not in (name or "")
     if name and "unknown" not in name:
-        assert _full_rt(smi, name), name
+        assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -57,4 +42,4 @@ def test_methyl_norbornane_still_names(namer):
     smi = "CC1CC2CCC1C2"
     name = namer.name(smi)
     assert name and "unknown" not in name, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name

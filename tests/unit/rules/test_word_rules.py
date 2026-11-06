@@ -5,7 +5,6 @@ Verifies that the OPSIN_WORD_RULES data imported from wordRules.xml
 has the expected structure and content.
 """
 
-import pytest
 
 from orthonym.data.opsin_imports.word_rules import OPSIN_WORD_RULES
 

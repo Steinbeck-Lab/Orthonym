@@ -24,6 +24,7 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.rules import charged_router
 from orthonym.perception.ions import get_ion_sites
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -98,15 +99,10 @@ DECLINED_ROWS = [
 TIERS = ["pin", "best-effort"]
 
 
-def _row(smiles, tier):
-    engine = Orthonym(style="pin", **(_emit_tier_flags(tier) if tier != "pin" else {}))
-    return engine.name_tiered(smiles)
-
-
 @pytest.mark.parametrize("tier", TIERS)
 @pytest.mark.parametrize("smiles, pin", PIN_ROWS)
 def test_the_anion_is_the_parent_and_the_senior_neutral_group_a_prefix(smiles, pin, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (pin, "pin_verified"), row
     assert name_is_rt_exact(row["name"], smiles), row
 
@@ -124,7 +120,7 @@ def test_the_neutral_phenol_is_still_named_on_its_oxoacid():
     # (class 4) reverses the order
     for smiles, name in [("Oc1ccc([As](O)O)cc1", "(4-hydroxyphenyl)arsonous acid"),
                          ("O=[N+]([O-])c1cc([As](O)O)ccc1O", "(4-hydroxy-3-nitrophenyl)arsonous acid")]:
-        row = _row(smiles, "pin")
+        row = tier_row(smiles, "pin")
         assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -136,7 +132,7 @@ def test_a_second_hydroxy_group_leaves_the_name_to_the_other_routes():
     neutral = "Oc1ccc(O)cc1"
     assert charged_router.olate_with_senior_neutral_group(
         mol, get_ion_sites(mol), neutral, "pin") == ""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     if row["name"] and row["tier"] != "abstain":
         assert name_is_rt_exact(row["name"], smiles), row
 
@@ -157,14 +153,14 @@ def test_the_expected_name_of_a_declined_member_is_the_molecule(smiles, expected
 @pytest.mark.parametrize("smiles, expected, why", DECLINED_ROWS)
 @pytest.mark.xfail(strict=True, reason="declined member of the olate class, see DECLINED_ROWS")
 def test_a_declined_member_is_named(smiles, expected, why):
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (expected, "pin_verified"), (why, row)
 
 
 @pytest.mark.parametrize("smiles, expected, why", DECLINED_ROWS)
 def test_a_declined_member_is_never_named_wrong(smiles, expected, why):
     for tier in TIERS:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         if row["name"] and row["tier"] != "abstain":
             assert name_is_rt_exact(row["name"], smiles), (tier, row)
 
@@ -185,7 +181,7 @@ NEUTRAL_ROWS = [
 
 @pytest.mark.parametrize("smiles, name", NEUTRAL_ROWS)
 def test_a_neutral_name_is_unchanged(smiles, name):
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["name"] == name, row
     assert name_is_rt_exact(row["name"], smiles), row
 
@@ -216,7 +212,6 @@ def test_the_pnictogen_oxoacid_prefix(smiles, name):
     assert pnictogen_oxoacid_prefix(mol, _bfs_substituent_atoms(mol, centre, ring), centre) == name
 
 
-
 # Named since lane L7 (they were DECLINED_ROWS): the ester beside a senior group as 'alkoxy...oxo',
 # the Blue Book, ``assembly.ester_oxo_prefix``), the -P(OH)2 and -As(OH)2 prefixes ('dihydroxyphosphanyl
 # (preselected prefix)',:36247; ``phosphorus.pnictogen_group_prefix``). A group senior to OH keeps 'olate'.
@@ -230,6 +225,5 @@ NAMED_SINCE_L7 = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles, expected", NAMED_SINCE_L7, ids=lambda v: v)
 def test_a_former_declined_member_is_named(smiles, expected):
-    from orthonym.cli import _emit_tier_flags
     row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)
     assert (row["name"], row["tier"]) == (expected, "pin_verified"), row

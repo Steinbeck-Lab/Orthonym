@@ -36,8 +36,6 @@ def ungated_namer(monkeypatch):
     asserted in the mode where nothing downstream can suppress a wrong producer
     output.
     """
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
     return Orthonym()
 
 

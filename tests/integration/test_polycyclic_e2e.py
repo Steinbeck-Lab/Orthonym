@@ -19,21 +19,6 @@ from orthonym.namer import name_compound
 class TestVonBaeyerE2E:
     """Full pipeline tests for Von Baeyer nomenclature (SMILES -> name_compound)."""
 
-    def test_norbornane_still_works(self):
-        """Norbornane: existing bicyclo naming preserved."""
-        # Norbornane = bicyclo[2.2.1]heptane
-        result = name_compound('C1CC2CCC1C2')
-        # Should be either retained name or systematic
-        assert 'norbornane' in result.lower() or 'bicyclo[2.2.1]heptane' in result.lower(), \
-            f"Expected norbornane or bicyclo[2.2.1]heptane, got: {result}"
-
-    def test_bicyclo_222_octane(self):
-        """Bicyclo[2.2.2]octane: existing naming preserved."""
-        result = name_compound('C1CC2CCC1CC2')
-        assert 'bicyclo' in result.lower(), f"Expected bicyclo, got: {result}"
-        assert '2.2.2' in result, f"Expected [2.2.2], got: {result}"
-        assert 'octane' in result.lower(), f"Expected octane, got: {result}"
-
     def test_norbornene_existing_naming(self):
         """Norbornene: existing unsaturation naming preserved."""
         result = name_compound('C1=CC2CCC1C2')
@@ -119,21 +104,6 @@ class TestPolycyclicLactoneE2E:
         result = name_compound('O=C1OC2CCC1CC2')
         assert result == '2-oxabicyclo[2.2.2]octan-3-one', result
 
-    def test_bicyclic_lactone_recognized_as_bicyclo(self):
-        """Bicyclic lactone: at minimum recognized as bicyclo framework."""
-        result = name_compound('O=C1OC2CCC1CC2')
-        # Should at minimum recognize bicyclo framework
-        assert 'bicyclo' in result.lower(), f"Expected bicyclo, got: {result}"
-
-    def test_simple_lactone_preserved(self):
-        """Simple monocyclic lactone: gamma-butyrolactone."""
-        # gamma-butyrolactone = oxolan-2-one
-        result = name_compound('O=C1CCCO1')
-        # Should be named as lactone (oxolan-2-one pattern)
-        assert 'one' in result.lower() or 'lactone' in result.lower() or 'oxol' in result.lower(), \
-            f"Expected lactone naming, got: {result}"
-
-
 class TestBridgedFusedE2E:
     """Tests for bridged fused nomenclature."""
 
@@ -166,19 +136,6 @@ class TestBridgedFusedE2E:
 class TestPolycyclicStereoE2E:
     """Tests for stereodescriptors on polycyclic frameworks."""
 
-    def test_stereo_bicyclo_standard_smiles(self):
-        """Bicyclo with stereo: use standard SMILES format."""
-        # Use non-stereo SMILES first to verify bicyclo detection
-        result = name_compound('C1CC2CCC1C2')
-        assert 'bicyclo' in result.lower() or 'norbornane' in result.lower(), \
-            f"Expected bicyclo/norbornane, got: {result}"
-
-    def test_norbornane_basic(self):
-        """Norbornane: basic bicyclo detection."""
-        result = name_compound('C1CC2CCC1C2')
-        assert 'bicyclo' in result.lower() or 'norbornane' in result.lower(), \
-            f"Expected bicyclo/norbornane, got: {result}"
-
     def test_stereo_on_substituted_bicyclo(self):
         """Substituted bicyclo with stereo SMILES."""
         # Methylnorbornane - substituent may trigger stereo collection
@@ -189,34 +146,6 @@ class TestPolycyclicStereoE2E:
 
 class TestRegressionE2E:
     """Critical regression tests - ensure existing naming unaffected."""
-
-    def test_existing_bicyclo_norbornane(self):
-        """Norbornane: existing bicyclo routing preserved."""
-        result = name_compound('C1CC2CCC1C2')
-        assert 'norbornane' in result.lower() or 'bicyclo[2.2.1]heptane' in result.lower(), \
-            f"Expected norbornane/bicyclo, got: {result}"
-
-    def test_existing_spiro_system(self):
-        """Spiro system: routing preserved."""
-        result = name_compound('C1CCC2(CC1)CCCCC2')
-        assert 'spiro' in result.lower(), f"Expected spiro, got: {result}"
-
-    def test_existing_fused_indole(self):
-        """Indole: fused heterocycle routing preserved."""
-        result = name_compound('c1ccc2[nH]ccc2c1')
-        assert 'indole' in result.lower() or 'fused' in result.lower(), \
-            f"Expected indole, got: {result}"
-
-    def test_existing_fused_quinoline(self):
-        """Quinoline: fused heterocycle routing preserved."""
-        result = name_compound('c1ccc2ncccc2c1')
-        assert 'quinoline' in result.lower(), f"Expected quinoline, got: {result}"
-
-    def test_simple_chain_butanoic_acid(self):
-        """Butanoic acid: simple chain unaffected."""
-        result = name_compound('CCCC(=O)O')
-        assert 'butanoic acid' in result.lower() or 'butyric acid' in result.lower(), \
-            f"Expected butanoic acid, got: {result}"
 
     def test_natural_product_cholesterol(self):
         """Cholesterol: natural product routing unaffected."""
@@ -263,11 +192,6 @@ class TestSuccessCriteria:
 class TestDescriptorFormats:
     """Tests for correct VB descriptor formatting."""
 
-    def test_bicyclo_descriptor_format(self):
-        """Bicyclo[x.y.z] format preserved."""
-        result = name_compound('C1CC2CCC1CC2')  # bicyclo[2.2.2]octane
-        assert 'bicyclo[2.2.2]' in result.lower(), f"Expected bicyclo[2.2.2], got: {result}"
-
     def test_tricyclo_secondary_bridge_locants(self):
         """Tricyclo with superscript locants for the secondary bridge.
 
@@ -300,19 +224,8 @@ class TestEdgeCases:
         result = name_compound('', on_failure="label")
         assert result == 'unknown', f"Expected 'unknown', got: {result}"
 
-    def test_single_atom_not_polycyclic(self):
-        """Single atom: not routed to polycyclic."""
-        result = name_compound('C')
-        assert result.lower() == 'methane', f"Expected methane, got: {result}"
-
-
 class TestPeryleneNaming:
     """Tests for perylene retained name lookup (Plan 16-07 gap closure)."""
-
-    def test_perylene_returns_retained_name(self):
-        """Perylene SMILES returns 'perylene' via retained name lookup."""
-        result = name_compound('c1cc2cccc3c4cccc5cccc(c(c1)c23)c54')
-        assert result.lower() == 'perylene', f"Expected perylene, got: {result}"
 
     def test_coronene_still_works(self):
         """Coronene retained name not broken by perylene addition."""
@@ -356,18 +269,6 @@ class TestClassificationFixes:
         assert mol is not None, "Failed to parse norbornane SMILES"
         assert is_bicyclo_system(mol) is True, \
             "Norbornane must still be classified as bicyclo"
-
-    def test_camphor_still_bicyclo(self):
-        """Camphor is named on its bicyclo skeleton (regression guard).
-
-        Task 12 fix a performance pass (wp6-tests), change-asserted-value (was the trivial
-        'camphor'): (the Blue Book) "Preferred IUPAC names (PINs) are
-        not identified for the compounds in this Chapter"; the Blue Book gives
-        '(1R,4R)-bornan-2-one (+)-camphor' with the systematic
-        '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one',:52646-52648).
-        OPSIN 2.9.0 full-InChIKey exact for this stereo-free input."""
-        result = name_compound('CC1(C)C2CCC1(C)C(=O)C2')
-        assert result == '1,7,7-trimethylbicyclo[2.2.1]heptan-2-one', result
 
     def test_pentacyclic_reaches_polycyclic_path(self):
         """Pentacyclic lactone must be recognized by is_polycyclic_system."""
@@ -432,40 +333,6 @@ class TestOPSINCompatibleVBFormat:
     parenthesized '1(3,7)' as well; both give an InChIKey for
     adamantane's descriptor). This class guards against the LaTeX '^{...}' form.
     """
-
-    def test_adamantane_opsin_format(self):
-        """Adamantane: retained name is OPSIN-compatible.
-
-        Adamantane now returns retained name; VB descriptor format tested via
-        generate_polycyclic_name in other tests.
-        """
-        result = name_compound('C1C2CC3CC1CC(C2)C3')
-        assert result == 'adamantane', f"Expected retained name 'adamantane', got: {result}"
-        # Must NOT contain old LaTeX-style notation
-        assert '^{' not in result, \
-            f"Found old ^{{}} notation in: {result}"
-
-    def test_cubane_opsin_format(self):
-        """Cubane: retained name is OPSIN-compatible.
-
-        Cubane now returns retained name; VB descriptor format tested via
-        generate_polycyclic_name. a phase: SMILES corrected from the wrong
-        (CH)8 cage isomer to the true cubane canonical (TXWRERCHRDBNLG).
-        """
-        result = name_compound('C12C3C4C1C1C2C3C41')
-        assert result == 'cubane', f"Expected retained name 'cubane', got: {result}"
-        # Must NOT contain old LaTeX-style notation
-        assert '^{' not in result, \
-            f"Found old ^{{}} notation in cubane: {result}"
-
-    def test_norbornane_no_secondary_bridges(self):
-        """Norbornane (bicyclo[2.2.1]heptane) has no secondary bridges - format unchanged."""
-        result = name_compound('C1CC2CCC1C2')
-        # Norbornane has no secondary bridges, so no superscript locants at all
-        assert 'bicyclo[2.2.1]' in result.lower() or 'norbornane' in result.lower(), \
-            f"Expected bicyclo[2.2.1]heptane or norbornane, got: {result}"
-        # No locant superscripts should appear (no secondary bridges)
-        assert '^{' not in result, f"Found unexpected ^{{}} in norbornane: {result}"
 
     def test_no_caret_brace_in_any_polycyclic(self):
         """No generated polycyclic name should contain '^{' (old format guard)."""

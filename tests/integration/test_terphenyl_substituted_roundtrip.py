@@ -13,7 +13,6 @@ If the engine emits 1,1':4,1''-terphenyl (wrong-prime), OPSIN will parse it
 to a DIFFERENT topology than the input SMILES and the InChI L1 assertion
 will fail — surfacing the regression even if a frozen-string canary masks it.
 """
-from pathlib import Path
 
 import pytest
 from rdkit import Chem

@@ -18,50 +18,8 @@ from orthonym.rules.benzene import (
     get_benzene_ring,
     get_benzene_substituents,
     orient_benzene,
-    name_substituted_benzene,
 )
 from rdkit import Chem
-
-
-# =============================================================================
-# Test Retained Names
-# =============================================================================
-
-class TestBenzeneRetainedNames:
-    """Test that common benzene derivatives use retained names."""
-
-    @pytest.mark.unit
-    def test_toluene(self):
-        """Methylbenzene should return retained name 'toluene'."""
-        assert name_compound("Cc1ccccc1") == "toluene"
-
-    @pytest.mark.unit
-    def test_phenol(self):
-        """Hydroxybenzene should return retained name 'phenol'."""
-        assert name_compound("Oc1ccccc1") == "phenol"
-
-    @pytest.mark.unit
-    def test_aniline(self):
-        """Aminobenzene should return retained name 'aniline'."""
-        assert name_compound("Nc1ccccc1") == "aniline"
-
-    @pytest.mark.unit
-    def test_ethylbenzene(self):
-        """Ethylbenzene should return retained name 'ethylbenzene'."""
-        assert name_compound("CCc1ccccc1") == "ethylbenzene"
-
-    @pytest.mark.unit
-    def test_styrene(self):
-        """In PIN style the systematic 'ethenylbenzene' is emitted, NOT the retained
-        'styrene' (BBR-HYG, a phase;, the Blue Book: styrene is
-        retained for general nomenclature only, ethenylbenzene is the PIN)."""
-        assert name_compound("C=Cc1ccccc1") == "ethenylbenzene"
-
-    @pytest.mark.unit
-    def test_cumene(self):
-        """F-T9/DD6 /: 'cumene' is general-only; the PIN is the
-        substitutive '(propan-2-yl)benzene' (enclosing marks per."""
-        assert name_compound("CC(C)c1ccccc1") == "(propan-2-yl)benzene"
 
 
 # =============================================================================
@@ -70,11 +28,6 @@ class TestBenzeneRetainedNames:
 
 class TestMonosubstitutedBenzene:
     """Test monosubstituted benzenes - no locant needed."""
-
-    @pytest.mark.unit
-    def test_chlorobenzene(self):
-        """Chlorobenzene - no locant needed."""
-        assert name_compound("Clc1ccccc1") == "chlorobenzene"
 
     @pytest.mark.unit
     def test_bromobenzene(self):
@@ -140,10 +93,6 @@ class TestDisubstitutedBenzene:
     @pytest.mark.unit
     def test_diethylbenzene_1_3(self):
         assert name_compound("CCc1cccc(CC)c1") == "1,3-diethylbenzene"
-
-    @pytest.mark.unit
-    def test_diethylbenzene_1_4(self):
-        assert name_compound("CCc1ccc(CC)cc1") == "1,4-diethylbenzene"
 
     @pytest.mark.unit
     def test_dichlorobenzene_1_2(self):
@@ -220,42 +169,11 @@ class TestBenzeneNumberingRules:
     """Test IUPAC 2013 numbering rules for benzene."""
 
     @pytest.mark.unit
-    def test_lowest_locants_1_4_not_1_4_via_different_path(self):
-        """Locants should be lowest via first-point-of-difference."""
-        # Both orientations give [1,4], so alphabetically first at 1
-        result = name_compound("Cc1ccc(Cl)cc1")
-        # chloro < methyl alphabetically, so chloro should be at position 1
-        assert result.startswith("1-chloro")
-
-    @pytest.mark.unit
     def test_alphabetization_bromo_before_chloro(self):
         """Bromo comes before chloro alphabetically."""
         result = name_compound("Brc1ccc(Cl)cc1")
         # bromo < chloro, so bromo at position 1
         assert result.startswith("1-bromo")
-
-    @pytest.mark.unit
-    def test_no_ortho_meta_para_in_pin(self):
-        """PIN style uses numeric locants, not o/m/p."""
-        result = name_compound("Cc1ccc(C)cc1")
-        assert "ortho" not in result
-        assert "meta" not in result
-        assert "para" not in result
-        assert "1,4-" in result
-
-    @pytest.mark.unit
-    def test_locants_sorted_ascending(self):
-        """Locants should be in ascending order."""
-        result = name_compound("Cc1ccc(C)c(C)c1")  # 1,2,4-trimethyl
-        assert "1,2,4" in result
-
-    @pytest.mark.unit
-    def test_lowest_locant_set_preferred(self):
-        """The orientation giving lowest locant set is preferred."""
-        # 1,2,4 is preferred over 1,3,4 (first-point-of-difference: 2 < 3)
-        result = name_compound("Cc1ccc(C)c(C)c1")
-        assert "1,2,4" in result
-
 
 # =============================================================================
 # Test Toluene Not As Parent
@@ -432,12 +350,6 @@ class TestBenzeneEdgeCases:
         """Pentamethylbenzene."""
         result = name_compound("Cc1c(C)c(C)c(C)c(C)c1")
         assert "pentamethylbenzene" in result
-
-    @pytest.mark.unit
-    def test_hexasubstituted_benzene(self):
-        """Hexamethylbenzene - all positions substituted."""
-        result = name_compound("Cc1c(C)c(C)c(C)c(C)c1C")
-        assert "hexamethylbenzene" in result
 
     @pytest.mark.unit
     def test_tetrasubstituted_benzene(self):

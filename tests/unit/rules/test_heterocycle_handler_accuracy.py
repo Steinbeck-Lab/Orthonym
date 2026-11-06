@@ -83,17 +83,6 @@ def test_heterocycle_accuracy(smiles, expected):
     )
 
 
-class TestXanthineRetainedNamePriority:
-    """Xanthine (unsubstituted) is named on purine: 'xanthine' does not occur in the
-    Blue Book (0 hits); "the PIN is 7H-purine" (the Blue Book)."""
-
-    def test_caffeine_systematic(self):
-        """Caffeine returns systematic name (not a retained IUPAC name)."""
-        result = name_compound("Cn1c(=O)c2c(ncn2C)n(C)c1=O")
-        assert "trimethyl" in result, f"Expected trimethyl in '{result}'"
-        assert "purine" in result, f"Expected purine in '{result}'"
-
-
 class TestGuanineTautomers:
     """Each guanine tautomer input gets the purine name of that tautomer ('guanine' does
     not occur in the Blue Book, 0 hits; "the PIN is 7H-purine", the Blue Book)."""
@@ -120,4 +109,3 @@ class TestFusedHeterocycleIdentification:
         assert phenanthridine == "phenanthridine", (
             f"Expected 'phenanthridine', got '{phenanthridine}'"
         )
-

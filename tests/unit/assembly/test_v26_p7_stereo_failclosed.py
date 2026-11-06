@@ -27,8 +27,6 @@ mirrors the late-recovery jar guard and keeps the abstention -- scoped to
 ``allow_aromatic_general`` (best-effort opts back in via
 ``general_fallback_unverified``).
 """
-import glob
-import shutil
 from unittest import mock as _m
 
 import pytest
@@ -37,7 +35,7 @@ from rdkit import Chem
 import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
 from orthonym.rules.stereochemistry import needs_stereo_injection
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 pytestmark = pytest.mark.unit
 
@@ -87,18 +85,13 @@ INLINE_GUARD_WITNESS = "[SiH3]c1ccccn1"
 INLINE_GUARD_WITNESS_NAME = "2-silylpyridine"
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 @pytest.fixture
 def production_gate(monkeypatch):
     """Re-enable the production OPSIN validity gate (the suite autouse
     fixture disables it). Skips when Java/OPSIN are unavailable -- without the
     gate the default path ships unverified names and the reproduce/emit
     semantics that surfaced the bug do not hold. Mirrors the P1 fixture."""
-    if not shutil.which("java") or _find_opsin_jar() is None:
+    if not java_on_path() or jar_or_none() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
     monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", False)
 

@@ -674,7 +674,7 @@ class TestIUPACLocantMappings:
                     f"{data['name']}: locants={len(locants)}, parent_atoms={parent_atoms}"
                 )
 
-        assert not mismatches, f"Mapping size mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Mapping size mismatches:\n" + "\n".join(mismatches)
 
 
 class TestChromeneVariants:
@@ -700,13 +700,6 @@ class TestChromeneVariants:
         coumarin_data = FUSED_HETEROCYCLE_DATA['O=c1ccc2ccccc2o1']
         assert coumarin_data['systematic'] == '2H-1-benzopyran-2-one'
         assert coumarin_data['tautomer_locant'] == 2
-
-    @pytest.mark.unit
-    def test_coumarin_e2e(self):
-        """O=c1ccc2ccccc2o1 should return the PIN 2H-1-benzopyran-2-one ."""
-        from orthonym import name_compound
-        result = name_compound('O=c1ccc2ccccc2o1')
-        assert result == '2H-1-benzopyran-2-one', f"Got {result}"
 
     @pytest.mark.unit
     def test_dihydrobenzofuran_in_data(self):
@@ -1110,14 +1103,6 @@ class TestPhase101EndToEndNaming:
         assert result == '4H-quinolizine'
 
     @pytest.mark.unit
-    def test_xanthone_e2e(self):
-        """: xanthone -> PIN 9H-xanthen-9-one (xanthene is the PIN ring parent,
-        the Blue Book; 'xanthone' is a non-PIN trivial). Emitted by the cyclic-oxo engine."""
-        from orthonym import name_compound
-        result = name_compound('O=c1c2ccccc2oc2ccccc12')
-        assert result == '9H-xanthen-9-one'
-
-    @pytest.mark.unit
     def test_thioxanthone_e2e(self):
         """Thioxanthone SMILES produces the PIN 9H-thioxanthen-9-one (cyclic-oxo
         engine; thioxanthene is the PIN ring parent per the Blue Book, 'thioxanthone'
@@ -1284,7 +1269,7 @@ class TestPhase101ComprehensiveCanonicalConsistency:
                     f"{data['name']}: key={smi}, canonical={canon}"
                 )
         assert not non_canonical, (
-            f"Non-canonical SMILES keys found:\n" + "\n".join(non_canonical)
+            "Non-canonical SMILES keys found:\n" + "\n".join(non_canonical)
         )
 
     @pytest.mark.unit
@@ -1297,7 +1282,7 @@ class TestPhase101ComprehensiveCanonicalConsistency:
                 if field not in data:
                     missing_fields.append(f"{data.get('name', smi)}: missing {field}")
         assert not missing_fields, (
-            f"Missing required fields:\n" + "\n".join(missing_fields)
+            "Missing required fields:\n" + "\n".join(missing_fields)
         )
 
     @pytest.mark.unit

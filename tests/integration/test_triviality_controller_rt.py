@@ -14,7 +14,6 @@ identical to OFF).
 Source: 168-internal notes +; RESEARCH section 6.4; Pattern S5.
 """
 
-import glob
 import logging
 import shutil
 import subprocess
@@ -27,12 +26,7 @@ from orthonym import name_compound
 from tests.support.jars import jar_or_none
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
-_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _OPSIN_AVAILABLE = bool(_OPSIN_JAR) and shutil.which("java") is not None
 
 

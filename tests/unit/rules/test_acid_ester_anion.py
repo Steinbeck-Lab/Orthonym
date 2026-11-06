@@ -1,6 +1,5 @@
 import pytest
 from rdkit import Chem
-from orthonym import Orthonym
 from orthonym.rules.phosphorus import name_phosphate_ester_anion
 from orthonym.rules.acid_ester_anion import (
     name_sulfate_ester_anion,
@@ -101,11 +100,6 @@ def test_dispatcher_routes_sulfate():
 
 def test_dispatcher_declines_nonester():
     assert name_acid_ester_anion(Chem.MolFromSmiles("CC(=O)[O-]")) is None  # acetate
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 @pytest.mark.opsin_gate

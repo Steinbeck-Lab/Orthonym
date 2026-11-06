@@ -12,13 +12,9 @@
 * (:2877),.2 (:2891),.3 (:2939),.5 (:3007),.6 (:3031) omitted locants.
 """
 import pytest
-from rdkit import Chem
 
-from orthonym.validation.pin_spelling import check_pin_spelling, registered_rules
-
-
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
+from orthonym.validation.pin_spelling import registered_rules
+from tests.support.read_back import spelling_rules
 
 
 def test_the_rules_are_registered():
@@ -59,7 +55,7 @@ def test_the_rules_are_registered():
     ("[CH2-]C", "ethan-1-ide", "P-14.3.4.2"),
 ])
 def test_a_spelling_that_breaks_the_rule_fails(smiles, name, rule):
-    assert rule in _rules(smiles, name)
+    assert rule in spelling_rules(smiles, name)
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -100,19 +96,19 @@ def test_a_spelling_that_breaks_the_rule_fails(smiles, name, rule):
      "(2R)-2-chloro-2-{4-[(2R)-2-hydroxybutan-2-yl]phenyl}acetic acid"),                #:46729
 ])
 def test_book_pins_pass(smiles, name):
-    assert _rules(smiles, name) == []
+    assert spelling_rules(smiles, name) == []
 
 
 @pytest.mark.parametrize("name", ["N4-ethyl-2-methylpentane-2,4-diamine", "N2-ethyl-4-methylpentane-2,4-diamine"])
 def test_an_element_locant_against_a_numeral_abstains(name):
     # the two numberings differ only in how 'N4' ranks against '2':3195 against the
     # PIN:26371): neither spelling is failed
-    assert "P-14.4" not in _rules("CCNC(C)CC(C)(C)N", name)
+    assert "P-14.4" not in spelling_rules("CCNC(C)CC(C)(C)N", name)
 
 
 def test_a_prefix_with_an_inherent_multiplying_syllable_is_not_read_as_multiplied():
     # 'trioxidanyl' is -OOOH, not three 'oxidanyl': '1-trioxidanylpropan-1-one (PIN)' (:39389)
-    assert _rules("CCC(=O)OOO", "1-trioxidanylpropan-1-one") == []
+    assert spelling_rules("CCC(=O)OOO", "1-trioxidanylpropan-1-one") == []
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -123,7 +119,7 @@ def test_a_prefix_with_an_inherent_multiplying_syllable_is_not_read_as_multiplie
     ("CCNC(CCCN)(CCNC)NC", "N3-ethyl-N1,N^ 3-dimethylhexane-1,3,3,6-tetramine"),
 ])
 def test_a_locant_set_split_by_an_extraction_space_is_not_read(smiles, name):
-    assert "P-14.3.3" not in _rules(smiles, name)
+    assert "P-14.3.3" not in spelling_rules(smiles, name)
 
 
 @pytest.mark.parametrize("name,kind", [
@@ -137,4 +133,4 @@ def test_a_name_with_an_isotope_descriptor_is_not_read_by_p14_3_3(name, kind):
     missing); the abstention is a recall bound, not a PIN claim."""
     from orthonym.validation.spelling.lexer import enclosures, normalise
     assert kind in {e.kind for e in enclosures(normalise(name))}
-    assert "P-14.3.3" not in _rules("OC1CCCC(C([2H])([2H])[2H])C1", name)
+    assert "P-14.3.3" not in spelling_rules("OC1CCCC(C([2H])([2H])[2H])C1", name)

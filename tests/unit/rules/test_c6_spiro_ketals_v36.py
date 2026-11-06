@@ -28,7 +28,6 @@ construction cannot pass, it can only abstain. Canaries lock the pre-existing sp
 """
 
 import pytest
-from rdkit import Chem
 from rdkit import RDLogger
 
 from orthonym.wallclock import wall_clock_limit

@@ -10,7 +10,6 @@ Requirements: (zero regressions), (canary stability),
                (collision coverage)
 """
 
-import pytest
 from rdkit import Chem
 from orthonym.perception.functional_groups import detect_functional_groups
 

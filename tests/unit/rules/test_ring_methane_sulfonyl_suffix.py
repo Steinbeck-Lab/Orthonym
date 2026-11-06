@@ -14,26 +14,14 @@ cites '1-', as the book does for '1-hydrazinylmethanamine (PIN)':38535 and
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.rules.amides import format_n_substitution
 from orthonym.rules.locanted_prefixes import locanted_prefix_block
 from orthonym.rules.parent_selection import single_carbon_hosts_suffix
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import same_key
 
 pytestmark = pytest.mark.opsin_gate
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _same(smi, name):
-    out = opsin_parse(name)
-    m_out = Chem.MolFromSmiles(out) if out else None
-    return m_out is not None and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == inchi.MolToInchiKey(m_out)
 
 
 ROWS = [
@@ -61,7 +49,7 @@ ROWS = [
 def test_name_and_readback(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified", row["name"]
-    assert _same(smiles, expected), expected
+    assert same_key(smiles, expected), expected
 
 
 def test_the_sulfonamido_prefix_is_method_1_with_locant_1(namer):
@@ -77,7 +65,7 @@ def test_the_sulfonyl_prefix_is_the_methanesulfonyl_form(namer):
     smiles = "CC1=CC=CC=C1CS(=O)(=O)N1CCC(CC1)C(=O)O"
     name = namer.name(smiles)
     assert "(2-methylphenyl)methanesulfonyl" in name and "sulfonyl]" in name, name
-    assert _same(smiles, name), name
+    assert same_key(smiles, name), name
 
 
 @pytest.mark.parametrize("smiles,expected", [

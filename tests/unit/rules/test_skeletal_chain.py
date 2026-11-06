@@ -11,13 +11,14 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym, name_compound
-from orthonym.cli import _emit_tier_flags
 from orthonym.rules import skeletal_chain
 from orthonym.rules.skeletal_chain import name_a_chain
 from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
 from orthonym.validation.pin_spelling import check_pin_spelling
 from orthonym.validation.spelling.checks_skeletal_chain import a_chain_applies
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import mol as _mol
 
 pytestmark = pytest.mark.unit
 
@@ -53,12 +54,6 @@ DECLINED = [
     ("[NH3+]CCOCCOCCOCCOCCOC", "charge"),
     ("CCOCCOCCOCC", "3 heterounits"),
 ]
-
-
-def _mol(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, smiles
-    return mol
 
 
 @pytest.mark.parametrize("smiles, name", CLASS_D, ids=[s for s, _ in CLASS_D])
@@ -176,7 +171,7 @@ def test_principal_groups_come_before_the_length_of_the_chain():
 def test_a_declined_longer_chain_is_named_substitutively_not_on_a_shorter_chain(smiles):
     """What ships after the decline is a substitutive name that reads back, below the PIN (S5: the molecule has an 'a'
     PIN), not the name of a shorter chain."""
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["tier"] == "systematic_verified", row
     assert "tetraoxa" not in row["name"], row
     assert_full_rt(row["name"], smiles)

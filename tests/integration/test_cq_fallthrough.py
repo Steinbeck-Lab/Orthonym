@@ -26,6 +26,7 @@ import pytest
 from orthonym.namer import Orthonym
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 # opsin_gate: the whole point of Task A is the RT/validity gate voiding the
 # primary and RT-gating the fall-through, so the gate MUST be enabled (it is
@@ -85,17 +86,12 @@ def _besteffort():
                      allow_aromatic_general=True)
 
 
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
-
-
 def _rt_inchikey_match(name, smiles):
     """OPSIN-parse ``name`` and compare its InChIKey to the input's."""
     assert not is_failure_name(name), f"expected a real name, got {name!r}"
     osmi = opsin_parse(name)
     assert osmi is not None, f"OPSIN could not parse {name!r}"
-    return _inchikey(osmi) == _inchikey(smiles)
+    return key_or_none(osmi) == key_or_none(smiles)
 
 
 # None => the default pytest id. Entry 0's id is the pre-N5c expected name's id.

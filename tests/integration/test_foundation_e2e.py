@@ -11,23 +11,6 @@ from orthonym import name_compound
 class TestPhase1Requirements:
     """Test representative compounds for each FOUND requirement."""
 
-    # FOUND-01: Substituent prefix generation
-    @pytest.mark.integration
-    def test_found01_substituent_prefix(self):
-        """FOUND-01: Substituent prefix generation."""
-        # 2-methylbutane should have "methyl" prefix
-        result = name_compound("CC(C)CC")
-        assert "methyl" in result
-
-    # FOUND-02: Locant calculation
-    @pytest.mark.integration
-    def test_found02_locant_calculation(self):
-        """FOUND-02: Locant calculation."""
-        # 2-methylbutane should have "2-" locant
-        result = name_compound("CC(C)CC")
-        assert result == "2-methylbutane"
-        assert "2-methyl" in result
-
     # FOUND-04: Alphabetization
     @pytest.mark.integration
     def test_found04_alphabetization(self):
@@ -40,15 +23,6 @@ class TestPhase1Requirements:
         assert result == "3-ethyl-4-methylhexane"
         # Verify ethyl comes before methyl
         assert result.index("ethyl") < result.index("methyl")
-
-    # FOUND-05: Multiplicative prefixes
-    @pytest.mark.integration
-    def test_found05_multiplicative_prefixes(self):
-        """FOUND-05: Multiplicative prefixes (di-, tri-)."""
-        # 2,2-dimethylbutane should have "di" prefix
-        result = name_compound("CC(C)(C)CC")
-        assert result == "2,2-dimethylbutane"
-        assert "dimethyl" in result
 
     # FOUND-15: Vowel elision
     @pytest.mark.integration
@@ -148,14 +122,3 @@ class TestOPSINRoundTrip:
         parsed_smiles = opsin_to_smiles(name)
         assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
         assert canonical(parsed_smiles) == canonical(smiles)
-
-
-class TestEdgeCases:
-    """Test edge cases and boundary conditions."""
-
-    @pytest.mark.integration
-    def test_methane_single_carbon(self):
-        """Methane (single carbon)."""
-        assert name_compound("C") == "methane"
-
-

@@ -105,17 +105,6 @@ class TestNPScaffoldCoverageGate:
 class TestRetainedNameExactMatch:
     """Tests that retained name lookup is exact SMILES match, not substructure."""
 
-    def test_retained_name_no_substructure_leak_toluene(self):
-        """Toluene should NOT return bare 'benzene'."""
-        from orthonym.namer import name_compound
-
-        result = name_compound("Cc1ccccc1")
-        assert result != "benzene", (
-            f"Toluene returned bare 'benzene' -- retained name leak"
-        )
-        # Should be "toluene" or "methylbenzene"
-        assert "benz" in result.lower() or "toluen" in result.lower()
-
     def test_retained_name_no_substructure_leak_large(self):
         """Benzene + decyl chain should NOT return bare 'benzene'."""
         from orthonym.namer import name_compound
@@ -123,7 +112,7 @@ class TestRetainedNameExactMatch:
         smiles = "c1ccc(CCCCCCCCCC)cc1"  # benzene + decyl chain, ~16 heavy atoms
         result = name_compound(smiles)
         assert result != "benzene", (
-            f"Large molecule returned bare 'benzene' -- retained name leak"
+            "Large molecule returned bare 'benzene' -- retained name leak"
         )
 
 

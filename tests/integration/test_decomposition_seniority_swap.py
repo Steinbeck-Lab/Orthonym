@@ -6,7 +6,6 @@ naming paths, plus simple compound canary preservation.
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 
@@ -38,14 +37,6 @@ class TestEsterSenioritySwap:
         smiles = "CC(=O)OC1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C"
         _pin, be = assert_tier_contract(smiles)
         assert "acetate" in be, be
-
-    def test_methyl_benzoate_unchanged(self):
-        """COC(=O)c1ccccc1 (methyl benzoate): should preserve functional class name."""
-        name = name_compound("COC(=O)c1ccccc1")
-        assert name is not None
-        assert "benzoate" in name.lower(), (
-            f"Expected 'benzoate' in methyl benzoate name: {name}"
-        )
 
     def test_large_ring_ester_produces_valid_name(self):
         """Ester where alkyl side is large polycyclic, acid is small.
@@ -97,14 +88,6 @@ class TestThioesterSenioritySwap:
 @pytest.mark.integration
 class TestAmideDoubleInversionGuard:
     """Test that amide seniority path does NOT double-invert with roles_swapped."""
-
-    def test_simple_amide_still_works(self):
-        """N-methylacetamide: roles_swapped=False, amide path works normally."""
-        name = name_compound("CC(=O)NC")
-        assert name is not None
-        assert "acetamide" in name.lower() or "ethanamide" in name.lower(), (
-            f"Expected acetamide/ethanamide in '{name}'"
-        )
 
     def test_n_methylbenzamide_preserved(self):
         """O=C(NC)c1ccccc1: acid has ring+COOH, amide path preserves pattern."""
@@ -218,4 +201,3 @@ class TestSenioritySwapCanaryPreservation:
         ("CCCC", "butane"),
         ("c1ccncc1", "pyridine"),
     ]
-

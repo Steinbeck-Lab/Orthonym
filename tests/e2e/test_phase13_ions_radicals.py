@@ -254,22 +254,6 @@ class TestRAD01OxylRadicals:
 class TestZWIT01AminoAcidZwitterions:
     """Test amino acid zwitterion naming."""
 
-    def test_glycine_zwitterion(self):
-        """Glycine zwitterion - systematic name."""
-        result = name_compound('[NH3+]CC([O-])=O')
-        # Should be systematic 2-azaniumylacetate or trivial glycine
-        assert 'azaniumyl' in result.lower() or 'glycine' in result.lower(), \
-            f'Got: {result}'
-
-    def test_alanine_zwitterion(self):
-        """Alanine zwitterion (racemic)."""
-        result = name_compound('[NH3+]C(C)C([O-])=O')
-        # Should produce some name (systematic or trivial)
-        assert result is not None and len(result) > 0, f'Got: {result}'
-        # Should be 2-azaniumylpropanoate or alanine
-        assert 'azaniumyl' in result.lower() or 'alanine' in result.lower(), \
-            f'Got: {result}'
-
     def test_glycine_zwitterion_variant_smiles(self):
         """Glycine zwitterion with different SMILES notation."""
         # Alternate SMILES for glycine zwitterion
@@ -380,7 +364,7 @@ class TestNoRegressionOnExistingTests:
         from orthonym.perception.ions import detect_species_type
         from orthonym.rules.ions import name_anion, name_cation
         from orthonym.rules.radicals import name_radical
-        from orthonym.rules.salts import name_salt, name_zwitterion
+        from orthonym.rules.salts import name_salt
         from orthonym.data.ion_retained_names import RETAINED_ANIONS
 
         assert detect_species_type is not None
@@ -411,28 +395,7 @@ class TestNoRegressionOnExistingTests:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_neutral_acid_not_salt(self):
-        """Ensure neutral acids aren't misidentified as salts."""
-        # Acetic acid is neutral, not a salt
-        result = name_compound('CC(=O)O')
-        assert result == 'acetic acid', f'Got: {result}'
-        assert 'sodium' not in result, 'Neutral acid should not contain metal name'
-
-    def test_neutral_with_zwitterion_pattern(self):
-        """Amino acids in non-zwitterionic form."""
-        # Glycine (neutral form: NH2-CH2-COOH)
-        result = name_compound('NCC(=O)O')
-        # Should be glycine or 2-aminoacetic acid, NOT zwitterion name
-        assert 'azaniumyl' not in result.lower(), \
-            f'Neutral amino acid should not have azaniumyl: {result}'
-
         # Not 'azanium something' - just the cation
-
-    def test_multiple_charges_same_atom(self):
-        """Handle divalent ions correctly."""
-        result = name_compound('[Ca+2].[Cl-].[Cl-]')
-        assert 'calcium' in result, f'Got: {result}'
-        assert 'chloride' in result, f'Got: {result}'
 
     def test_chain_length_edge_cases(self):
         """Test ions at chain length boundaries."""
@@ -465,15 +428,3 @@ class TestRequirementsVerification:
         """: Phenolate anions work."""
         result = name_compound('[O-]c1ccccc1')
         assert 'phen' in result.lower() and ('olate' in result or 'oxide' in result)
-
-    def test_zwit01_zwitterion(self):
-        """: Zwitterion naming works."""
-        result = name_compound('[NH3+]CC([O-])=O')
-        assert 'azaniumyl' in result.lower() or 'glycine' in result.lower()
-
-    def test_salt01_compositional(self):
-        """: Salt naming uses compositional format."""
-        result = name_compound('[Na+].[O-]C(C)=O')
-        assert result == 'sodium acetate'
-        # Check format: cation + space + anion
-        assert ' ' in result

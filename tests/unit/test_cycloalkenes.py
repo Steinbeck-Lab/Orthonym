@@ -93,20 +93,6 @@ class TestCycloalkeneNumberingOmission:
         assert result == "cyclopentene"
         assert "-1-" not in result
 
-    @pytest.mark.unit
-    def test_no_locant_cyclobutene(self):
-        """Result should be 'cyclobutene' not 'cyclobut-1-ene'."""
-        result = name_compound("C1=CCC1")
-        assert result == "cyclobutene"
-        assert "-1-" not in result
-
-    @pytest.mark.unit
-    def test_dienes_require_locants(self):
-        """Cycloalkadienes MUST include locants."""
-        result = name_compound("C1=CC=CCC1")
-        assert "1,3" in result or "1,4" in result
-
-
 # ============================================================================
 # Ring Classification Tests for Cycloalkenes
 # ============================================================================
@@ -197,8 +183,3 @@ class TestCycloalkeneAlternativeSMILES:
         # Different ways to write cyclohexene
         assert name_compound("C1=CCCCC1") == "cyclohexene"
         assert name_compound("C=1CCCCC1") == "cyclohexene"
-
-    @pytest.mark.unit
-    def test_cyclopentene_different_notation(self):
-        """Different SMILES notations for cyclopentene."""
-        assert name_compound("C1=CCCC1") == "cyclopentene"

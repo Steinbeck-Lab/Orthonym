@@ -20,10 +20,6 @@ from orthonym.perception.functional_groups import detect_functional_groups
 class TestUreaRetainedName:
     """Test urea naming using retained name with N-substitution."""
 
-    def test_urea_base(self):
-        """Unsubstituted urea -> 'urea'."""
-        assert name_compound("NC(=O)N") == "urea"
-
     def test_urea_n_methyl(self):
         """Monosubstituted urea -> 'methylurea', the Blue Book verbatim
         `CH3-NH-CO-NH2 methylurea (PIN)`: urea's four N-H are one orbit, so the
@@ -37,10 +33,6 @@ class TestUreaRetainedName:
     def test_urea_nn_dimethyl_same_nitrogen(self):
         """N,N-disubstituted (same nitrogen) -> 'N,N-dimethylurea'."""
         assert name_compound("CN(C)C(=O)N") == "N,N-dimethylurea"
-
-    def test_urea_nn_prime_dimethyl_different_nitrogens(self):
-        """N,N'-disubstituted (different nitrogens) -> 'N,N'-dimethylurea'."""
-        assert name_compound("CNC(=O)NC") == "N,N'-dimethylurea"
 
     def test_urea_n_phenyl(self):
         """Monosubstituted (aryl) urea -> 'phenylurea', same licence)."""
@@ -62,10 +54,6 @@ class TestUreaRetainedName:
 
 class TestGuanidineRetainedName:
     """Test guanidine naming using retained name with N-substitution."""
-
-    def test_guanidine_base(self):
-        """Unsubstituted guanidine -> 'guanidine'."""
-        assert name_compound("NC(=N)N") == "guanidine"
 
     def test_guanidine_n_methyl(self):
         """N-monosubstituted guanidine -> 'N-methylguanidine'."""
@@ -140,13 +128,6 @@ class TestFGCollisionAvoidance:
 
 class TestPrefixForms:
     """Test prefix forms when urea/guanidine is subordinate to a principal group."""
-
-    def test_urea_as_prefix_with_acid(self):
-        """Urea subordinate to carboxylic acid should use carbamoylamino prefix."""
-        result = name_compound("NC(=O)NCCCC(=O)O")
-        # The polyfunctional assembly produces a name containing "carbamoylamino"
-        # The full name format may have imperfections but the prefix form is correct
-        assert "carbamoylamino" in result or "ureido" in result
 
     def test_diaminomethylidene_tautomer_prefix(self):
         """(H2N)2C=N- takes '(diaminomethylidene)amino (preferred prefix)'

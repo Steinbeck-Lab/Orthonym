@@ -10,7 +10,6 @@ RDKit: STEREOATROPCW/CCW for atropisomers, CHI_ALLENE for allenes
 Mapping: RDKit CIP P -> Ra, RDKit CIP M -> Sa
 """
 
-import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 

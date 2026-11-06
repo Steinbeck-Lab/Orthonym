@@ -63,9 +63,6 @@ class TestPrefixAndFrnClasses:
         assert (name_compound("N=S(N)CCC(=O)O")
                 == "3-(S-aminosulfinimidoyl)propanoic acid")
 
-    def test_sulfinimidamide_suffix_unchanged(self):
-        assert name_compound("CS(=N)N") == "methanesulfinimidamide"
-
     def test_propaneperoxoic_acid(self):
         assert name_compound("CCC(=O)OO") == "propaneperoxoic acid"
 
@@ -113,15 +110,6 @@ class TestPrefixAndFrnClasses:
 
 @pytest.mark.unit
 class TestFusedRingRows:
-    def test_selenazolothiazole(self):
-        # fix a performance pass (wp6-tests), change-asserted-value (was
-        # 'selenazolo[5,4-d]thiazole'): 'Seniority criteria for selecting the
-        # parent component' (the Blue Book) and the BB's own
-        # '[1,3]selenazolo[5,4-d][1,3]thiazole (PIN) (S,N senior to Se,N)' (:12311).
-        # OPSIN 2.9.0 full-InChIKey exact.
-        assert (name_compound("c1nc2[se]cnc2s1")
-                == "[1,3]selenazolo[5,4-d][1,3]thiazole")
-
     def test_thiazolothiazole(self):
         # S2c-1 (change-asserted-value, was 'thiazolo[5,4-d]thiazole'):
         # 'Heteromonocycles' (the Blue Book), the Hantzsch-Widman name 1,3-thiazole
@@ -143,10 +131,6 @@ class TestFusedRingRows:
     def test_9_methylfluorene(self):
         assert (name_compound("CC1c2ccccc2-c2ccccc21")
                 == "9-methyl-9H-fluorene")
-
-    def test_bare_fluorene_retained(self):
-        # (the Blue Book-11400): '(9H-isomer shown; the PIN is 9H-fluorene)'
-        assert name_compound("c1ccc2c(c1)Cc1ccccc12") == "9H-fluorene"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038

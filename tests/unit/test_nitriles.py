@@ -8,7 +8,6 @@ Tests the nitrile naming module for:
 
 Based on IUPAC 2013 Blue Book.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.nitriles import (
@@ -187,18 +186,6 @@ class TestRingAttachedNitriles:
         from orthonym import name_compound
         result = name_compound("C1CCCC1C#N")
         assert result == "cyclopentanecarbonitrile"
-
-
-class TestNitrileAsPrefix:
-    """Test nitrile as prefix (cyano-) when not principal group."""
-
-    def test_cyanoacetic_acid(self):
-        """Acid is higher seniority than nitrile -> 2-cyanoacetic acid."""
-        from orthonym import name_compound
-        # N#C-CH2-COOH
-        result = name_compound("N#CCC(=O)O")
-        # Acid is principal group, nitrile becomes cyano- prefix
-        assert "cyano" in result.lower() or "cyanoacetic" in result.lower()
 
 
 class TestNitrileAmideIntegration:

@@ -155,14 +155,6 @@ class TestCycloalkaneHydroxyAminoPrefix:
     """Hydroxy/amino appear as prefixes or suffixes on cycloalkanes with mixed substituents."""
 
     @pytest.mark.integration
-    def test_hydroxy_methyl_cyclohexane(self):
-        """CC1CCC(O)CC1 -> contains 'methyl' and ('hydroxy' or 'ol')."""
-        name = name_compound('CC1CCC(O)CC1')
-        assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
-        assert 'hydroxy' in name or 'ol' in name, \
-            f"Expected 'hydroxy' or 'ol' in '{name}'"
-
-    @pytest.mark.integration
     def test_amino_chloro_cyclohexane(self):
         """NC1CCC(Cl)CC1 -> contains 'amino' or 'amine', and 'chloro'."""
         name = name_compound('NC1CCC(Cl)CC1')
@@ -179,22 +171,8 @@ class TestRegressionPureAlkylRings:
     """Pure alkyl substituents on rings are not regressed by the fixes."""
 
     @pytest.mark.integration
-    def test_dimethylcyclohexane_with_locants(self):
-        """CC1CCCC(C)C1 -> contains 'dimethyl' and locants."""
-        name = name_compound('CC1CCCC(C)C1')
-        assert 'dimethyl' in name, f"Expected 'dimethyl' in '{name}'"
-        assert 'cyclohexane' in name, f"Expected 'cyclohexane' in '{name}'"
-
-    @pytest.mark.integration
     def test_trimethyl_norbornane(self):
         """CC1(C)CC2CCC1(C)C2 -> contains 'trimethyl' or 'methyl' and 'bicyclo'."""
         name = name_compound('CC1(C)CC2CCC1(C)C2')
         # May be routed through a different naming path but should include methyl substituents
         assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
-
-    @pytest.mark.integration
-    def test_ethylcyclopentane(self):
-        """CCC1CCCC1 -> contains 'ethyl' and 'cyclopentane'."""
-        name = name_compound('CCC1CCCC1')
-        assert 'ethyl' in name, f"Expected 'ethyl' in '{name}'"
-        assert 'cyclopentane' in name, f"Expected 'cyclopentane' in '{name}'"

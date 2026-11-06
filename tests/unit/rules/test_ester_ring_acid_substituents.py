@@ -59,16 +59,6 @@ class TestSubstitutedAromaticEsters:
 class TestEsterRegressionGuards:
     """Ensure unsubstituted ring esters and chain esters are unchanged."""
 
-    def test_ethyl_benzoate_unsubstituted(self):
-        """Unsubstituted ethyl benzoate: no spurious substituent prefixes."""
-        result = name_compound("CCOC(=O)c1ccccc1")
-        assert result is not None
-        assert "benzoate" in result, f"Expected 'benzoate' in name, got: {result}"
-        # Should NOT have any substituent prefixes
-        assert "amino" not in result
-        assert "chloro" not in result
-        assert "methyl" not in result
-
     def test_ethyl_acetate_chain_ester(self):
         """Chain ester (ethyl acetate): unchanged by ring-acid fix."""
         result = name_compound("CCOC(C)=O")

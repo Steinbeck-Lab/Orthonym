@@ -35,7 +35,6 @@ structure (full-InChIKey match) -- not merely to *a* valid molecule.
 import pytest
 from rdkit import Chem
 
-from orthonym.errors import is_failure_name
 from orthonym.namer import Orthonym
 from orthonym.rules.spiro import name_charged_spiro_system
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check

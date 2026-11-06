@@ -17,13 +17,9 @@
   N-(4-methoxyphenyl)aniline...]':21610).
 """
 import pytest
-from rdkit import Chem
 
-from orthonym.validation.pin_spelling import check_pin_spelling, registered_rules
-
-
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
+from orthonym.validation.pin_spelling import registered_rules
+from tests.support.read_back import spelling_rules
 
 
 def test_the_rules_are_registered():
@@ -55,7 +51,7 @@ def test_the_rules_are_registered():
     ("OCCc1ccc(O)cc1", "2-(4-hydroxyphenyl)ethan-1-ol", "P-52.2.8"),
 ])
 def test_a_parent_the_rules_do_not_choose_fails(smiles, name, rule):
-    assert rule in _rules(smiles, name)
+    assert rule in spelling_rules(smiles, name)
 
 
 #: (structure, a name whose suffix is a junior suffix of the class of one of its prefixes, the
@@ -78,17 +74,17 @@ JUNIOR_SUFFIX_ROWS = [
 
 @pytest.mark.parametrize("smiles,name,senior", JUNIOR_SUFFIX_ROWS)
 def test_a_class_prefix_beside_a_junior_suffix_of_its_class_fails_p43(smiles, name, senior):
-    rules = _rules(smiles, name)
+    rules = spelling_rules(smiles, name)
     assert "P-43" in rules, rules
     assert not {"P-44.1.1", "P-52.2.8"} & set(rules), rules     # no group is counted before
     if senior:
-        assert _rules(smiles, senior) == []
+        assert spelling_rules(smiles, senior) == []
 
 
 def test_a_class_prefix_beside_the_suffix_it_expresses_fails_p44_1_1():
     # the same pattern with the suffix the prefix expresses: 'carbamoyl' beside 'amide'
-    assert _rules("NC(=O)c1cccc(C(N)=O)c1", "3-carbamoylbenzamide") == ["P-44.1.1"]
-    assert _rules("NC(=O)c1cccc(C(N)=O)c1", "benzene-1,3-dicarboxamide") == []
+    assert spelling_rules("NC(=O)c1cccc(C(N)=O)c1", "3-carbamoylbenzamide") == ["P-44.1.1"]
+    assert spelling_rules("NC(=O)c1cccc(C(N)=O)c1", "benzene-1,3-dicarboxamide") == []
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -115,4 +111,4 @@ def test_a_class_prefix_beside_the_suffix_it_expresses_fails_p44_1_1():
     ("O=C1C=CC=CC=CO1", "2H-oxocin-2-one"),
 ])
 def test_book_pins_pass(smiles, name):
-    assert _rules(smiles, name) == []
+    assert spelling_rules(smiles, name) == []

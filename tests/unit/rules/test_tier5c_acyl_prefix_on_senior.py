@@ -42,13 +42,6 @@ def test_tier5c_acyl_prefix_on_senior_parent(smiles, expected):
     assert name_compound(smiles) == expected
 
 
-@pytest.fixture
-def _validity_gate_on(monkeypatch):
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
-
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "smiles,why",
@@ -58,7 +51,7 @@ def _validity_gate_on(monkeypatch):
          "acyl prefix — stays on the HEAD fail-closed path"),
     ],
 )
-def test_tier5c_fail_closed(_validity_gate_on, smiles, why):
+def test_tier5c_fail_closed(opsin_gate, smiles, why):
     # production (validity gate ON) must not emit a name for these shapes
     assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin"), why
 

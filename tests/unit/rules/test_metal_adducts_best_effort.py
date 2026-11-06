@@ -24,17 +24,17 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from orthonym.jvm_budget import jvm_slots
 from tests.support.rt_assert import _independent_parse, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.opsin_gate]
 
 
 def _best_effort_row(smiles):
     with jvm_slots(1, purpose="breadth-job2-test"):
-        return Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        return tier_row(smiles, "best-effort")
 
 
 def _pin_row(smiles):

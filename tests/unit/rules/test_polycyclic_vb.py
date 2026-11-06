@@ -13,7 +13,6 @@ from rdkit import Chem
 
 from orthonym.rules.polycyclic import (
     VonBaeyerAnalyzer,
-    PolycyclicDescriptor,
     find_longest_path,
     generate_polycyclic_name,
     is_polycyclic_system,

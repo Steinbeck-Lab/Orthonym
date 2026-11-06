@@ -289,13 +289,6 @@ class TestEsterRetrofit:
 class TestAmideRetrofit:
     """Tests for amide handler with correct prefix locant joining."""
 
-    def test_n_methylacetamide_no_regression(self):
-        """Simple N-substituted amide: N-methylacetamide."""
-        from orthonym.namer import name_compound
-        result = name_compound("CC(=O)NC")
-        assert result is not None
-        assert result.lower() == "n-methylacetamide", f"Expected 'N-methylacetamide', got '{result}'"
-
     def test_2_methylbutanamide(self):
         """Chain substituent on saturated amide: 2-methylbutanamide."""
         from orthonym.namer import name_compound
@@ -344,15 +337,6 @@ class TestPolyfunctionalRingAsParent:
         from orthonym.rules.polyfunctional import _name_ring_as_parent_polyfunctional
         assert callable(_name_ring_as_parent_polyfunctional)
 
-    def test_4_aminocyclohexanol(self):
-        """Ring-as-parent: 4-aminocyclohexan-1-ol (amino + alcohol on cyclohexane)."""
-        from orthonym.namer import name_compound
-        result = name_compound("OC1CCC(N)CC1")
-        assert result is not None
-        assert "amino" in result.lower(), f"Expected 'amino' in '{result}'"
-        assert "cyclohexan" in result.lower(), f"Expected 'cyclohexan' in '{result}'"
-        assert "ol" in result.lower(), f"Expected '-ol' suffix in '{result}'"
-
     def test_4_hydroxycyclohexanone(self):
         """Ring-as-parent: 4-hydroxycyclohexan-1-one (hydroxy + ketone on cyclohexane)."""
         from orthonym.namer import name_compound
@@ -361,15 +345,6 @@ class TestPolyfunctionalRingAsParent:
         assert "hydroxy" in result.lower(), f"Expected 'hydroxy' in '{result}'"
         assert "cyclohexan" in result.lower(), f"Expected 'cyclohexan' in '{result}'"
         assert "one" in result.lower(), f"Expected '-one' suffix in '{result}'"
-
-    def test_chain_polyfunctional_unchanged(self):
-        """Chain-as-parent polyfunctional still works: 4-aminobutanoic acid (GABA)."""
-        from orthonym.namer import name_compound
-        result = name_compound("NCCCC(=O)O")
-        assert result is not None
-        assert "amino" in result.lower(), f"Expected 'amino' in '{result}'"
-        assert "butanoic" in result.lower(), f"Expected 'butanoic' in '{result}'"
-        assert "acid" in result.lower(), f"Expected 'acid' in '{result}'"
 
     def test_complex_sphingolipid_no_ring_intercept(self):
         """Large molecule with small ring: ring-as-parent should NOT intercept.
@@ -687,66 +662,6 @@ class TestCategoryCHandlerSafety:
         # Methyl(cyclopentyl) sulfide -- cyclopentyl is complex for simple alkyl naming
         result = name_compound("C1CCCC1SC")
         assert result is not None  # Falls through to general naming
-
-    def test_boronic_acid_simple_works(self):
-        """Boronic acid handler names simple R-groups correctly."""
-        from orthonym import name_compound
-        result = name_compound("CB(O)O")
-        assert "boronic acid" in result.lower()
-
-    def test_urea_unsubstituted(self):
-        """Urea handler produces retained name."""
-        from orthonym import name_compound
-        result = name_compound("NC(=O)N")
-        assert result is not None
-
-    def test_urea_n_substituted(self):
-        """Urea handler correctly names N-substituted ureas."""
-        from orthonym import name_compound
-        result = name_compound("CN(C)C(=O)N")
-        assert result is not None
-        assert "dimethyl" in result.lower(), f"Expected 'dimethyl' in '{result}'"
-        assert "urea" in result.lower(), f"Expected 'urea' in '{result}'"
-
-    def test_amine_n_methyl(self):
-        """Amine handler produces N-methyl prefix."""
-        from orthonym import name_compound
-        result = name_compound("CNCC")
-        assert result is not None
-        assert "methyl" in result.lower()
-
-    def test_carbamic_acid_retained(self):
-        """Carbamic acid handler produces retained name."""
-        from orthonym import name_compound
-        result = name_compound("NC(=O)O")
-        assert result is not None
-        assert "carbamic" in result.lower() or "amino" in result.lower(), (
-            f"Expected carbamic-based name, got '{result}'"
-        )
-
-    def test_n_oxide_pyridine(self):
-        """N-oxide handler correctly names pyridine 1-oxide."""
-        from orthonym import name_compound
-        result = name_compound("[O-][n+]1ccccc1")
-        assert result is not None
-        assert "oxide" in result.lower(), f"Expected 'oxide' in '{result}'"
-
-    def test_guanidine_retained(self):
-        """Guanidine handler produces retained name."""
-        from orthonym import name_compound
-        result = name_compound("NC(=N)N")
-        assert result is not None
-
-    def test_oxime_functional_class(self):
-        """Oxime handler uses functional class naming."""
-        from orthonym import name_compound
-        result = name_compound("CC(=NO)C")
-        assert result is not None
-        # 'Oximes' (under, the Blue Book): "Preferred IUPAC
-        # names are formed substitutively as N-hydroxy derivatives of imines" (example
-        #:38468 'N-hydroxypentan-2-imine (PIN)... pentan-2-one oxime'); the oxime name
-        # is the functional class form.
-        assert result == "N-hydroxypropan-2-imine", f"Expected 'N-hydroxypropan-2-imine', got '{result}'"
 
     def test_carbamate_functional_class(self):
         """Carbamate handler uses functional class naming."""

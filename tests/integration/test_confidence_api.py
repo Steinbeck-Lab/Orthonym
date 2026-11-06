@@ -9,8 +9,6 @@ Verifies:
 6. CLI --confidence flag works
 """
 
-import subprocess
-import sys
 
 import pytest
 from orthonym import name_compound, Orthonym

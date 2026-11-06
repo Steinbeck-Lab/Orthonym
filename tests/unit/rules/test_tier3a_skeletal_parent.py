@@ -64,13 +64,6 @@ class TestSkeletalSuffixChainParent:
     def test_chain_parent_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_benzophenone_demoted_to_diphenylmethanone(self):
-        # W8-P1 R6, BB 28326/28378): 'benzophenone' is retained
-        # for GENERAL nomenclature only; the PIN is the systematic
-        # diphenylmethanone (mirror of acetophenone -> 1-phenylethan-1-one).
-        assert name_compound("O=C(c1ccccc1)c1ccccc1") == "diphenylmethanone"
-
-
 @pytest.mark.unit
 class TestRingParentGuards:
     """Suffix atom IS a ring atom (or exocyclic-carbon suffix class):

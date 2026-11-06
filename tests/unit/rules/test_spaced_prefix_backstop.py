@@ -12,6 +12,7 @@ functional-class name `urea oxime` itself is OPSIN-valid and is NOT affected (th
 the substituent-prefix conversion).
 """
 from orthonym.assembly.substituent_naming import parent_to_prefix
+from tests.support.pin_tiers import tier_row
 
 
 def test_spaced_functional_class_name_declines():
@@ -25,10 +26,7 @@ def test_ordinary_prefix_unchanged():
 
 def test_no_spaced_token_in_full_name():
     # end-to-end: the arginine-oxime side chain must not splice a spaced token.
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
-        "NC(=NO)NCCCC(N)C(=O)O")
+    r = tier_row("NC(=NO)NCCCC(N)C(=O)O", "best-effort")
     nm = r["name"] if isinstance(r, dict) else r
     if nm:
         assert " oxim" not in nm and "urea oxim" not in nm, nm

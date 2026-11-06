@@ -15,7 +15,7 @@ Source: AUTONOM 1990 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym, compute_features
+from orthonym.namer import Orthonym
 
 
 def _classify_full(smiles: str):

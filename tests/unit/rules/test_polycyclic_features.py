@@ -102,14 +102,6 @@ def stereo_norbornane():
 
 
 @pytest.fixture
-def substituted_stereo_norbornane():
-    """Stereo norbornane with methyl substituent."""
-    mol = Chem.MolFromSmiles('C[C@H]1C[C@@H]2CC[C@H]1C2')
-    rdCIPLabeler.AssignCIPLabels(mol)
-    return mol
-
-
-@pytest.fixture
 def methyl_norbornene():
     """3-methylbicyclo[2.2.1]hept-2-ene - substituent + unsaturation."""
     return Chem.MolFromSmiles('CC1C=C2CCC1C2')
@@ -252,8 +244,8 @@ class TestPolycyclicStereo:
         # Should return a stereo prefix string like "(1R,4S)-" or empty
         # If molecule has defined stereo, it should be non-empty
         if stereo_str:
-            assert stereo_str.startswith('('), f"Stereo string should start with '('"
-            assert stereo_str.endswith('-'), f"Stereo string should end with '-'"
+            assert stereo_str.startswith('('), "Stereo string should start with '('"
+            assert stereo_str.endswith('-'), "Stereo string should end with '-'"
             # Should contain R or S
             assert 'R' in stereo_str or 'S' in stereo_str, (
                 f"Stereo string should contain R or S: {stereo_str}"

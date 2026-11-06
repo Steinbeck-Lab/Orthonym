@@ -27,33 +27,12 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C[In](C)C",
     "[Al+3].[Cl-].[Cl-].[Cl-]",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
 
 
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
 
 
@@ -64,7 +43,6 @@ pytestmark = pytest.mark.unit
 @pytest.mark.parametrize("smiles", [
     "C[Al]C", "C[Al](C)C", "CC[Ga](CC)CC", "C[In](C)C", "[Al+3].[Cl-].[Cl-].[Cl-]"])
 def test_group13_names_are_never_pin_verified(smiles):
-    from orthonym import Orthonym
     from tests.support.rt_assert import name_is_rt_exact
     r = _dt_row(smiles)
     assert r["tier"] not in ("pin_verified", "pin_unverified") and not r["is_pin"], r
@@ -74,5 +52,4 @@ def test_group13_names_are_never_pin_verified(smiles):
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", ["CCO", "C[Si](C)(C)C", "CB(C)C"])
 def test_other_elements_keep_their_labels(smiles):
-    from orthonym import Orthonym
     assert _dt_row(smiles)["tier"] == "pin_verified"

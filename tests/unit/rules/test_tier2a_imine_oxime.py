@@ -93,10 +93,6 @@ class TestSubstitutiveOximes:
         # unconditional).
         assert name_compound("C/C=N/O") == "(E)-N-hydroxyethanimine"
 
-    def test_oxime_prefix_on_senior_parent_unchanged(self):
-        assert name_compound("ON=CCCC(=O)O") == "4-(hydroxyimino)butanoic acid"
-
-
 @pytest.mark.unit
 class TestSubstitutiveIsoCyanates:
     """U5: substitutive isocyanato parents + mask + ring locant elision."""

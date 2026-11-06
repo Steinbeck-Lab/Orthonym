@@ -5,16 +5,14 @@ composed-charge workstreams. Do NOT edit the expected values to match a future
 regression — that defeats the tripwire; if one of these breaks, STOP and report
 the actual output so the failure gets diagnosed, not silenced.
 """
-import sys
-from pathlib import Path
 
 import pytest
 from rdkit import Chem
 from orthonym import Orthonym
-from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.jars import jar_or_skip
 from tests.support.rt_assert import assert_full_rt
+from tests.support import v34_charged_probe as v34_probe
 
 BE = dict(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
 
@@ -35,17 +33,9 @@ def test_composed_charge_controls_unchanged(smi, expected):
 # RT classifier. The real charged corpus backlog measured B=0 (no wrong/
 # unparseable rows), so the `wrong` and `unparseable` branches — and the
 # falsy-InChIKey fail-closed guard the Critical finding was about — are
-# otherwise never exercised by any test. `v34_charged_probe.py` lives outside
-# the `orthonym` package (it is a measurement script, not shipped code). It
-# used to sit in internal notes, which the public-release commit
-# 0245191d1 untracked, so collection failed with ModuleNotFoundError; since
-# 2026-09-03 the test's own copy lives in `tests/support/` and is imported via
-# an explicit sys.path insert.
+# otherwise never exercised by any test. `tests/support/v34_charged_probe.py` is a
+# measurement script, not shipped code.
 # --------------------------------------------------------------------------
-_PROBE_DIR = str(Path(__file__).resolve().parents[2] / "support")
-if _PROBE_DIR not in sys.path:
-    sys.path.insert(0, _PROBE_DIR)
-import v34_charged_probe as v34_probe  # noqa: E402 (path must be inserted first)
 
 
 def test_probe_classifies_wrong_molecule_name_as_wrong(monkeypatch):
@@ -637,7 +627,6 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
     assert verified == name
 
 
-
 # --------------------------------------------------------------------------
 # NOABSTAIN  -- class 1: fused mancude/aromatic ring anion/cation
 # (flavonoid/isoflavone phenolate + protonated heteroaromatic).
@@ -796,7 +785,6 @@ def test_ws_noabstain_achiral_saturated_bicycle_self_check_unchanged():
     cage = analyze_cage_universal(mol, cage_atoms=ring_atoms)
     assert cage is not None
     assert not cage.is_mancude
-
 
 
 # --------------------------------------------------------------------------

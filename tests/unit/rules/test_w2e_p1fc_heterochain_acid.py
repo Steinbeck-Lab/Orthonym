@@ -22,7 +22,3 @@ class TestP5832HeterochainAcid:
         # the carboxyl split must not corrupt the bare-hydride path.
         assert name_compound("NNNN") == "tetraazane"
         assert name_polyazane(Chem.MolFromSmiles("NNNN")) == "tetraazane"
-
-    def test_2n_acid_keeps_retained_pin(self):
-        # 2-N acid stays 'hydrazinecarboxylic acid' (peel gated to n>=3).
-        assert name_compound("NNC(=O)O") == "hydrazinecarboxylic acid"

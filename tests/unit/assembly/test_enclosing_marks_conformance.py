@@ -2,7 +2,6 @@
 
 Names are the Blue Book's own examples (the Blue Book-7530).
 """
-import pytest
 
 from orthonym.assembly.naming_utils import (
     apply_enclosing_marks,

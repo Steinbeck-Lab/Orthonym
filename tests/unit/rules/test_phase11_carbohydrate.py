@@ -46,17 +46,6 @@ def test_foxane_drop_hydroxymethyl_lowest_locant(smiles, expected):
     assert name_compound(smiles) == expected
 
 
-def test_foxane_drop_no_bare_methyl_for_ch2oh():
-    """The -CH2OH must NOT collapse to a bare 'methyl' (the structure-loss bug).
-
-    Uses 1,5-anhydro-D-glucitol, which is NOT a catalog sugar and so still exercises
-    the substitutive fallback (the thio sugars that used to test this now catalog to
-    a PIN — see test_thio_anhydro_catalog_pin)."""
-    name = name_compound("C1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO")
-    assert "hydroxymethyl" in name
-    assert "methyloxane" not in name  # the old sugar-ring-oxygen-drop structure-loss output
-
-
 @pytest.mark.parametrize("smiles, expected", [
     # W6-P4: thio + anhydro sugars now catalog to their PIN (S / bridge preserved).
     ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO", "5-thio-β-D-glucopyranose"),

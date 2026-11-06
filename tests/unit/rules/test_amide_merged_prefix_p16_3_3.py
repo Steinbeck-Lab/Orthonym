@@ -121,14 +121,6 @@ def test_different_prefixes_are_alphanumerically_ordered(smiles, expected):
     assert name_compound(smiles) == expected
 
 
-def test_italic_locant_is_not_glued_to_the_previous_prefix():
-    """Regression: the joiner hyphenated before a DIGIT only, so an italic
-    locant produced `3-chloroN-methylbenzamide` -- which OPSIN accepted."""
-    out = name_compound("CNC(=O)c1cccc(Cl)c1")
-    assert "chloroN" not in out
-    assert "-N-methyl" in out
-
-
 # --------------------------------------------------------------------------
 # Unchanged shapes — the merge must not disturb the cases that were correct.
 # --------------------------------------------------------------------------

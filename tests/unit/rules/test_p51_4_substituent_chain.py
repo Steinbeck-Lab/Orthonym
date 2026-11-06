@@ -16,7 +16,7 @@ from rdkit import Chem
 from orthonym.validation.spelling.checks_skeletal_chain import (
     a_substituent_chain_applies, a_substituent_chain_name_check)
 from tests.support.default_tier import default_tier_row
-from tests.support.rt_assert import assert_full_rt, name_best_effort
+from tests.support.rt_assert import assert_full_rt
 
 # four oxygens beyond the atom bonded to the ring
 FOUR = [

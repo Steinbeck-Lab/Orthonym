@@ -55,11 +55,6 @@ import pytest
 from orthonym.namer import Orthonym
 
 
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
 def _name(namer, smiles):
     return namer.name(smiles)
 
@@ -286,16 +281,13 @@ class TestIsotopeEndToEnd:
     # ---------------- FIXED: the descriptor carries a locant => parent cites --------- #
 
     def test_labelled_cyclohexanol_keeps_its_locant(self):
-        from orthonym.namer import Orthonym
         assert Orthonym().name("OC1CCCC[13CH2]1") == "(2-13C)cyclohexan-1-ol"
 
     def test_labelled_cyclohexanone_keeps_its_locant(self):
         """The ketone class too -- the defect spanned the whole licence allowlist."""
-        from orthonym.namer import Orthonym
         assert Orthonym().name("O=C1CCCC[13CH2]1") == "(2-13C)cyclohexan-1-one"
 
     def test_deuterium_keeps_its_locant(self):
-        from orthonym.namer import Orthonym
         assert Orthonym().name("[2H]C1CCCCC1O") == "(2-2H1)cyclohexan-1-ol"
 
     # ---------------- CORRECT ALREADY: omission is right, sweep over-claimed -------- #
@@ -303,13 +295,11 @@ class TestIsotopeEndToEnd:
     def test_hexafluorobenzene_correctly_omits(self):
         """Also reported by the sweep, also correct: hexafluorobenzene has exactly ONE
         carbon environment (fluorine is not carbon), so one 13C gives one isotopomer."""
-        from orthonym.namer import Orthonym
         assert Orthonym().name("Fc1c(F)c(F)c(F)c(F)[13c]1F") == "hexafluoro(13C)benzene"
 
     def test_uniformly_equivalent_ring_correctly_omits(self):
         """ (``:44202``) -- all six ring positions are one orbit, so labelling
         any of them gives the same compound. Must stay locant-free."""
-        from orthonym.namer import Orthonym
         assert Orthonym().name("O[13c]1c(O)c(O)c(O)c(O)c1O") == "(13C)benzenehexol"
 
     def test_scoped_descriptor_on_an_ester_alkyl_is_correct(self):
@@ -319,7 +309,6 @@ class TestIsotopeEndToEnd:
         whole-molecule test calls it ambiguous -- but the descriptor precedes ``methyl``,
         whose scope is a single carbon, so the name is already unique. The
         over-broad test was withdrawn; this row guards against re-introducing it."""
-        from orthonym.namer import Orthonym
         assert Orthonym().name("[13CH3]OC(C)=O") == "(13C)methyl acetate"
 
     # ---------------- two labelled atoms: the isotopomers are distinct ---------------- #
@@ -337,17 +326,14 @@ class TestIsotopeEndToEnd:
     # interchangeable).
 
     def test_double_labelled_benzenehexol_needs_locants(self):
-        from orthonym.namer import Orthonym
         assert Orthonym().name("O[13c]1[13c](O)c(O)c(O)c(O)c1O") == \
             "(1,2-13C2)benzene-1,2,3,4,5,6-hexol"
 
     def test_double_labelled_benzenehexol_1_3_isotopomer(self):
-        from orthonym.namer import Orthonym
         assert Orthonym().name("O[13c]1c(O)[13c](O)c(O)c(O)c1O") == \
             "(1,3-13C2)benzene-1,2,3,4,5,6-hexol"
 
     def test_double_labelled_benzenehexol_1_4_isotopomer(self):
-        from orthonym.namer import Orthonym
         assert Orthonym().name("O[13c]1c(O)c(O)[13c](O)c(O)c1O") == \
             "(1,4-13C2)benzene-1,2,3,4,5,6-hexol"
 

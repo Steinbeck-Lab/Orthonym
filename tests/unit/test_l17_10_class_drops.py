@@ -42,8 +42,8 @@ from types import SimpleNamespace
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -56,10 +56,6 @@ _ESTER = "CC(CCCC(=O)CCC1C2CCC(C2(CCC1=O)C)OC(=O)C)OC(=O)C"
 _ESTER_NAME = "4-[7-(acetyloxy)-3-oxooctyl]-7a-methyl-5-oxooctahydro-1H-inden-1-yl acetate"
 
 
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
-
-
 @pytest.mark.parametrize("tier", _WIDER)
 def test_the_amide_is_the_suffix(tier):
     """The amide is the parent, the other amide a prefix of the acid side. The two amides tie as parents,:
@@ -68,14 +64,14 @@ def test_the_amide_is_the_suffix(tier):
     'methyl' before 'methylcyclohexyl...' at 'N,2', the other cites its other amide first, at '2,N',:3189: 'N' is
     lower than a numeral). The name is the first of them, with its N-block first as the order of citation puts it. It is
     not labelled the PIN (the nested prefix of the acid side is not certified), and the PIN tier gives no name."""
-    row = _row(_AMIDE, tier)
+    row = tier_row(_AMIDE, tier)
     assert row["name"] == _AMIDE_NAME, row
     assert not row["is_pin"], row
     assert_full_rt(row["name"], _AMIDE)
 
 
 def test_the_pin_tier_gives_no_name_for_the_amide_with_a_substituted_ring():
-    row = _row(_AMIDE, "pin")
+    row = tier_row(_AMIDE, "pin")
     assert row["tier"] == "abstain" and not row["is_pin"], row
 
 
@@ -88,7 +84,7 @@ def test_the_pin_tier_gives_no_name_for_the_amide_with_a_substituted_ring():
 def test_two_amides_with_an_azanediyl_group_are_named_on_the_amide_at_every_tier(smiles, name, tier):
     """'N-ethyl...' sorts before 'methylamino...', so the name is the PIN; before, the PIN tier gave no name for the
     ethyl amide ('2-{[2-(ethylamino)-2-oxoethyl]amino}-1-(methylamino)acetamide' stood in the way of the split)."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -107,7 +103,7 @@ def test_the_amide_that_has_the_n_methyl_group_is_the_pin_where_its_locants_are_
     , the Blue Book, " CRITERIA RELATED TO NUMBER AND LOCATION OF SUBSTITUENT GROUPS"), so the N-methyl
     amide is the parent of the PIN; the split of the other amide ('N-propyl-2-{...}acetamide', its N-block out of the order of
      is no longer the name of the molecule."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -122,7 +118,7 @@ def test_the_amide_that_has_the_n_methyl_group_is_the_pin_where_its_locants_are_
 ])
 @pytest.mark.parametrize("tier", _WIDER)
 def test_the_siblings_whose_name_is_spelled_below_the_pin_are_named_and_labelled(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -138,7 +134,7 @@ def test_the_siblings_whose_name_is_spelled_below_the_pin_are_named_and_labelled
 ])
 @pytest.mark.parametrize("tier", _WIDER)
 def test_amides_that_tie_on_every_locant_are_named_but_not_labelled_the_pin(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -146,7 +142,7 @@ def test_amides_that_tie_on_every_locant_are_named_but_not_labelled_the_pin(smil
 
 @pytest.mark.parametrize("smiles", ["CCNC(=O)CNC(=O)CNC", "CCNC(=O)CNC(=O)CO"])
 def test_the_pin_tier_gives_no_name_for_amides_that_tie_on_every_locant(smiles):
-    assert _row(smiles, "pin")["tier"] == "abstain"
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
 
 
 @pytest.mark.parametrize("tier", _WIDER)
@@ -154,14 +150,14 @@ def test_the_ester_of_the_ring_is_the_parent_and_the_ring_is_fused(tier):
     """Two acetates, a ring alcohol and a chain alcohol: the ring is the senior alcoholic component,
     the Blue Book), the other acetate a prefix. The ring is the fused hydrindane, as the strict ring namer names it
     : a fused name is senior to a von Baeyer name for an ortho-fused bicycle), not 'bicyclo[4.3.0]nonane'."""
-    row = _row(_ESTER, tier)
+    row = tier_row(_ESTER, tier)
     assert row["name"] == _ESTER_NAME, row
     assert not row["is_pin"], row
     assert_full_rt(row["name"], _ESTER)
 
 
 def test_the_pin_tier_gives_no_name_for_the_ester():
-    assert _row(_ESTER, "pin")["tier"] == "abstain"
+    assert tier_row(_ESTER, "pin")["tier"] == "abstain"
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -174,7 +170,7 @@ def test_the_pin_tier_gives_no_name_for_the_ester():
 def test_a_polyacetate_is_named_from_one_of_its_esters(smiles, name, tier):
     """The same cause on rows of the L16 scan: the alcohol fragment named '...(acetyloxy)...cyclohexane' lost its
     ester to the string rule, and the molecule was named '1,2,3,4,5-pentakis(acetyloxy)-6-fluorocyclohexane'."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -184,7 +180,7 @@ def test_a_polyacetate_is_named_from_one_of_its_esters(smiles, name, tier):
 def test_an_ester_whose_alcohol_is_named_as_an_alcohol_keeps_its_name(tier):
     """Positive control: the alcohol fragment states its oxygen as '-ol', the string rule is trusted and nothing is read."""
     smiles = "CC(=O)OC1CCC2CCCC12"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == "octahydropentalen-1-yl acetate" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
 
@@ -202,7 +198,7 @@ def test_the_probe_holds_no_name_and_no_probe_is_read_back(smiles, monkeypatch):
     real_probe, real_verdict = probe.probe_name, engine.name_constitution_verdict
     monkeypatch.setattr(probe, "probe_name", lambda s, style: seen.append((s, real_probe(s, style))) or seen[-1][1])
     monkeypatch.setattr(engine, "name_constitution_verdict", lambda n, m: reads.append(n) or real_verdict(n, m))
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] in (_AMIDE_NAME, _ESTER_NAME), row
     whole = [name for s, name in seen if Chem.MolToSmiles(Chem.MolFromSmiles(s)) == wanted]
     assert whole and not any(whole), seen
@@ -363,7 +359,7 @@ def test_the_n_acyl_float_is_not_built_on_the_rescue_name_of_an_amine_fragment()
     amino group inside a substituent ('(9Z)-1-{[...2-amino-...propoxy]...}-1-oxooctadec-9-ene'); '(9Z)-N-hexadecanoyl-1-{...}-1-
     oxooctadec-9-ene' put a locant N in front of a parent that has no nitrogen. The molecule keeps the name with the amide
     cited as the prefix 'hexadecanamido', the Blue Book)."""
-    row = _row(_LIPID, "best-effort")
+    row = tier_row(_LIPID, "best-effort")
     assert "N-hexadecanoyl" not in row["name"], row
     assert "2-hexadecanamido-3-oxido-3-oxopropoxy" in row["name"], row
     assert not row["is_pin"], row

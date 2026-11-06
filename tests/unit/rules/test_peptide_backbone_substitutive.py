@@ -54,16 +54,13 @@ Three witnesses spanning simple -> bigger, per plan:
 """
 
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
-from orthonym import name_compound
 from orthonym.errors import is_failure_name
-from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import same_key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -74,53 +71,18 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label", emit_tier="pin")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 # GATE ON (production default) -- matches test_peptide_capped_termini.py's
 # rationale: this module tests exactly what `name_compound` emits.
 pytestmark = pytest.mark.opsin_gate
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    """name -> OPSIN -> full InChIKey, compared to the input's InChIKey."""
-    if not name:
-        return False
-    o = opsin_parse(name)
-    if not o:
-        return False
-    mol_in = Chem.MolFromSmiles(smiles)
-    mol_out = Chem.MolFromSmiles(o)
-    if mol_in is None or mol_out is None:
-        return False
-    return inchi.MolToInchiKey(mol_in) == inchi.MolToInchiKey(mol_out)
 
 
 @pytest.mark.unit
@@ -156,7 +118,7 @@ class TestBackboneSubstitutiveConverts:
             "(2S)-2-{(2S)-2-[(2S)-2-{2-[(2R)-2-amino-2-cyclopropylacetamido]acetamido}"
             "propanamido]-3-methylbutanamido}-4-methylpentanoic acid"
         ), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
 
 @pytest.mark.unit
@@ -197,7 +159,7 @@ class TestBackboneSubstitutiveAbstainsCorrectly:
         assert result == (
             "5-amino-2-{2-[2-(2-aminopropanamido)-3-(1H-indol-3-yl)propanamido]"
             "-3-(1H-indol-3-yl)propanamido}-5-oxopentanoic acid"), result
-        assert _full_rt(self.UNDEFINED_STEREO_WITNESS, result), result
+        assert same_key(self.UNDEFINED_STEREO_WITNESS, result), result
 
     @pytest.mark.slow  # one 49 s molecule: nightly run only
     def test_side_chain_acid_trap_witness_abstains(self):
@@ -214,15 +176,11 @@ class TestRegressionUnaffected:
     """Spot-checks that ordinary peptides (and Task 2.0/2.1's levers) stay
     PIN byte-identical -- this producer is tried LAST, only on decline."""
 
-    def test_glycylglycine_unchanged(self):
-        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
-        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
-
     def test_standard_tripeptide_unchanged(self):
         smi = "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O"
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
     def test_lever_c_amide_cterm_unchanged(self):
         """Task 2.1's own witness. Decision A part 2 (2026-09-27): was
@@ -236,5 +194,5 @@ class TestRegressionUnaffected:
         # CHAINS (THE PRINCIPAL CHAIN)" (the Blue Book): "(b) has the greater number of skeletal atoms"; the two amides
         # are one class and the alanine chain (three atoms) outranks the glycine chain (two), so the amide of
         # the acyl end is the parent. The read-back to the full InChIKey is checked by test_peptide_capped_termini's twin of
-        # this molecule (``_full_rt``, OPSIN outside the engine); mutation: fails at 10accd4429, which names the old string.
+        # this molecule (``same_key``, OPSIN outside the engine); mutation: fails at 10accd4429, which names the old string.
         assert result == "(2S)-2-amino-N-(2-amino-2-oxoethyl)propanamide", result

@@ -22,18 +22,14 @@ name) when an amide nitrogen is substituted.
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from orthonym.routing.dispatch_table import StoutClass, _breaks_pin_spelling
 from tests.support.default_tier import strict_path_row
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # a chiral butanediamide (or an Asn peptide with a C-terminal amide) with a substituted amide nitrogen
@@ -55,7 +51,7 @@ _DIAMIDES = [
 def test_a_chiral_diamide_with_substituted_nitrogens_is_named_on_its_chain(smiles, name, tier):
     """ (the Blue Book) cites the N-substituents with the locant N on the diamide parent
     ('N1-methyl...butanediamide'); (:44639) puts the descriptors of the parent at the front of the name."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -70,7 +66,7 @@ _UNCHANGED = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name,label", _UNCHANGED)
 def test_the_diamides_the_general_path_names_keep_their_names(smiles, name, label, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, label), row
 
 
@@ -96,7 +92,7 @@ def test_a_symmetric_chiral_diamide_is_named_with_the_descriptors_by_criterion_j
     (pseudoasymmetry) that are preferred to E, S, P, and s". 2,3-Dihydroxy-N1,N4-dimethylbutanediamide ties on (f) and (g) in
     both directions; the C2 symmetric diastereomer reads the same either way, and the meso one is numbered so that the R takes
     the lower locant. The PIN tier ships both, full-key read back."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -148,7 +144,7 @@ def test_a_clean_substitutive_name_is_still_preferred():
     name = "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"
     assert not _breaks_pin_spelling(name, Chem.MolFromSmiles(smiles))
     for tier in _TIERS:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -171,10 +167,10 @@ def test_a_retained_residue_prefix_is_no_indicated_hydrogen_failure_of_the_subst
     ring, Table 10.4;: the name's only failure is the mark every name of the chapter has, and
     it ships at the best-effort tier as before, like the phenylalanine one (no PIN is identified for it,."""
     assert not _breaks_pin_spelling(name, Chem.MolFromSmiles(smiles))
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
     assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
 
 
 def test_a_name_that_breaks_a_spelling_rule_is_not_lost_without_a_peptide_name(monkeypatch):
@@ -203,7 +199,7 @@ def _handler_record(monkeypatch, smiles):
         return name
 
     monkeypatch.setitem(dt.DISPATCH_TABLE, StoutClass.PEPTIDE, dataclasses.replace(entry, handler=spy))
-    _row(smiles, "best-effort")
+    tier_row(smiles, "best-effort")
     return seen[-1]
 
 

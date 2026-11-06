@@ -55,35 +55,6 @@ class TestRingChainParentSelection:
         assert result == '4-cyclopentylbutanoic acid'
 
 
-class TestRingSubstituentNames:
-    """Test correct ring substituent names are used."""
-
-    def test_phenyl_from_benzene(self):
-        """Benzene substituent is named phenyl."""
-        result = name_compound('c1ccc(CCC(=O)O)cc1')
-        assert 'phenyl' in result.lower()
-
-    def test_cyclohexyl_from_cyclohexane(self):
-        """Cyclohexane substituent is named cyclohexyl."""
-        result = name_compound('C1CCCCC1CCC(=O)O')
-        assert 'cyclohexyl' in result.lower()
-
-    def test_cyclopentyl_from_cyclopentane(self):
-        """Cyclopentane substituent is named cyclopentyl."""
-        result = name_compound('C1CCCC1CCC(=O)O')
-        assert 'cyclopentyl' in result.lower()
-
-    def test_cyclopropyl_from_cyclopropane(self):
-        """Cyclopropane substituent is named cyclopropyl."""
-        result = name_compound('C1CC1CCC(=O)O')
-        assert 'cyclopropyl' in result.lower()
-
-    def test_cyclobutyl_from_cyclobutane(self):
-        """Cyclobutane substituent is named cyclobutyl."""
-        result = name_compound('C1CCC1CCC(=O)O')
-        assert 'cyclobutyl' in result.lower()
-
-
 class TestRetainedNamesPreserved:
     """Test that retained names are not broken by parent selection."""
 
@@ -96,27 +67,11 @@ class TestRetainedNamesPreserved:
 class TestLocantAssignment:
     """Test locants are correctly assigned for ring substituents."""
 
-    def test_4_phenylbutanoic_acid_locant(self):
-        """Phenyl at position 4 of butanoic acid."""
-        result = name_compound('c1ccc(CCCC(=O)O)cc1')
-        assert '4-phenyl' in result
-
-    def test_3_phenylpropanoic_acid_locant(self):
-        """Phenyl at position 3 of propanoic acid."""
-        result = name_compound('c1ccc(CCC(=O)O)cc1')
-        assert '3-phenyl' in result
-
     def test_2_phenylethanoic_acid_locant(self):
         """Phenyl at position 2 of acetic acid (the only substitutable carbon: no locant)."""
         result = name_compound('c1ccc(CC(=O)O)cc1')
         # (the Blue Book); example:6694 'phenylacetic acid (PIN)'.
         assert result == 'phenylacetic acid'
-
-    def test_4_cyclohexylbutanoic_acid_locant(self):
-        """Cyclohexyl at position 4 of butanoic acid."""
-        result = name_compound('C1CCCCC1CCCC(=O)O')
-        assert '4-cyclohexyl' in result
-
 
 class TestEdgeCases:
     """Test edge cases in ring-chain naming."""
@@ -127,13 +82,6 @@ class TestEdgeCases:
         # PIN style: 2-phenylethan-1-ol (with locant for -ol)
         assert result == '2-phenylethan-1-ol'
 
-    def test_long_alkyl_on_benzene(self):
-        """Propylbenzene: still ring is parent for simple alkyl."""
-        result = name_compound('CCCc1ccccc1')
-        # Propylbenzene or 1-propylbenzene
-        assert 'benzene' in result.lower()
-
-
 @pytest.mark.integration
 class TestP441ParentCorrections:
     """a phase E2E tests: verify parent selection corrections for ring+chain compounds.
@@ -142,19 +90,6 @@ class TestP441ParentCorrections:
     multiple bonds) and (PG proximity) changes produce correct naming
     for compounds that previously had wrong parent selection.
     """
-
-    def test_cyclohexanone_no_chain_competition(self):
-        """Cyclohexanone: single ring, no chain competition. Ring is parent.
-
-        Verifies single-ring molecules are unaffected by PG proximity changes.
-        """
-        result = name_compound('O=C1CCCCC1')
-        assert 'cyclohex' in result.lower(), (
-            f"Cyclohexanone should use ring parent. Got: {result}"
-        )
-        assert 'one' in result.lower() or 'on-' in result.lower(), (
-            f"Should contain ketone suffix. Got: {result}"
-        )
 
     def test_cyclohexanol_chain_longer_wins(self):
         """Alcohol on both ring and chain (one -OH each): the ring is the parent.

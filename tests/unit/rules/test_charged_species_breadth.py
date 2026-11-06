@@ -1,20 +1,11 @@
 from rdkit import Chem
-from rdkit.Chem import inchi
 from orthonym.namer import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import same_key
 
 
 def _be():
     return Orthonym(general_fallback=True, general_fallback_unverified=True,
                      allow_aromatic_general=True)
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    o = opsin_parse(name)
-    if not o:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
 
 
 def test_complex_quaternary_ammonium_names():
@@ -23,7 +14,7 @@ def test_complex_quaternary_ammonium_names():
     smi = "CCC(Cc1ccco1)C[N+](C)(C)C"
     name = _be().name_tiered(smi).get("name")
     assert name and "unknown" not in name, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 def test_simple_charged_still_name_unchanged():
@@ -39,7 +30,7 @@ def test_multifragment_salt_assembles():
     smi = "CCC(Cc1ccco1)C[N+](C)(C)C.[I-]"
     name = _be().name_tiered(smi).get("name")
     assert name and "unknown" not in name and "iodide" in name, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 def test_simple_salt_unchanged():

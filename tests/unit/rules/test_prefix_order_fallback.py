@@ -42,6 +42,7 @@ from tests.support.rt_assert import (
     assert_full_rt,
     name_best_effort,
 )
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -123,8 +124,8 @@ def test_witness_is_named_in_the_p145_order_without_the_fallback():
 
 
 def test_witness_is_deterministic_in_one_process():
-    first = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(P_ROW)
-    again = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(P_ROW)
+    first = tier_row(P_ROW, "best-effort")
+    again = tier_row(P_ROW, "best-effort")
     assert (first["name"], first["tier"], first["prefix_order_fallback"]) == (
         again["name"], again["tier"], again["prefix_order_fallback"])
 

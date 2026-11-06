@@ -50,13 +50,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C[NH2+]CCC(=O)O",
     "[NH3+]CCC(=O)O",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 pytestmark = pytest.mark.opsin_gate
@@ -67,7 +60,7 @@ _PC = "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP([O-])(=O)OCC[N+](C)(C)C)OC(=O)CCCCCCCCCCC
 
 def _row(smiles, namer=None):
     if namer is None and smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     with jvm_slots(1, purpose="test-n-cation-labels"):
         return (namer or Orthonym(style="pin")).name_tiered(smiles)
 

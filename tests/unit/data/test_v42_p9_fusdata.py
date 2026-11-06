@@ -19,7 +19,6 @@ Blue Book citations (``the Blue Book Blue Book``; the ``expected`` column of
   * 1H-thieno[2,3-d]imidazole, the Blue Book (PIN)
 """
 import shutil
-from pathlib import Path
 
 import pytest
 from rdkit import Chem

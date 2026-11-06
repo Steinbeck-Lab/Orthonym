@@ -15,7 +15,7 @@ Targets verified by OPSIN round-trip:
 """
 import pytest
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
+from tests.support.pin_tiers import tier_row
 
 # The lactone reclassification is exercised through the recovery lane /
 # suppression of the (wrong) saturated PIN name, which needs the OPSIN validity
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.opsin_gate
 
 
 def _best_effort(smi):
-    r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smi)
+    r = tier_row(smi, "best-effort")
     return r["name"] if isinstance(r, dict) else r
 
 

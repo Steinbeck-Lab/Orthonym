@@ -21,7 +21,6 @@ Blue Book citations (``the Blue Book Blue Book``; the ``expected`` column of
   * 1H,3H-thieno[3,4-c]thiophene, the Blue Book (PIN)
 """
 import shutil
-from pathlib import Path
 
 import pytest
 from rdkit import Chem

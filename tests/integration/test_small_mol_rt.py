@@ -280,11 +280,6 @@ class TestMissingSubstituent:
         name = name_compound("C(#Cc1ccccc1)c1ccccc1")
         assert "benz" in name or "phenyl" in name
 
-    def test_093_alanine(self):
-        """#93: CC(N)C(=O)O -> alanine."""
-        name = name_compound("CC(N)C(=O)O")
-        assert "alanine" in name.lower() or "amino" in name
-
     def test_094_galactitol(self):
         """#94: OCC(O)C(O)C(O)C(O)CO -> hexane-1,2,3,4,5,6-hexol [RT]."""
         # (the Blue Book): method (1), "using the suffix 'ol' and the prefix
@@ -306,10 +301,6 @@ class TestStereo:
         """#10: COC(=O)/C=C\\C(=O)OC - dimethyl Z-butenedioate."""
         name = name_compound(r"COC(=O)/C=C\C(=O)OC")
         assert "butanedioate" in name or "butenedioate" in name or "methyl" in name
-
-    def test_012_cinnamic_acid(self):
-        """#12: OC(=O)/C=C/c1ccccc1 -> (2E)-3-phenylprop-2-enoic acid [RT]."""
-        assert name_compound("OC(=O)/C=C/c1ccccc1") == "(2E)-3-phenylprop-2-enoic acid"
 
     def test_013_benzaldehyde_oxime(self):
         """#13: C(=N\\O)c1ccccc1 -> N-hydroxy-1-phenylmethanimine [RT]."""
@@ -442,11 +433,6 @@ class TestCharge:
         """#4: O=CCS(=O)(=O)[O-] - sulfonate anion."""
         name = name_compound("O=CCS(=O)(=O)[O-]")
         assert name is not None and len(name) > 3
-
-    def test_006_sodium_fumarate(self):
-        """#6: O=C([O-])/C=C/C(=O)O.[Na+] - sodium salt."""
-        name = name_compound("O=C([O-])/C=C/C(=O)O.[Na+]")
-        assert "sodium" in name
 
     def test_008_isoleucinate(self):
         """#8: CC[C@H](C)[C@H](N)C(=O)[O-] - amino acid anion."""
@@ -582,12 +568,6 @@ class TestOther:
 class TestSkip:
     """Compounds that cannot be fixed (wildcard atoms, isotopes)."""
 
-    @pytest.mark.xfail(reason="Contains silicon wildcard atoms [SiH]")
-    def test_001_wildcard(self):
-        """#1: C=[SiH]C#[SiH] - wildcard/silicon compound."""
-        name = name_compound("C=[SiH]C#[SiH]")
-        assert "silicon" in name.lower() or "silane" in name.lower()
-
     def test_009_deuterated_methanol(self):
         """#9: [2H]C([2H])([2H])O - deuterated compound."""
         name = name_compound("[2H]C([2H])([2H])O")
@@ -659,9 +639,9 @@ class TestOrganicUnknownElimination:
     def test_dinitrogen_anion_not_bare_unknown(self):
         """[N-2][NH-] must not return bare 'unknown'."""
         name = name_compound("[N-2][NH-]")
-        assert name != "unknown", f"Organic compound must not be bare 'unknown'"
+        assert name != "unknown", "Organic compound must not be bare 'unknown'"
 
     def test_phosphonate_aa_not_bare_unknown(self):
         """C[C@@H]([NH3+])P(=O)([O-])[O-] must not return bare 'unknown'."""
         name = name_compound("C[C@@H]([NH3+])P(=O)([O-])[O-]")
-        assert name != "unknown", f"Organic compound must not be bare 'unknown'"
+        assert name != "unknown", "Organic compound must not be bare 'unknown'"

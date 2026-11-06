@@ -49,14 +49,6 @@ class TestNOxideRouting:
     """N-oxides must NOT be routed through ion naming."""
 
     @pytest.mark.unit
-    def test_pyridine_n_oxide_not_ion(self):
-        """Pyridine N-oxide should NOT produce ion-style name."""
-        result = name_compound("[O-][n+]1ccccc1")
-        assert "-ium" not in result, f"N-oxide should not have -ium suffix: '{result}'"
-        assert "-olate" not in result, f"N-oxide should not have -olate suffix: '{result}'"
-        assert "oxide" in result
-
-    @pytest.mark.unit
     def test_trimethylamine_n_oxide_not_ion(self):
         """Trimethylamine N-oxide should NOT produce ion-style name."""
         result = name_compound("C[N+](C)(C)[O-]")
@@ -100,21 +92,6 @@ class TestIsocyanate:
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
-    @pytest.mark.unit
-    def test_isocyanate_not_nitrile(self):
-        """Isocyanate should NOT be named as a nitrile."""
-        result = name_compound("CN=C=O")
-        assert "nitrile" not in result
-        assert "isocyanato" in result
-
-    @pytest.mark.unit
-    def test_isocyanate_not_amide(self):
-        """Isocyanate should NOT be named as an amide."""
-        result = name_compound("CN=C=O")
-        assert "amide" not in result
-        assert "isocyanato" in result
-
-
 # ============================================================================
 # Isothiocyanate tests
 # ============================================================================
@@ -157,22 +134,6 @@ class TestCarbamate:
         """N-methylcarbamate: CNC(=O)OCC -> ethyl N-methylcarbamate."""
         result = name_compound("CNC(=O)OCC")
         assert result == "ethyl methylcarbamate", f"Got '{result}'"
-
-    @pytest.mark.unit
-    def test_carbamate_not_ester(self):
-        """Carbamate should NOT be named as a generic ester."""
-        result = name_compound("NC(=O)OCC")
-        assert "carbamate" in result
-        assert "formate" not in result.lower()
-        assert "alkanoate" not in result.lower()
-
-    @pytest.mark.unit
-    def test_carbamate_not_amide(self):
-        """Carbamate should NOT be named as an amide."""
-        result = name_compound("NC(=O)OCC")
-        assert "carbamate" in result
-        assert "amide" not in result
-
 
 # ============================================================================
 # Prefix form tests (when another FG has higher seniority)

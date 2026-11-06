@@ -14,7 +14,6 @@ from orthonym.data.hw_heteroatoms import (
     sort_heteroatoms_by_priority,
 )
 from orthonym.data.hw_stems import (
-    HW_STEMS,
     HETEROATOMS_USE_ANE,
     HETEROATOMS_USE_INANE,
     get_hw_stem,

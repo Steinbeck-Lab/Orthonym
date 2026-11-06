@@ -13,14 +13,11 @@ from rdkit.Chem import inchi
 
 from orthonym.validation.key_blind_hydrogens import hydrogen_atom_count, key_blind_hydrogen_verdict
 from orthonym.validation.radical_identity import radical_identity_verdict
+from tests.support.read_back import key as _key
 
 RDLogger.DisableLog("rdApp.*")
 
 L = "λ"
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 # ---------------------------------------------------------------------------------------------

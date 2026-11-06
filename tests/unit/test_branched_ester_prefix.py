@@ -4,7 +4,6 @@ Ensures that esters with branched acid fragments use the principal chain
 length (not total carbon count) for the acid stem, and include branch
 substituent prefixes in the acyloxy name.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.esters import name_ester_as_prefix

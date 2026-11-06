@@ -27,14 +27,9 @@ emission and the 0-wrong contract, so they MUST run gate-ON.
 import pytest
 from rdkit import Chem
 
-from orthonym import name_compound
 from orthonym.assembly.substituent_enumerator import name_substituent
 from orthonym.rules.phosphorus import carbon_free_phospho_prefix
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-from tests.support.default_tier import (  # noqa: E402
-    declined_pin_row,
-    default_tier_rule_applies,
-)
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -44,35 +39,11 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 # (Lane/l17 fix a performance pass: the one molecule of the set, 'OCCOP(=O)(O)O', is named by the functional class ester, the PIN, '2-hydroxyethyl
 # dihydrogen phosphate' (``test_byte_identity_controls``); the set is empty.)
-DEFAULT_TIER_DECLINES = frozenset()
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+    from orthonym import name_compound
     return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 pytestmark = pytest.mark.opsin_gate

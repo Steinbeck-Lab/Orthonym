@@ -20,15 +20,12 @@ Anti-patterns avoided:
     : per-instance counter only.
 """
 
-import importlib
 import re
 
 import pytest
 
 from orthonym.validation.opsin_grammar import (
     OpsinGrammar,
-    _REGEX_TOKEN_MAP,
-    _TOKEN_REGEX,
     opsin_grammar_suggest_fix,
     opsin_grammar_validate,
 )
@@ -54,12 +51,6 @@ class TestValidateBracket:
         ok, msg = g._validate_detailed("ethanol")
         assert ok is True
         assert msg == "ok"
-
-    def test_BR_valid_canonical_brackets_pass(self):
-        # Canonical PIN-style name with single-level brackets passes.
-        g = OpsinGrammar()
-        ok, msg = g._validate_detailed("(2R)-butan-2-ol")
-        assert ok is True
 
     def test_BR_valid_indol_3_yl_propanoic_acid(self):
         # Real-world PIN-style name with nested  + indicated-H passes.

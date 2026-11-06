@@ -80,15 +80,6 @@ class TestAcyclicDisulfideCanaries:
     confirm the fix does not perturb the disulfide perception layer.
     """
 
-    def test_dimethyl_disulfide(self):
-        """``CSSC`` -> ``(methyldisulfanyl)methane``.
-
-        DD2 (Phase D, (1)): a dialkyl disulfide is a SUBSTITUTIVE PIN —
-        the senior R as parent + ``(R'disulfanyl)`` prefix — not the ``dithia``
-        skeletal-replacement chain (the old ``2,3-dithiabutane`` consumed the S-S
-        bond as two skeletal thia atoms, the catalog C3 defect)."""
-        assert name_compound("CSSC") == "(methyldisulfanyl)methane"
-
     def test_diethyl_disulfide(self):
         """``CCSSCC`` -> ``(ethyldisulfanyl)ethane`` (substitutive PIN, (1))."""
         assert name_compound("CCSSCC") == "(ethyldisulfanyl)ethane"

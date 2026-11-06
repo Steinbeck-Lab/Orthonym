@@ -32,6 +32,7 @@ from orthonym.rules.phosphorus import (
     name_phosphoanhydride_oxy_substituent as name_pa,
 )
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -111,10 +112,6 @@ def test_ring_collector_hook_declines_every_other_o_p_group(smiles):
 
 
 # ---- whole names: independent non-radical read-back ------------------------------------
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
-
 
 def _reads_back_closed_shell(name, smiles):
     """OPSIN WITHOUT ``-r`` (``opsin_parse``) reads ``name`` to the input's full InChIKey."""

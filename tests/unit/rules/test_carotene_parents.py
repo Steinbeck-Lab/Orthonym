@@ -16,7 +16,6 @@ from orthonym.namer import Orthonym
 from orthonym.jvm_budget import jvm_slots
 from orthonym.validation import opsin_roundtrip_check
 from orthonym.data.natural_products import CAROTENE_PARENT_INCHIKEYS
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.

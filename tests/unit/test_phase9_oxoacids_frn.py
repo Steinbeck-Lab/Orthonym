@@ -444,7 +444,6 @@ def test_p67_2_new_element_free_acids_stay_tabled_not_producer():
     """The new-element FREE di-acids must be matched by the _INORGANIC_OXOACIDS
     table (B.1), never routed through the derivative producer (B.2) — the table
     lookup is first in name_inorganic_acid, and the producer runs last."""
-    from orthonym.rules.inorganic_acids import name_polyacid_derivative
     for smi in ("O=[As](O)(O)O[As](=O)(O)O",                         # diarsoric acid
                 "[O]=[Sb]([OH])([OH])[O][Sb](=[O])([OH])[OH]",       # distiboric acid
                 "O=S(=O)(O)S(=O)(=O)O"):                             # dithionic acid

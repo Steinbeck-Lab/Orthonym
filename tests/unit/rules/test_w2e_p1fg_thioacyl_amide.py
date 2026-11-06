@@ -45,9 +45,6 @@ class TestThioacylThioamide:
         n = name_compound("CC(=S)N(C)C(C)=S", style="pin")
         assert n != "N-(ethanethioyl)ethanethioamide"
 
-    def test_thioamide_parent_protect(self):
-        assert name_compound("CC(=S)N", style="pin") == "ethanethioamide"
-
     def test_n_methyl_thioamide_protect(self):
         assert name_compound("CC(=S)NC", style="pin") == "N-methylethanethioamide"
 

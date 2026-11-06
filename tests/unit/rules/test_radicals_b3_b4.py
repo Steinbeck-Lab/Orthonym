@@ -4,20 +4,11 @@ Each name must match exactly and pass a strict OPSIN -r round trip (canonical
 SMILES, radical dots included).
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
-from orthonym.jvm_bridge import opsin_stdout
-from tests.support.jars import jar_or_skip
-
-
-def _strict_rt(name: str, smiles: str) -> bool:
-    jar = jar_or_skip()
-    txt, _ = opsin_stdout(name, allow_radicals=True, jar_path=jar)
-    parsed = Chem.MolFromSmiles((txt or "").strip())
-    return parsed is not None and Chem.MolToSmiles(parsed) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+from tests.support.read_back import same_canonical_smiles
 
 
 def _name(smiles: str, tier: str = "pin") -> dict:
@@ -51,7 +42,7 @@ PIN_ROWS = [
 def test_pin_tier(smiles, expected):
     row = _name(smiles)
     assert row["name"] == expected and row["tier"] != "abstain"
-    assert _strict_rt(expected, smiles)
+    assert same_canonical_smiles(expected, smiles)
 
 
 @pytest.mark.opsin_gate
@@ -66,4 +57,4 @@ def test_ring_n_radical_keeps_indicated_hydrogen():
     for tier in ("pin", "best-effort"):
         row = _name("[N]1C=CC=C1", tier)
         assert row["name"] == "1H-pyrrol-1-yl" and row["tier"] != "abstain"
-    assert _strict_rt("1H-pyrrol-1-yl", "[N]1C=CC=C1")
+    assert same_canonical_smiles("1H-pyrrol-1-yl", "[N]1C=CC=C1")

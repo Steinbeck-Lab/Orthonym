@@ -5,7 +5,6 @@ merged dictionary size, and register_retained_name behavior.
 """
 
 import pytest
-from rdkit import Chem
 
 
 @pytest.mark.unit

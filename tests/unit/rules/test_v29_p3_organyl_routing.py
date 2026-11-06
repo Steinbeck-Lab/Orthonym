@@ -66,8 +66,6 @@ def ungated_namer(monkeypatch):
     producer output. This is the mode in which the sibling ``heptyl`` bugs were
     shipping wrong structures before Phase B.
     """
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
     return Orthonym()
 
 
@@ -317,10 +315,8 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
     that returns the string, and the routed guard must be CALLED and must return
     the ``benzyl`` token that ends up in the name.
     """
-    import orthonym.namer as _namer
     import orthonym.rules.phosphorus as ph
     import orthonym.rules.substituent_purity as sp
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
 
     guard_calls = []
     real_guard = sp.organyl_prefix_name
@@ -1589,8 +1585,6 @@ def test_the_deprecated_narrow_namer_no_longer_exists():
     assert sp.__all__ == ["organyl_prefix_name", "is_simple_unbranched_organyl"]
     # the predicate's backing walker must still be there
     assert callable(sp._narrow_walk_name)
-
-
 
 
 @pytest.mark.parametrize("smiles,expected", [

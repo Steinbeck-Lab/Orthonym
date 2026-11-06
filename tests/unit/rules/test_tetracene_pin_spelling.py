@@ -11,7 +11,6 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
 pytestmark = pytest.mark.opsin_gate
@@ -19,11 +18,6 @@ pytestmark = pytest.mark.opsin_gate
 TETRACENE_DIONE = "O=C1c2ccccc2C(=O)c2cc3ccccc3cc12"
 D825 = "CC1(O)CC(O)Cc2cc3c(c(O)c21)C(=O)c1c(O)cc(O)cc1C3(C)C"
 D1491 = ("COc1cc2c(c(O)c1Cl)C(=O)c1c(cc3c(Cl)c(O)cc(-c4c(C)c(Cl)c(O)c(Cl)c4O)c3c1O)C2(C)C")
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 def _same(smi, name):

@@ -180,12 +180,9 @@ class TestThiazolidineDistinction:
         mol = Chem.MolFromSmiles('C1CSCN1')
         # Find S and N atoms
         s_atom = None
-        n_atom = None
         for atom in mol.GetAtoms():
             if atom.GetSymbol() == 'S':
                 s_atom = atom
-            elif atom.GetSymbol() == 'N':
-                n_atom = atom
 
         # Check if S and N are neighbors
         s_neighbors = [n.GetSymbol() for n in s_atom.GetNeighbors()]
@@ -197,12 +194,9 @@ class TestThiazolidineDistinction:
         mol = Chem.MolFromSmiles('C1CNSC1')
         # Find S and N atoms
         s_atom = None
-        n_atom = None
         for atom in mol.GetAtoms():
             if atom.GetSymbol() == 'S':
                 s_atom = atom
-            elif atom.GetSymbol() == 'N':
-                n_atom = atom
 
         # Check if S and N are neighbors
         s_neighbors = [n.GetSymbol() for n in s_atom.GetNeighbors()]

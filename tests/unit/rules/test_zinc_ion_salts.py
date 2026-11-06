@@ -31,15 +31,12 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.rules.metal_labels import is_carbanion_salt_of_group_3_12_metal
 from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 EM_DASH = "—"
 PREDICATE = is_carbanion_salt_of_group_3_12_metal
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 def _panel_smiles(panel_id, drawing):
@@ -63,11 +60,11 @@ SALTS = [
 def test_organic_ion_salts_of_zinc_are_composed_as_salts(smiles):
     """The adduct form 'ligand' + em dash + 'zinc(2+) (2/1)' is the form of a metal the table does
     not admit; zinc is admitted, so its salts of organic anions are named as salts, as sodium's are."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"].startswith("zinc ") and EM_DASH not in row["name"], row["name"]
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False
     assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"                # the default tier is not widened
+    assert tier_row(smiles, "pin")["tier"] == "abstain"                # the default tier is not widened
 
 
 def test_other_metals_keep_the_adduct_form_of_organic_ion_salts():
@@ -80,18 +77,18 @@ def test_other_metals_keep_the_adduct_form_of_organic_ion_salts():
         ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Tc+2]", f"4-oxopent-2-en-2-olate{EM_DASH}technetium(2+) (2/1)"),
         ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pu+2]", f"4-oxopent-2-en-2-olate{EM_DASH}plutonium(2+) (2/1)"),
     ]:
-        row = _row(smiles, "best-effort")
+        row = tier_row(smiles, "best-effort")
         assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), smiles
-        assert _row(smiles, "pin")["limit_code"] == "UNSUPPORTED_ELEMENT"
+        assert tier_row(smiles, "pin")["limit_code"] == "UNSUPPORTED_ELEMENT"
 
 
 def test_platinum_carbanide_stays_out():
     """The platinum(II)-carbanide hazard of -1b: a true metal with a carbanion is never
     rendered as a salt of a best-effort-named organic ion unless the table admits it. The names are
     those of the start commit."""
-    best = _row("[Pt+2].[CH3-].[CH3-]", "best-effort")
+    best = tier_row("[Pt+2].[CH3-].[CH3-]", "best-effort")
     assert (best["name"], best["tier"], best["is_pin"]) == ("platinum(II) methanide", "systematic_verified", False)
-    default = _row("[Pt+2].[CH3-].[CH3-]", "pin")
+    default = tier_row("[Pt+2].[CH3-].[CH3-]", "pin")
     assert default["tier"] == "abstain" and default["limit_code"] == "NO_VERIFIED_PIN"
 
 
@@ -111,7 +108,7 @@ def test_a_wrong_salt_name_is_rejected_by_the_gate(monkeypatch):
 
     monkeypatch.setattr(salts, "name_salt", near_miss)
     for tier in ("pin", "best-effort"):
-        row = _row(stearate, tier)
+        row = tier_row(stearate, tier)
         assert row["name"] != "zinc dioctanoate", tier
         if row["tier"] != "abstain":
             assert_full_rt(row["name"], stearate)
@@ -163,11 +160,11 @@ def test_carbanion_salts_of_zinc_are_not_pin_labelled(smiles, name):
     """ notes no PIN for organometallic compounds of the transition elements (the heading of
      puts Group 12 with them); calls the salt name 'a compositional name'. The wider
     tiers keep the name, the default tier declines it. The name is unchanged."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False
     assert_full_rt(row["name"], smiles)
-    default = _row(smiles, "pin")
+    default = tier_row(smiles, "pin")
     assert default["tier"] == "abstain" and default["limit_code"] == "NO_VERIFIED_PIN"
     assert Orthonym(style="pin").name(smiles, on_failure="label") == "unknown organic compound"
 
@@ -184,11 +181,11 @@ def test_carbon_free_and_acid_salts_keep_their_label():
         ("CC[O-].CC[O-].[Zn+2]", "zinc diethoxide"),
     ]:
         for tier in ("pin", "best-effort"):
-            row = _row(smiles, tier)
+            row = tier_row(smiles, tier)
             assert (row["name"], row["tier"], row["is_pin"]) == (name, "pin_verified", True), (smiles, tier)
     for smiles, name in [("[Cl-].[Cl-].[Zn+2]", "zinc dichloride"), ("[Na+].[Cl-]", "sodium chloride")]:
-        assert (_row(smiles, "pin")["tier"], _row(smiles, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
-        row = _row(smiles, "best-effort")
+        assert (tier_row(smiles, "pin")["tier"], tier_row(smiles, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
+        row = tier_row(smiles, "best-effort")
         assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), smiles
 
 
@@ -196,7 +193,7 @@ def test_cyanide_is_not_a_carbanion_for_the_label():
     """Cyanide is the anion of hydrogen cyanide, an acid: 'zinc dicyanide' stays in the first class
     of section 3 (ASSUMED, listed in ZN11)."""
     for tier in ("pin", "best-effort"):
-        row = _row("[C-]#N.[C-]#N.[Zn+2]", tier)
+        row = tier_row("[C-]#N.[C-]#N.[Zn+2]", tier)
         assert (row["name"], row["tier"], row["is_pin"]) == ("zinc dicyanide", "pin_verified", True), tier
 
 
@@ -214,7 +211,7 @@ def test_carbanion_salts_of_other_group_3_12_metals_follow_the_rule(smiles, name
     """The rule is the user's wording: every Group 3-12 metal alike. The name is the one of the
     start commit (pin_verified there); only the label moves."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         if tier == "pin":
             assert row["tier"] == "abstain" and row["limit_code"] == "NO_VERIFIED_PIN", smiles
         else:
@@ -268,7 +265,7 @@ def test_ionic_ocenes_and_cymantrene_keep_their_start_label_and_tier(smiles, def
     bond and a carbanion carbon with no positive neighbour, so only clauses (e) and (f) of the
     predicate keep it out of the rule."""
     for tier, expected in (("pin", default), ("best-effort", best_effort)):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert (row["name"], row["tier"], row["is_pin"]) == expected, (smiles, tier)
 
 

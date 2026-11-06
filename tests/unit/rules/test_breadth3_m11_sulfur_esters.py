@@ -20,7 +20,6 @@ Every name is read back by a FRESH OPSIN call that does not go through the engin
 (tests.support.rt_assert._independent_parse) and compared by full InChIKey.
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from tests.support.rt_assert import _independent_parse
@@ -28,6 +27,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import key_or_empty as _key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -50,11 +50,6 @@ def _declined_pin_row(smiles):
 
 
 pytestmark = [pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return Chem.MolToInchiKey(mol) if mol is not None else ""
 
 
 def _assert_named(smiles, expected, tiers):

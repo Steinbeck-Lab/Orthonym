@@ -74,7 +74,6 @@ CONTROLS = [
     ("[C-]#[C-]", "ethynediide"),
     ("CCCC=[N-]", "butaniminide"),
     ("[NH-]CC[NH-]", "ethane-1,2-bis(aminide)"),
-    ("CCCC=[N-]", "butaniminide"),
     ("CCC(=O)[S-]", "propanethioate"),
 ]
 

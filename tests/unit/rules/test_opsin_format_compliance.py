@@ -8,7 +8,6 @@ Covers:
 These are root-cause fixes at the point of name generation, not postprocessors.
 """
 
-import os
 import subprocess
 
 import pytest
@@ -833,7 +832,7 @@ def test_canary_known_defect_takes_its_pin(smiles, target):
 
 
 class TestCanaryRegression:
-    """The 703 canary compounds (tests/support/canary_rt75_data.py) name as recorded.
+    """The 654 canary compounds (tests/support/canary_rt75_data.py) name as recorded.
 
     Re-baselined in Task 11 (2026-09-26): verified rows assert their fixture name; the rows in
     CANARY_KNOWN_DEFECTS assert their current (defective) name, so any change is flagged --
@@ -853,12 +852,13 @@ class TestCanaryRegression:
 
         failures = []
         for smi, expected_name in CANARY_COMPOUNDS:
+            known = CANARY_KNOWN_DEFECTS.get(smi)
+            if known is not None and known[1] == "DK-NOTEXACT":
+                continue  # not RT-exact: see test_canary_not_rt_exact_rows_*
             try:
                 result = name_compound(smi)
-                if smi in CANARY_KNOWN_DEFECTS:
-                    recorded, cls, calls = CANARY_KNOWN_DEFECTS[smi]
-                    if cls == "DK-NOTEXACT":
-                        continue  # not RT-exact: see test_canary_not_rt_exact_rows_*
+                if known is not None:
+                    recorded, cls, calls = known
                     if result != recorded:
                         failures.append(
                             f"KNOWN-DEFECT ROW CHANGED ({cls}, canary call(s) {calls}): {smi}: "

@@ -14,7 +14,6 @@ import pytest
 
 from orthonym import Orthonym
 from orthonym.assembly.candidate_pool import (
-    CandidatePool,
     get_current_pool,
     clear_pool,
     push_pool,

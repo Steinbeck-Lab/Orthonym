@@ -12,11 +12,10 @@ The best-effort tier keeps an RT-exact name for each of them (systematic path).
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from orthonym.rules.natural_products import name_natural_product
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 DROPPED = [
     # (input, the candidate the producer used to return)
@@ -50,6 +49,6 @@ def test_a_candidate_that_carries_every_decoration_is_kept(smiles, name):
 @pytest.mark.parametrize("smiles,dropped", DROPPED)
 def test_best_effort_still_names_them_rt_exact(smiles, dropped):
     with jvm_slots(1, purpose="np-decorations"):
-        row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        row = tier_row(smiles, "best-effort")
     assert row["tier"] != "abstain", row
     assert name_is_rt_exact(row["name"], smiles), row["name"]

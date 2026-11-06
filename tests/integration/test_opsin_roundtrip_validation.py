@@ -9,21 +9,12 @@ import subprocess
 import pytest
 from rdkit import Chem
 from rdkit.Chem.inchi import MolToInchi
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 def _java_available():
     """Check if Java is available."""
-    try:
-        subprocess.run(["java", "-version"], capture_output=True, timeout=10)
-        return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def _opsin_jar_path():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
+    return java_on_path()
 
 
 def _opsin_name_to_smiles(name: str, jar_path: str) -> str:
@@ -59,7 +50,7 @@ class TestOpsinJarAvailable:
 
     def test_opsin_jar_available(self):
         """OPSIN CLI jar exists in project root or opsin/ directory."""
-        jar = _opsin_jar_path()
+        jar = jar_or_none()
         if jar is None:
             pytest.skip("OPSIN CLI jar not found")
         assert os.path.getsize(jar) > 1_000_000, "Jar file too small"
@@ -95,7 +86,7 @@ class TestOpsinRoundtripSample:
 
     def test_opsin_roundtrip_sample(self):
         """At least 15/20 sample names round-trip through OPSIN CLI."""
-        jar = _opsin_jar_path()
+        jar = jar_or_none()
         if jar is None:
             pytest.skip("OPSIN CLI jar not found")
         if not _java_available():

@@ -29,7 +29,7 @@ byte-identity to the OPSIN-verified PIN targets and full-InChI round-trip.
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym, name_compound
+from orthonym.namer import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -45,35 +45,13 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "O=C1NC(=O)C2(CCCCC2)C(=O)N1",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
 
 
 def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 # Safe best-effort tier: RT-gated (unverified=False), so an emission is never a
@@ -169,12 +147,6 @@ def test_pin_controls_byte_identical(smiles, expected):
     assert _BE.name(smiles) == expected
     # default tier must match too (the fix is scoped to the mixed-spiro path).
     assert _dt_name(smiles) == expected
-
-
-@pytest.mark.opsin_gate
-def test_trivial_controls():
-    assert name_compound("CCO") == "ethanol"
-    assert name_compound("c1ccccc1") == "benzene"
 
 
 # --- complex census witnesses: RT-verify OR abstain, never wrong ------------

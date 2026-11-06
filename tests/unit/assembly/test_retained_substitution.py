@@ -13,7 +13,6 @@ Pins the reviews-iter-1 fixes: #2 (conditional fragment_legacy reset via
 Source: 168-internal notes /////; internal notes #2 + #3.
 """
 
-import dataclasses
 
 import pytest
 from rdkit import Chem
@@ -22,7 +21,6 @@ from orthonym.assembly.name_tree import NameTreeNode, is_coarse_node
 from orthonym.assembly.retained_substitution import (
     apply_triviality_controller,
     _build_rewrite,
-    _recompute_multiplicative_prefix,
     _replace_preserving_or_resetting_legacy,
     _type_1_check,
     _type_2a_check,
@@ -322,5 +320,3 @@ class TestFragmentLegacyConditionalReset:
         new_child = NameTreeNode(parent_stem="chloro")  # a DIFFERENT child
         out = _replace_preserving_or_resetting_legacy(node, (new_child,))
         assert out.fragment_legacy is None  # child changed => reset (serializer-short-circuit closed)
-
-

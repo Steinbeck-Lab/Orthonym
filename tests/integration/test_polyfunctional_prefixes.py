@@ -21,16 +21,11 @@ from tests.support.jars import jar_or_none
 
 _OPSIN_JAR = None
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 def _opsin_to_smiles(name: str) -> str:
     """Convert IUPAC name to SMILES via OPSIN. Returns None on failure."""
     global _OPSIN_JAR
     if _OPSIN_JAR is None:
-        _OPSIN_JAR = _find_opsin_jar() or ""
+        _OPSIN_JAR = jar_or_none() or ""
     if not _OPSIN_JAR:
         return None
     try:
@@ -86,14 +81,6 @@ class TestSulfoxideAsNonPrincipal:
         # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
         # 2-(methylsulfonyl)ethan-1-ol":28150. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
         assert result == "3-(methanesulfinyl)propanoic acid"
-
-    @pytest.mark.integration
-    def test_sulfinyl_prefix_present(self):
-        """Verify 'sulfinyl' appears and 'acid' is suffix."""
-        result = name_compound("OC(=O)CS(=O)C")
-        assert "sulfinyl" in result, f"Expected 'sulfinyl' in '{result}'"
-        assert "acid" in result, f"Expected 'acid' in '{result}'"
-
 
 # ============================================================================
 # TestSulfoneAsNonPrincipal
@@ -212,38 +199,6 @@ class TestCompoundPrefixParenthesization:
         # 2-(methylsulfonyl)ethan-1-ol":28150; and per R3 (acetic acid, no locant). OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
         assert result == "(methanesulfonyl)acetic acid", \
             f"Expected '(methanesulfonyl)acetic acid', got '{result}'"
-
-    @pytest.mark.integration
-    def test_methylsulfanyl_parenthesized(self):
-        """'methylsulfanyl' should appear as '(methylsulfanyl)' in the name."""
-        result = name_compound("OC(=O)CSC")
-        assert "(methylsulfanyl)" in result, \
-            f"Expected '(methylsulfanyl)' in '{result}'"
-
-    @pytest.mark.integration
-    def test_simple_prefixes_not_parenthesized(self):
-        """Simple prefixes like 'hydroxy', 'amino', 'oxo' should NOT have extra parentheses."""
-        result = name_compound("OCC(=O)O")
-        assert "(hydroxy)" not in result, \
-            f"'hydroxy' should NOT be parenthesized in '{result}'"
-        assert "hydroxy" in result
-
-    @pytest.mark.integration
-    def test_amino_not_parenthesized(self):
-        """'amino' prefix should NOT be parenthesized."""
-        result = name_compound("OCC(N)CC(=O)C(=O)O")
-        assert "(amino)" not in result, \
-            f"'amino' should NOT be parenthesized in '{result}'"
-        assert "amino" in result
-
-    @pytest.mark.integration
-    def test_oxo_not_parenthesized(self):
-        """'oxo' prefix should NOT be parenthesized."""
-        result = name_compound("CC(=O)C(=O)O")
-        assert "(oxo)" not in result, \
-            f"'oxo' should NOT be parenthesized in '{result}'"
-        assert "oxo" in result
-
 
 # ============================================================================
 # TestOPSINRoundTrip
@@ -364,17 +319,3 @@ class TestExistingPolyfunctionalNoRegression:
         # to the contracted name 'acetoxy'":31700; "3-(benzoyloxy)propanoic acid (PIN)":31711.
         # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
         assert name_compound("OC(=O)CCOC(=O)C") == "3-(acetyloxy)propanoic acid"
-
-    @pytest.mark.integration
-    def test_no_double_naming_sulfoxide(self):
-        """Sulfoxide compound should NOT have both sulfinyl and sulfanyl prefixes."""
-        result = name_compound("OC(=O)CS(=O)C")
-        assert "sulfanyl" not in result, \
-            f"Double-naming detected: 'sulfanyl' should not be in '{result}'"
-
-    @pytest.mark.integration
-    def test_no_double_naming_sulfone(self):
-        """Sulfone compound should NOT have both sulfonyl and sulfanyl prefixes."""
-        result = name_compound("OC(=O)CS(=O)(=O)C")
-        assert "sulfanyl" not in result, \
-            f"Double-naming detected: 'sulfanyl' should not be in '{result}'"

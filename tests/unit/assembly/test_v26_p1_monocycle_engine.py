@@ -29,7 +29,6 @@ fixture (skipped when Java/OPSIN are unavailable), so they exercise real
 production semantics. The direct-engine cases are deterministic and
 gate-independent.
 """
-import glob
 import shutil
 import subprocess
 
@@ -40,7 +39,7 @@ import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym
 from orthonym.assembly.general_engine import name_general_monocycle
 from orthonym.validation.e1_certificate import verify_certificate
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 from tests.support.rt_assert import assert_full_rt
 
 
@@ -136,18 +135,13 @@ UNCHANGED_CASES = [
 # --------------------------------------------------------------------------
 # Fixtures / helpers
 # --------------------------------------------------------------------------
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 @pytest.fixture
 def production_gate(monkeypatch):
     """Re-enable the production OPSIN validity gate for the full-namer
     tests (the suite autouse-fixture disables it). Skips when Java/OPSIN are
     unavailable -- without the gate, the default path ships unverified names
     and the reproduce/emit semantics do not hold."""
-    if not shutil.which("java") or _find_opsin_jar() is None:
+    if not java_on_path() or jar_or_none() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
     monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", False)
 
@@ -158,7 +152,7 @@ def opsin_roundtrip():
     Java/OPSIN are unavailable. The conftest ``opsin_to_smiles`` fixture is not
     used: it passes the name as a positional CLI arg, which OPSIN reads as a
     file path (always None)."""
-    jar = _find_opsin_jar()
+    jar = jar_or_none()
     if not shutil.which("java") or jar is None:
         pytest.skip("OPSIN/Java not available")
     names = [name for _s, name in ALL_RT_CASES]

@@ -1,8 +1,6 @@
 """Item 12a (task 3): one book spelling that no round trip confirms does not take the ring
 names of the molecule with it. The retry rungs keep the single-ring names,
 the Blue Book;,:23682) before they give up the book forms."""
-import sys
-from pathlib import Path
 
 import pytest
 from rdkit import Chem
@@ -10,11 +8,11 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.assembly.book_prefixes import mechanical_forms, ring_forms_enabled
 from orthonym.assembly.universal_substituent import name_universal_substitutive
-from orthonym.cli import _emit_tier_flags
 from orthonym.rules.monocycle_forms import monocycle_form
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "eval"))
-from tests.support.rt_assert import name_is_rt_exact  # noqa: E402
+from tests.support.rt_assert import name_is_rt_exact
+from tests.support.pin_tiers import tier_row as _row
+from tests.support.pin_tiers import tier_row
 
 
 def _ring_and_fv(smiles):
@@ -30,10 +28,6 @@ def _form(smiles, **kw):
     branches = [a for a in ring for nb in mol.GetAtomWithIdx(a).GetNeighbors()
                 if nb.GetIdx() not in ring and nb.GetIdx() != 1]
     return fv, monocycle_form(mol, ring, fv, branches, **kw)
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 # --- one book spelling that no round trip confirms must not take the ring names with it ---
@@ -97,7 +91,7 @@ def test_the_keep_rings_retry_runs_only_when_a_ring_and_another_spelling_were_gi
                 bp.note_book_form(k)
         return _abstain_row()
     monkeypatch.setattr(Orthonym, "_name_tiered_scoped", spy)
-    Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("CCO")
+    tier_row("CCO", "best-effort")
     assert calls == expected
 
 
@@ -115,7 +109,7 @@ def test_the_retry_never_returns_a_lower_label_than_the_run_it_replaces(monkeypa
             bp.note_book_form("other")
         return {"name": "x" if tier != "abstain" else "unknown organic compound", "tier": tier}
     monkeypatch.setattr(Orthonym, "_name_tiered_scoped", spy)
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("CCO")
+    row = tier_row("CCO", "best-effort")
     assert row["tier"] == "systematic_verified"
 
 

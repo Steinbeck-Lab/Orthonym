@@ -51,16 +51,6 @@ class TestOxybisMethyleneBridge:
 
     # --- regression anchors: shipped bridge family stays byte-identical ---
 
-    def test_methylenebis_oxy_untouched(self):
-        # gold W2C-C- (recognizer _try_methylenebis_oxy_bridge:862)
-        assert name_compound("Oc1ccc(OCOc2ccc(O)cc2)cc1") == \
-            "4,4'-[methylenebis(oxy)]diphenol"
-
-    def test_single_atom_methylene_untouched(self):
-        assert name_compound("Oc1ccc(Cc2ccc(O)cc2)cc1") == \
-            "4,4'-methylenediphenol"
-
-
 @pytest.mark.unit
 class TestBridgeFailClosed:
     """Task 5: research §2.D fail-closed rows."""

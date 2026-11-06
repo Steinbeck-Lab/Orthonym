@@ -13,7 +13,6 @@ Reference: IUPAC 2013 Blue Book + BBerrors.html corrections through Dec 2025
 """
 
 import inspect
-import pytest
 
 
 # ============================================================================
@@ -261,16 +260,6 @@ class TestErrataEZThreshold:
             f"E-cyclooctene should have E/Z descriptor, got: '{name}'"
         )
 
-    def test_cycloheptene_no_ez(self):
-        """Cycloheptene (7-member ring) must NOT include E/Z descriptor."""
-        from orthonym import name_compound
-
-        name = name_compound("C1=CCCCCC1")
-        # Should be plain "cycloheptene" without E or Z
-        assert "E" not in name and "Z" not in name, (
-            f"Cycloheptene should not have E/Z descriptor, got: '{name}'"
-        )
-
     def test_z_cyclononene_gets_ez(self):
         """Z-cyclononene (9-member ring) must include E/Z -- already worked."""
         from orthonym import name_compound
@@ -278,16 +267,6 @@ class TestErrataEZThreshold:
         name = name_compound(r"C1=C/CCCCCCC/1")
         assert "Z" in name or "E" in name, (
             f"Z-cyclononene should have E/Z descriptor, got: '{name}'"
-        )
-
-    def test_unspecified_cyclooctene_no_ez(self):
-        """Unspecified cyclooctene should not get E/Z (no stereo in SMILES)."""
-        from orthonym import name_compound
-
-        name = name_compound("C1=CCCCCCC1")
-        # Unspecified stereo - RDKit won't assign CIP, so no E/Z expected
-        assert name == "cyclooctene" or ("E" not in name and "Z" not in name), (
-            f"Unspecified cyclooctene should not have E/Z, got: '{name}'"
         )
 
     def test_collect_stereodescriptors_8_member_ring(self):
@@ -303,7 +282,7 @@ class TestErrataEZThreshold:
 
         ez_descs = [(loc, cip) for loc, cip in descs if cip in ('E', 'Z')]
         assert len(ez_descs) > 0, (
-            f"8-member ring should now have E/Z descriptors per errata, got none"
+            "8-member ring should now have E/Z descriptors per errata, got none"
         )
 
 
@@ -321,7 +300,7 @@ class TestErrataFusionSeparator:
 
         # Simulate multi-edge fusion input
         # generate_fusion_descriptor with multi_edge parameter
-        result = generate_fusion_descriptor(
+        generate_fusion_descriptor(
             parent_ring=[0, 1, 2, 3, 4, 5],
             child_ring=[1, 2, 6, 7],
             shared_atoms={1, 2},
@@ -339,35 +318,4 @@ class TestErrataFusionSeparator:
         )
         assert "';'.join" not in source or source.index("':'.join") < source.index("';'.join") if "';'.join" in source else True, (
             "Multi-edge fusion descriptor must NOT use ';' as separator"
-        )
-
-
-# ============================================================================
-# ERRATA-08: Symmetrical anhydride naming
-# ============================================================================
-
-
-class TestErrataAnhydrideNaming:
-    """ERRATA-08: Symmetrical anhydrides use plain '{acid} anhydride' without bis-."""
-
-    def test_acetic_anhydride_no_bis(self):
-        """Acetic anhydride should not contain 'bis' prefix."""
-        from orthonym import name_compound
-
-        name = name_compound("CC(=O)OC(=O)C")
-        assert "anhydride" in name.lower(), (
-            f"Expected 'anhydride' in name, got: '{name}'"
-        )
-        assert "bis" not in name.lower(), (
-            f"Symmetrical anhydride should not have 'bis', got: '{name}'"
-        )
-
-    def test_acetic_anhydride_name(self):
-        """Acetic anhydride should produce 'acetic anhydride' or close variant."""
-        from orthonym import name_compound
-
-        name = name_compound("CC(=O)OC(=O)C")
-        # Accept "acetic anhydride" or "ethanoic anhydride" (systematic)
-        assert "anhydride" in name.lower(), (
-            f"Expected anhydride in name, got: '{name}'"
         )

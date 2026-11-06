@@ -12,7 +12,6 @@ IUPAC Rule: The ring oxygen is position 1, the carbonyl carbon is position 2.
 The parent heterocyclic name has its terminal 'e' elided before '-one'.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.lactones import (

@@ -54,21 +54,7 @@ the three witnesses, confirmed via producer tracing):
 import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
-from orthonym import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    o = opsin_parse(name)
-    if not o:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
+from tests.support.read_back import same_key
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +80,7 @@ def test_saccharopine_names_and_full_rt(namer):
     smi = "N[C@@H](CCCCN[C@@H](CCC(=O)O)C(=O)O)C(=O)O"
     name = namer.name(smi)
     assert name == "(2S)-2-{[(5S)-5-amino-5-carboxypentyl]amino}pentanedioic acid", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -106,7 +92,7 @@ def test_saccharopine_integration_via_name_tiered(namer):
     result = namer.name_tiered(smi)
     name = result.get("name")
     assert name == "(2S)-2-{[(5S)-5-amino-5-carboxypentyl]amino}pentanedioic acid", result
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +113,7 @@ def test_anandamide_analogue_names_and_full_rt(namer):
     smi = "CCCCCCCC/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCCO"
     name = namer.name(smi)
     assert name == "(5Z,8Z,11Z)-N-(2-hydroxyethyl)icosa-5,8,11-trienamide", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
     assert inchi.MolToInchiKey(Chem.MolFromSmiles(smi)).startswith("YKGQBEGMUSSPFY")
 
 
@@ -137,7 +123,7 @@ def test_anandamide_analogue_integration_via_name_tiered(namer):
     result = namer.name_tiered(smi)
     name = result.get("name")
     assert name == "(5Z,8Z,11Z)-N-(2-hydroxyethyl)icosa-5,8,11-trienamide", result
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 @pytest.mark.opsin_gate
@@ -150,7 +136,7 @@ def test_short_chain_amide_control_unchanged(namer):
     smi = "CCCCC(=O)NCCO"
     name = namer.name(smi)
     assert name == "N-(2-hydroxyethyl)pentanamide", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
     # And through the integration surface too.
     assert namer.name_tiered(smi).get("name") == "N-(2-hydroxyethyl)pentanamide"
 
@@ -187,7 +173,7 @@ def test_168479_names_the_arm_with_its_own_stereo_descriptor(namer, smi, expecte
     from tests.support.rt_assert import name_is_rt_exact
     name = namer.name(smi)
     assert name == expected, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
     assert name_is_rt_exact(name, smi), name
     assert inchi.MolToInchiKey(Chem.MolFromSmiles(smi)).startswith("IVZLDVMNNVAWDA")
 
@@ -203,7 +189,7 @@ def test_aldehyde_branch_duplicate_oxo_fixed_same_shape_no_stereo(namer):
     smi = "OC(=O)C(CC=O)CCC"
     name = namer.name(smi)
     assert name == "2-(2-oxoethyl)pentanoic acid", name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
     assert namer.name_tiered(smi).get("name") == "2-(2-oxoethyl)pentanoic acid"
 
 
@@ -218,7 +204,7 @@ def test_aldehyde_branch_duplicate_oxo_fixed_same_shape_no_stereo(namer):
 def test_ordinary_polyfunctional_acids_unchanged(namer, smi, expected):
     name = namer.name(smi)
     assert name == expected, name
-    assert _full_rt(smi, name), name
+    assert same_key(smi, name), name
 
 
 def test_bugb_guard_contract_untouched():

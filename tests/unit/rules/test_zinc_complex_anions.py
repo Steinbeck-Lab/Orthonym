@@ -25,8 +25,6 @@ standard InChIKey of the input.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
 from orthonym.data.metal_scope import AMMINE, ELEMENT, METAL_SCOPE, MetalScope
 from orthonym.rules import adducts, metal_atoms
@@ -34,14 +32,11 @@ from orthonym.rules.adducts import SINGLE_ATOM_COMPONENT_NAMES
 from orthonym.rules.metal_atoms import ammine_component_names
 from tests.support.metal_baselines import bonded_metal_symbols
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 BONDED_METALS = bonded_metal_symbols()          # lanes B1 and B2
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 def _view(row):
@@ -50,11 +45,11 @@ def _view(row):
 
 def _assert_named_without_a_pin(smiles, name):
     """Best-effort: the name, a verified systematic label, no PIN, read back. Default tier: no name."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert_full_rt(row["name"], smiles)
-    declined = _row(smiles, "pin")
+    declined = tier_row(smiles, "pin")
     assert declined["tier"] == "abstain" and declined["is_pin"] is False, declined
 
 
@@ -86,8 +81,8 @@ def test_an_ammine_of_zinc_is_named_and_read_back(smiles, name):
 
 def test_the_two_drawings_of_the_ammine_have_one_name():
     """Both drawings of D1 share the standard InChIKey; the bonded one is named through the ionic one."""
-    a = _row("[Zn+2].N.N.N.N", "best-effort")
-    b = _row("[NH3+][Zn-2]([NH3+])([NH3+])[NH3+]", "best-effort")
+    a = tier_row("[Zn+2].N.N.N.N", "best-effort")
+    b = tier_row("[NH3+][Zn-2]([NH3+])([NH3+])[NH3+]", "best-effort")
     assert a["name"] == b["name"] and a["tier"] == b["tier"] == "systematic_verified"
 
 
@@ -149,7 +144,7 @@ def test_the_adduct_reads_the_guard_in_the_unverified_call_only():
 
 def test_the_ammine_names_carry_no_pin_label():
     for smiles, _name in AMMINES:
-        row = _row(smiles, "best-effort")
+        row = tier_row(smiles, "best-effort")
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (smiles, row)
 
 
@@ -176,11 +171,11 @@ ZINCATES = [
 def test_a_zincate_is_named_and_read_back(smiles, name):
     """A drawing as written is named through its ionic drawing: the drawing as written is
     named too, and the better name ships), so the label is that of a rewritten drawing."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
 
 
 def test_an_ionic_zincate_takes_the_label_of_a_carbon_free_salt():
@@ -190,8 +185,8 @@ def test_an_ionic_zincate_takes_the_label_of_a_carbon_free_salt():
     names of compounds "that also contain at least one carbon atom in their structure";:2058 "... the label
     'preselected name' is added to appropriate names". The PIN tier declines it; the best-effort tier gives the name."""
     smiles = "[Na+].[Na+].[Cl-].[Cl-].[Cl-].[Cl-].[Zn+2]"
-    assert (_row(smiles, "pin")["tier"], _row(smiles, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
-    row = _row(smiles, "best-effort")
+    assert (tier_row(smiles, "pin")["tier"], tier_row(smiles, "pin")["limit_code"]) == ("abstain", "NO_VERIFIED_PIN")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "disodium zinc tetrachloride", row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert_full_rt("disodium zinc tetrachloride", smiles)
@@ -203,7 +198,7 @@ def test_no_name_of_a_bare_zincate_is_built_by_a_second_producer():
     second producer would change no name. The class has no unnamed row among the fixtures."""
     smiles = "Cl[Zn-2](Cl)(Cl)Cl"
     assert_full_rt("tetrachlorozinc(2-)", smiles)               # a name that exists
-    assert _row(smiles, "best-effort")["name"] == "chloride—zinc(2+) (4/1)"
+    assert tier_row(smiles, "best-effort")["name"] == "chloride—zinc(2+) (4/1)"
 
 
 # ---- the other metals and the other assemblies are not moved (START literals, computed on the start tree)
@@ -312,16 +307,16 @@ ADMITTED_B2_AMMINES = {
 @pytest.mark.parametrize("smiles", sorted(ADMITTED_B2_AMMINES))
 def test_the_ammines_of_the_metals_of_lane_b2_are_named(smiles):
     default_view, best_effort_view = ADMITTED_B2_AMMINES[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
     assert_full_rt(best_effort_view[0], smiles)
 
 
 @pytest.mark.parametrize("smiles", sorted(ADMITTED_PLATINUM_AMMINES))
 def test_the_platinum_ammines_are_named(smiles):
     default_view, best_effort_view = ADMITTED_PLATINUM_AMMINES[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
     assert_full_rt(best_effort_view[0], smiles)
 
 
@@ -330,8 +325,8 @@ def test_other_metals_are_not_moved(smiles):
     """The ammines of the metals that the table does not admit, and the assemblies without a metal, keep
     their rows of the start commit."""
     default_view, best_effort_view = START_ROWS[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
 
 
 def test_the_other_metals_panel_holds_no_row_the_guard_could_reach():

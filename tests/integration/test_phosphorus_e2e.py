@@ -1,6 +1,5 @@
 """End-to-end tests for phosphorus compound naming."""
 
-import pytest
 from orthonym import name_compound
 
 
@@ -137,12 +136,6 @@ class TestPhosphanylPrefix:
         (PIN)', the Blue Book."""
         result = name_compound("Cc1ccc(P(c2ccccc2)c3ccccc3)cc1")
         assert result == "(4-methylphenyl)di(phenyl)phosphane"
-
-    def test_phenyl_not_counted_as_alkyl(self):
-        """Phenyl groups on P should not be counted as hexyl (regression)."""
-        result = name_compound("c1ccc(P(c2ccccc2)c3ccccc3)cc1")
-        assert "hexyl" not in result
-
 
 class TestBisPhosphanyl:
     """E2E tests for bis/tris multiplied phosphanyl groups ."""

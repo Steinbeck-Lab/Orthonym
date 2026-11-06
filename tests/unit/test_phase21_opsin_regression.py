@@ -11,7 +11,6 @@ All tests require Java and the OPSIN JAR to be available.
 Tests are marked @pytest.mark.roundtrip and skipped if Java is absent.
 """
 
-import os
 import shutil
 import subprocess
 

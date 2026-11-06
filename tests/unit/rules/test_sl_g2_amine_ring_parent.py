@@ -18,7 +18,6 @@ full InChIKey (OPSIN 2.9.0); the old spelling is the mutation each NOT_PIN row r
 """
 import pytest
 
-import orthonym.rules.parent_selection as _parent_selection
 from tests.support.pin_tiers import (
     assert_not_pin_labelled,
     assert_pin_at_both_tiers,
@@ -30,13 +29,8 @@ from tests.support.rt_assert import name_is_rt_exact
 pytestmark = pytest.mark.opsin_gate
 
 # The count of the groups a parent holds reads the nitrogen, not the one carbon the perceived match kept
-# (lane M, SL-M1: ``parent_selection.bridging_group_reaches``). Without it the parent of a row whose
-# chain carbon ties the ring carbon still follows the order of the input; the rows below that need the ring
-# as parent run when that change is in the tree. The chain name never ships as a PIN either way
+# (lane M, SL-M1: ``parent_selection.bridging_group_reaches``). The chain name never ships as a PIN
 # (NOT_PIN_ROWS: the spelling check of.
-needs_nitrogen_count = pytest.mark.skipif(
-    not hasattr(_parent_selection, "bridging_group_reaches"),
-    reason="needs the nitrogen count of the parent selection (SL-M1)")
 
 PIN_ROWS = [
     # the headline row of the brief: a ring on the nitrogen, a substituted chain
@@ -83,7 +77,6 @@ NOT_PIN_ROWS = [
 ]
 
 
-@needs_nitrogen_count
 @pytest.mark.parametrize("smiles,pin", PIN_ROWS)
 def test_pin(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
@@ -94,7 +87,6 @@ def test_the_chain_parent_is_not_pin_labelled(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
 
 
-@needs_nitrogen_count
 def test_a_chain_that_holds_a_ring_of_its_own_is_named_at_the_default_tier_only_when_the_namer_can():
     """The default tier names the substituent '1-phenylethyl' ('N-(1-phenylethyl)aniline'); its
     namer does not build '1-phenylbutan-2-yl', so that row declines there and the breadth tier names it

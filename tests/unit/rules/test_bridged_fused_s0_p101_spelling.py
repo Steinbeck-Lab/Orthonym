@@ -22,7 +22,6 @@ import pytest
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import name_is_rt_exact
 
 pytestmark = pytest.mark.usefixtures("np_producer_only")

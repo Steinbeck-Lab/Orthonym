@@ -14,7 +14,6 @@ so class 17 (hydroxy + thiol/selenol/tellurol) is SENIOR to class 18 (hydroperox
 The 169.7 swap moved hydroperoxide BELOW the chalcogen-ols; these tests now assert
 the corrected order.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.seniority import SENIORITY_ORDER, get_principal_group

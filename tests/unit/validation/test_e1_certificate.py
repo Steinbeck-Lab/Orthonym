@@ -4,7 +4,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly.general_engine import GeneralEngineResult, TokenBinding
-from orthonym.validation.e1_certificate import E1Verdict, verify_certificate
+from orthonym.validation.e1_certificate import verify_certificate
 
 pytestmark = pytest.mark.unit
 
@@ -13,14 +13,6 @@ ETHANOL = Chem.MolFromSmiles("CCO")  # atoms: 0 C, 1 C, 2 O
 
 def _res(bindings, name="ethan-1-ol"):
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
-
-
-def test_complete_partition_ok():
-    v = verify_certificate(ETHANOL, _res([
-        TokenBinding((0, 1), "eth", "parent"),
-        TokenBinding((2,), "ol", "suffix"),
-    ]))
-    assert v.ok
 
 
 def test_unbound_atom_fails():

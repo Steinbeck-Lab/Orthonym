@@ -13,7 +13,6 @@ guard.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym.jvm_budget import jvm_slots
 from orthonym.jvm_bridge import opsin_stdout
 from orthonym.rules.ions import name_anion

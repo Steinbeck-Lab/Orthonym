@@ -8,7 +8,6 @@ Tests that the stereo-already-present regex correctly detects:
 a phase Plan 02 Task 1: Stereo detection regex tests.
 """
 
-import pytest
 import re
 
 # We test the regex pattern directly rather than the full function,

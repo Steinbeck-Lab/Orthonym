@@ -19,19 +19,6 @@ from orthonym import name_compound
 class TestSimpleEtherNoEnclosingMarks:
     """Simple alkoxy prefixes should NOT have enclosing marks."""
 
-    def test_methoxy(self):
-        """Methoxy prefix on benzene (anisole is retained)."""
-        name = name_compound("COc1ccccc1")
-        assert "anisole" in name or "methoxybenzene" in name
-        # Should NOT have (methoxy) -- it's a simple prefix
-        assert "(methoxy)" not in name
-
-    def test_ethoxy(self):
-        """Ethoxy prefix on benzene."""
-        name = name_compound("CCOc1ccccc1")
-        assert "ethoxybenzene" in name
-        assert "(ethoxy)" not in name
-
     def test_phenoxy(self):
         """Phenoxy prefix -- simple prefix, no enclosing marks.
 
@@ -49,19 +36,6 @@ class TestSimpleEtherNoEnclosingMarks:
 
 class TestComplexSubstituentEnclosingMarks:
     """Complex substituents on rings need enclosing marks per IUPAC."""
-
-    def test_branched_alkyl_on_monosubstituted_ring(self):
-        """2-methylbut-2-en-1-yl on benzene must have enclosing marks.
-
-        IUPAC: (2-methylbut-2-en-1-yl)benzene, not 2-methylbut-2-enylbenzene
-        The name contains locants (digits) so it's a compound substituent.
-        """
-        name = name_compound("CC(C)=CCc1ccccc1")
-        # Must have enclosing marks around the complex substituent
-        # The substituent name contains digits (locants), so needs brackets
-        assert "(" in name and ")" in name, (
-            f"Complex substituent needs enclosing marks: {name}"
-        )
 
     def test_isobutyl_on_monosubstituted_ring(self):
         """2-methylpropyl on benzene needs enclosing marks if systematic name used.

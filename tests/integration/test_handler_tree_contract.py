@@ -58,11 +58,6 @@ STRUCTURED_IDS = [p["handler_id"] for p in STRUCTURED_PROBES]
 COARSE_HANDLERS: set = set()
 
 
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
 # A probe runs under the default PIN style unless the fixture gives it ``"style"``. The
 # functional-class handlers ('isocyanate', 'isothiocyanate') decline under PIN style for
 # every attachment since leads item 43c ISOCYANATES, the Blue Book,:26001:

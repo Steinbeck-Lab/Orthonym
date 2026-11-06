@@ -6,7 +6,6 @@ Source: internal notes "Hook Point #3: _try_algorithmic_fusion_name Gate Audit "
 """
 import logging
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.fused_rings import _try_algorithmic_fusion_name

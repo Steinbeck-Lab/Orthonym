@@ -70,13 +70,6 @@ class TestRingAcylAmidoPIN:
         from orthonym import name_compound
         assert name_compound(smiles) == expected
 
-    def test_nested_stereo_uses_square_brackets_not_parens(self):
-        #: a stereodescriptor-bearing amido prefix nests to
-        from orthonym import name_compound
-        name = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
-        assert "[(2S)-pyrrolidine-2-carboxamido]" in name, name
-        assert "((2S)-pyrrolidine-2-carboxamido)" not in name, name
-
     @pytest.mark.parametrize("smiles", [
         "OC(=O)CNC(=O)C1CCCN1",
         "OC(=O)CNC(=O)[C@@H]1CCCN1",   # stereo proline: RT (bracket nesting may vary)

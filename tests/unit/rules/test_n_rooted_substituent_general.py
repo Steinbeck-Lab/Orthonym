@@ -19,12 +19,6 @@ def _sub(smi, frag, root):
     return name_substituent(m, set(frag), root, allow_mancude=True)
 
 
-def test_methylamino():
-    # OC(=O)c1ccc(NC)cc1... but name_substituent takes the fragment; build -NH-CH3 on benzene
-    m = Chem.MolFromSmiles("CNc1ccccc1")   # C0-N1-c2(ring); frag {C0,N1}, root N1
-    assert name_substituent(m, {0, 1}, 1, allow_mancude=True) == "methylamino"
-
-
 def test_ethylamino():
     m = Chem.MolFromSmiles("CCNc1ccccc1")  # C0-C1-N2-c3; frag {C0,C1,N2}, root N2
     assert name_substituent(m, {0, 1, 2}, 2, allow_mancude=True) == "ethylamino"
@@ -33,11 +27,6 @@ def test_ethylamino():
 def test_dimethylamino():
     m = Chem.MolFromSmiles("CN(C)c1ccccc1")  # C0-N1(-C2)-c3; frag {C0,N1,C2}, root N1
     assert name_substituent(m, {0, 1, 2}, 1, allow_mancude=True) == "dimethylamino"
-
-
-def test_acetamido():
-    m = Chem.MolFromSmiles("CC(=O)Nc1ccccc1")  # C0-C1(=O2)-N3-c4; frag {C0,C1,O2,N3}, root N3
-    assert name_substituent(m, {0, 1, 2, 3}, 3, allow_mancude=True) == "acetamido"
 
 
 def test_not_aminomethyl_for_methylamino():

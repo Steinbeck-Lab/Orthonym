@@ -67,11 +67,6 @@ def _canon(smiles: str) -> str:
     return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
 
 
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
 class TestChalconeRetainedKey:
     """The data row itself."""
 

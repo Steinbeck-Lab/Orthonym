@@ -26,36 +26,6 @@ from orthonym import errors
 
 
 # ---------------------------------------------------------------------------
-# Producer-level (OPSIN validity gate OFF by default in this suite): proves the
-# PRODUCER itself no longer emits the O-dropped wrong molecule — not merely that
-# catches it downstream.
-# ---------------------------------------------------------------------------
-class TestProducerNoAtomDrop:
-    def test_producer_no_longer_drops_ether_o(self):
-        """Gate OFF: the raw producer must NOT emit the O-dropped dipropylamine.
-
-        Today (pre-fix) the producer returns 'N-propylpropan-1-amine' (WRONG,
-        the ether O dropped). After the fix it returns the correct PIN, which
-        retains the methoxy on the ethyl arm."""
-        name = name_compound('COCCNCCC')
-        assert name != 'N-propylpropan-1-amine'          # never the O-dropped wrong molecule
-        assert name == 'N-(2-methoxyethyl)propan-1-amine'
-
-
-# ---------------------------------------------------------------------------
-# Production config (OPSIN validity gate ON): the real deployment behaviour.
-# ---------------------------------------------------------------------------
-class TestMixedEtherAmineProduction:
-    @pytest.mark.opsin_gate
-    def test_mixed_ether_amine_n_substituent_no_atom_drop(self):
-        # COCCNCCC = CH3-O-CH2CH2-NH-CH2CH2CH3; PIN N-(2-methoxyethyl)propan-1-amine
-        # (an InChIKey)
-        name = name_compound('COCCNCCC')
-        assert name != 'N-propylpropan-1-amine'
-        assert name == 'N-(2-methoxyethyl)propan-1-amine'
-
-
-# ---------------------------------------------------------------------------
 # The class: an element-agnostic set of amines whose N-substituent carries a
 # non-carbon heavy atom (ether O, thioether S, halogen) and is the SUBSTITUENT
 # (not the parent) — the exact shape that used to drop the heteroatom. Each

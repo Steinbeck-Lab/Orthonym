@@ -17,10 +17,7 @@ molecule split does not fire there; the ester claim is asserted at the
 decomposition + fragment-RT level (the split FORM round-trips), and the
 thioester carries the hard whole-molecule RT anchor.
 """
-import os
 import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -63,17 +60,12 @@ def opsin_roundtrips(name, ref_smiles):
     """True iff OPSIN parses `name` to a structure connectivity-matching `ref_smiles`."""
     if not name or _JAR is None:
         return False
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
-        f.write(name + "\n")
-        path = f.name
     try:
-        out = subprocess.run(["java", "-jar", _JAR, "-osmi", path],
+        out = subprocess.run(["java", "-jar", _JAR, "-osmi"], input=name + "\n",
                              capture_output=True, text=True, timeout=20)
         parsed = out.stdout.strip()
     except Exception:
         return False
-    finally:
-        os.unlink(path)
     ref, got = _conn(ref_smiles), _conn(parsed)
     return ref is not None and ref == got
 

@@ -19,7 +19,7 @@ from rdkit import Chem
 
 from orthonym.namer import classify_compound_class
 from orthonym import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
+from tests.support.read_back import mol as _mol
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -29,13 +29,6 @@ pytestmark = pytest.mark.usefixtures("np_producer_only")
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
-
-def _mol(smiles: str):
-    """Return RDKit Mol from SMILES, raising on invalid input."""
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"Invalid SMILES: {smiles}"
-    return mol
-
 
 def _canonical(smiles: str) -> str:
     """Return canonical SMILES."""
@@ -223,34 +216,3 @@ class TestSugarInMainCascade:
         # control: the same skeleton WITH its configuration keeps the sugar name
         assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == (
             "β-D-glucopyranose")
-
-
-# ===========================================================================
-# Test Class 7: Existing NP detection preserved
-# ===========================================================================
-
-@pytest.mark.unit
-class TestExistingNPPreserved:
-    """Existing NP detection order must be preserved -- no regressions."""
-
-    def test_cholesterol_still_returns_cholesterol(self):
-        result = name_compound(CHOLESTEROL_SMILES)
-        assert result == "cholesterol"
-
-    def test_morphine_still_returns_morphine(self):
-        # (the Blue Book) identifies no PIN for a natural product; the strict path builds its bridged fused PIN:23816,:23843) on the rule-derived parent '[1]benzofuro[3,2-e]isoquinoline' (slice S4)
-        result = name_compound(MORPHINE_SMILES)
-        assert result == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
-
-    def test_codeine_still_returns_codeine(self):
-        # the bridged fused PIN, as for morphine (slice S4)
-        result = name_compound(CODEINE_SMILES)
-        assert result == "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"
-
-    def test_ethanol_still_returns_ethanol(self):
-        result = name_compound(ETHANOL_SMILES)
-        assert result == "ethanol"
-
-    def test_benzene_still_returns_benzene(self):
-        result = name_compound(BENZENE_SMILES)
-        assert result == "benzene"

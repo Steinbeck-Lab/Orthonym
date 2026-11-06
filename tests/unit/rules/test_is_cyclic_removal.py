@@ -13,7 +13,7 @@ import os
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym, MolecularFeatures
+from orthonym.namer import Orthonym
 
 
 @pytest.fixture

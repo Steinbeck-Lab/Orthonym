@@ -9,7 +9,6 @@ Tests verify and requirements.
 """
 
 import pytest
-from collections import defaultdict
 from rdkit import Chem
 
 from orthonym.data.fused_heterocycles import match_fused_heterocycle_core

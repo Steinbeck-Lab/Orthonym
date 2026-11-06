@@ -18,14 +18,10 @@ greater number of rings",:19461), so a naphthalenecarboxylic acid is senior to a
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -40,7 +36,7 @@ def _row(smiles, tier):
 ])
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_the_diester_of_a_ring_acid_has_the_functional_class_multiplicative_name(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -50,8 +46,8 @@ def test_the_benzodioxole_diester_is_named_by_the_class_name_and_is_no_pin_by_th
     """The lateral name that was labelled a PIN is gone: the functional class name of the producer ships at the wider tier
     (a ring system of several rings is named below the PIN there), and the PIN tier declines."""
     smiles = "O=C(OCCOC(=O)c1ccc2OCOc2c1)c1ccc2OCOc2c1"
-    assert _row(smiles, "pin")["tier"] != "pin_verified"
-    row = _row(smiles, "best-effort")
+    assert tier_row(smiles, "pin")["tier"] != "pin_verified"
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "ethane-1,2-diyl di(2H-1,3-benzodioxole-5-carboxylate)", row
     assert not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -70,7 +66,7 @@ def test_an_ester_cited_as_a_prefix_on_a_polycyclic_parent_is_not_the_name(smile
     the decomposition engine now reads that name as no name at the PIN tier too, and the split names the ester by
     functional class: the senior ester is the naphthalenecarboxylic acid, two rings before one,
     , a name OPSIN reads back."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -90,7 +86,7 @@ def test_the_wider_tier_keeps_the_pin_of_the_senior_ester(tier):
     tier's PIN: the producer of independent esters took the acid with the most carbons for the principal one, and that count
     reaches the atoms of the second ester."""
     smiles = "O=C(c1cc2ccccc2o1)OCc1ccc(C(=O)OC)cc1"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == "[4-(methoxycarbonyl)phenyl]methyl 1-benzofuran-2-carboxylate", row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)

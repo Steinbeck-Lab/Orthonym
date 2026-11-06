@@ -7,7 +7,6 @@ import pytest
 from rdkit import Chem
 from orthonym import name_compound
 from orthonym.decomposition.engine import (
-    try_decompose,
     _name_fragment_with_fallback,
     _get_max_decomp_levels,
 )

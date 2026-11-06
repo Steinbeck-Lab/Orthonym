@@ -9,7 +9,6 @@ stereo-only / different-constitution / unparseable).
 import pytest
 
 from orthonym.metrics.coverage_metrics import (
-    Matcher,
     RowClassification,
     aggregate,
     classify_row,

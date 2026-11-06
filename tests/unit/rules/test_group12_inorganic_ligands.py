@@ -32,14 +32,11 @@ from orthonym.rules import metal_labels
 from orthonym.rules.organometallics import _assemble_bonded_metal_name, assemble_organometallic_name
 from tests.support.metal_baselines import baseline_path, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 P_69_2_1 = "P-69.2.1"   # coordination nomenclature is the primary method for Groups 3-12: no PIN
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 def _assembled(smiles):
@@ -51,11 +48,11 @@ def _assembled(smiles):
 
 def _assert_named_without_a_pin(smiles, name, tiers=("best-effort", "valid")):
     for tier in tiers:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, (tier, row)
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
         assert_full_rt(row["name"], smiles)
-    declined = _row(smiles, "pin")                    # the default tier declines it, with a reason
+    declined = tier_row(smiles, "pin")                    # the default tier declines it, with a reason
     assert declined["tier"] == "abstain" and declined["limit_code"] == "NO_VERIFIED_PIN", declined
     assert declined["is_pin"] is False
 
@@ -85,12 +82,12 @@ def test_the_lithium_zincate_is_named_and_read_back():
     namer for a compound with a metal-carbon bond that no organometallic handler won, so the adduct
     route gives the name; it reads back to the full key."""
     smiles = "[Li+].C[Zn-](C)C"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "trimethylzinc(1-)—lithium(1+) (1/1)"
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False
     assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"                 # no name at the default tier
-    sodium = _row("[Na+].C[Zn-](C)C", "best-effort")
+    assert tier_row(smiles, "pin")["tier"] == "abstain"                 # no name at the default tier
+    sodium = tier_row("[Na+].C[Zn-](C)C", "best-effort")
     assert sodium["name"] == "trimethylzinc(1-)—sodium(1+) (1/1)" and sodium["tier"] == "systematic_verified"
     assert_full_rt(sodium["name"], "[Na+].C[Zn-](C)C")
 
@@ -215,7 +212,7 @@ def test_no_name_that_drops_a_hydrogen_or_a_bond_order_is_shipped():
     from the metal only)."""
     for smiles, name in MULTIPLY_BONDED:
         for tier in ("best-effort", "valid"):
-            row = _row(smiles, tier)
+            row = tier_row(smiles, tier)
             assert row["name"] == name and row["tier"] == "systematic_verified", (smiles, tier, row)
             assert row["name"] not in ("methylzinc", "aminozinc", "zinc"), (smiles, tier, row)
             assert name_is_rt_exact(row["name"], smiles), (smiles, tier, row)
@@ -258,7 +255,7 @@ def test_the_predicate_is_what_lowers_the_label(monkeypatch):
     import orthonym.namer as namer
     monkeypatch.setattr(metal_labels, "is_bonded_metal_name_without_pin", lambda smiles, name: False)
     monkeypatch.setattr(namer, "_is_carbon_free_compound", lambda smiles: False)
-    row = _row("O=[Zn]", "valid")
+    row = tier_row("O=[Zn]", "valid")
     assert row["name"] == "oxozinc" and row["tier"] == "pin_verified", row
 
 
@@ -342,6 +339,6 @@ def test_the_names_that_zinc_had_are_the_names_it_has():
     for smiles, name in (("CC[Zn]CC", "diethylzinc"), ("CC[Zn]Cl", "ethylzinc chloride"),
                          ("O[Zn]O", "zinc dihydroxide"),           # the rewrite to the ionic drawing still wins the tie
                          ("N#C[Zn]C#N", "dicyanozinc")):
-        row = _row(smiles, "best-effort")
+        row = tier_row(smiles, "best-effort")
         assert row["name"] == name and row["tier"] == "systematic_verified" and row["is_pin"] is False, row
         assert_full_rt(name, smiles)

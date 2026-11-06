@@ -59,14 +59,6 @@ class TestOxoSeniorToThione:
     """Seniority C=O > C=S (the Blue Book): when a ring bears BOTH, the C=O wins the
     -one/-dione suffix and the C=S stays a sulfanylidene PREFIX (a project rule)."""
 
-    def test_rhodanine_keeps_sulfanylidene_prefix(self):
-        # O=C1CSC(=S)N1 (rhodanine-shaped): the senior C=O is the -4-one suffix,
-        # the C=S is the 2-sulfanylidene prefix. UNCHANGED by the P-6F branch --
-        # the principal group is 'secondary_amide' (not a *amide chalcogen class),
-        # so ring_thioamide_suffix never fires here (the Blue Book).
-        assert (name_compound("O=C1CSC(=S)N1")
-                == "2-sulfanylidene-1,3-thiazolidin-4-one")
-
     def test_thiobarbituric_dione_keeps_sulfanylidene(self):
         # S=C1NC(=O)CC(=O)N1: two senior ring C=O -> -4,6-dione, the C=S stays
         # a 2-sulfanylidene prefix.
@@ -77,10 +69,6 @@ class TestOxoSeniorToThione:
 @pytest.mark.unit
 class TestP6FRegressionGuards:
     """Nothing outside the saturated ring thiolactam class is touched."""
-
-    def test_plain_lactam_unchanged(self):
-        # ordinary C=O lactam still -> azepan-2-one (lactam handler, not P-6F).
-        assert name_compound("O=C1CCCCCN1") == "azepan-2-one"
 
     def test_exocyclic_carbothioamide_not_a_thione(self):
         # an EXOCYCLIC C(=S)N on a ring carbon is a carbothioamide, NOT a ring

@@ -5,7 +5,6 @@ full-InChIKey OPSIN round trip (tests/support/rt_assert.py, not the engine's gat
 """
 import pytest
 
-from orthonym.namer import Orthonym
 from tests.support.rt_assert import name_is_rt_exact
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -24,35 +23,13 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CC[Zn]CC",
     "C[Mg]Br",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
 
 
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 # ---------------------------------------------------------------------------

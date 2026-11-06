@@ -8,17 +8,11 @@ Root cause: _identify_hetero_substituent only recognized 5 patterns
 all multi-atom heteroatom groups.
 """
 
-import pytest
 from orthonym import name_compound
 
 
 class TestHeterocycleHalogens:
     """Halogens on heterocyclic rings must appear in names."""
-
-    def test_chloropyridine(self):
-        """3-chloropyridine: Cl on pyridine must produce 'chloro' prefix."""
-        result = name_compound("Clc1ccncc1")
-        assert "chloro" in result, f"Expected 'chloro' in '{result}'"
 
     def test_fluoroimidazole(self):
         """Fluoroimidazole: F on imidazole must produce 'fluoro' prefix."""

@@ -21,14 +21,10 @@ from rdkit import Chem
 
 from orthonym.assembly.chain_amide_prefixes import consume_acylated_nitrogen
 from orthonym.assembly.n_acyl_amido import in_peptide, parent_sulfonamide_is_senior
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # (smiles, the PIN) -- every name read back whole by OPSIN to the input's full InChIKey, at both tiers
@@ -66,7 +62,7 @@ _TARGETS = [
 @pytest.mark.parametrize("smiles,name", _TARGETS)
 def test_an_acylated_nitrogen_is_the_amido_prefix_on_any_attachment(smiles, name, tier):
     """ (the Blue Book), method (1) 'generates preferred IUPAC names'."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -87,7 +83,7 @@ _UNCHANGED = [
 
 @pytest.mark.parametrize("smiles,name", _UNCHANGED)
 def test_the_neighbours_of_the_class_keep_their_names(smiles, name):
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -96,7 +92,7 @@ def test_a_sulfonamide_senior_to_the_group_is_not_cited_as_its_prefix():
     """ "Maximum number of substituent groups cited as prefixes" (the Blue Book): two sulfonamides tie, so
     the group is no prefix of the other, and the PIN tier names neither as one."""
     smiles = "CS(=O)(=O)N(C)Cc1ccc(cc1)S(N)(=O)=O"
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["tier"] != "pin_verified", row
     assert "sulfonamido" not in (row["name"] or "").replace("benzene-1-sulfonamide", ""), row
 
@@ -108,7 +104,7 @@ def test_a_peptide_stays_out_of_the_pin_tier():
     of a dipeptide is a PIN of the project,:54247)."""
     smiles = "C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O"
     assert in_peptide(Chem.MolFromSmiles(smiles))
-    assert _row(smiles, "pin")["tier"] != "pin_verified"
+    assert tier_row(smiles, "pin")["tier"] != "pin_verified"
 
 
 def test_a_group_behind_a_heteroatom_of_the_chain_keeps_the_name_it_had():
@@ -117,7 +113,7 @@ def test_a_group_behind_a_heteroatom_of_the_chain_keeps_the_name_it_had():
     smiles = "CC(=O)N(C)CC(C)(C)C(=O)OCC(CN(CCN(CC(=O)O)CC(=O)O)CC(=O)O)O"
     name = ("[{2-[bis(carboxymethyl)amino]ethyl}(3-{[2,2-dimethyl-3-(N-methylacetamido)propanoyl]oxy}-2-"
             "hydroxypropyl)amino]acetic acid")
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 

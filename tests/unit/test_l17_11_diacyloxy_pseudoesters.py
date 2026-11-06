@@ -29,14 +29,10 @@ engine's 'lateral' name, '1-{[(acetyloxy)di(butyl)stannyl]oxy}-1-oxoethane'.
 """
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 def _tin_diacylate(carbons):
@@ -108,7 +104,7 @@ _CASES = [
 @pytest.mark.parametrize("smiles,name,pin", _CASES)
 def test_the_hub_group_is_named_as_one_ester(smiles, name, pin):
     """The best-effort name is the one of and OPSIN 2.9.0 reads it back to the full InChIKey of the input."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
@@ -117,8 +113,8 @@ def test_the_hub_group_is_named_as_one_ester(smiles, name, pin):
 def test_the_label_of_the_name(smiles, name, pin):
     """The PIN tier gives the name as the PIN where the book prints the PIN of this class (Si, Ge, Sn, Pb, a plain
     anion), and no name where it does not: Al, Ga, In, Tl; a substituted or multi-ring anion)."""
-    wide = _row(smiles, "best-effort")
-    narrow = _row(smiles, "pin")
+    wide = tier_row(smiles, "best-effort")
+    narrow = tier_row(smiles, "pin")
     if pin:
         assert wide["is_pin"] and wide["tier"] == "pin_verified", wide
         assert narrow["name"] == name and narrow["is_pin"], narrow
@@ -135,14 +131,14 @@ def test_the_name_does_not_depend_on_the_atom_order():
         "O=C(C)O[Sn](OC(C)=O)(CCCC)CCCC",
         "CCCC[Sn](OC(C)=O)(CCCC)OC(C)=O",
     ]
-    names = {_row(s, "best-effort")["name"] for s in drawings}
+    names = {tier_row(s, "best-effort")["name"] for s in drawings}
     assert names == {"dibutylstannanediyl diacetate"}, names
 
 
 # what the change must leave as it was
 def test_one_acyloxy_group_keeps_the_monoester_name():
     """'tributylstannyl acetate' is the name of one group and keeps the PIN label it had."""
-    row = _row("CCCC[Sn](CCCC)(CCCC)OC(C)=O", "best-effort")
+    row = tier_row("CCCC[Sn](CCCC)(CCCC)OC(C)=O", "best-effort")
     assert row["name"] == "tributylstannyl acetate" and row["is_pin"], row
 
 
@@ -156,7 +152,7 @@ def test_one_acyloxy_group_keeps_the_monoester_name():
 ])
 def test_a_shape_outside_the_class_is_not_named_as_a_hub_group(smiles):
     """The producer declines (the molecule keeps the name it had) and no name it ships is a wrong molecule."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert not (row["name"] or "").startswith(("dimethylsilanediyl", "dimethylstannanediyl", "butylstannanetriyl")), row
     # no multivalent group of the class is cited at all, whatever its hub
     assert not any(word in (row["name"] or "") for word in ("diyl ", "triyl ", "tetrayl ")), row
@@ -169,7 +165,7 @@ def test_a_shape_outside_the_class_is_not_named_as_a_hub_group(smiles):
     ("CC(=O)OCC(OC(C)=O)COC(C)=O", "propane-1,2,3-triyl triacetate"),
 ])
 def test_the_carbon_polyol_esters_keep_their_pins(smiles, name):
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["name"] == name and row["is_pin"], row
 
 
@@ -177,7 +173,7 @@ def test_the_book_stannanediyl_diester_of_a_dibasic_acid_is_untouched():
     """ (:38202): 'dimethyl dibutylstannanediyl dibutanedioate' is a polyester of two alcohols and two acid
     units; this producer names one acid and one group and leaves it as it was."""
     smiles = "CCCC[Sn](CCCC)(OC(=O)CCC(=O)OC)OC(=O)CCC(=O)OC"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and "diacetate" not in row["name"], row
     assert_full_rt(row["name"], smiles)
 
@@ -192,7 +188,7 @@ def test_the_book_stannanediyl_diester_of_a_dibasic_acid_is_untouched():
     ("CCCC[Sn](CCCC)(OC(=O)[14CH3])OC(=O)[14CH3]", "dibutylstannanediyl di[(2-14C)acetate]"),
 ])
 def test_a_label_on_every_anion_is_cited_once_inside_the_multiplier(smiles, name):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
@@ -211,7 +207,7 @@ def test_a_label_on_one_of_identical_anions_keeps_a_name(smiles):
     method (1), 'ethane-1,2-diyl 1-acetate 2-propanoate'), a form OPSIN 2.9.0 does not read, so it cannot be checked.
     The decorator names the groups as acyloxy prefixes instead (method (2), "acceptable in general nomenclature"):
     a name, below the PIN, that reads back to the labelled molecule. Best-effort never loses a name."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and row["tier"] != "abstain" and not row["is_pin"], row
     assert any(token in row["name"] for token in ("13C", "14C", "2H")), row
     assert_full_rt(row["name"], smiles)
@@ -225,7 +221,7 @@ def test_a_label_on_one_of_identical_anions_keeps_a_name(smiles):
 ])
 def test_the_carbon_polyol_ester_spells_its_multiplied_anion_alike(smiles, name):
     """The carbon polyol esters and the hub groups join the multiplier to the anion by one primitive."""
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["name"] == name and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
 
@@ -243,8 +239,8 @@ def test_the_carbon_polyol_ester_of_a_ring_acid_is_the_functional_class_name(smi
     the unsubstituted anion with its locant enclosed (e)). The acyl namer has no word for these acids, and the
     producer used to decline, leaving the substitutive '2-[(pyridine-4-carbonyl)oxy]ethyl pyridine-4-carboxylate'
     under the PIN label: the book's PIN is the multiplicative name, and the acid is read as the hub groups' is."""
-    wide = _row(smiles, "best-effort")
-    narrow = _row(smiles, "pin")
+    wide = tier_row(smiles, "best-effort")
+    narrow = tier_row(smiles, "pin")
     assert wide["name"] == name and wide["is_pin"] and wide["tier"] == "pin_verified", wide
     assert narrow["name"] == name and narrow["is_pin"], narrow
     assert_full_rt(wide["name"], smiles)
@@ -256,8 +252,8 @@ def test_the_carbon_polyol_ester_of_a_ring_acid_is_the_functional_class_name(smi
     ("O=C(OCCCCOC(=O)c1cc2ccccc2[nH]1)c1cc2ccccc2[nH]1", "butane-1,4-diyl di(1H-indole-2-carboxylate)"),
 ])
 def test_a_ring_system_acid_of_a_carbon_polyol_ester_is_named_below_the_pin(smiles, name):
-    wide = _row(smiles, "best-effort")
-    narrow = _row(smiles, "pin")
+    wide = tier_row(smiles, "best-effort")
+    narrow = tier_row(smiles, "pin")
     assert wide["name"] == name and not wide["is_pin"] and wide["tier"] != "pin_verified", wide
     assert narrow["tier"] == "abstain" and not narrow["is_pin"], narrow
     assert_full_rt(wide["name"], smiles)
@@ -267,6 +263,6 @@ def test_two_unlike_ring_acids_are_not_one_multiplied_anion():
     """The acids differ, so no multiplied anion is built: the molecule keeps the name of the producers of unlike anions
      method (2)), below the PIN."""
     smiles = "O=C(OCCOC(=O)c1ccncc1)c1ccccc1"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and "di(" not in row["name"] and not row["is_pin"], row
     assert_full_rt(row["name"], smiles)

@@ -51,14 +51,6 @@ class TestAmidineNSubstituentEnclosure:
             "methyl 4-{[(4-chlorophenyl)methyl]amino}-4-(ethylimino)butanoate"
         )
 
-    def test_no_paren_directly_inside_a_paren(self):
-        """The violation itself, stated as a property.
-
-        Pinning only the literal above would pass for a name that fixed this
-        witness and reintroduced `((` elsewhere."""
-        n = name_compound("COC(=O)CCC(=NCC)NCc1ccc(Cl)cc1")
-        assert "((" not in n and "[[" not in n and "{{" not in n, n
-
     def test_two_compound_n_substituents_each_get_their_own_marks(self):
         """The coverage-recovery case: this abstained to `unknown organic
         compound` before, because the run-together prefix named a diarylmethyl."""

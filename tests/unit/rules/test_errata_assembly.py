@@ -4,7 +4,6 @@ ERRATA-07: Bracket nesting rules expanded per (5 new subsections, Dec 2025)
 ERRATA-10: First substituent no enclosing marks for mononuclear parent hydrides
 """
 
-import pytest
 
 from orthonym.assembly.naming_utils import apply_enclosing_marks, compute_nesting_depth
 from orthonym.rules.phosphorus import _build_substituent_string

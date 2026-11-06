@@ -45,11 +45,6 @@ def _opsin_to_smiles(name):
     return out or None
 
 
-def _ikey(smi):
-    m = Chem.MolFromSmiles(smi)
-    return Chem.MolToInchiKey(m) if m is not None else None
-
-
 def _constitution_key(smi):
     m = Chem.MolFromSmiles(smi)
     if m is None:

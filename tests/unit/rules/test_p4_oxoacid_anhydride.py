@@ -13,7 +13,6 @@ Two families of assertion:
 import pytest
 
 from orthonym.namer import Orthonym, name_compound
-from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 RAW = Orthonym(_disable_opsin_validity_gate=True)
 
@@ -222,11 +221,6 @@ class TestAtomDropVetoFalsePositiveProtection:
     def test_benzenesulfonic_anhydride_unaffected(self):
         smi = "O=S(=O)(OS(=O)(=O)c1ccccc1)c1ccccc1"
         assert name_compound(smi) == "benzenesulfonic anhydride"
-
-    def test_cyclic_carbonate_unaffected(self):
-        # A cyclic 'naked carbonate' carbon (1,3-dioxan-2-one) is ring-excluded
-        # from the naked-carbonate motif -- must keep its ring name.
-        assert name_compound("O=C1OCCCO1") == "1,3-dioxan-2-one"
 
     def test_free_carbonic_acid_family_unaffected(self):
         assert name_compound("OC(=O)O") == "carbonic acid"

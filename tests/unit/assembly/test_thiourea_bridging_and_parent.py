@@ -59,12 +59,7 @@ InChIKey identical to the input's before being asserted here.
 import pytest
 from rdkit import Chem
 
-import orthonym.namer as _namer
 from orthonym import Orthonym
-from tests.support.default_tier import (  # noqa: E402
-    declined_pin_row,
-    default_tier_rule_applies,
-)
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -72,36 +67,7 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset()   # PB lane R: the 1,1-disubstituted cyclohexyl row left (pin_verified)
 #... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 R3_SMILES = "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C"
@@ -111,11 +77,8 @@ R3_SMILES = "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C"
 def namer():
     # Judge the GENERATOR, not the gate: with the validity gate on,
     # merely suppresses the wrong name instead of preventing its construction.
-    # The flag is put back when the module ends, so a later module is not named
-    # with the gate off.
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(_namer, "_DISABLE_VALIDITY_GATE", True)
-        yield Orthonym(style="pin")
+    #
+    return Orthonym(style="pin")   # the suite runs every test without the opsin_gate marker with the gate off
 
 
 def _name(nm, smiles):

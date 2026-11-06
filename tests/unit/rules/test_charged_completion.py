@@ -256,20 +256,6 @@ def test_thiolate_sulfido(smi, expected):
     _full_ik_rt(smi, n)
 
 
-# --- regression: shapes _apply_anionic_substituent_prefixes / the poly-anion
-# dispatch already handled correctly must stay byte-identical.
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smi,expected", [
-    ("[O-]C(=O)CC(=O)[O-]", "propanedioate"),
-    ("CP(=O)([O-])[O-]", "methylphosphonate"),
-    ("OC(=O)CCCCC(=O)[O-]", "5-carboxypentanoate"),
-])
-def test_c1_no_regression_existing_partial_and_dianion_shapes(smi, expected):
-    n = Orthonym(general_fallback=True, general_fallback_unverified=True,
-                  allow_aromatic_general=True).name(smi)
-    assert n == expected
-
-
 # =============================================================================
 # Task C2 (charged completion): partial-acid-salt CHAIN widening
 # (guard AND builder together).

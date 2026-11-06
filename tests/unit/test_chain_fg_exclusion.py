@@ -26,7 +26,6 @@ Ref: IUPAC 2013 (amide amino+oxo, chain end),
  (cyano-prefix exclusion).
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.perception.chains import find_principal_chain

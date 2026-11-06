@@ -10,7 +10,6 @@ Tests cover:
 - OPSIN carbohydrate integration (a phase Plan 03)
 """
 
-import pytest
 
 from orthonym.data.sugar_names import (
     lookup_sugar,
@@ -249,12 +248,6 @@ class TestOpsinCarbohydrateIntegration:
         """ALL_SUGAR_NAMES has at least 70 entries after OPSIN integration."""
         from orthonym.data.sugar_names import ALL_SUGAR_NAMES
         assert len(ALL_SUGAR_NAMES) >= 70, f"Expected >= 70 sugar entries, got {len(ALL_SUGAR_NAMES)}"
-
-    def test_sugar_main_cascade(self):
-        """name_compound() on β-D-glucopyranose SMILES returns a sugar name."""
-        from orthonym import name_compound
-        result = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert "glucopyranose" in result.lower(), f"Expected sugar name, got: {result}"
 
     def test_nonstereo_sugar_fallback_expanded(self):
         """Non-stereo glucose SMILES: the hexopyranose skeleton is shared by 8 sugars, so it

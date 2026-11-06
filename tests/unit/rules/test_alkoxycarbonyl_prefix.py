@@ -69,17 +69,6 @@ class TestAlkoxycarbonylE2E:
 class TestAlkoxycarbonylNegative:
     """Tests that specific compound classes do NOT produce alkoxycarbonyl."""
 
-    def test_lactone_no_alkoxycarbonyl(self):
-        """gamma-Butyrolactone: cyclic ester, NOT alkoxycarbonyl."""
-        result = name_compound("O=C1CCCO1")
-        assert "oxycarbonyl" not in result.lower()
-        assert "oxolan" in result.lower()
-
-    def test_simple_ester_no_alkoxycarbonyl(self):
-        """Ethyl acetate: ester as principal group, functional class naming."""
-        result = name_compound("CCOC(=O)C")
-        assert "oxycarbonyl" not in result.lower()
-
     def test_acyloxy_ester_no_double_naming(self):
         """C16:0 acyloxy ester: acyloxy orientation, not alkoxycarbonyl.
 

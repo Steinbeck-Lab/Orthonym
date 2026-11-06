@@ -7,7 +7,6 @@ Validates:
 - get_stereodescriptor_string delegates to production pipeline (no idx+1 fallback)
 """
 
-import pytest
 from types import SimpleNamespace
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler

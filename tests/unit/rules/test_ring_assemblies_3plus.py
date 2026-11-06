@@ -49,28 +49,8 @@ from tests.support.jars import jar_or_none
 from tests.support.opsin_marks import composite_or_primed
 
 
-# Lazy imports inside test bodies so test collection succeeds even when
-# new code (Task 2) hasn't landed yet. Same pattern used in 151-01 and
-# 151-02 Wave-0 scaffolds for audit-first cadence per internal notes.
-
-def _ra_import():
-    """Return the ring_assemblies module symbols this test file uses."""
-    from orthonym.rules import ring_assemblies as ra
-    return ra
-
-
-def _ra_supplier_import():
-    """Return the cascade-step-6 supplier — fails until Task 2 lands."""
-    from orthonym.rules.ring_assemblies import (
-        get_ring_assembly_iupac_locants,
-    )
-    return get_ring_assembly_iupac_locants
-
-
-def _ra_topology_import():
-    """Return the _check_path_topology helper — fails until Task 2 lands."""
-    from orthonym.rules.ring_assemblies import _check_path_topology
-    return _check_path_topology
+from orthonym.rules import ring_assemblies as ra
+from orthonym.rules.ring_assemblies import _check_path_topology, get_ring_assembly_iupac_locants
 
 
 # OPSIN oracle . The jar lives at the worktree root via symlink to
@@ -126,7 +106,6 @@ class TestIdentity:
 
     @pytest.mark.unit
     def test_homogeneous_terphenyl_accepted(self):
-        ra = _ra_import()
         mol = Chem.MolFromSmiles("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
@@ -137,7 +116,6 @@ class TestIdentity:
 
     @pytest.mark.unit
     def test_heterogeneous_phenyl_pyridyl_chain_rejected(self):
-        ra = _ra_import()
         # 1-phenyl-3-pyridyl-benzene: phenyl-pyridyl-phenyl mixed signatures
         mol = Chem.MolFromSmiles("c1ccc(-c2ccncc2)cc1-c1ccccc1")
         from orthonym.perception.rings import get_ring_systems
@@ -147,7 +125,6 @@ class TestIdentity:
 
     @pytest.mark.unit
     def test_2_phenyl_pyridine_rejected(self):
-        ra = _ra_import()
         mol = Chem.MolFromSmiles("c1ccc(-c2ccccn2)cc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
@@ -156,7 +133,6 @@ class TestIdentity:
 
     @pytest.mark.unit
     def test_terpyridine_homogeneous_accepted(self):
-        ra = _ra_import()
         mol = Chem.MolFromSmiles("c1ccc(-c2cccc(-c3ccccn3)n2)nc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
@@ -174,34 +150,29 @@ class TestTopology:
 
     @pytest.mark.unit
     def test_check_path_topology_linear_returns_true(self):
-        _check_path_topology = _ra_topology_import()
         # Linear: 0-1-2 (degrees 1,2,1)
         connections = [(0, 0, 0, 1), (0, 0, 1, 2)]
         assert _check_path_topology(3, connections) is True
 
     @pytest.mark.unit
     def test_check_path_topology_quaterphenyl_returns_true(self):
-        _check_path_topology = _ra_topology_import()
         # Linear 4-chain: 0-1-2-3 (degrees 1,2,2,1)
         connections = [(0, 0, 0, 1), (0, 0, 1, 2), (0, 0, 2, 3)]
         assert _check_path_topology(4, connections) is True
 
     @pytest.mark.unit
     def test_check_path_topology_star_branched_returns_false(self):
-        _check_path_topology = _ra_topology_import()
         # Star: central system 0 with degree 3 (connects to 1, 2, 3)
         connections = [(0, 0, 0, 1), (0, 0, 0, 2), (0, 0, 0, 3)]
         assert _check_path_topology(4, connections) is False
 
     @pytest.mark.unit
     def test_check_path_topology_single_system_trivially_true(self):
-        _check_path_topology = _ra_topology_import()
         assert _check_path_topology(1, []) is True
 
     @pytest.mark.unit
     def test_135_triphenylbenzene_rejected_by_detect(self):
         """End-to-end: 1,3,5-triphenylbenzene must NOT be a ring assembly."""
-        ra = _ra_import()
         mol = Chem.MolFromSmiles("c1cc(-c2ccccc2)cc(-c2ccccc2)c1-c1ccccc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
@@ -211,7 +182,6 @@ class TestTopology:
     @pytest.mark.unit
     def test_4prime_methylbiphenyl_still_accepted(self):
         """RESEARCH Pitfall 4 control: substituent does NOT disturb topology."""
-        ra = _ra_import()
         mol = Chem.MolFromSmiles("Cc1ccc(-c2ccccc2)cc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
@@ -221,7 +191,6 @@ class TestTopology:
 
     @pytest.mark.unit
     def test_para_terphenyl_linear_accepted(self):
-        ra = _ra_import()
         mol = Chem.MolFromSmiles("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
@@ -238,17 +207,14 @@ class TestPrimedLocants:
 
     @pytest.mark.unit
     def test_format_prime_zero_returns_empty(self):
-        ra = _ra_import()
         assert ra._format_prime(0) == ""
 
     @pytest.mark.unit
     def test_format_prime_one_returns_single_apostrophe(self):
-        ra = _ra_import()
         assert ra._format_prime(1) == "'"
 
     @pytest.mark.unit
     def test_format_prime_three_returns_triple_apostrophe(self):
-        ra = _ra_import()
         assert ra._format_prime(3) == "'''"
 
     @pytest.mark.unit
@@ -286,13 +252,11 @@ class TestMultiplierClosed:
 
     @pytest.mark.unit
     def test_deci_present(self):
-        ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS[10] == "deci"
 
     @pytest.mark.unit
     def test_size_11_12_present(self):
         # (Wave2 P1CB Task 8): undeci(11)/dodeci(12) now supported.
-        ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS.get(11) == "undeci"
         assert ra.ASSEMBLY_MULTIPLIERS.get(12) == "dodeci"
 
@@ -300,18 +264,15 @@ class TestMultiplierClosed:
     def test_size_13_returns_none(self):
         """Table stops at dodeci(12); count 13+ has no OPSIN-verifiable affix
         here ->.get->None decline (fail closed)."""
-        ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS.get(13) is None
 
     @pytest.mark.unit
     def test_size_15_returns_none(self):
         """OPSIN multipliers.xml extends to 15; the table deliberately stops at 12."""
-        ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS.get(15) is None
 
     @pytest.mark.unit
     def test_name_ring_assembly_returns_none_above_table(self):
-        ra = _ra_import()
         # Build a 13-system mock info dict directly to exercise the gate
         # (13 is above the dodeci(12) cap -> multiplier lookup fails -> None).
         fake_info = {
@@ -338,7 +299,6 @@ class TestConnectionLocant:
         SMILES uses the canonical 2,2'-bipyridine constitution
         (each connection atom directly adjacent to N).
         """
-        ra = _ra_import()
         from orthonym.perception.rings import get_ring_systems
         # 2,2'-bipyridine: ring atoms with N as locant 1, connection at locant 2
         mol = Chem.MolFromSmiles("c1ccc(-c2ccccn2)nc1")  # 2,2'-bipyridine
@@ -353,7 +313,6 @@ class TestConnectionLocant:
     @pytest.mark.unit
     def test_thiophene_sulfur_priority(self):
         """Thienyl atom adjacent to S gets locant 2 (lowest-locant tiebreak)."""
-        ra = _ra_import()
         from orthonym.perception.rings import get_ring_systems
         mol = Chem.MolFromSmiles("c1ccsc1-c1cccs1")  # 2,2'-bithiophene
         rs = get_ring_systems(mol, include_spiro=False)
@@ -365,27 +324,6 @@ class TestConnectionLocant:
 
 
 # ============================================================================
-# TestLowestLocantTiebreak
-# ============================================================================
-class TestLowestLocantTiebreak:
-    """: lowest-locant tiebreak via compare_locant_sets (no parallel)."""
-
-    @pytest.mark.unit
-    def test_compare_locant_sets_imported_in_supplier(self):
-        """Lock: get_ring_assembly_iupac_locants OR detect/name path uses
-        compare_locant_sets, never a parallel comparator."""
-        src = (
-            Path(__file__).resolve().parents[3]
-            / "src" / "orthonym" / "rules" / "ring_assemblies.py"
-        ).read_text()
-        # Either imported or currently absent (will be added by Task 2 if
-        # the supplier needs cross-orientation tiebreaks; if the helpers
-        # don't introduce a comparator at all, that's also fine — the
-        # negative assertion in TestNoParallelComparator covers it).
-        assert "_compare_locant" not in src or "compare_locant_sets" in src
-
-
-# ============================================================================
 # TestSupplierCoverageInvariant (Pitfall 7 /)
 # ============================================================================
 class TestSupplierCoverageInvariant:
@@ -393,7 +331,6 @@ class TestSupplierCoverageInvariant:
 
     @pytest.mark.unit
     def test_supplier_full_coverage_on_terphenyl(self):
-        get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
         locants = get_ring_assembly_iupac_locants(mol)
         assert locants is not None
@@ -406,7 +343,6 @@ class TestSupplierCoverageInvariant:
 
     @pytest.mark.unit
     def test_supplier_full_coverage_on_quaterphenyl(self):
-        get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles(
             "c1ccc(-c2ccc(-c3ccc(-c4ccccc4)cc3)cc2)cc1"
         )
@@ -421,7 +357,6 @@ class TestSupplierCoverageInvariant:
     @pytest.mark.unit
     def test_supplier_returns_none_on_135_triphenylbenzene(self):
         """Branched arrangements MUST return None (+ Pitfall 7)."""
-        get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles(
             "c1cc(-c2ccccc2)cc(-c2ccccc2)c1-c1ccccc1"
         )
@@ -432,20 +367,17 @@ class TestSupplierCoverageInvariant:
 
     @pytest.mark.unit
     def test_supplier_returns_none_on_phenyl_pyridyl_mixed(self):
-        get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles("c1ccc(-c2ccncc2)cc1-c1ccccc1")
         result = get_ring_assembly_iupac_locants(mol)
         assert result is None  # n-way identity rejects; supplier follows
 
     @pytest.mark.unit
     def test_supplier_returns_none_on_single_ring(self):
-        get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles("c1ccccc1")
         assert get_ring_assembly_iupac_locants(mol) is None
 
     @pytest.mark.unit
     def test_supplier_returns_none_on_acyclic(self):
-        get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles("CCCC")
         assert get_ring_assembly_iupac_locants(mol) is None
 

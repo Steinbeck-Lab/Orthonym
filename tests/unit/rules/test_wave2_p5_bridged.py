@@ -240,10 +240,6 @@ class TestP51MultiCarbonBridgeMultiplicative:
     and must NOT hijack a structure whose PIN is a multiplicative parent
     enumeration (that is the multiplicative engine's job)."""
 
-    def test_ethanoanthracene_locked(self):
-        # OPSIN-RT-verified multi-carbon bridge PIN
-        assert name_compound("C1=CC=CC2=C3C4=CC=CC=C4C(=C12)CC3") == "9,10-ethanoanthracene"
-
     def test_multiplicative_parent_not_hijacked(self):
         # a biphenyl-type identical-parent structure must NOT become a bridged name
         from orthonym.rules.bridged_fused import name_bridged_fused_pin

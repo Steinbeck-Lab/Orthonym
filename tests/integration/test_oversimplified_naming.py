@@ -17,7 +17,6 @@ Data source: benchmark_v5_results_p46.json (pre-Phase-47 baseline)
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 

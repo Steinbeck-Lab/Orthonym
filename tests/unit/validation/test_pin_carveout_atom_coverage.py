@@ -65,7 +65,6 @@ import pytest
 from orthonym.errors import is_failure_name
 from orthonym.namer import Orthonym
 from tests.support.opsin_marks import release_opsin_only
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -76,11 +75,6 @@ from tests.support.np_producer import np_producer_only  # noqa: F401
 # blind" block). `pytest_runtest_call` there skips these tests outright if no
 # OPSIN jar is reachable, rather than passing them unverified.
 pytestmark = [pytest.mark.opsin_gate, pytest.mark.usefixtures("np_producer_only")]
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # ---------------------------------------------------------------------------

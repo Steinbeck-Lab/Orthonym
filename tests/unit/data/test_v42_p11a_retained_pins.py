@@ -40,7 +40,6 @@ Group 4 — retained nitrile names:
   * oxalonitrile the Blue Book "NC-CN oxalonitrile (PIN) ethanedinitrile"
 """
 import shutil
-from pathlib import Path
 
 import pytest
 from rdkit import Chem

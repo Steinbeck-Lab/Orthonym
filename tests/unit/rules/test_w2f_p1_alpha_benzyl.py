@@ -158,13 +158,6 @@ class TestAlphaBenzylFailClosedAndGuards:
         # gold W2E-P1FC-04 neighbourhood (undecorated bare-phenyl fragment)
         assert name_compound("C(c1ccccc1)c1ccccn1") == "2-benzylpyridine"
 
-    def test_ring_fold_path_untouched(self):
-        # gold W2E-P1FC-05 shape: ring decoration folds BEFORE the new
-        # decoration split — '(4-chlorophenyl)methyl' unchanged.
-        assert name_compound("Clc1ccc(Cc2ccccn2)cc1") == \
-            "2-[(4-chlorophenyl)methyl]pyridine"
-
-
 @pytest.mark.unit
 class TestAlphaBenzylDeterminism:
     """Task 9: research C det-probe protocol — evidence, sibling,

@@ -9,14 +9,9 @@ it is the label's second line of defence: it must keep failing the old spelling 
 of increasing numerical order" (:3301).
 """
 import pytest
-from rdkit import Chem
 
-from orthonym.validation.pin_spelling import check_pin_spelling
 from tests.support.rt_assert import name_is_rt_exact
-
-
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
+from tests.support.read_back import spelling_rules
 
 
 ROWS = [
@@ -31,5 +26,5 @@ ROWS = [
 @pytest.mark.parametrize("smiles, old, pin", ROWS)
 def test_the_perception_order_spelling_fails_and_the_pin_passes(smiles, old, pin):
     assert name_is_rt_exact(old, smiles) and name_is_rt_exact(pin, smiles)   # both are the molecule
-    assert "P-14.4" in _rules(smiles, old)
-    assert _rules(smiles, pin) == []
+    assert "P-14.4" in spelling_rules(smiles, old)
+    assert spelling_rules(smiles, pin) == []

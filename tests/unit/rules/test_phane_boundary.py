@@ -7,7 +7,6 @@ present." Orthonym does NOT build the linear-phane amplification engine
 name is ever emitted. It also asserts the existing cyclophane API is
 untouched.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.phane import (

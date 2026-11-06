@@ -7,7 +7,6 @@ Plan 02 tests cover regressions 1, 2, 3, 4, 6 (decomposition quality
 comparison, fatty acid identification).
 """
 import pytest
-from orthonym import name_compound
 from tests.support.rt_assert import assert_full_rt, assert_tier_contract
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -25,35 +24,11 @@ from tests.support.default_tier import (  # noqa: E402
 # acyloxy twin, validation.polyester_twin, which OPSIN reads to the input's full InChIKey: (the Blue Book
 #:31842) prints '(2S)-propane-1,2,3-triyl 2-acetate 1-hexadecanoate 3-[(9Z)-octadec-9-enoate]' (:55113).)
 DEFAULT_TIER_DECLINES = frozenset()
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+    from orthonym import name_compound
     return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 class TestCoverageGateWhitelist:
@@ -138,8 +113,8 @@ class TestCoverageGateWhitelist:
         )
         name = _dt_name_compound(smiles)
         assert name != "1H-indole", (
-            f"Dense polycyclic should not be named '1H-indole' -- "
-            f"coverage gate should reject this oversimplification"
+            "Dense polycyclic should not be named '1H-indole' -- "
+            "coverage gate should reject this oversimplification"
         )
         assert len(name) > 15, (
             f"Name '{name}' too short for 34-atom polycyclic"
@@ -483,7 +458,7 @@ class TestFattyAcidIdentification:
         )
         name, _be = assert_tier_contract(smiles)
         if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-            name = _declined_pin_row(smiles)["name"]
+            name = declined_pin_row(smiles)["name"]
         # C23:0 should use the systematic stem tricosanoyl: 'tricosanoate' in the functional-class name of the
         # default tier, 'tricosanoyloxy' in the substitutive name of the wider tiers
         assert "tricosanoate" in name or "tricosanoyloxy" in name, (

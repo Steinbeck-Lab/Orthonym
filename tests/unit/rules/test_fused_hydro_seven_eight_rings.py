@@ -21,6 +21,7 @@ from rdkit import Chem
 from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 from orthonym.rules.fusion_numbering import compute_fused_numbering
 from tests.support.pin_tiers import assert_pin_at_both_tiers
+from tests.support.pin_tiers import tier_row
 
 PIN_ROWS = [
     ("N1=C2C(=CC=C1)CCCCC2", "6,7,8,9-tetrahydro-5H-cyclohepta[b]pyridine"),
@@ -54,11 +55,10 @@ def test_an_unbracketed_azole_component_is_not_a_pin():
     """The unbracketed '...cyclohepta[d]thiazole' still reads back to the input but is shipped by
     neither tier (the bracketed PIN is a row of ``PIN_ROWS``)."""
     from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     from tests.support.rt_assert import name_is_rt_exact
     smiles, unbracketed = "S1C=NC2=C1CCCCC2", "5,6,7,8-tetrahydro-4H-cyclohepta[d]thiazole"
     assert name_is_rt_exact(unbracketed, smiles)
-    be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    be = tier_row(smiles, "best-effort")
     assert be["name"] != unbracketed
     assert Orthonym().name_tiered(smiles)["name"] != unbracketed
 

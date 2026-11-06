@@ -32,8 +32,6 @@ standard InChIKey of the input.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
 from orthonym.data.ion_retained_names import get_cation_name
 from orthonym.data.metal_scope import CARBANION_SALTS, ELEMENT, MetalScope
@@ -44,12 +42,9 @@ from tests.support.opsin_marks import release_opsin_in_use
 from orthonym.rules import adducts, metal_atoms, metal_labels
 from orthonym.rules.metal_atoms import admitted_metal_atom_name, inorganic_anion_word, lone_atom_name, metal_atom_name
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 def _view(row):
@@ -64,11 +59,11 @@ def _class_of(smiles):
 
 def _assert_named_without_a_pin(smiles, name, tiers=("best-effort", "valid")):
     for tier in tiers:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, (tier, row)
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
         assert_full_rt(row["name"], smiles)
-    declined = _row(smiles, "pin")                    # the PIN tier declines it, with a reason
+    declined = tier_row(smiles, "pin")                    # the PIN tier declines it, with a reason
     assert declined["tier"] == "abstain" and declined["limit_code"] == "NO_VERIFIED_PIN", declined
     assert declined["is_pin"] is False
 
@@ -101,7 +96,7 @@ def test_the_free_ion_is_not_named_by_the_cation_word_of_a_salt():
     assert get_cation_name("[Zn+2]") == "zinc"
     assert name_is_rt_exact("zinc", "[Zn+2]") is False
     assert name_is_rt_exact("zinc(2+)", "[Zn+2]") is True
-    assert _row("[Zn+2]", "best-effort")["name"] == "zinc(2+)"
+    assert tier_row("[Zn+2]", "best-effort")["name"] == "zinc(2+)"
 
 
 def test_the_isotope_and_the_charge_are_in_the_name():
@@ -110,7 +105,7 @@ def test_the_isotope_and_the_charge_are_in_the_name():
     assert name_is_rt_exact("(66Zn)zinc", "[65Zn]") is False
     assert name_is_rt_exact("(65Zn)zinc(2+)", "[66Zn+2]") is False
     assert name_is_rt_exact("zinc(2+)", "[66Zn+2]") is False
-    assert _row("[66Zn+2]", "best-effort")["name"] == "(66Zn)zinc(2+)"
+    assert tier_row("[66Zn+2]", "best-effort")["name"] == "(66Zn)zinc(2+)"
 
 
 def test_the_class_of_the_dispatch_table_names_a_lone_atom_before_the_radical_and_retained_classes():
@@ -262,7 +257,7 @@ def test_the_predicate_is_what_lowers_the_label(monkeypatch):
     import orthonym.namer as namer
     monkeypatch.setattr(metal_labels, "is_lone_atom_name_without_pin", lambda smiles, name: False)
     monkeypatch.setattr(namer, "_is_carbon_free_compound", lambda smiles: False)
-    row = _row("[Zn+2]", "valid")
+    row = tier_row("[Zn+2]", "valid")
     assert row["name"] == "zinc(2+)" and row["tier"] == "pin_verified", row
 
 
@@ -275,8 +270,8 @@ def test_zinc_dihydride_is_named_and_read_back():
     their structure";:2058), so the PIN tier declines it, as 'zinc dichloride'."""
     smiles = "[H-].[H-].[Zn+2]"
     _assert_named_without_a_pin(smiles, "zinc dihydride")
-    assert _row("[Zn+2].[Cl-].[Cl-]", "pin")["limit_code"] == "NO_VERIFIED_PIN"   # as zinc dichloride
-    assert _row("[Zn+2].[Zn+2].[H-].[H-].[H-].[H-]", "best-effort")["name"] == "dizinc tetrahydride"
+    assert tier_row("[Zn+2].[Cl-].[Cl-]", "pin")["limit_code"] == "NO_VERIFIED_PIN"   # as zinc dichloride
+    assert tier_row("[Zn+2].[Zn+2].[H-].[H-].[H-].[H-]", "best-effort")["name"] == "dizinc tetrahydride"
     assert_full_rt("dizinc tetrahydride", "[Zn+2].[Zn+2].[H-].[H-].[H-].[H-]")
 
 
@@ -303,7 +298,7 @@ def test_neutral_atom_with_neutral_components_is_unchanged():
     """Two neutral acids and a zinc atom: the adduct producer already names it (a component of a
      adduct is cited by its element name), byte for byte."""
     smiles = "CCCCCCCCCCCCCCCCCC(=O)O.CCCCCCCCCCCCCCCCCC(=O)O.[Zn]"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "octadecanoic acid—zinc (2/1)"
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False
     assert_full_rt(row["name"], smiles)
@@ -313,11 +308,11 @@ def test_a_neutral_atom_beside_anions_is_cited_with_zero():
     """Decision 2 of the user (2026-10-13) declined a producer for a neutral metal atom beside anions;
     User decision 2026-10-30 (breadth lane, levers B and C) replaces it: the atom is cited with the oxidation number zero, at the best-effort tier only
     (``ZERO_VALENT`` of ``data/metal_scope.py``), and the name reads back to the neutral atom drawn."""
-    row = _row("[Zn].[Cl-].[Cl-]", "best-effort")
+    row = tier_row("[Zn].[Cl-].[Cl-]", "best-effort")
     assert row["name"] == "chloride—zinc(0) (2/1)" and row["tier"] == "systematic_verified", row
     assert row["is_pin"] is False
     assert_full_rt(row["name"], "[Zn].[Cl-].[Cl-]")
-    assert _row("[Zn].[Cl-].[Cl-]", "pin")["tier"] == "abstain"
+    assert tier_row("[Zn].[Cl-].[Cl-]", "pin")["tier"] == "abstain"
 
 
 # ---- the other metals and the other assemblies are not moved (START literals, computed on the start tree)
@@ -365,8 +360,8 @@ def _opsin_reads(name) -> bool:
 @pytest.mark.parametrize("smiles", sorted(MOVED_ROWS))
 def test_the_rows_that_lane_b2_moves(smiles):
     default_view, best_effort_view = MOVED_ROWS[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    best_effort = _row(smiles, "best-effort")
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    best_effort = tier_row(smiles, "best-effort")
     if not _opsin_reads(best_effort_view[0]):
         assert best_effort["name"] is None and best_effort["tier"] == "abstain", best_effort   # no name, never a wrong one
         return
@@ -407,9 +402,8 @@ UNNAMED_ZINC_ASSEMBLIES = {
 @pytest.mark.parametrize("smiles", sorted(UNNAMED_ZINC_ASSEMBLIES))
 def test_zinc_assemblies_no_producer_names_are_unnameable(smiles):
     default_view, best_effort_view = UNNAMED_ZINC_ASSEMBLIES[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
-
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
 
 
 #: the rows of the start commit that lane LONE (2026-11-01) moves: every metal is admitted to ``ELEMENT``, and a bare
@@ -434,7 +428,7 @@ def test_the_rows_that_lane_lone_moves(smiles):
 def test_a_hydride_stays_out_of_an_assembly_of_a_metal_the_table_does_not_admit():
     """The hydride ion has a name of its own now; beside technetium (no CARBANION_SALTS) the assembly is still
     organometallic for the metal INTRODUCTION) and gets no adduct name."""
-    assert _row("[Tc+2].[H-].[H-]", "best-effort")["name"] is None
+    assert tier_row("[Tc+2].[H-].[H-]", "best-effort")["name"] is None
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -444,7 +438,7 @@ def test_a_hydride_stays_out_of_an_assembly_of_a_metal_the_table_does_not_admit(
 def test_the_salt_route_does_not_cite_a_one_atom_non_metal_ion_by_its_free_ion_name(smiles, name):
     """``rules.salts._name_organic_ion_best_effort`` names organic ions; a one-atom ion of hydrogen, carbon or a
     p-block element keeps the adduct name of its drawing (systematic_verified,."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     if smiles.startswith("[B+3]") and release_opsin_in_use():
         # OPSIN 2.9.0 reads no 'boron(3+)—hydride (1/3)' (OPSIN's main branch does): the row then has no name, and
         # never the free-ion name of its hydride
@@ -456,7 +450,7 @@ def test_the_salt_route_does_not_cite_a_one_atom_non_metal_ion_by_its_free_ion_n
 
 @pytest.mark.parametrize("smiles", ["CCO.[H]", "[Na+].[H]"])
 def test_a_stray_hydrogen_atom_is_no_adduct_component(smiles):
-    assert _row(smiles, "best-effort")["name"] is None
+    assert tier_row(smiles, "best-effort")["name"] is None
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -466,7 +460,7 @@ def test_carbon_ions_keep_their_names_on_methane(smiles, name):
     """'H3C– methanide (PIN)', the Blue Book): a carbon ion is named on methane and keeps the
     PIN label of (it contains carbon); ``lone_atom_name`` leaves it to the ion classes."""
     assert lone_atom_name(Chem.MolFromSmiles(smiles)) is None
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -477,7 +471,7 @@ def test_an_isotopologue_takes_the_label_of_its_parent(plain, labelled):
     """The label of a lone atom is a function of the structure: a carbon-free name has no PIN, an element
     name or a name on a parent hydride alike; the nuclide changes neither ('(13C)methane (PIN)' and 'methane (PIN)',
     :7354)."""
-    a, b = _row(plain, "best-effort"), _row(labelled, "best-effort")
+    a, b = tier_row(plain, "best-effort"), tier_row(labelled, "best-effort")
     assert a["tier"] == b["tier"] and a["is_pin"] == b["is_pin"], (a, b)
 
 
@@ -486,8 +480,8 @@ def test_other_metals_are_not_moved(smiles):
     """The atoms, ions and hydride salts of the metals that the table does not admit keep their rows of the
     start commit."""
     default_view, best_effort_view = START_ROWS[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
 
 
 def test_the_other_metals_panel_has_no_atom_or_hydride_row_the_class_could_reach():

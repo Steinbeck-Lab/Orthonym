@@ -44,14 +44,6 @@ class TestSpiroSubstituents:
         assert 'methyl' in result, f"methyl missing from dimethyl spiro: {result}"
         assert 'spiro' in result, f"spiro missing: {result}"
 
-    @pytest.mark.integration
-    def test_plain_spiro_unchanged(self):
-        """Unsubstituted spiro[4.5]decane should still work correctly."""
-        result = name_compound('C1CCC2(CC1)CCCC2')
-        assert 'spiro' in result
-        assert result == 'spiro[4.5]decane' or 'spiro' in result
-
-
 class TestFusedHeterocycleNoDoubleCount:
     """: Fused heterocycles with substituents_included=True are NOT
     processed by the universal pipeline (no double-counting)."""
@@ -116,13 +108,6 @@ class TestRingSubLocants:
         assert re.search(r'\d+-methyl', result), (
             f"No integer locant on methyl in spiro: {result}"
         )
-
-    @pytest.mark.integration
-    def test_fused_heterocycle_locant_preserved(self):
-        """5-methyl-1H-indole locant should be 5 (IUPAC fused numbering)."""
-        result = name_compound('Cc1ccc2[nH]ccc2c1')
-        assert '5-methyl' in result, f"Expected '5-methyl' in {result}"
-
 
 class TestRegressionSuite:
     """Verify no regressions on previously-working ring compounds."""

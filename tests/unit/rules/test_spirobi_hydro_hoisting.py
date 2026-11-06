@@ -45,7 +45,6 @@ that the hydro prefix landed in the right place.
 import pytest
 from rdkit import Chem
 
-from orthonym.namer import Orthonym
 from orthonym.rules.spiro import (
     _can_bear_ring_double_bond,
     _is_saturated_in_component,
@@ -54,11 +53,6 @@ from orthonym.rules.spiro import (
     _spirobi_locant_key,
     _spirobi_component_saturation,
 )
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # --------------------------------------------------------------------------

@@ -19,8 +19,6 @@ import inspect
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.rules.seniority import get_principal_group
 from tests.support.pin_tiers import assert_pin_at_both_tiers, name_default

@@ -14,14 +14,10 @@ import subprocess
 
 import pytest
 
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 _OPSIN_JAR = jar_or_none()
-_HAS_JAVA = True
-try:
-    subprocess.run(["java", "-version"], capture_output=True, timeout=10)
-except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-    _HAS_JAVA = False
+_HAS_JAVA = java_on_path()
 
 _needs_opsin = pytest.mark.skipif(
     not (_OPSIN_JAR and _HAS_JAVA), reason="OPSIN jar / Java unavailable"

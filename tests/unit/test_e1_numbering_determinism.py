@@ -23,11 +23,6 @@ from orthonym.rules.locants import (
 )
 
 
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
 def _name(namer, smiles):
     return namer.name(smiles)
 

@@ -10,6 +10,7 @@ import pytest
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -49,7 +50,7 @@ def test_one_oxo_elides_the_final_e():
 def test_a_parent_with_hydrogen_on_a_ring_carbon_is_named_below_the_pin(smiles, name):
     """The certified parent keeps its indicated hydrogen ('3H-2,1-benzoxathiole') and the lambda token joins its
     heteroatom locants; no book name of this kind is printed, so the name is valid, not the PIN."""
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == "systematic_verified", row
     assert_full_rt(name, smiles)

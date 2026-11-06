@@ -4,7 +4,6 @@ Tests for name_substituent_fragment, _is_linear_alkyl,
 _extract_fragment_smiles, and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN).
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.assembly.substituent_naming import (
@@ -275,7 +274,6 @@ class TestNameSubstituentFragment:
     def test_sec_butyl(self):
         """CH(CH3)(CH2CH3) -> butan-2-yl (F-T9/DD6: 'sec-butyl' is deprecated)."""
         # 2-methylbutane: CCC(C)C -> atoms 0,1,2,3,4
-        mol = Chem.MolFromSmiles("CCC(C)C")
         # Atom 2 is attachment point, sub_atoms = [2, 0, 1, 3] with parent=[4]
         # Actually let's construct more carefully
         # CCC(C)C: 0-1-2(-3)-4
@@ -284,7 +282,6 @@ class TestNameSubstituentFragment:
         # Wait - that would be 3 branches = tert-butyl. Let me reconsider.
         # sec-butyl = CH(CH3)(CH2CH3), attachment at the CH
         # Molecule: parent-CH(CH3)(CH2CH3) = CCC(C)CC where parent=last C
-        mol2 = Chem.MolFromSmiles("CCC(C)CC")
         # 0-1-2(-3)-4-5
         # If parent is [5], sub_atoms = [2, 0, 1, 3] through atom 4
         # Wait, need to trace: parent_chain = [5, 4], sub at atom 2 = [2,0,1,3]

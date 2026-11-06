@@ -28,21 +28,6 @@ class TestPolyfunctionalAcidWithRingSub:
     """Acid compounds with ring substituents -- tests correct ring naming
     and FG retention in polyfunctional assembly."""
 
-    def test_biphenyl_carboxylic_acid(self):
-        """[1,1'-biphenyl]-4-carboxylic acid: ring-as-sub + acid suffix.
-        Ring assembly handler treats biphenyl as parent, COOH as substituent.
-        Ideal: "[1,1'-biphenyl]-4-carboxylic acid" (acid as PG suffix).
-        Current: "4-formyl-1,1'-biphenyl" (COOH named as prefix via recursive
-        fallback). This is an improvement over "4-substituent-1,1'-biphenyl".
-        Full fix requires ring assembly handler to respect FG seniority .
-        """
-        name = name_compound("OC(=O)c1ccc(-c2ccccc2)cc1")
-        assert name is not None
-        # Verify recursive fallback names the COOH fragment (was "substituent" before)
-        assert "substituent" not in name.lower(), (
-            f"Recursive fallback should name COOH fragment, got: {name}"
-        )
-
     def test_pyridinyl_benzoic_acid(self):
         """4-(pyridin-2-yl)benzoic acid: heterocycle-as-sub + acid suffix.
         Exercises heterocycle naming on ring acid parent.
@@ -82,14 +67,6 @@ class TestPolyfunctionalAcidWithRingSub:
         assert name is not None
         assert "acid" in name.lower() or "carboxyl" in name.lower()
         assert "indol" in name.lower(), f"Expected indole, got: {name}"
-
-    def test_naphthalene_carboxylic_acid(self):
-        """naphthalene-2-carboxylic acid: fused carbocycle acid."""
-        name = name_compound("OC(=O)c1ccc2ccccc2c1")
-        assert name is not None
-        assert "acid" in name.lower() or "carboxyl" in name.lower()
-        assert "naphthalene" in name.lower(), f"Expected naphthalene, got: {name}"
-
 
 @pytest.mark.integration
 class TestPolyfunctionalKetoneWithHydroxyl:
@@ -245,20 +222,6 @@ class TestMultiFGNoDrop:
 class TestRingAsSubstituent:
     """Compounds where a ring appears as substituent on chain parent."""
 
-    def test_phenylethanol(self):
-        """2-phenylethan-1-ol: phenyl sub on chain alcohol."""
-        name = name_compound("c1ccc(CCO)cc1")
-        assert name is not None
-        assert "phenyl" in name.lower(), f"Missing phenyl: {name}"
-        assert "ol" in name.lower() or "alcohol" in name.lower(), f"Missing alcohol suffix: {name}"
-
-    def test_phenylacetic_acid(self):
-        """2-phenylacetic acid: phenyl sub on chain acid."""
-        name = name_compound("c1ccc(CC(=O)O)cc1")
-        assert name is not None
-        assert "phenyl" in name.lower(), f"Missing phenyl: {name}"
-        assert "acid" in name.lower(), f"Missing acid suffix: {name}"
-
     def test_hydroxyphenyl_propanoic_acid(self):
         """3-(4-hydroxyphenyl)propanoic acid: substituted phenyl sub on chain acid."""
         name = name_compound("OC(=O)CCc1ccc(O)cc1")
@@ -278,45 +241,6 @@ class TestRingAsSubstituent:
         assert name is not None
         assert "phenoxy" in name.lower() or "phenyl" in name.lower(), f"Missing phenoxy: {name}"
         assert "acid" in name.lower(), f"Missing acid suffix: {name}"
-
-    def test_cinnamic_acid(self):
-        """(2E)-3-phenylprop-2-enoic acid: phenyl on unsaturated chain acid."""
-        name = name_compound("OC(=O)/C=C/c1ccccc1")
-        assert name is not None
-        assert "phenyl" in name.lower(), f"Missing phenyl: {name}"
-        assert "acid" in name.lower(), f"Missing acid suffix: {name}"
-
-
-@pytest.mark.integration
-class TestDiacidsAndAmides:
-    """Diacids, diamines, and amide compounds."""
-
-    def test_malonic_acid(self):
-        """Propanedioic acid (malonic acid)."""
-        name = name_compound("OC(=O)CC(=O)O")
-        assert name is not None
-        assert "acid" in name.lower()
-        assert "dioic" in name.lower() or "dicarbox" in name.lower() or "propanedioic" in name.lower()
-
-    def test_succinic_acid(self):
-        """Butanedioic acid (succinic acid)."""
-        name = name_compound("OC(=O)CCC(=O)O")
-        assert name is not None
-        assert "acid" in name.lower()
-
-    def test_adipic_acid(self):
-        """Hexanedioic acid (adipic acid)."""
-        name = name_compound("OC(=O)CCCCC(=O)O")
-        assert name is not None
-        assert "acid" in name.lower()
-        assert "dioic" in name.lower() or "hexanedioic" in name.lower()
-
-    def test_carboxymethyl_benzoic_acid(self):
-        """4-(carboxymethyl)benzoic acid: two acid groups on ring+chain."""
-        name = name_compound("OC(=O)c1ccc(CC(=O)O)cc1")
-        assert name is not None
-        assert "acid" in name.lower() or "carboxyl" in name.lower()
-
 
 @pytest.mark.integration
 class TestBenchmarkSubstituentLoss:

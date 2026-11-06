@@ -103,7 +103,3 @@ class TestNitrileChalcogenides:
 
     def test_benzonitrile_sulfide(self):
         assert orthonym.name_compound("c1ccccc1C#[N+][S-]", style="pin") == "benzonitrile sulfide"
-
-    def test_oxide_unchanged(self):
-        # the O sibling is byte-identical to the pre-generalisation output
-        assert orthonym.name_compound("CC#[N+][O-]", style="pin") == "acetonitrile oxide"

@@ -18,10 +18,11 @@ principal amine (S2), a branch that carries heteroatoms, a ring, a charge, a sec
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym, name_compound
-from orthonym.cli import _emit_tier_flags
+from orthonym import name_compound
 from orthonym.validation import pin_spelling as ps
 from orthonym.validation.spelling import checks_skeletal_chain as sc
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import mol as _mol
 
 pytestmark = pytest.mark.unit
 
@@ -51,12 +52,6 @@ NO_FAILURE = [  # (smiles, name): not flagged
     ("COCCOCCOCCOC.O", "2,5,8,11-tetraoxadodecane water"),                  # two fragments
 ]
 BUTOXY_PEG_ACETATE = FAILS[3][0]
-
-
-def _mol(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, smiles
-    return mol
 
 
 @pytest.mark.parametrize("smiles,name", FAILS, ids=[s for s, _ in FAILS])
@@ -204,7 +199,7 @@ def test_integration_label():
     """The alkyl group of the ester is named by skeletal replacement ('a') nomenclature now
     (``rules.replacement_chain_prefix``), the PIN of; the check passes it."""
     pin = "3,6,9,12,15,18,21,24,27-nonaoxahentriacontan-1-yl acetate"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(BUTOXY_PEG_ACETATE)
+    row = tier_row(BUTOXY_PEG_ACETATE, "best-effort")
     assert (row["name"], row["tier"]) == (pin, "pin_verified") and not row["spelling_failures"], row
     assert name_compound(BUTOXY_PEG_ACETATE, emit_tier="pin") == pin
 

@@ -1,7 +1,6 @@
 """Perf lever A1/A11 (2026-09-13): the opt-in batch-worker tuning is idempotent, honours
 ORTHONYM_GC_TUNE=off, and only the env-driven path reacts to ORTHONYM_GC_TUNE=on."""
 import gc
-import importlib
 import os
 
 import pytest

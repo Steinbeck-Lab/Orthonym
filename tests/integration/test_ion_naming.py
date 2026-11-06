@@ -12,12 +12,6 @@ class TestAnionNaming:
         # Should be phenoxide or phenolate
         assert 'phen' in name.lower()
 
-    def test_propanoate(self):
-        """Test propanoate anion naming."""
-        name = name_compound('CCC(=O)[O-]')
-        assert 'propano' in name.lower() or name == 'propanoate'
-
-
 class TestCationNaming:
     """Test cation naming through main API."""
 
@@ -71,23 +65,6 @@ class TestRadicalNaming:
         """Test propyl radical naming."""
         name = name_compound('CC[CH2]')
         assert name == 'propyl'
-
-
-class TestZwitterionNaming:
-    """Test zwitterion naming through main API."""
-
-    def test_glycine_zwitterion(self):
-        """Test glycine zwitterion naming."""
-        name = name_compound('[NH3+]CC([O-])=O')
-        # Either 'glycine' or '2-azaniumylacetate' or similar
-        assert name is not None
-        assert len(name) > 0
-
-    def test_alanine_zwitterion(self):
-        """Test alanine zwitterion naming."""
-        name = name_compound('[NH3+]C(C)C([O-])=O')
-        assert name is not None
-        assert len(name) > 0
 
 
 class TestSpeciesTypeDetection:

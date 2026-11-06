@@ -16,7 +16,6 @@ from orthonym.rules.fusion_descriptors import (
     format_complex_fusion,
     handle_duplicate_edge_fusion,
     edge_position_to_letter,
-    get_fusion_letter,
     build_multi_component_name,
     get_fusion_edge,
     EDGE_LETTERS,
@@ -126,11 +125,6 @@ class TestComplexEdgeLocants:
         """Test [2,3-b] format for standard fusion."""
         result = format_complex_fusion((2, 3), 'b')
         assert result == '[2,3-b]'
-
-    def test_edge_locant_23a(self):
-        """Test [2,3-a] format."""
-        result = format_complex_fusion((2, 3), 'a')
-        assert result == '[2,3-a]'
 
     def test_edge_locant_12b(self):
         """Test [1,2-b] format."""

@@ -10,7 +10,6 @@ Governing rule for the emission it REPLACES: (a name must specify every
 stereogenic unit to denote one stereoisomer). The old "omit descriptors"
 ship path is retained only under ORTHONYM_BE_STRIP_STEREO=1 (measurement).
 """
-import os
 import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi

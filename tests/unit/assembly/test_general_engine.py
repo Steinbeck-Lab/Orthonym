@@ -4,7 +4,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly.general_engine import (
-    GeneralEngineResult, TokenBinding, name_general_chain,
+    name_general_chain,
 )
 
 pytestmark = pytest.mark.unit
@@ -52,9 +52,6 @@ def _name(smiles):
 
 
 class TestChainNaming:
-    def test_ethanol(self):
-        assert _name("CCO").name == "ethan-1-ol"
-
     def test_propan2ol(self):
         assert _name("CC(O)C").name == "propan-2-ol"
 

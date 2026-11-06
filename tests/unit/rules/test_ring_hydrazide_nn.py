@@ -158,12 +158,6 @@ def test_ring_hydrazide_protection(smiles, expected):
 # test_tier3b_sulfoxide_substitutive.py pattern).
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def _validity_gate_on(monkeypatch):
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -177,12 +171,12 @@ def _validity_gate_on(monkeypatch):
         "CNNC(=O)N1CCCCC1",
     ],
 )
-def test_ring_hydrazide_fail_closed(smiles, _validity_gate_on):
+def test_ring_hydrazide_fail_closed(smiles, opsin_gate):
     assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin")
 
 
 @pytest.mark.unit
-def test_acyl_n_substituent_is_the_diacylhydrazide_producer_s(_validity_gate_on):
+def test_acyl_n_substituent_is_the_diacylhydrazide_producer_s(opsin_gate):
     # The N-acyl ring hydrazide used to sit in the list above (the pure-alkyl collector cannot spell an acyl
     # N-substituent). rules/diacylhydrazides.py owns it now: (the Blue Book), 'Acyl, diacyl,
     # and triacyl derivatives of hydrazides are named by substituting the senior hydrazide by the appropriate

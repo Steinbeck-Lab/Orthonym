@@ -12,7 +12,6 @@ BOTH atom stereocentres AND stereogenic double bonds, so a Z-vs-E numbering
 choice is decided (the old key saw only atoms and got 'Z senior to E' backwards
 by falling through to input order).
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.locants import orient_chain, build_atom_to_locant

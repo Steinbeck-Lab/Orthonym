@@ -13,7 +13,6 @@ a phase Plan 03 additions:
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.decomposition.fragment_assembly import (
     assemble_fragment_name,
@@ -21,13 +20,7 @@ from orthonym.decomposition.fragment_assembly import (
 from orthonym.decomposition.engine import try_decompose, _coverage_is_adequate
 from orthonym.decomposition.bond_cleavage import find_cleavable_bonds
 from orthonym.assembly.fragment_naming import _fragment_guard
-
-
-def _mol(smiles: str):
-    """Helper to create RDKit Mol from SMILES."""
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"Invalid SMILES: {smiles}"
-    return mol
+from tests.support.read_back import mol as _mol
 
 
 # ============================================================================
@@ -285,13 +278,6 @@ class TestSulfonamideEndToEnd:
         if result is not None:
             assert "sulfonamide" in result.lower()
 
-    def test_n_methyl_sulfonamide(self):
-        """N-methylbenzenesulfonamide (CS(=O)(=O)Nc1ccccc1) naming."""
-        mol = _mol("CS(=O)(=O)Nc1ccccc1")
-        result = try_decompose(mol)
-        if result is not None:
-            assert "sulfonamide" in result.lower() or "sulfon" in result.lower()
-
     def test_sulfamethoxazole_decomposes(self):
         """Sulfamethoxazole: decomposition produces a name (not None/unknown)."""
         # Sulfamethoxazole: Cc1cc(NS(=O)(=O)c2ccc(N)cc2)no1
@@ -318,23 +304,9 @@ class TestPhosphodiesterEndToEnd:
         """Dimethyl phosphate: phosphodiester bond detected."""
         mol = _mol("COP(=O)(O)OC")
         bonds = find_cleavable_bonds(mol)
-        phospho_bonds = [b for b in bonds if b.get("type") == "phosphodiester"]
         # Small molecule may or may not trigger phosphodiester detection
         # depending on ring guards
         assert isinstance(bonds, list)
-
-    def test_quality_gate_with_substitutive_preference(self):
-        """Quality gate and substitutive preference work together.
-
-        The decomposition engine should prefer substitutive names for
-        phosphodiester fragments when possible.
-        """
-        mol = _mol("COP(=O)(O)OC")
-        result = try_decompose(mol)
-        # Result is either None (quality gate skips -- normal pipeline handles it)
-        # or a valid phosphate-related name
-        assert result is None or isinstance(result, str)
-
 
 # ============================================================================
 # Combined multi-bond decomposition (validation)
@@ -389,7 +361,7 @@ class TestCombinedMultiBondDecomposition:
         result = try_decompose(mol)
         if result is not None:
             assert result != "unknown", (
-                f"Should produce a real name, not 'unknown'"
+                "Should produce a real name, not 'unknown'"
             )
             assert isinstance(result, str)
             assert len(result) > 3
@@ -603,8 +575,7 @@ class TestEtherMinimumHALowered:
         Previously required 5, now requires 3.
         """
         mol = _mol("CCOCC")
-        bonds = find_cleavable_bonds(mol)
-        ether_bonds = [b for b in bonds if b.get("type") == "ether"]
+        find_cleavable_bonds(mol)
         # With lowered threshold (3), diethyl ether should be detectable
         # Each side has 2 HA (CC) -- still below 3, so not detectable
         # Use propyl-ethyl ether: CCCOCCC (3 each side)

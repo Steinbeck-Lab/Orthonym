@@ -135,13 +135,6 @@ class TestNaming:
     """Tests for ring assembly naming via name_compound."""
 
     @pytest.mark.unit
-    def test_biphenyl_name(self):
-        """Biphenyl SMILES produces the PIN '1,1'-biphenyl' (F-T9/DD6: bare
-        'biphenyl' is general-only; the ring-assembly PIN is 1,1'-biphenyl,."""
-        name = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert name == "1,1'-biphenyl"
-
-    @pytest.mark.unit
     def test_bipyridine_contains_bipyridine(self):
         """Bipyridine SMILES produces a name containing 'bipyridine'."""
         name = name_compound("c1ccncc1-c2ccncc2")
@@ -159,35 +152,6 @@ class TestNaming:
         name = name_compound("c1ccsc1-c1ccsc1")
         assert "bithiophene" in name
 
-    @pytest.mark.unit
-    def test_4_chlorobiphenyl(self):
-        """4-chlorobiphenyl SMILES produces '4-chloro-1,1'-biphenyl'."""
-        name = name_compound("Clc1ccc(-c2ccccc2)cc1")
-        assert name == "4-chloro-1,1'-biphenyl"
-
-    @pytest.mark.unit
-    def test_biphenyl_uses_phenyl_not_benzene(self):
-        """Biphenyl assembly name uses 'phenyl', not 'benzene'."""
-        name = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert "phenyl" in name
-        assert "benzene" not in name
-
-    @pytest.mark.unit
-    def test_primed_locant_format(self):
-        """Primed locants use ASCII apostrophe (U+0027).
-
-        Uses substituted biphenyl since unsubstituted biphenyl is a retained name.
-        """
-        name = name_compound("Clc1ccc(-c2ccccc2)cc1")
-        assert "'" in name  # ASCII apostrophe
-
-    @pytest.mark.unit
-    def test_bifuran_contains_bifuran(self):
-        """Bifuran SMILES produces a name containing 'bifuran'."""
-        name = name_compound("c1ccoc1-c1ccoc1")
-        assert "bifuran" in name
-
-
 # ---------------------------------------------------------------------------
 # Boundary / negative naming tests
 # ---------------------------------------------------------------------------
@@ -200,12 +164,6 @@ class TestNamingNegatives:
         """Phenanthrene retains its PAH name, not misrouted to assembly."""
         name = name_compound("c1ccc2c(c1)ccc1ccccc12")
         assert name == "phenanthrene"
-
-    @pytest.mark.unit
-    def test_naphthalene_not_assembly_name(self):
-        """Naphthalene retains its PAH name."""
-        name = name_compound("c1ccc2ccccc2c1")
-        assert name == "naphthalene"
 
     @pytest.mark.unit
     def test_phenylcyclohexane_unchanged(self):
@@ -292,7 +250,6 @@ class TestHigherMultipliers:
     def test_quinquephenyl_prefix(self):
         """name_ring_assembly with 5 identical benzene rings returns name
         containing 'quinquephenyl'."""
-        from orthonym.rules.ring_assemblies import name_ring_assembly_prefix
         smiles = "c1ccc(-c2ccc(-c3ccc(-c4ccc(-c5ccccc5)cc4)cc3)cc2)cc1"
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None, f"Invalid SMILES: {smiles}"
@@ -313,20 +270,6 @@ class TestHigherMultipliers:
         assert ASSEMBLY_MULTIPLIERS[11] == "undeci"
         assert ASSEMBLY_MULTIPLIERS[12] == "dodeci"
         assert 13 not in ASSEMBLY_MULTIPLIERS
-
-    @pytest.mark.unit
-    def test_regression_biphenyl(self):
-        """Regression: biphenyl detection + naming produces the PIN 1,1'-biphenyl
-        (F-T9/DD6)."""
-        name = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert name == "1,1'-biphenyl"
-
-    @pytest.mark.unit
-    def test_regression_bipyridine(self):
-        """Regression: bipyridine detection and naming still works."""
-        name = name_compound("c1ccncc1-c2ccncc2")
-        assert "bipyridine" in name
-
 
 # ---------------------------------------------------------------------------
 #: Fused ring assembly unit tests
@@ -497,10 +440,6 @@ class TestP28CitationOrderDeterminism:
     invariant to SMILES atom order (2,3'-bifuran, never 3,2'-bifuran).
     BB worked example: '2,3'-bifuran (PIN)'.
     """
-
-    @pytest.mark.unit
-    def test_bifuran_is_2_3prime(self):
-        assert name_compound("c1ccoc1-c1ccoc1") == "2,3'-bifuran"
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles", [

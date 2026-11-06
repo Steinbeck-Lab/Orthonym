@@ -21,7 +21,6 @@ from rdkit import Chem
 from orthonym import name_compound
 from orthonym.decomposition.engine import (
     _coverage_is_adequate,
-    _RETAINED_CORE_NAMES,
 )
 
 

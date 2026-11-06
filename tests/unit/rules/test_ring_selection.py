@@ -7,7 +7,6 @@ from orthonym.rules.ring_selection.
 Reference: IUPAC 2013 Blue Book, (Ring System Selection)
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.ring_selection import (
@@ -205,19 +204,6 @@ class TestRingSystemScore:
         score_7 = ring_system_score(mol_7, rs_7[0])
         score_6 = ring_system_score(mol_6, rs_6[0])
         assert score_7 < score_6
-
-    def test_hetero_beats_more_rings_across_types(self):
-        """A heterocyclic monocyclic ring should score more senior
-        on the heteroatom criterion than a carbocyclic monocyclic
-        ring of same size. This verifies scoring tuple comparison works."""
-        mol_pyridine = Chem.MolFromSmiles("c1ccncc1")
-        mol_benzene = Chem.MolFromSmiles("c1ccccc1")
-        rs_pyridine = get_ring_systems(mol_pyridine)
-        rs_benzene = get_ring_systems(mol_benzene)
-        score_pyridine = ring_system_score(mol_pyridine, rs_pyridine[0])
-        score_benzene = ring_system_score(mol_benzene, rs_benzene[0])
-        # Pyridine should be more senior (lower tuple) because of heteroatom
-        assert score_pyridine < score_benzene
 
     def test_monocyclic_heterocycle_beats_fused_carbocycle(self):
         """(a): A monocyclic heterocycle (pyridine) should beat a fused

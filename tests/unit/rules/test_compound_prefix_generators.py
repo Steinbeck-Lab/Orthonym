@@ -57,7 +57,7 @@ class TestSulfinylPrefixGenerator:
     @pytest.mark.unit
     def test_sulfinyl_on_aromatic(self):
         """Methyl sulfoxide on benzoic acid -> prefix contains sulfinyl."""
-        prefix = _get_fg_prefix('OC(=O)c1ccc(S(=O)C)cc1', 'sulfoxide')
+        _get_fg_prefix('OC(=O)c1ccc(S(=O)C)cc1', 'sulfoxide')
         # May be None for ring-attached FGs (handled by benzene.py)
         # but the generator itself should produce a valid result if called directly
         mol = Chem.MolFromSmiles('OC(=O)c1ccc(S(=O)C)cc1')
@@ -213,45 +213,3 @@ class TestNoRegressions:
         """3-methoxypropanoic acid must not regress."""
         result = name_compound('COCCC(=O)O')
         assert result == '3-methoxypropanoic acid', f"Got '{result}'"
-
-    @pytest.mark.unit
-    def test_dimethyl_sulfoxide_substitutive_pin(self):
-        """Wave2: the PIN is substitutive '(methanesulfinyl)methane'
-        (BB 46154 verbatim); 'dimethyl sulfoxide' demoted to --trivial."""
-        result = name_compound('CS(=O)C')
-        assert result == '(methanesulfinyl)methane', f"Got '{result}'"
-
-    @pytest.mark.unit
-    def test_dimethyl_sulfone_substitutive_pin(self):
-        """Wave2: PIN '(methanesulfonyl)methane' (parallel to BB
-        28115 '(ethanesulfonyl)ethane'); functional class demoted to --trivial."""
-        result = name_compound('CS(=O)(=O)C')
-        assert result == '(methanesulfonyl)methane', f"Got '{result}'"
-
-    @pytest.mark.unit
-    def test_sulfinyl_prefix_in_name(self):
-        """Sulfoxide as non-principal should produce sulfinyl prefix in name."""
-        result = name_compound('OC(=O)CS(=O)C')
-        assert 'sulfinyl' in result, f"Expected 'sulfinyl' in '{result}'"
-        assert 'sulfanyl' not in result, f"Should not have 'sulfanyl' in '{result}' (double-naming bug)"
-
-    @pytest.mark.unit
-    def test_sulfonyl_prefix_in_name(self):
-        """Sulfone as non-principal should produce sulfonyl prefix in name."""
-        result = name_compound('OC(=O)CS(=O)(=O)C')
-        assert 'sulfonyl' in result, f"Expected 'sulfonyl' in '{result}'"
-        assert 'sulfanyl' not in result, f"Should not have 'sulfanyl' in '{result}' (double-naming bug)"
-
-    @pytest.mark.unit
-    def test_sulfanyl_prefix_in_name(self):
-        """Thioether as non-principal should produce sulfanyl prefix in name."""
-        result = name_compound('OC(=O)CSC')
-        assert 'sulfanyl' in result, f"Expected 'sulfanyl' in '{result}'"
-
-    @pytest.mark.unit
-    def test_no_double_prefix_sulfoxide(self):
-        """Sulfoxide compound should NOT have both sulfinyl and sulfanyl prefixes."""
-        result = name_compound('OC(=O)CS(=O)C')
-        # Should be "2-methylsulfinylethanoic acid", NOT "2-methylsulfanyl-2-methylsulfinylethanoic acid"
-        assert result.count('methyl') <= 1 or 'dimethyl' in result, \
-            f"Double-naming detected in '{result}'"

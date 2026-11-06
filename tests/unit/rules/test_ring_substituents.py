@@ -5,7 +5,6 @@ Tests the ring_substituents module for correct identification and naming
 of rings when they become substituents on a chain parent.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.ring_substituents import (

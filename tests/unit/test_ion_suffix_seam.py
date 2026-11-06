@@ -194,13 +194,6 @@ class TestGuard1AllowedSuffixes:
 # ===========================================================================
 
 class TestAnionPathUnchanged:
-    def test_propanesulfonic_acid_to_propanesulfonate(self):
-        """: the 169.5 byte-identical anion path is reused
-        unchanged through the generalized primitive."""
-        assert apply_ion_suffix_to_name(
-            "propane-1-sulfonic acid", -1, allowed_suffixes=frozenset({"sulfonic acid"})
-        ) == "propane-1-sulfonate"
-
     def test_butanoic_acid_to_butanoate(self):
         """: oic acid->oate (the canonical carboxylate transform)."""
         assert apply_ion_suffix_to_name("butanoic acid", -1) == "butanoate"

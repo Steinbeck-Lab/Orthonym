@@ -30,7 +30,6 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.phane import (
-    Amplificant,
     PhaneStructure,
     SkeletonClass,
     _amplification_prefix,

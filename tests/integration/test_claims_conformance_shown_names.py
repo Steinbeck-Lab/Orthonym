@@ -30,8 +30,8 @@ from rdkit.Chem import inchi
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_flags import java_cmd
-from orthonym.namer import _is_exact_match_list_name
 from tests.support.jars import jar_or_skip
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
@@ -60,7 +60,7 @@ PENTAKIS_NAME = "(1s,2R,3S,4s,5R,6S)-2,3,4,5,6-pentakis(phosphonooxy)cyclohexan-
 
 
 def _be_row(smiles):
-    return Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    return tier_row(smiles, "best-effort")
 
 
 def _jar_full_key(name):

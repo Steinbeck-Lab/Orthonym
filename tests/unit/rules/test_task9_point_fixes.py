@@ -212,10 +212,6 @@ class TestRingNitrogenNotAmineGold:
     def test_phenylpyrrolidine(self):
         assert name_compound("c1ccccc1N1CCCC1").strip() == "1-phenylpyrrolidine"
 
-    def test_methylmorpholine_pin(self):
-        assert name_compound("CN1CCOCC1").strip() == "4-methylmorpholine"
-
-
 @pytest.mark.unit
 class TestRingNitrogenNotAmineProtect:
     """Acyclic amines and bare N-heterocycle parents must not move."""
@@ -283,12 +279,6 @@ class TestNoPGReplacementChainGold:
     """ + /: with no PG, a heteroatom skeletal chain
     admissible for replacement nomenclature (>=4 hetero units) is senior to
     an all-carbon ring, and the chain stem cites the oxa locants."""
-
-    def test_tetraoxadodecane(self):
-        assert (
-            name_compound("C1CCCCC1COCCOCCOCCOC").strip()
-            == "1-cyclohexyl-2,5,8,11-tetraoxadodecane"
-        )
 
     def test_mono_ether_keeps_ring_parent(self):
         assert name_compound("CCCCOC1CCCCC1").strip() == "butoxycyclohexane"

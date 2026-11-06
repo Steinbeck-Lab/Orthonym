@@ -7,7 +7,6 @@ on chain parents.
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.namer import Orthonym
 

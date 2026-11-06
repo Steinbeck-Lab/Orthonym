@@ -11,7 +11,6 @@ IUPAC Reference: (CIP sequence rules for allene axial chirality)
 
 import pytest
 from rdkit import Chem
-from rdkit.Chem import rdCIPLabeler
 
 from orthonym.perception.stereo import (
     _cip_priority_key,

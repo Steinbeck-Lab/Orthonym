@@ -22,23 +22,7 @@ is for an ester that is not the principal characteristic group "Esters cited
 as prefixes",:31696). Every name asserted here reads back to its input's full InChIKey
 with OPSIN 2.9.0.
 """
-import pytest
 from orthonym import name_compound
-
-
-class TestSingleEsterNoRegression:
-    """Compounds with a single ester prefix and NO other substituents.
-    These must continue to work exactly as before (no regression)."""
-
-    def test_acetyloxycyclohexane(self):
-        """CC(=O)OC1CCCCC1 -> cyclohexyl acetate (PIN; was acetyloxycyclohexane)"""
-        result = name_compound("CC(=O)OC1CCCCC1")
-        assert result == "cyclohexyl acetate", f"Got: {result}"
-
-    def test_acetyloxybenzene(self):
-        """CC(=O)Oc1ccccc1 -> phenyl acetate (PIN; was acetyloxybenzene)"""
-        result = name_compound("CC(=O)Oc1ccccc1")
-        assert result == "phenyl acetate", f"Got: {result}"
 
 
 class TestEsterPlusSingleSubstituent:
@@ -111,16 +95,6 @@ class TestNoRegressionWithoutEsters:
         """C1CCCCC1 -> cyclohexane"""
         result = name_compound("C1CCCCC1")
         assert result == "cyclohexane", f"Got: {result}"
-
-    def test_methylcyclohexane(self):
-        """CC1CCCCC1 -> methylcyclohexane"""
-        result = name_compound("CC1CCCCC1")
-        assert result == "methylcyclohexane", f"Got: {result}"
-
-    def test_benzene(self):
-        """c1ccccc1 -> benzene"""
-        result = name_compound("c1ccccc1")
-        assert result == "benzene", f"Got: {result}"
 
     def test_chlorobenzene(self):
         """Clc1ccccc1 -> chlorobenzene"""

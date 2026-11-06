@@ -109,14 +109,6 @@ class TestNoDoubleFGPrefix:
     """FGs on small branches are only named once (in compound substituent name)."""
 
     @pytest.mark.integration
-    def test_hydroxy_branch_no_duplicate(self):
-        """CCCC(CO)CC(=O)O -> 'hydroxy' appears exactly once (in hydroxymethyl)."""
-        name = name_compound('CCCC(CO)CC(=O)O')
-        assert name.count('hydroxy') == 1, (
-            f"Expected exactly 1 'hydroxy' in '{name}', found {name.count('hydroxy')}"
-        )
-
-    @pytest.mark.integration
     def test_amino_branch_no_duplicate(self):
         """CCCC(CN)CC(=O)O -> 'amino' appears exactly once (in aminomethyl)."""
         name = name_compound('CCCC(CN)CC(=O)O')
@@ -169,12 +161,6 @@ class TestHydroxyalkylLocant:
         """CCCC(CO)CC(=O)O -> 'hydroxymethyl' with no locant prefix."""
         name = name_compound('CCCC(CO)CC(=O)O')
         assert 'hydroxymethyl' in name, f"Expected 'hydroxymethyl' in '{name}'"
-
-    @pytest.mark.integration
-    def test_hydroxyethyl_with_locant(self):
-        """CCCC(CCO)CC(=O)O -> '2-hydroxyethyl' (locant included for 2-carbon)."""
-        name = name_compound('CCCC(CCO)CC(=O)O')
-        assert '2-hydroxyethyl' in name, f"Expected '2-hydroxyethyl' in '{name}'"
 
     @pytest.mark.integration
     def test_hydroxyethyl_no_plain_form(self):

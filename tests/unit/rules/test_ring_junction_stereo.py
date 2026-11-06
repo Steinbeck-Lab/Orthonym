@@ -60,7 +60,7 @@ class TestBridgeheadDetection:
         mol = Chem.MolFromSmiles('C1CC2CCCCC2C1')  # 5,6 fused saturated
         # Actually let's use a proper indane structure
         mol = Chem.MolFromSmiles('C1Cc2ccccc2C1')  # indane (partially aromatic)
-        bridgeheads = get_bridgehead_atoms(mol)
+        get_bridgehead_atoms(mol)
         # Aromatic bridgeheads are sp2, not sp3, so should not be counted
         # unless saturated
         # For fully saturated 5,6:

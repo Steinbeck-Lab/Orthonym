@@ -6,7 +6,6 @@ produce correct IUPAC prefix names via get_fused_heterocycle_prefix routing.
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 

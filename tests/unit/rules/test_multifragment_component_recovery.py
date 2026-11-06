@@ -26,20 +26,15 @@ rules: (binary salt name), (-ium cation suffix),
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym, name_compound
 from orthonym.rules.salts import _ion_fragment_roundtrips
+from tests.support.read_back import key_or_none
 
 # Best-effort tier flags -- the recovery is scoped to these (PIN tier is
 # byte-identical because all three are False there).
 FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
              allow_aromatic_general=True)
-
-
-def _ik(smiles: str):
-    m = Chem.MolFromSmiles(smiles)
-    return inchi.MolToInchiKey(m) if m is not None else None
 
 
 def _full_rt_matches(name: str, input_smiles: str) -> bool:
@@ -49,7 +44,7 @@ def _full_rt_matches(name: str, input_smiles: str) -> bool:
         return False
     from orthonym.namer import _validity_gate_name_to_smiles
     smi = _validity_gate_name_to_smiles(name)
-    return bool(smi) and _ik(smi) == _ik(input_smiles)
+    return bool(smi) and key_or_none(smi) == key_or_none(input_smiles)
 
 
 @pytest.fixture(scope="module")

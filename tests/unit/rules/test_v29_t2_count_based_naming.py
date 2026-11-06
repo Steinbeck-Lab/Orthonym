@@ -58,8 +58,6 @@ def ungated_namer(monkeypatch):
     path would pass vacuously against the pre-fix tree too. The gate is the
     margin here, not the producer, and these tests are about the producer.
     """
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
     return Orthonym()
 
 

@@ -12,7 +12,6 @@ this Chapter": the name is a systematic one, `systematic_verified`, and the PIN 
 Every expected name is read back by an independent OPSIN call (``name_is_rt_exact``); the structures are built from
 nucleosides (``tests/support/oligonucleotide_smiles.py``) or written out.
 """
-import contextlib
 
 import pytest
 from rdkit import Chem

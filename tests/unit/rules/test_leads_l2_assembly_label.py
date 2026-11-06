@@ -32,7 +32,6 @@ from orthonym.rules.ring_assembly_screen import _assemblies
 from orthonym.validation import pin_spelling
 from orthonym.validation.pin_spelling import check_pin_spelling
 from orthonym.validation.spelling import checks_assembly
-from tests.support.hydro_wiring import WIRED
 from tests.support.rt_assert import assert_full_rt
 
 RDLogger.DisableLog("rdApp.*")
@@ -75,7 +74,7 @@ IDS = [row[0] for row in SPLIT]
 HYDRO_NAMED = {"piperidinyl-pyridine", "piperidin-1-yl-pyridine", "cyclohexenylbenzene",
                "tetrahydronaphthyl-naphthalene"}
 ENGINE_SPLIT = [row for row in SPLIT
-                if not row[0].startswith("bicyclo") and not (WIRED and row[0] in HYDRO_NAMED)]
+                if not row[0].startswith("bicyclo") and row[0] not in HYDRO_NAMED]
 ENGINE_IDS = [row[0] for row in ENGINE_SPLIT]
 
 #: DT3 step A (``assembly/pin_rerun.py``): the default tier's first run of this row is the split name above, which

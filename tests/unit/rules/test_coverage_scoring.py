@@ -5,13 +5,10 @@ select_best_candidate selection logic, and thread-local confidence store.
 """
 
 import logging
-import pytest
 from rdkit import Chem
 
 from orthonym.assembly.coverage_scoring import (
     CandidateName,
-    CONFIDENCE_HIGH,
-    CONFIDENCE_MEDIUM,
     FACTOR_WEIGHTS,
     HANDLER_PRIORITY,
     compute_confidence,
@@ -408,7 +405,6 @@ def test_handler_priority_extended_with_iss002_entries():
     """ REGRESSION: HANDLER_PRIORITY contains the entries Plan 01's
     HANDLER_POLICIES needs. Single source of truth -- no hardcoded literals
     in candidate_pool.py."""
-    from orthonym.assembly.coverage_scoring import HANDLER_PRIORITY
     assert HANDLER_PRIORITY['n_oxide'] == 5, "n_oxide must be 5 (matches direct-return peers)"
     assert HANDLER_PRIORITY['amine'] == 5, "amine must be 5 (matches direct-return peers)"
     assert HANDLER_PRIORITY['simple_molecule'] == 1, "simple_molecule must be 1 (terminal fallback)"

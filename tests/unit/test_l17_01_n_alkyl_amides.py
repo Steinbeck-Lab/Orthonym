@@ -12,16 +12,12 @@ the two-carbon acyl chain on length, held the group by no count, tied the ring a
 """
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # an N-alkyl of three carbons or more on an acyl chain of two that carries a ring (or a hetero substituent)
@@ -48,7 +44,7 @@ _TARGETS = [
 def test_the_acyl_chain_is_the_parent_of_an_n_alkyl_amide(smiles, name, tier):
     """ (the Blue Book): the N-substituents are prefixes with the locant N; the acyl chain is the
     parent, the ring on it a prefix ('2-phenyl-N-(propan-2-yl)acetamide')."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -76,7 +72,7 @@ _CONTROLS = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _CONTROLS)
 def test_the_controls_keep_their_names(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -93,7 +89,7 @@ _PIN_ROWS = [
 
 @pytest.mark.parametrize("smiles,name", _PIN_ROWS)
 def test_the_gold_rows_and_the_formamide_keep_their_pins(smiles, name):
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -112,7 +108,7 @@ _AMIDO = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _AMIDO)
 def test_a_tertiary_acyl_nitrogen_of_a_three_carbon_substituent_is_the_amido_prefix(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert not row["name"].startswith("N-"), row
     assert_full_rt(row["name"], smiles)
@@ -136,7 +132,7 @@ _HETERO_ON_ACYL = [
 def test_a_heteroatom_substituent_of_the_acyl_chain_is_a_prefix_of_the_amide(smiles, name, tier):
     """ (the Blue Book): the substituents of the acyl parent and the N-substituents are prefixes of
     one amide name; no atom of the molecule is dropped."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -156,7 +152,7 @@ _N_CHAIN_OF_THE_SAME_LENGTH = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _N_CHAIN_OF_THE_SAME_LENGTH)
 def test_an_n_chain_of_the_acyl_length_with_more_prefixes_is_no_parent(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -167,7 +163,7 @@ def test_the_amine_on_the_acyl_ring_is_no_oxo_ethyl_substituent_of_aniline(tier)
     parent ('2-(2-aminophenyl)-N-propylacetamide'); the ring parent '2-[2-oxo-2-(propylamino)ethyl]aniline' was a false
     PIN of the unfixed chain choice."""
     smiles = "CCCNC(=O)Cc1ccccc1N"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == ("2-(2-aminophenyl)-N-propylacetamide", "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -186,7 +182,7 @@ def test_a_hydrogen_isotope_on_the_acyl_chain_is_no_hetero_substituent():
     assert verdict("OCCCNC(=O)CC[2H]") and verdict("OCCCNC(=O)CC[3H]")
     assert verdict("OCCCNC(=O)CCC")
     assert not verdict("OCCCNC(=O)CCCl")
-    row = _row("OCCCNC(=O)CC[2H]", "pin")
+    row = tier_row("OCCCNC(=O)CC[2H]", "pin")
     assert (row["name"], row["tier"]) == ("N-(3-hydroxypropyl)(3-2H1)propanamide", "pin_verified"), row
 
 
@@ -212,6 +208,6 @@ _N_SUBSTITUTED_ACETAMIDE = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _N_SUBSTITUTED_ACETAMIDE)
 def test_an_n_substituted_acetamide_cites_every_locant(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)

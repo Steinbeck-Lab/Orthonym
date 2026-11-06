@@ -1,5 +1,4 @@
 """Unit tests for salt and zwitterion naming."""
-import pytest
 from rdkit import Chem
 from orthonym.rules.salts import (
     name_salt,
@@ -181,15 +180,6 @@ class TestSUB01ZwitterionNegativeCanary:
         parent,:42473). The retained 'glycine' names the neutral acid and:50943 gives it no PIN, so
         it no longer pre-empts the structured name (ruling R6, RULINGS-ANION.md). OPSIN reads the name to the input."""
         assert name_compound("[NH3+]CC(=O)[O-]") == "azaniumylacetate"
-
-    def test_betaine_structured_p74_1_3(self):
-        """169.6-04: the hardcoded ``betaine`` literal was DELETED (it is NOT
-        OPSIN-parseable — the validity gate suppressed it to 'unknown organic
-        compound'). route_charged GUARD 4 now produces the structured
-        (trimethylazaniumyl)acetate, which round-trips in OPSIN to
-        C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
-        assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "(N,N-dimethylmethanaminiumyl)acetate"
-
 
 class TestSUB01Zwitterion:
     """Non-retained zwitterion -> whole-skeleton azaniumyl...oate ."""

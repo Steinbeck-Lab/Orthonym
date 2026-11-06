@@ -16,7 +16,6 @@ branch cation_to_prefix could already name. This test suite proves:
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym.assembly.substituent_enumerator import name_substituent
 from orthonym.assembly.substituent_naming import name_substituent_fragment
 
@@ -100,11 +99,6 @@ def test_direct_attach_shape_unaffected_by_generic_namer():
 # repo's conftest (autouse fixture), so no JVM is required here; @opsin_gate
 # turns it ON to also prove round-trip validity.
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 @pytest.mark.opsin_gate

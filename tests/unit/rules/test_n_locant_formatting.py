@@ -2,7 +2,6 @@
 pins (Wave-2 P0c Task 9). BB the Blue Book. Evidence rows verified
 OPSIN-RT 2026-07-09.
 """
-import pytest
 
 from orthonym.namer import name_compound
 

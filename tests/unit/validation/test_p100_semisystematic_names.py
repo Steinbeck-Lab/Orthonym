@@ -8,8 +8,8 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.validation.spelling.checks_natural_products import chapter_p10_name_is_no_pin
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -40,8 +40,7 @@ def test_a_systematic_name_is_not_flagged(name):
 
 @pytest.mark.opsin_gate
 def test_a_retained_sugar_name_is_not_labelled_a_pin():
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
-        "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO")
+    row = tier_row("O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO", "best-effort")
     assert row["name"] == "D-glucose" and row["tier"] == "systematic_verified"
     assert Orthonym().name_tiered("O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO")["limit_code"] == "NO_VERIFIED_PIN"
 
@@ -53,7 +52,7 @@ def test_a_retained_sugar_name_is_not_labelled_a_pin():
 ])
 def test_an_inositol_ships_at_best_effort_and_the_pin_tier_declines(smiles, expected):
     # OPSIN has no grammar for inositol names; the exact InChIKey of the meso stereoisomer is the licence
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == expected and row["is_pin"] is False
     assert Orthonym().name_tiered(smiles)["limit_code"] == "NO_VERIFIED_PIN"
 
@@ -134,6 +133,6 @@ def test_a_systematic_name_beside_a_natural_product_stem_is_not_flagged(name):
 def test_the_anion_and_the_ester_of_a_table_acid_are_not_pins(smiles, expected):
     """ (:50941) covers the salt and the ester of a acid as it covers the acid: the name ships below
     the PIN and the PIN tier declines it."""
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["is_pin"]) == (expected, False)
     assert Orthonym().name_tiered(smiles)["limit_code"] == "NO_VERIFIED_PIN"

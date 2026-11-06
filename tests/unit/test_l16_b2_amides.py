@@ -7,20 +7,15 @@ ways: (1) substitutively, by using a prefix formed by changing the final letter 
 benzoic acid'), not the anilino prefix of (the Blue Book), whose 'N-<R>anilino' takes an
 N-substituent that is no acyl ('3-(N-methylanilino)phenol (PIN)',:26308).
 """
-import re
 
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # an acylated nitrogen on a benzene ring that also carries a phenyl: the amido prefix of method (1), at both tiers
@@ -38,7 +33,7 @@ _N_ARYL_AMIDO = [
 def test_an_acyl_nitrogen_that_carries_a_phenyl_is_the_amido_prefix_not_the_anilino(smiles, name, tier):
     """ (the Blue Book), method (1) 'generates preferred IUPAC names': '4-(N-phenylacetamido)benzoic
     acid', not '4-(N-acetylanilino)benzoic acid' (the book gives no 'N-acylanilino' name)."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert "anilino" not in row["name"], row
     assert_full_rt(row["name"], smiles)

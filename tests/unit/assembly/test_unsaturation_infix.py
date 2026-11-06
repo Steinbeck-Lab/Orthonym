@@ -8,7 +8,6 @@ Tests _build_unsaturation_infix and _build_hydrocarbon_name to ensure:
 a phase Plan 02 Task 1: Written before rewrite to serve as characterization tests.
 """
 
-import pytest
 
 from orthonym.assembly.composer import _build_unsaturation_infix, _build_hydrocarbon_name
 

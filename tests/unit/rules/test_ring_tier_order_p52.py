@@ -38,31 +38,12 @@ longer recommended, so they MUST NOT. All four live in the same Blue Book table
 undifferentiated bucket breaks two of the four in one direction or the other.
 """
 
-import os
 import re
-
-# Same pattern as tests/unit/assembly/test_serializer_flip_tripwire.py: keep the
-# fast unit tier free of the OPSIN subprocess...
-#... and put the environment back right after the import. Under xdist every
-# worker imports every test module at collection, so a module-level write that
-# stayed in os.environ switched the gates off in every child process the rest of
-# the suite spawned (TRIAGE C1: subprocess tests saw gate-off names). The namer
-# reads these variables once, at import, so restoring them changes nothing here.
-_ENV_BEFORE = {k: os.environ.get(k) for k in (
-    "ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "ORTHONYM_SELF_CONSISTENCY_GATE")}
-os.environ.setdefault("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "1")
-os.environ.setdefault("ORTHONYM_SELF_CONSISTENCY_GATE", "off")
 
 import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
-
-for _k, _v in _ENV_BEFORE.items():   # restore: see the note above the import
-    if _v is None:
-        os.environ.pop(_k, None)
-    else:
-        os.environ[_k] = _v
 
 #: A von Baeyer descriptor: "bicyclo[", "tetracyclo[",... but NOT "cyclohexane"
 #: and NOT "spiro[".

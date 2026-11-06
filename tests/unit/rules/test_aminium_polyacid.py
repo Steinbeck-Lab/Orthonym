@@ -80,31 +80,11 @@ def _dt_obj_row(namer_obj, smiles):
     return namer_obj.name_tiered(smiles)
 
 
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
         return _declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
-
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # --- the 2 goal molecules (RT-verified via OPSIN 2026-08-17) --------------
@@ -367,7 +347,6 @@ def test_amidinium_arm_is_named_below_the_pin():
     labelled below the PIN, with the arm enclosed and the chain atom's locant."""
     from rdkit import Chem
     from rdkit.Chem import inchi
-    from orthonym import Orthonym
     from tests.support.jars import jar_or_skip
     from tests.support.rt_assert import _independent_parse
     jar_or_skip()

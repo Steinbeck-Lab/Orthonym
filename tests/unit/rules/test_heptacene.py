@@ -33,7 +33,6 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
 pytestmark = pytest.mark.opsin_gate
@@ -42,11 +41,6 @@ HEPTACENE_SMILES = "c1ccc2cc3cc4cc5cc6cc7ccccc7cc6cc5cc4cc3cc2c1"
 HEXACENE_SMILES = "c1ccc2cc3cc4cc5cc6ccccc6cc5cc4cc3cc2c1"
 PENTACENE_SMILES = "c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1"
 ANTHRACENE_SMILES = "c1ccc2cc3ccccc3cc2c1"
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 def _full_rt(smi, name):

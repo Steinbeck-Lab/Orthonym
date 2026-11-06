@@ -6,7 +6,6 @@ behaviour in every mode. Guarded by `ORTHONYM_COVERAGE_AUDIT`
 (default "shadow"): off / shadow (L0, this task) / veto (reserved for L1,
 behaves like shadow here).
 """
-import os
 import time
 
 import pytest

@@ -16,33 +16,20 @@ Two defects made it suppress correct names:
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.perception import structure_conservation as sc
-from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import same_key
 
 pytestmark = pytest.mark.opsin_gate
 
 TRIOL = "CC(C)(O)[C@@H]1CC[C@](C)(O)[C@H]2CC[C@](C)(O)[C@H]2C1"
 
 
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _same(smi, name):
-    out = opsin_parse(name)
-    m_out = Chem.MolFromSmiles(out) if out else None
-    return m_out is not None and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == inchi.MolToInchiKey(m_out)
-
-
 def test_the_saturated_bicycle_is_named(namer):
     row = namer.name_tiered(TRIOL)
     expected = "(1S,3aS,4S,7R,8aS)-7-(2-hydroxypropan-2-yl)-1,4-dimethyldecahydroazulene-1,4-diol"
     assert row["name"] == expected and row["tier"] == "pin_verified", row
-    assert _same(TRIOL, expected)
+    assert same_key(TRIOL, expected)
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -52,7 +39,7 @@ def test_the_saturated_bicycle_is_named(namer):
 def test_tetralin_esters_are_named(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified", row
-    assert _same(smiles, expected)
+    assert same_key(smiles, expected)
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -94,4 +81,4 @@ def test_the_hydroxy_aminotetralin_is_named(namer):
     smiles = "NC1CCc2cc(O)ccc2C1"
     row = namer.name_tiered(smiles)
     assert row["name"] == "6-amino-5,6,7,8-tetrahydronaphthalen-2-ol" and row["tier"] == "pin_verified", row
-    assert _same(smiles, row["name"])
+    assert same_key(smiles, row["name"])

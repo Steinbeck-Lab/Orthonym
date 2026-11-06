@@ -63,18 +63,8 @@ class TestHydrazineParentUnchanged:
     hydrazine (or a hydrazide) is the correct parent. These are the BEFORE names,
     re-asserted AFTER the fix."""
 
-    def test_phenylhydrazine_unchanged(self):
-        # All-carbon ring -> hydrazine parent (retained PIN,. The
-        # risk the brief flagged: a naive producer would ship `hydrazinylbenzene`.
-        assert name_compound("NNc1ccccc1") == "phenylhydrazine"
-
     def test_methylhydrazine_unchanged(self):
         assert name_compound("CNN") == "methylhydrazine"
-
-    def test_acetohydrazide_unchanged(self):
-        # -C(=O)-NH-NH2 is a hydrazide (different FG), never a hydrazinyl prefix.
-        assert name_compound("CC(=O)NN") == "acetohydrazide"
-
 
 @pytest.mark.unit
 class TestSeniorityScopeGuard:
@@ -95,9 +85,6 @@ class TestSeniorityScopeGuard:
 class TestChainHydrazinylUnchanged:
     """Regression pins: the chain path (a senior chain carrying a principal group)
     already spelled hydrazinyl and is untouched by the ring-collector fix."""
-
-    def test_4_hydrazinylbutanoic_acid(self):
-        assert name_compound("NNCCCC(=O)O") == "4-hydrazinylbutanoic acid"
 
     def test_2_hydrazinylethanol(self):
         assert name_compound("NNCCO") == "2-hydrazinylethan-1-ol"

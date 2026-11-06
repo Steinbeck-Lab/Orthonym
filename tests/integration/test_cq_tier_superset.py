@@ -12,11 +12,11 @@ RT-verified name. If a later change re-narrows the fall-through gate, this fails
 See `internal notes` and CQ1-CQ5-a review-REVIEW.md RISK 8.
 """
 import pytest
-from rdkit import Chem
 
 from orthonym.namer import Orthonym
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 pytestmark = [pytest.mark.integration, pytest.mark.roundtrip,
               pytest.mark.opsin_gate]
@@ -37,16 +37,11 @@ def _besteffort():
                      allow_aromatic_general=True)
 
 
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
-
-
 def _rt_ok(name, smiles):
     if is_failure_name(name):
         return False
     osmi = opsin_parse(name)
-    return osmi is not None and _inchikey(osmi) == _inchikey(smiles)
+    return osmi is not None and key_or_none(osmi) == key_or_none(smiles)
 
 
 @pytest.mark.parametrize("smiles", WITNESSES)

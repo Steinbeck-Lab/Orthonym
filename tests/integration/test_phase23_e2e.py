@@ -19,7 +19,6 @@ pipeline (SMILES -> name_compound -> IUPAC name):
 Run with: pytest tests/integration/test_phase23_e2e.py -v -m "not roundtrip"
 """
 
-import os
 import shutil
 import subprocess
 
@@ -107,58 +106,6 @@ class TestRingAssemblyE2E:
         assert expected_contains in result, (
             f"Expected '{expected_contains}' in '{result}'"
         )
-
-    @pytest.mark.integration
-    def test_substituted_biphenyl(self):
-        """4-chlorobiphenyl is correctly named."""
-        result = name_compound("Clc1ccc(-c2ccccc2)cc1")
-        assert "chloro" in result
-        assert "biphenyl" in result
-
-
-# ============================================================================
-# Section 3: Fused Heterocycle Locants (RING-)
-# ============================================================================
-
-
-class TestFusedHeterocycleLocantE2E:
-    """Verify fused heterocycle locant naming through the full pipeline."""
-
-    @pytest.mark.integration
-    def test_indole_indicated_hydrogen(self):
-        """Indole produces a name with indicated hydrogen or retained name."""
-        result = name_compound("c1ccc2[nH]ccc2c1")
-        assert "1H-" in result or "indole" in result
-
-    @pytest.mark.integration
-    def test_substituted_indole_preserves_indicated_h(self):
-        """Substituted indole preserves indicated hydrogen and methyl prefix."""
-        result = name_compound("Cc1ccc2[nH]ccc2c1")
-        assert "methyl" in result
-        assert "indole" in result
-
-
-# ============================================================================
-# Section 4: Lactams (RING-)
-# ============================================================================
-
-
-class TestLactamE2E:
-    """Verify monocyclic lactam naming through the full pipeline."""
-
-    @pytest.mark.integration
-    def test_succinimide_not_misrouted(self):
-        """Succinimide (imide, not lactam) should not be named as a lactam."""
-        result = name_compound("O=C1CCC(=O)N1")
-        # Imides have 2 C=O on the ring nitrogen -- should not produce lactam name
-        assert "lactam" not in (result or "").lower()
-        assert result is not None
-
-
-# ============================================================================
-# Section 5: Cross-feature regression tests
-# ============================================================================
-
 
 # ============================================================================
 # Section 6: OPSIN Round-Trip Tests

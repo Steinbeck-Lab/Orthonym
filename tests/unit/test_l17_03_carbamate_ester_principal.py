@@ -17,17 +17,13 @@ ester of it is 'R hydrazinecarboxylate' (derived from; the book has no such este
 """
 import pytest
 
-from orthonym.cli import _tiered_namer
 from orthonym.errors import is_failure_name
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 def _abstains(row):
@@ -74,7 +70,7 @@ _ESTERS = [
 @pytest.mark.parametrize("smiles,name", _ESTERS)
 def test_a_carbamate_ester_with_a_junior_group_is_named_as_the_ester(smiles, name, tier):
     """ class 9 > 11/12/14/16/17/19;; the exemplar of (:30766)."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -93,8 +89,8 @@ _UNCHANGED = [
 
 @pytest.mark.parametrize("smiles,_why", _UNCHANGED)
 def test_a_carbamate_the_handler_does_not_build_keeps_its_declined_pin_tier(smiles, _why):
-    assert _abstains(_row(smiles, "pin"))
-    row = _row(smiles, "best-effort")
+    assert _abstains(tier_row(smiles, "pin"))
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and row["tier"] != "abstain", row
     assert_full_rt(row["name"], smiles)
 
@@ -102,7 +98,7 @@ def test_a_carbamate_the_handler_does_not_build_keeps_its_declined_pin_tier(smil
 @pytest.mark.parametrize("tier", _TIERS)
 def test_a_senior_acid_keeps_the_parent_and_cites_the_carbamate_as_a_prefix(tier):
     """ class 7 (acids) outranks class 9: the carbamate is the prefix 'carbamoyloxy'."""
-    row = _row("OC(=O)COC(N)=O", tier)
+    row = tier_row("OC(=O)COC(N)=O", tier)
     assert (row["name"], row["tier"]) == ("(carbamoyloxy)acetic acid", "pin_verified"), row
     assert_full_rt(row["name"], "OC(=O)COC(N)=O")
 
@@ -111,7 +107,7 @@ def test_a_senior_acid_keeps_the_parent_and_cites_the_carbamate_as_a_prefix(tier
 def test_the_hydrazide_name_of_the_ester_is_not_emitted(tier):
     """Class 12 (a hydrazide) is below class 9: no name of a carbazate ester expresses 'methanehydrazide' / 'carbamoyl'."""
     for smiles in ("CC(COC(=O)NN)O", "COC(=O)NN", "NNC(=O)OCCO"):
-        name = _row(smiles, tier)["name"]
+        name = tier_row(smiles, tier)["name"]
         assert "hydrazide" not in name and "aminocarbamate" not in name and "carbamoyl" not in name, name
 
 
@@ -146,7 +142,7 @@ _SENIOR_ACID_ESTERS = [
 @pytest.mark.parametrize("smiles,name", _SENIOR_ACID_ESTERS)
 def test_the_ester_of_a_senior_acid_keeps_the_parent_over_the_carbamate(smiles, name, tier):
     """ (:31696) keeps the ester of the senior acid as the parent: the carbamate (class 7b) is its prefix."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -175,21 +171,21 @@ _JUNIOR_ACID_ESTERS = [
 @pytest.mark.parametrize("smiles,name,label,junior_parent_name", _JUNIOR_ACID_ESTERS)
 def test_a_carbamate_ester_outranks_the_ester_of_a_phosphorus_or_sulfur_acid(smiles, name, label, junior_parent_name):
     """ class 7b > class 7c > class 7d; class 9 ranks esters by their acid,:31696)."""
-    assert _abstains(_row(smiles, "pin"))
-    row = _row(smiles, "best-effort")
+    assert _abstains(tier_row(smiles, "pin"))
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, label), row
     assert row["name"] != junior_parent_name
     assert_full_rt(row["name"], smiles)
     # the name of the junior acid's ester reads back to the molecule and is no PIN: it is not shipped as one at any tier
     assert_full_rt(junior_parent_name, smiles)
     for tier in _TIERS:
-        assert (_row(smiles, tier)["name"], _row(smiles, tier)["tier"]) != (junior_parent_name, "pin_verified")
+        assert (tier_row(smiles, tier)["name"], tier_row(smiles, tier)["tier"]) != (junior_parent_name, "pin_verified")
 
 
 def test_a_phosphonate_ester_keeps_the_parent_when_the_other_group_is_junior_to_it():
     """The control: an amine (class 19) is junior to the ester of phosphonic acid, so its PIN is unchanged."""
     for tier in _TIERS:
-        row = _row("COP(=O)(OC)CCNC", tier)
+        row = tier_row("COP(=O)(OC)CCNC", tier)
         assert (row["name"], row["tier"]) == ("dimethyl [2-(methylamino)ethyl]phosphonate", "pin_verified"), row
 
 
@@ -229,7 +225,7 @@ def test_the_ester_of_carbamothioic_acid_is_named_on_the_carbamothioate(smiles, 
     """ (:30756): "Substitution of formic acid is not recommended for generation of these names", so
     '(methylamino)methanethioate' and '[(methylcarbamothioyl)oxy]ethan-1-ol' (the hydroxy group as the parent) are no names of these
     esters (class 9 ranks above class 17,,:18182,:18190)."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -240,7 +236,7 @@ def test_the_carbamate_first_name_of_a_molecule_with_carbamoyl_amides_is_kept():
     counted none of them,:30867: carbamoyl is the prefix of carbamic acid) and handed the molecule to a producer
     that spelled '2-(1H-indol-3-yl)ethan-1-yl'."""
     smiles = "COC(=O)Nc1coc(C(=O)Nc2coc(C(=O)NCCc3c[nH]c4ccccc34)c2)c1"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == ("methyl {5-[(5-{[2-(1H-indol-3-yl)ethyl]carbamoyl}furan-3-yl)carbamoyl]furan-3-yl}carbamate"), row
     assert "ethan-1-yl" not in row["name"]
     assert_full_rt(row["name"], smiles)
@@ -253,7 +249,7 @@ def test_estramustine_is_named_as_the_carbamate_on_the_systematic_fused_parent(t
     (:50943): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter", so the semisystematic
     'estra-1,3,5(10)-trien-3-yl' is not the name to pin; the systematic fused name is the PIN."""
     smiles = "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC(=O)N(CCCl)CCCl)ccc34)[C@@H]1CC[C@@H]2O"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (
         "(8R,9S,13S,14S,17S)-17-hydroxy-13-methyl-7,8,9,11,12,13,14,15,16,17-decahydro-6H-cyclopenta[a]phenanthren-3-yl "
         "bis(2-chloroethyl)carbamate", "pin_verified"), row
@@ -274,6 +270,6 @@ _IONS = [
 
 @pytest.mark.parametrize("smiles,name,label", _IONS)
 def test_an_ion_keeps_its_charged_parent_over_the_carbamate_ester(smiles, name, label):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, label), row
     assert_full_rt(row["name"], smiles)

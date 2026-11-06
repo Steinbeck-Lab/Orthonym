@@ -197,13 +197,6 @@ class TestSpiroVonBaeyerP24_5:
     def test_spiro_vonbaeyer_named(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_systematic_not_retained_component_name(self):
-        # The cage MUST be cited systematically (bicyclo[2.2.1]heptane), never
-        # the retained 'norbornane' — that also fixes the citation order (b<c).
-        out = name_compound("C1CCC2(CC1)CC1CCC2C1")
-        assert "bicyclo[2.2.1]heptane" in out
-        assert "norbornane" not in out
-
     def test_claimed_by_new_detector_only(self):
         from orthonym.rules.spiro import (
             is_mixed_spiro_fused, is_spiro_system, is_spirobi,

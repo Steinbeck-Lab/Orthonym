@@ -10,20 +10,11 @@ Every expected name is checked two ways: the exact string, and a strict OPSIN
 InChIKey alone cannot separate a radical from a closed-shell twin.
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
-from orthonym.jvm_bridge import opsin_stdout
-from tests.support.jars import jar_or_skip
-
-
-def _strict_rt(name: str, smiles: str) -> bool:
-    jar = jar_or_skip()
-    txt, _ = opsin_stdout(name, allow_radicals=True, jar_path=jar)
-    parsed = Chem.MolFromSmiles((txt or "").strip())
-    return parsed is not None and Chem.MolToSmiles(parsed) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+from tests.support.read_back import same_canonical_smiles
 
 
 def _name(smiles: str, tier: str = "pin") -> dict:
@@ -56,7 +47,7 @@ def test_n_oxyl_named_at_pin_tier(smiles, expected):
     row = _name(smiles, "pin")
     assert row["name"] == expected
     assert row["tier"] != "abstain"
-    assert _strict_rt(expected, smiles)
+    assert same_canonical_smiles(expected, smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", N_OXYL)
@@ -84,7 +75,7 @@ def test_acyl_n_oxyl_is_not_built_here():
     # rather than guessing, and the best-effort tier still names it.
     assert _name("CC(=O)N([O])C", "pin")["tier"] == "abstain"
     be = _name("CC(=O)N([O])C", "best-effort")
-    assert be["tier"] != "abstain" and _strict_rt(be["name"], "CC(=O)N([O])C")
+    assert be["tier"] != "abstain" and same_canonical_smiles(be["name"], "CC(=O)N([O])C")
 
 
 @pytest.mark.parametrize("prefixes,expected", [

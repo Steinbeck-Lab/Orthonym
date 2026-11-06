@@ -14,13 +14,11 @@ atom lies inside the chosen parent (chain or ring). It FAILS today (documents th
 PASS after the membership filter lands. Perception-level, no OPSIN, so it stays in the fast suite.
 """
 
-import sys
 from pathlib import Path
 
 from rdkit import Chem
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from orthonym.cli import _emit_tier_flags  # noqa: E402
 from orthonym.namer import Orthonym  # noqa: E402

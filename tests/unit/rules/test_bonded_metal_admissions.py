@@ -173,7 +173,7 @@ def test_no_declared_move_lowers_a_pin_label():
     """A PIN label is never lowered by an admission: a declared move never turns a ``pin_verified`` row of the baseline
     into a lower one (the baseline rows with that label keep it; the respelled ones are 'iron diacetate' and the like,
     ``declared_respellings_pinc.tsv``, decided on main before these lanes)."""
-    from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
+    from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, read_rows
     moves = declared_bonded_metal_moves()
     for row in read_rows(baseline_path("other")):
         key = (row["smiles"], row["tier_req"])

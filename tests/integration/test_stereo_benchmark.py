@@ -35,9 +35,8 @@ a phase+ parent fixes), update the expected name here.
 import re
 
 import pytest
+from rdkit import Chem
 
-from orthonym import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import assert_tier_contract
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -56,33 +55,19 @@ DEFAULT_TIER_DECLINES = frozenset({
     "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43",
     "C[C@@H]([NH3+])P(=O)([O-])[O-]",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label")
 
 
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
 
 
@@ -317,16 +302,13 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O', None),
     ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', None),  # Fixed: ring boundary fix changed substituent/locant assignment
     ('CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN([C@H]2CCCNC2=O)C3=O)C[C@@H]1O', None),
-    ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', None),
     # a phase Plan 02 Task 03: indole+peptide chain. Pre-148 ring-as-parent
     # (`-3-(2-aminoethyl)-1H-indole` suffix); post-148 cascade per (a)
     # selects propanamide chain as parent with indole as `1H-indol-3-yl`
     # substituent. Acceptable churn (cascade decision IUPAC-correct).
     ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', None),  # a phase cascade unblock; depth-independent naming v11; N-bracket fix v15
     ('O=C1N[C@@H](C[C@@]2(O)c3ccccc3N3C(=O)[C@@H]4CCCCN4[C@@H]32)C(=O)N[C@H]1Cc1ccccc1', None),
-    ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', None),
     ('COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(c(O)c1C3=O)[C@H](C)OC2=O', None),  # Updated P72: IUPAC citation order
-    ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid'),
     ('C[C@@H]1O[C@@H](OCCCCCCCCCCCCCCCCCCCC[C@@H](O)CC(=O)O)[C@H](O)C[C@H]1O', None),
     ('CC(C)[C@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)OS(=O)(=O)[O-]', '(24S)-3β-hydroxycholest-5-en-24-yl sulfate'),
 ]
@@ -335,18 +317,19 @@ MEDIUM_STEREO_COMPOUNDS = [
 # ---------------------------------------------------------------------------
 # Test IDs
 # ---------------------------------------------------------------------------
+def _heavy_atoms(smi):
+    mol = Chem.MolFromSmiles(smi)
+    return mol.GetNumHeavyAtoms() if mol is not None else 0
+
+
 _SMALL_IDS = [
-    f"s{i:02d}_HA{ha}"
+    f"s{i:02d}_HA{_heavy_atoms(smi)}"
     for i, (smi, _) in enumerate(SMALL_STEREO_COMPOUNDS)
-    for ha in [len([a for a in __import__('rdkit').Chem.MolFromSmiles(smi).GetAtoms()
-                    if a.GetAtomicNum() > 1]) if __import__('rdkit').Chem.MolFromSmiles(smi) else 0]
 ]
 
 _MEDIUM_IDS = [
-    f"m{i:02d}_HA{ha}"
+    f"m{i:02d}_HA{_heavy_atoms(smi)}"
     for i, (smi, _) in enumerate(MEDIUM_STEREO_COMPOUNDS)
-    for ha in [len([a for a in __import__('rdkit').Chem.MolFromSmiles(smi).GetAtoms()
-                    if a.GetAtomicNum() > 1]) if __import__('rdkit').Chem.MolFromSmiles(smi) else 0]
 ]
 
 
@@ -560,7 +543,6 @@ def test_stereo_pin_not_built_yet(smiles):
     """The PIN tier ships a PIN for a known non-PIN row (the derived string where there
     is one). Strict xfail: it XPASSes when a PIN producer lands -- or if the demoted
     label regresses to pin_verified -- and forces the row to be re-verified."""
-    from orthonym import Orthonym
     r = _dt_row(smiles)
     target = {**_KNOWN_NON_PIN, **_LIST_NAME_NOT_THE_PIN}[smiles][1]
     assert r["tier"] == "pin_verified", r
@@ -574,7 +556,6 @@ def test_cip_audit_no_wrong_labels():
     a phase CIP audit confirmed 0 WRONG_LABEL and 0 WRONG_LOCANT across
     all 500 benchmark compounds. This test verifies the invariant holds.
     """
-    import re
     from rdkit import Chem
     from rdkit.Chem import rdCIPLabeler
 

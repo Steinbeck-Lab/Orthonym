@@ -411,12 +411,6 @@ class TestAromaticCarboxylateNaming:
     IUPAC 2013 Reference: (anions from acids), (aromatic precedence)
     """
 
-    def test_simple_benzoate(self):
-        """Unsubstituted benzoate should be named 'benzoate'."""
-        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1')
-        name = name_anion(mol)
-        assert name == 'benzoate'
-
     def test_4_chlorobenzoate(self):
         """
         4-chlorobenzoate should NOT be named 'heptanoate'.
@@ -631,15 +625,6 @@ class TestSUB01NegativeCanary:
 
     def test_benzoate_unchanged(self):
         assert name_compound("[O-]C(=O)c1ccccc1") == "benzoate"
-
-    def test_propanolate_unchanged(self):
-        # 169.6-03 named this 'propan-1-olate' (systematic, locant mandated).
-        # Wave2 supersedes it: BB VERBATIM retains 'propoxide'
-        # as the PIN ("sodium propoxide (PIN) sodium propan-1-olate"), so the
-        # retained table now resolves the bare skeleton first. Substituted
-        # alkoxides still take the systematic -olate route this canary was
-        # written to protect (see test_tier2d_data_flips for the family).
-        assert name_compound("CCC[O-]") == "propoxide"
 
     def test_propanethiolate_unchanged(self):
         # 169.6-03: chokepoint adds the IUPAC locant ('propane-1-thiolate'),

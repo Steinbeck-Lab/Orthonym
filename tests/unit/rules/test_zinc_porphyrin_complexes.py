@@ -28,8 +28,6 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
 from orthonym.data.metal_scope import ELEMENT, MACROCYCLE, METAL_SCOPE, MetalScope
 from orthonym.rules import adducts, metal_labels, metal_macrocycles
@@ -43,6 +41,7 @@ from orthonym.rules.porphyrin import decline_reason, name_porphyrin_dianion
 from tests.support.jars import jar_or_skip
 from tests.support.metal_baselines import bonded_metal_symbols
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -76,10 +75,6 @@ ZN_TPP_NAME = "zinc 5,10,15,20-tetraphenylporphyrin-21,23-diide"
 ZN_PORPHINE_NAME = "zinc porphyrin-21,23-diide"
 
 
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
-
-
 def _view(row):
     return (row["name"], row["tier"], row["is_pin"], row["limit_code"])
 
@@ -106,11 +101,11 @@ def _dianion(free_base_smiles):
 
 def _assert_named_without_a_pin(smiles, name, tiers=("best-effort", "valid")):
     for tier in tiers:
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, (tier, row)
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
     assert_full_rt(name, smiles)
-    declined = _row(smiles, "pin")
+    declined = tier_row(smiles, "pin")
     assert declined["tier"] == "abstain" and declined["is_pin"] is False, declined
 
 
@@ -203,7 +198,7 @@ def test_zinc_octaethylporphyrin_and_a_dissymmetric_porphyrin():
     oep = "CCc1c(CC)c2cc3[n-]c(cc4nc(cc5[n-]c(cc1n2)c(CC)c5CC)c(CC)c4CC)c(CC)c3CC.[Zn+2]"
     _assert_named_without_a_pin(oep, "zinc 2,3,7,8,12,13,17,18-octaethylporphyrin-21,23-diide")
     diphenyl = _dianion("c1ccc(cc1)-c1c2ccc(n2)cc2ccc([nH]2)c(-c2ccccc2)c2ccc(n2)cc2ccc1[nH]2") + ".[Zn+2]"
-    row = _row(diphenyl, "best-effort")
+    row = tier_row(diphenyl, "best-effort")
     assert row["name"] == "zinc 5,15-diphenylporphyrin-21,23-diide", row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
     assert_full_rt(row["name"], diphenyl)
@@ -235,7 +230,7 @@ def test_the_diide_is_cited_in_the_salt_of_a_hydrate():
 def test_a_zinc_phthalocyanine_keeps_the_von_baeyer_ligand_name():
     """OPSIN has no phthalocyanine (hazard H7 of the plan) and the producer has no porphyrin core to name: the
     ionic drawing is named with the von Baeyer ligand of the general engine."""
-    row = _row(PHTHALOCYANINE_ZN, "best-effort")
+    row = tier_row(PHTHALOCYANINE_ZN, "best-effort")
     assert row["name"] == PHTHALOCYANINE_ZN_NAME, row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False
     assert_full_rt(row["name"], PHTHALOCYANINE_ZN)
@@ -265,7 +260,7 @@ def test_a_decorated_fused_ring_substituent_has_the_porphyrin_name_at_both_tiers
     was a test of "the best-effort call only". Both labels are verified systematic names."""
     smiles = BROMOANTHRACENYL_DIANION + ".[Zn+2]"
     for tier in ("best-effort", "valid"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == "zinc 5-(8-bromoanthracen-1-yl)-10,15,20-triphenylporphyrin-21,23-diide", (tier, row)
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
         assert_full_rt(row["name"], smiles)
@@ -278,9 +273,9 @@ def test_the_predicate_is_no_longer_the_only_thing_that_lowers_the_label(monkeyp
     compounds in this Chapter";, Table 10.1 (d)), so the label stays ``systematic_verified`` without the
     predicate: two independent reasons lower it. The predicate itself is pinned by ``test_the_label_predicate``."""
     smiles = TPP_DIANION + ".[Zn+2]"
-    assert _row(smiles, "best-effort")["tier"] == "systematic_verified"
+    assert tier_row(smiles, "best-effort")["tier"] == "systematic_verified"
     monkeypatch.setattr(metal_labels, "is_macrocycle_complex_name_without_pin", lambda smiles, name: False)
-    assert _row(smiles, "best-effort")["tier"] == "systematic_verified"
+    assert tier_row(smiles, "best-effort")["tier"] == "systematic_verified"
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -310,7 +305,7 @@ def test_an_ion_the_producer_declines_keeps_the_general_engine_name_and_has_no_p
     the ligand and the label is a verified systematic name at both tiers."""
     smiles = TPP_WITH_STEREOCENTRE + ".[Zn+2]"
     for tier in ("best-effort", "valid"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
         assert "porphyrin" not in row["name"], row
         assert_full_rt(row["name"], smiles)
@@ -474,16 +469,16 @@ ADMITTED_B2_PORPHYRINS = {
 @pytest.mark.parametrize("smiles", sorted(ADMITTED_B2_PORPHYRINS), ids=lambda s: s[-28:])
 def test_the_porphyrin_complexes_of_the_metals_of_lane_b2_are_named(smiles):
     default_view, best_effort_view = ADMITTED_B2_PORPHYRINS[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
     assert_full_rt(best_effort_view[0], smiles)
 
 
 @pytest.mark.parametrize("smiles", sorted(START_ROWS), ids=lambda s: s[-28:])
 def test_other_metals_and_unscoped_ions_are_not_moved(smiles):
     default_view, best_effort_view = START_ROWS[smiles]
-    assert _view(_row(smiles, "pin")) == default_view, smiles
-    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert _view(tier_row(smiles, "pin")) == default_view, smiles
+    assert _view(tier_row(smiles, "best-effort")) == best_effort_view, smiles
 
 
 def test_the_other_metals_panel_holds_no_row_the_guard_could_reach():
@@ -511,5 +506,5 @@ def test_the_default_tier_is_not_moved_for_zinc():
     drawing, with no PIN."""
     for smiles in (TPP_DIANION + ".[Zn+2]", TPP_BONDED_2, TPP_BONDED_4, PORPHINE_DIANION + ".[Zn+2]",
                    TPP_FREE_BASE + ".[Zn+2]"):
-        row = _row(smiles, "pin")
+        row = tier_row(smiles, "pin")
         assert row["tier"] == "abstain" and row["is_pin"] is False, (smiles, row)

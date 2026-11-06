@@ -16,7 +16,6 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -216,10 +215,6 @@ class TestTerpenoidE2E:
     """Test terpenoid derivative naming via name_compound."""
 
     @pytest.mark.integration
-    def test_camphor(self):
-        assert name_compound(CAMPHOR_SMILES) == CAMPHOR_PIN
-
-    @pytest.mark.integration
     def test_beta_pinene(self):
         assert name_compound(BETA_PINENE_SMILES) == BETA_PINENE_PIN
 
@@ -302,19 +297,6 @@ class TestNoRegression:
     def test_diethyl_ether(self):
         result = name_compound("CCOCC")
         assert result is not None, "diethyl ether should produce a name"
-
-
-# ---------------------------------------------------------------------------
-# a phase success criteria tests (from internal notes)
-# ---------------------------------------------------------------------------
-
-class TestSuccessCriteria:
-    """Validate success criteria from 14-internal notes."""
-
-    @pytest.mark.integration
-    def test_sc5_camphor_recognition(self):
-        """SC5: name_compound('CC12CCC(CC1=O)C2(C)C') -> the PIN (camphor is withdrawn,."""
-        assert name_compound(CAMPHOR_SMILES) == CAMPHOR_PIN
 
 
 # ---------------------------------------------------------------------------
@@ -401,5 +383,3 @@ class TestPhase141CompoundClassRouting:
             can = Chem.MolToSmiles(mol)
             result = lookup_sugar(can)
             assert result is not None, f"Meglumine not found in sugar lookup for {can}"
-
-

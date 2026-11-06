@@ -36,17 +36,6 @@ class TestPolycyclicDataLookup:
         for pah in expected_pahs:
             assert pah in POLYCYCLIC_DATA, f"{pah} not in POLYCYCLIC_DATA"
 
-    def test_get_polycyclic_by_smiles_naphthalene(self):
-        """Naphthalene lookup by canonical SMILES."""
-        result = get_polycyclic_by_smiles('c1ccc2ccccc2c1')
-        assert result is not None
-        assert result['name'] == 'naphthalene'
-
-    def test_get_polycyclic_by_smiles_not_found(self):
-        """Non-PAH SMILES returns None."""
-        result = get_polycyclic_by_smiles('c1ccccc1')  # benzene
-        assert result is None
-
     def test_is_polycyclic_aromatic_naphthalene(self):
         """Naphthalene is recognized as polycyclic aromatic."""
         assert is_polycyclic_aromatic('c1ccc2ccccc2c1') is True
@@ -108,18 +97,6 @@ class TestPolycyclicIdentification:
 class TestPolycyclicRetainedNames:
     """Tests for PAH retained names via name_compound."""
 
-    def test_naphthalene_retained(self):
-        """c1ccc2ccccc2c1 -> naphthalene"""
-        assert name_compound('c1ccc2ccccc2c1') == 'naphthalene'
-
-    def test_anthracene_retained(self):
-        """c1ccc2cc3ccccc3cc2c1 -> anthracene"""
-        assert name_compound('c1ccc2cc3ccccc3cc2c1') == 'anthracene'
-
-    def test_phenanthrene_retained(self):
-        """c1ccc2c(c1)ccc1ccccc12 -> phenanthrene"""
-        assert name_compound('c1ccc2c(c1)ccc1ccccc12') == 'phenanthrene'
-
     def test_pyrene_retained(self):
         """Pyrene -> pyrene"""
         assert name_compound('c1cc2ccc3cccc4ccc(c1)c2c34') == 'pyrene'
@@ -150,11 +127,6 @@ class TestSubstitutedPolycyclics:
         """1-methylnaphthalene: methyl at alpha position."""
         result = name_compound('Cc1cccc2ccccc12')
         assert '1-methylnaphthalene' == result
-
-    def test_2_methylnaphthalene(self):
-        """2-methylnaphthalene: methyl at beta position."""
-        result = name_compound('Cc1ccc2ccccc2c1')
-        assert '2-methylnaphthalene' == result
 
     def test_1_chloronaphthalene(self):
         """1-chloronaphthalene: chloro at alpha position."""

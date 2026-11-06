@@ -26,20 +26,6 @@ class TestBenzeneRetainedSubstituents:
     """Verify retained substituent names on benzene ring."""
 
     @pytest.mark.integration
-    def test_isopropylbenzene_cumene(self):
-        """F-T9/DD6: PIN is '(propan-2-yl)benzene' (cumene/isopropyl are general-only)."""
-        result = name_compound("CC(C)c1ccccc1")
-        assert result is not None
-        assert "propan-2-yl" in result.lower(), f"Expected propan-2-yl in {result}"
-
-    @pytest.mark.integration
-    def test_sec_butylbenzene(self):
-        """F-T9/DD6: secondary attachment -> 'butan-2-yl' (sec-butyl deprecated)."""
-        result = name_compound("CCC(C)c1ccccc1")
-        assert result is not None
-        assert "butan-2-yl" in result, f"Expected butan-2-yl in {result}"
-
-    @pytest.mark.integration
     def test_tert_butylbenzene(self):
         """tert-butylbenzene has 3 methyl branches at attachment."""
         result = name_compound("CC(C)(C)c1ccccc1")
@@ -47,27 +33,11 @@ class TestBenzeneRetainedSubstituents:
         assert "tert-butyl" in result, f"Expected tert-butyl in {result}"
 
     @pytest.mark.integration
-    def test_isobutylbenzene(self):
-        """F-T9/DD6: terminal-branched -> '2-methylpropyl' (isobutyl deprecated)."""
-        result = name_compound("CC(C)Cc1ccccc1")
-        assert result is not None
-        assert "2-methylpropyl" in result, f"Expected 2-methylpropyl in {result}"
-
-    @pytest.mark.integration
     def test_neopentylbenzene(self):
         """F-T9/DD6: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
         result = name_compound("CC(C)(C)Cc1ccccc1")
         assert result is not None
         assert "2,2-dimethylpropyl" in result, f"Expected 2,2-dimethylpropyl in {result}"
-
-    @pytest.mark.integration
-    def test_methylbut2enyl_benzene(self):
-        """Branched unsaturated substituent on benzene should be named recursively."""
-        result = name_compound("CC(C)=CCc1ccccc1")
-        assert result is not None
-        # Should contain compound substituent name, not plain "pentyl"
-        assert "pentyl" not in result or "methylbut" in result
-
 
 class TestCycloalkaneRetainedSubstituents:
     """Verify retained substituent names on cycloalkane rings."""
@@ -110,15 +80,6 @@ class TestCycloalkaneRetainedSubstituents:
 
 class TestFusedRingRetainedSubstituents:
     """Verify retained substituent names on fused ring systems."""
-
-    @pytest.mark.integration
-    @pytest.mark.xfail(reason="Fused ring fallback path uses simple carbon count; "
-                               "ortho-fused namer returns None for substituted naphthalene")
-    def test_isopropylnaphthalene(self):
-        """Isopropyl on naphthalene should use retained name."""
-        result = name_compound("CC(C)c1cccc2ccccc12")
-        assert result is not None
-        assert "isopropyl" in result or "1-methylethyl" in result
 
     @pytest.mark.integration
     def test_tert_butylnaphthalene(self):

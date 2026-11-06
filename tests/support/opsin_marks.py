@@ -25,10 +25,6 @@ release_opsin_only = pytest.mark.skipif(
 needs_composite_opsin = pytest.mark.skipif(
     not caps.composite_assembly_enabled(),
     reason="needs an OPSIN that reads composite locants (1^1,2^1:2^4,3^1-terphenyl): ORTHONYM_OPSIN=main")
-#: a test of OPSIN 2.9.0 behaviour for the ring assemblies of three or more rings: skipped when the active OPSIN reads
-#: composite locants
-release_composite_only = pytest.mark.skipif(
-    caps.composite_assembly_enabled(), reason="describes OPSIN 2.9.0, which reads no composite locants")
 #: a test of the twin route of a halogen -uide name: skipped when the active OPSIN reads such a name
 release_uide_only = pytest.mark.skipif(
     caps.opsin_capabilities()["halogen_uide"],

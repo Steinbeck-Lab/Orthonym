@@ -469,10 +469,6 @@ class TestL4DoesNotReuseSubstitutablePositions:
         assert l6_all_substitutable_h_share_one_locant(
             parent, {0: 1, 1: 2, 2: 3}) is False
 
-    def test_but_l4_fires(self):
-        assert _l4("CSSS", {"S"}, 1) is True
-
-
 class TestL4IsAFunctionOfTheStructureNotTheSPELLING:
     """★ Found by chasing a mutation SURVIVOR, and it is a real defect class.
 

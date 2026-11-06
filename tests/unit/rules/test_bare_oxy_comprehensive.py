@@ -8,7 +8,6 @@ Phase: 90-02 Task 1
 """
 import pytest
 import re
-import logging
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +124,7 @@ class TestNameAlkoxyBranchNoBareOxy:
         parent_atoms = {0, 1}
         name = _name_alkoxy_branch(mol, frag_atoms, 2, parent_atoms)
         assert name is not None
-        assert name != "oxy", f"Got bare 'oxy' from _name_alkoxy_branch"
+        assert name != "oxy", "Got bare 'oxy' from _name_alkoxy_branch"
         assert "oxy" in name  # Should be "methoxy"
 
 

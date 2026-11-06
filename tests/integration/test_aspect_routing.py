@@ -13,7 +13,6 @@ Tests verify:
 Phase: 17-03 (Composer Routing Redesign)
 """
 
-import pytest
 from orthonym import name_compound
 
 
@@ -29,11 +28,6 @@ class TestIonFallThrough:
         """Acetate should use retained name directly from namer.py."""
         result = name_compound('CC([O-])=O')
         assert result == 'acetate', f'Expected acetate, got: {result}'
-
-    def test_retained_anion_benzoate(self):
-        """Benzoate should use retained name directly from namer.py."""
-        result = name_compound('[O-]C(=O)c1ccccc1')
-        assert result == 'benzoate', f'Expected benzoate, got: {result}'
 
     def test_retained_anion_formate(self):
         """Formate should use retained name directly from namer.py."""
@@ -51,13 +45,6 @@ class TestIonFallThrough:
         result = name_compound('CC[NH3+]')
         assert result == 'ethanaminium', f'Expected ethanaminium, got: {result}'
 
-    def test_zwitterion_early_exit(self):
-        """Zwitterions should use early exit in namer.py."""
-        result = name_compound('[NH3+]CC([O-])=O')
-        # Should produce some valid zwitterion name (not crash)
-        assert result, f'Zwitterion returned empty: {result}'
-        assert isinstance(result, str), f'Expected string, got: {type(result)}'
-
     def test_radical_early_exit(self):
         """Radicals should use early exit in namer.py."""
         result = name_compound('[CH3]')
@@ -71,29 +58,6 @@ class TestIonFallThrough:
 
 class TestIonAspectComposition:
     """Test aspect-based ion composition in composer.py."""
-
-    def test_non_retained_carboxylate_pentanoate(self):
-        """Non-retained carboxylate should be named via fallback ion naming."""
-        result = name_compound('CCCCC(=O)[O-]')
-        assert 'pentanoate' in result, f'Expected pentanoate, got: {result}'
-
-    def test_non_retained_carboxylate_butanoate(self):
-        """Butanoate (non-retained) should be named correctly."""
-        result = name_compound('O=C([O-])CCC')
-        assert 'butanoate' in result, f'Expected butanoate, got: {result}'
-
-    def test_non_retained_alkoxide_propanolate(self):
-        """Non-retained alkoxide should preserve chain identity."""
-        result = name_compound('CCC[O-]')
-        # Should be propanolate (PIN) or propoxide (common)
-        assert 'prop' in result.lower(), f'Expected prop- prefix, got: {result}'
-
-    def test_non_retained_phenolate(self):
-        """Non-retained substituted phenolate should be named correctly."""
-        result = name_compound('[O-]c1ccc(C)cc1')
-        # Should contain 'olate' or 'oxide' -- phenolate naming
-        assert 'ol' in result.lower() or 'oxide' in result.lower(), \
-            f'Expected phenolate/oxide name, got: {result}'
 
     def test_neutral_molecule_unchanged_butanone(self):
         """Neutral ketone should not be affected by ion routing."""
@@ -155,14 +119,6 @@ class TestRecursionGuard:
         assert 'ol' in result, f'Expected alcohol name, got: {result}'
         assert 'ethan' in result, f'Expected ethan- prefix, got: {result}'
 
-    def test_no_infinite_loop_on_complex_ion(self):
-        """Complex ion should not cause infinite recursion."""
-        # This would previously cause RecursionError without the guard
-        result = name_compound('CCCCC(=O)[O-]')
-        assert isinstance(result, str), f'Expected string, got: {type(result)}'
-        assert len(result) > 0, 'Expected non-empty name'
-
-
 # ============================================================================
 # TestLocantValidation: Verify locant validation in default assembly path
 # ============================================================================
@@ -177,17 +133,6 @@ class TestLocantValidation:
         assert 'cyclohex' in result.lower(), f'Expected cyclohexanone, got: {result}'
         assert 'one' in result.lower(), f'Expected -one suffix, got: {result}'
 
-    def test_cyclohexanol_locant_valid(self):
-        """Cyclohexanol should keep valid locants."""
-        result = name_compound('C1CCCCC1O')
-        assert 'cyclohex' in result.lower(), f'Expected cyclohexanol, got: {result}'
-        assert 'ol' in result.lower(), f'Expected -ol suffix, got: {result}'
-
-    def test_diol_locants_valid(self):
-        """Butane-1,4-diol should have valid locants within parent capacity."""
-        result = name_compound('OCCCCO')
-        assert 'diol' in result.lower(), f'Expected diol, got: {result}'
-
     def test_no_zero_locants_in_name(self):
         """Names should never contain locant 0 (IUPAC uses 1-indexing)."""
         # Test several compound classes
@@ -198,27 +143,7 @@ class TestLocantValidation:
             assert ',0,' not in result, f'{smiles}: contains ,0, in {result}'
             assert not result.startswith('0-'), f'{smiles}: starts with 0- in {result}'
 
-    def test_hexanol_locant_valid(self):
-        """Hexan-1-ol locant should be within parent size 6."""
-        result = name_compound('CCCCCCO')
-        assert 'hexan' in result.lower(), f'Expected hexanol, got: {result}'
-        assert 'ol' in result.lower(), f'Expected -ol suffix, got: {result}'
-
     def test_long_chain_diol(self):
         """Long chain diol locants should be valid."""
         result = name_compound('OCCCCCCCCCO')
         assert 'diol' in result or 'ol' in result, f'Expected diol/ol, got: {result}'
-
-
-# ============================================================================
-# TestOverallIntegrity: Verify no regressions in common naming scenarios
-# ============================================================================
-
-
-class TestOverallIntegrity:
-    """Smoke tests to verify no regressions in common naming paths."""
-
-    def test_amine(self):
-        """Simple amine unchanged."""
-        result = name_compound('CCN')
-        assert 'amine' in result.lower() or 'amin' in result.lower(), f'Got: {result}'

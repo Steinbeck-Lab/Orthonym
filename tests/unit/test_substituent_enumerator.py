@@ -169,10 +169,7 @@ class TestChainSubstituentExtraction:
 
     def test_chain_basic_conversion(self):
         """Substituents dict is correctly converted to SubstituentInfo list."""
-        mol = Chem.MolFromSmiles('CCCC')  # butane
-        principal_chain = [0, 1, 2, 3]
         # Simulate: methyl at position 2
-        sub_dict = {2: [[4]]}  # hypothetical atom index 4 at position 2
         # Since atom 4 doesn't exist in butane, just test the structure
         mol2 = Chem.MolFromSmiles('CC(C)CC')  # 2-methylbutane
         principal_chain2 = [0, 1, 3, 4]

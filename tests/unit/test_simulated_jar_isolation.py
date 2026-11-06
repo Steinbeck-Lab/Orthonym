@@ -10,8 +10,7 @@ the gate withholds every name as 'unknown organic compound' (TRIAGE 'Unit suite 
 unknown-organic-compound order leak').
 
 * In the test suite a jar-absent test did this and monkeypatch put the resolver back:
-  every later name on that pytest worker was withheld. `tests/conftest.py` now puts
-  such an oracle back after the test (first test below).
+  every later name on that pytest worker was withheld (first test below).
 * Outside the tests, `orthonym.jars.fetch_all` in a process that started in reduced
   mode did the same (second test): the validity gate's oracle
   (`namer._validity_oracle`), the split gate's oracle
@@ -61,7 +60,7 @@ def _env(**extra):
     return env
 
 
-def test_an_oracle_built_for_a_simulated_missing_jar_is_put_back():
+def test_an_oracle_built_for_a_simulated_missing_jar_is_built_again():
     jar_or_skip("opsin")
     # Under tests/unit so that tests/conftest.py applies; the name does not match
     # `test_*.py`, so no other collection picks the file up.

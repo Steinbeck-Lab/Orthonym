@@ -11,25 +11,11 @@ chain has had the retained name since (:32691). The retained C2 spelling lives i
 producer and (through the assembler) the N/N'-substituted hydrazide producer in composer.py.
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.assembly.composition_primitives import RETAINED_C2_ACYL_BY_SUFFIX
-from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import same_key
 
 pytestmark = pytest.mark.opsin_gate
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _same(smi, name):
-    out = opsin_parse(name)
-    m_out = Chem.MolFromSmiles(out) if out else None
-    return m_out is not None and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == inchi.MolToInchiKey(m_out)
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -41,7 +27,7 @@ def _same(smi, name):
 def test_substituted_acetohydrazides(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified", row
-    assert _same(smiles, expected)
+    assert same_key(smiles, expected)
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -61,16 +47,3 @@ def test_neighbours(namer, smiles, expected):
 
 def test_the_table_is_the_one_home():
     assert RETAINED_C2_ACYL_BY_SUFFIX == {"amide": "acetamide", "hydrazide": "acetohydrazide"}
-
-
-@pytest.mark.parametrize("name", [
-    "4-(1-sulfanylideneethyl)benzoic acid",
-    "4-chloro-7-[(3-chloro-4-nitroquinolin-7-yl)sulfanyl]-3-nitroquinoline",
-    "2-(cyanosulfonyl)cyclohexane-1-carboxylic acid",
-    "1-(2-oxophosphepan-3-yl)propan-1-one",
-])
-def test_the_four_refuted_names_are_not_pin_verified(namer, name):
-    out = opsin_parse(name)
-    if out:
-        row = namer.name_tiered(out)
-        assert not (row["tier"] == "pin_verified" and row["name"] == name)

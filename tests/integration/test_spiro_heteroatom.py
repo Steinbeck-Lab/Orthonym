@@ -31,17 +31,6 @@ def test_hetero_spiro_imports_polycyclic_bridged_helper():
 
 
 @pytest.mark.integration
-def test_hetero_spiro_no_new_prefix_builder():
-    """: no new heteroatom prefix builder beyond _build_hetero_prefix."""
-    import inspect
-    from orthonym.rules import spiro
-    src = inspect.getsource(spiro)
-    # Allow only the existing _build_hetero_prefix; reject any new
-    # _build_heteroatom_prefix or similar.
-    assert "def _build_heteroatom_prefix" not in src
-
-
-@pytest.mark.integration
 def test_hetero_spiro_priority_order_in_existing_helper():
     """IUPAC priority order O > S > Se > N > P > Si > B is honored
     by the existing _build_hetero_prefix function.

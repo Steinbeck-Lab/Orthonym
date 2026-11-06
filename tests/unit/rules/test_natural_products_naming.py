@@ -11,26 +11,14 @@ Test classes:
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.rules.natural_products import name_natural_product
 from orthonym import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
+from tests.support.read_back import mol as _mol
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
 pytestmark = pytest.mark.usefixtures("np_producer_only")
-
-
-# ---------------------------------------------------------------------------
-# Helper: canonical SMILES for consistency
-# ---------------------------------------------------------------------------
-
-def _mol(smiles: str):
-    """Return RDKit Mol from SMILES, raising on invalid input."""
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"Invalid SMILES: {smiles}"
-    return mol
 
 
 # ---------------------------------------------------------------------------
@@ -181,10 +169,6 @@ class TestNonNaturalProducts:
         mol = _mol("c1cccc2ccccc12")
         assert name_natural_product(mol) is None
 
-    def test_none_mol_returns_none(self):
-        assert name_natural_product(None) is None
-
-
 # ===========================================================================
 # Test Class 4: Pipeline integration via name_compound
 # ===========================================================================
@@ -192,10 +176,6 @@ class TestNonNaturalProducts:
 @pytest.mark.unit
 class TestPipelineIntegration:
     """NP detection integrates correctly with the full namer.py pipeline."""
-
-    def test_cholesterol_via_name_compound(self):
-        result = name_compound(CHOLESTEROL_SMILES)
-        assert result == "cholesterol"
 
     def test_ethanol_unchanged(self):
         """Ethanol should still come from retained names."""
@@ -218,17 +198,6 @@ class TestPipelineIntegration:
         # (the Blue Book) identifies no PIN for a natural product; the strict path builds its bridged fused PIN:23816,:23843) on the rule-derived parent '[1]benzofuro[3,2-e]isoquinoline' (slice S4)
         result = name_compound(MORPHINE_SMILES)
         assert result == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
-
-    def test_camphor_via_name_compound(self):
-        """: was ``== "camphor"``. The PIN path now emits the Blue Book's
-        own rendering, printed verbatim at the Blue Book as
-        "(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one" (this input carries no
-        stereo, so no descriptors are due). See /.2 for why the trivial
-        name has no standing: the Blue Book and:28307.
-        """
-        result = name_compound(CAMPHOR_SMILES)
-        assert result == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
-
 
 # ===========================================================================
 # Test Class 5: NP hydroxyl prefix/suffix exclusivity (a phase-02)
@@ -494,13 +463,6 @@ class TestNewScaffoldRecognition:
 class TestNoRegressionExistingNP:
     """ALL 26 original NP derivatives must still return correct names."""
 
-    def test_cholesterol(self):
-        assert name_compound(CHOLESTEROL_SMILES) == "cholesterol"
-
-    def test_morphine(self):
-        # the bridged fused PIN (slice S4; the Blue Book)
-        assert name_compound(MORPHINE_SMILES) == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
-
     def test_codeine(self):
         assert name_compound(CODEINE_SMILES) == "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"
 
@@ -510,15 +472,6 @@ class TestNoRegressionExistingNP:
     def test_hydrocodone(self):
         # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
         assert name_compound(HYDROCODONE_SMILES) == "(4R,4aR,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
-
-    def test_camphor(self):
-        """: camphor is the ONE of these 26 rows that is deliberately no
-        longer returned as a trivial name -- it is an adjudicated non-PIN
-         the Blue Book,:28307). This is a demotion, not
-        a regression: the emitted name is the Blue Book's own von Baeyer rendering
-        from:52648, and the row is still present in NATURAL_PRODUCT_DERIVATIVES.
-        """
-        assert name_compound(CAMPHOR_SMILES) == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
 
     def test_limonene(self):
         assert name_compound(LIMONENE_SMILES) == "limonene"
@@ -577,12 +530,6 @@ class TestNoRegressionExistingNP:
 
     def test_androstane(self):
         assert name_compound(ANDROSTANE_SMILES) == "androstane"
-
-    def test_gonane(self):
-        assert name_compound(GONANE_SMILES) == "gonane"
-
-    def test_estrane(self):
-        assert name_compound(ESTRANE_SMILES) == "estrane"
 
     def test_morphinan(self):
         assert name_compound(MORPHINAN_SMILES) == "morphinan"

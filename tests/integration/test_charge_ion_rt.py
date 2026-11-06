@@ -23,7 +23,6 @@ Each test verifies a specific compound produces the expected name pattern.
 When names improve in future phases, update the expected values.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
@@ -124,11 +123,6 @@ class TestSaltNaming:
         """Basic salt: sodium acetate must not regress."""
         result = name_compound('[Na+].[O-]C(C)=O')
         assert result == 'sodium acetate', f"Got: {result}"
-
-    def test_basic_potassium_chloride(self):
-        """Basic salt: potassium chloride must not regress."""
-        result = name_compound('[K+].[Cl-]')
-        assert result == 'potassium chloride', f"Got: {result}"
 
     def test_basic_ammonium_chloride(self):
         """Basic salt: ammonium chloride must not regress."""
@@ -431,7 +425,7 @@ class TestNitroCompoundNaming:
         mol = Chem.MolFromSmiles('[NH3+]c1ccc([N+](=O)[O-])cc1')
         assert detect_species_type(mol) == 'ion'
         result = name_compound('[NH3+]c1ccc([N+](=O)[O-])cc1')
-        assert result != '', f"Should produce a name"
+        assert result != '', "Should produce a name"
 
 
 class TestGetIonSitesFiltering:

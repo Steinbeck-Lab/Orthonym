@@ -593,7 +593,7 @@ class TestRingAssembly:
         """RESEARCH Pitfall 4: control case still gets a benzene/biphenyl
         branch (NOT Branch 7) since it is a 2-ring assembly, not 3+."""
         mol = Chem.MolFromSmiles('Cc1ccc(-c2ccccc2)cc1')
-        features = compute_features(mol)
+        compute_features(mol)
         # 2-ring assembly should not engage Branch 7 (>=3 gate).
         # We can't directly observe which branch fired, but we can assert
         # the existing biphenyl naming path is preserved.
@@ -608,7 +608,7 @@ class TestRingAssembly:
         """: heterogeneous chain falls through to substituent naming."""
         mol = Chem.MolFromSmiles('c1ccc(-c2ccncc2)cc1-c1ccccc1')
         features = compute_features(mol)
-        ring_info = _build_ring_info_for_parent_selection(features)
+        _build_ring_info_for_parent_selection(features)
         # Branch 7 must NOT supply locants for a heterogeneous chain.
         # If ring_info is not None, it must come from a different branch
         # (e.g., Branch 6.5 fused-base or a single-ring branch).

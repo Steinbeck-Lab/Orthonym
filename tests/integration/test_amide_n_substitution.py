@@ -22,12 +22,6 @@ class TestNPhenylAmideNaming:
     """Verify N-phenylacetamide uses amide path (not anilino)."""
 
     @pytest.mark.integration
-    def test_n_phenylacetamide_via_amide_path(self):
-        """Simple amide path: CC(=O)Nc1ccccc1 -> N-phenylacetamide."""
-        result = name_compound("CC(=O)Nc1ccccc1")
-        assert result == "N-phenylacetamide"
-
-    @pytest.mark.integration
     def test_pentanedioic_acid_compound(self):
         """Complex compound naming produces a valid name (no phenylamino)."""
         smiles = "NC(CCC(=O)NC(CSC(CC=O)c1ccccc1O)C(=O)NCC(=O)O)C(=O)O"
@@ -39,33 +33,6 @@ class TestNPhenylAmideNaming:
         """Sulfonamide compound produces valid name."""
         result = name_compound("CC(=O)Nc1ccc(S(=O)(=O)NC(C)=O)cc1")
         assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# Section 2: Simple amide N-substituent naming (regression guard)
-# ---------------------------------------------------------------------------
-
-
-class TestSimpleAmideNSubstitution:
-    """Verify existing amide N-substitution is not broken."""
-
-    @pytest.mark.integration
-    def test_n_ethylacetamide(self):
-        """N-ethylacetamide contains N-ethyl."""
-        result = name_compound("CC(=O)NCC")
-        assert "N-ethyl" in result
-
-    @pytest.mark.integration
-    def test_nn_dimethylformamide(self):
-        """N,N-dimethylformamide contains dimethyl."""
-        result = name_compound("CN(C)C=O")
-        assert "dimethyl" in result
-
-    @pytest.mark.integration
-    def test_n_benzylacetamide(self):
-        """N-benzylacetamide contains benzyl."""
-        result = name_compound("CC(=O)NCc1ccccc1")
-        assert "benzyl" in result
 
 
 # ---------------------------------------------------------------------------

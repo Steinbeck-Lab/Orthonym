@@ -34,7 +34,6 @@ everything else refuses instead of lying.
 import pytest
 from rdkit import Chem
 
-import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
 from orthonym.rules.polycyclic import (
     HETEROATOM_PREFIXES, VonBaeyerAnalyzer, get_heteroatom_replacement_prefix,
@@ -501,7 +500,6 @@ def no_opsin_jar(monkeypatch):
     import orthonym.validation.opsin_roundtrip as _rt
     from orthonym.assembly import memo as _memo
     monkeypatch.setattr(_rt, "_find_opsin_jar", lambda *a, **k: None)
-    monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", True)
     # Hiding the jar must also hide the OPSIN parses an earlier test left in the process-wide
     # cache (jvm_bridge stores them there across molecules); otherwise a parse made while the jar
     # was present still verifies a name here, and the result depends on the tests that ran before.

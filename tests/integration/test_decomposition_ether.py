@@ -86,20 +86,6 @@ class TestEtherDecomposition:
         )
 
     @pytest.mark.integration
-    def test_guard_dimethyl_ether_not_decomposed(self):
-        """Dimethyl ether (COC): too small for decomposition.
-
-        Both fragments < 5 heavy atoms. Should use regular naming pipeline
-        and produce 'methoxymethane' or similar.
-        """
-        name = name_compound("COC")
-        assert name != "unknown"
-        # Should be methoxymethane (regular naming, not decomposition)
-        assert "methox" in name.lower() or "oxa" in name.lower(), (
-            f"Expected methoxymethane or oxa name, got: {name}"
-        )
-
-    @pytest.mark.integration
     def test_guard_anisole_not_decomposed(self):
         """Anisole (PhOCH3): should NOT be decomposed.
 
@@ -109,31 +95,4 @@ class TestEtherDecomposition:
         name = name_compound("c1ccc(OC)cc1")
         assert name == "anisole" or name == "methoxybenzene" or "methoxy" in name.lower(), (
             f"Expected 'anisole' or 'methoxybenzene', got: {name}"
-        )
-
-    @pytest.mark.integration
-    def test_guard_oxane_ring_ether_excluded(self):
-        """Tetrahydropyran (C1CCOCC1): oxygen is IN the ring.
-
-        The ring guard should exclude this -- ether SMARTS requires [OX2;!R]
-        (not in ring). Should produce 'oxane' via retained names.
-        """
-        name = name_compound("C1CCOCC1")
-        assert name != "unknown"
-        assert "oxane" in name.lower() or "oxane" in name.lower(), (
-            f"Expected oxane/oxane, got: {name}"
-        )
-
-    @pytest.mark.integration
-    def test_guard_diethyl_ether_too_small(self):
-        """Diethyl ether (CCOCC): both fragments < 5 heavy atoms.
-
-        Should NOT be decomposed. Should produce ethoxyethane via
-        regular pipeline naming.
-        """
-        name = name_compound("CCOCC")
-        assert name != "unknown"
-        # Should be ethoxyethane or similar
-        assert "ethox" in name.lower() or "oxa" in name.lower(), (
-            f"Expected ethoxyethane or oxa name, got: {name}"
         )

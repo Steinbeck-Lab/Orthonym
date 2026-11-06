@@ -27,6 +27,7 @@ final ``e``); λ-convention hypervalent iodine /.
 Verification uses the NORMAL gated path (gate ON, jar present) in a FRESH subprocess per
 molecule, and confirms full round-trip to the input InChIKey.
 """
+import functools
 import json
 import subprocess
 import sys
@@ -151,10 +152,15 @@ def _name_fresh(smi):
     return json.loads(proc.stdout.strip().splitlines()[-1])
 
 
+#: one fresh process per SMILES for the tests that read its result (the determinism test calls
+#: ``_name_fresh`` itself, three times)
+_name_fresh_once = functools.lru_cache(maxsize=None)(_name_fresh)
+
+
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("smi", RECLAIM_SMILES)
 def test_a1_neutral_iodane_substituent_reclaims_and_roundtrips(smi):
-    r = _name_fresh(smi)
+    r = _name_fresh_once(smi)
     if smi in DEFAULT_TIER_DECLINES:
         assert not r["emits"] and r["limit"] == "NO_VERIFIED_PIN", r
         assert "iodanyl" in r["be"] and r["be_rt"], r
@@ -171,7 +177,7 @@ def test_a1_neutral_iodane_substituent_reclaims_and_roundtrips(smi):
 def test_a1_dimethyl_shape_also_reclaims(smi):
     # The plan feared these needed a separate producer; the single parent_to_prefix
     # fix reaches them (Task-0 trace). Proves both token shapes are covered.
-    r = _name_fresh(smi)
+    r = _name_fresh_once(smi)
     assert r["emits"] and r["rt_ok"], f"expected reclaim+RT, got {r}"
     assert "iodanyl" in r["name"], r["name"]
 
@@ -181,7 +187,7 @@ def test_a1_dimethyl_shape_also_reclaims(smi):
 def test_a1_charged_and_hypervalent_cl_stay_abstained(smi):
     # 0-wrong canary: charged iodanuide and RDKit-rejected hypervalent Cl must NOT
     # be turned into an emission by the elide-list change.
-    r = _name_fresh(smi)
+    r = _name_fresh_once(smi)
     assert not r["emits"], f"0-wrong canary regressed — expected abstain, got {r}"
 
 

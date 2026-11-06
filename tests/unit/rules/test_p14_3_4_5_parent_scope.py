@@ -90,12 +90,6 @@ from orthonym.assembly.locant_omission import (
     substitutable_h_count,
     substitutable_positions,
 )
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # --------------------------------------------------------------------------- #

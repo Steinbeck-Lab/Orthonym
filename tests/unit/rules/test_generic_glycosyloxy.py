@@ -11,19 +11,10 @@ Two capabilities, both fail-closed and additive:
 Each emitted name is asserted to round-trip to the full InChIKey via OPSIN.
 """
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym.assembly.substituent_enumerator import name_substituent
 from orthonym.namer import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    osmi = opsin_parse(name)
-    if not osmi:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(osmi))
+from tests.support.read_back import same_key
 
 
 def _sub(smiles, attach_smiles_atom):
@@ -74,7 +65,7 @@ def test_fully_stereo_steroid_glycoside_round_trips():
     assert name == ("2-({(3R,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-"
                     "2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-3-yl}oxy)"
                     "oxane-3,4,5-triol"), name
-    assert _full_rt(smi, name)
+    assert same_key(smi, name)
 
 
 def test_simple_ring_naming_unchanged():

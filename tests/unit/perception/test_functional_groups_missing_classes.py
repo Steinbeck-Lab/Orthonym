@@ -8,17 +8,11 @@ false-positive guard per MEMORY feedback_smarts_and_seniority).
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym.perception.functional_groups import detect_functional_groups as d
 
 
 def _fgs(smi):
     return set(d(Chem.MolFromSmiles(smi)).keys())
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # --- hydroxylamine (R-NH-OH / R2N-OH) ---

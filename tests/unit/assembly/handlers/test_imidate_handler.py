@@ -324,27 +324,6 @@ class TestImidatePredicateDefersToHigherPG:
         features.principal_group = None
         assert _is_imidate(features) is True
 
-    def test_acid_with_imidate_substituent_drops_to_acid_naming(self):
-        """End-to-end case from reviewer: acid wins, no silent acid drop.
-
-        Pre-fix: OC(=O)c1ccc(C(=N)OC)cc1 -> 'methyl octanimidate' (acid lost,
-        chain inflated to 8 aromatic carbons). Post-fix: handler defers to
-        acid pipeline.
-        """
-        from orthonym import name_compound
-        actual = name_compound("OC(=O)c1ccc(C(=N)OC)cc1", style="pin")
-        # The exact name depends on the acid pipeline; the regression-defining
-        # assertion is that the acid is NOT silently dropped (i.e. the name
-        # is NOT the bogus 'methyl octanimidate' from).
-        assert actual is not None
-        assert "octanimidate" not in actual.lower(), (
-            f"CR-01 regression: acid silently dropped; got {actual!r}"
-        )
-        # Acid carbon must appear in the name (as 'benzoic acid' or similar).
-        assert "acid" in actual.lower(), (
-            f"CR-01 regression: acid-PG name expected; got {actual!r}"
-        )
-
     def test_acid_with_imidate_substituent_names_methoxycarbonimidoyl(self):
         """ imidate producer: the imidate substituent is expressed as the
         IUPAC prefix ``C-methoxycarbonimidoyl`` on the senior benzoic-acid

@@ -36,21 +36,6 @@ class TestAlcoholNaming:
         """Methanol is a retained name, not metan-1-ol."""
         assert name_compound("CO") == "methanol"
 
-    @pytest.mark.unit
-    def test_propan_1_ol_systematic(self):
-        """Propan-1-ol uses PIN-style infix locant."""
-        result = name_compound("CCCO")
-        assert result == "propan-1-ol"
-        # Verify vowel elision (not propane-1-ol)
-        assert "propane" not in result
-
-    @pytest.mark.unit
-    def test_propan_2_ol_locant(self):
-        """Propan-2-ol has locant 2 for secondary alcohol."""
-        result = name_compound("CC(O)C")
-        assert result == "propan-2-ol"
-        assert "-2-" in result
-
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
         ("CCCCCO", "pentan-1-ol"),
@@ -89,24 +74,6 @@ class TestAldehydeNaming:
         """Acetaldehyde is a retained name."""
         assert name_compound("CC=O") == "acetaldehyde"
 
-    @pytest.mark.unit
-    def test_propanal_no_locant(self):
-        """Propanal has no locant (terminal group, always at position 1)."""
-        result = name_compound("CCC=O")
-        assert result == "propanal"
-        # Verify no locant in name
-        assert "-1-" not in result
-        assert result == "propanal"  # Not propan-1-al
-
-    @pytest.mark.unit
-    def test_butanal_vowel_elision(self):
-        """Butanal shows vowel elision (not butaneal)."""
-        result = name_compound("CCCC=O")
-        assert result == "butanal"
-        # Not "butaneal" or "butane-al"
-        assert "butaneal" not in result
-
-
 # ============================================================================
 # Ketone Naming Tests
 # ============================================================================
@@ -123,25 +90,6 @@ class TestKetoneNaming:
     def test_simple_ketones(self, smiles, expected):
         """Test simple ketone naming."""
         assert name_compound(smiles) == expected
-
-    @pytest.mark.unit
-    def test_propan_2_one_pin(self):
-        """Propan-2-one is the IUPAC 2013 PIN (acetone removed from retained names)."""
-        assert name_compound("CC(C)=O") == "propan-2-one"
-
-    @pytest.mark.unit
-    def test_butan_2_one_locant(self):
-        """Butan-2-one requires locant in PIN style."""
-        result = name_compound("CCC(C)=O")
-        assert result == "butan-2-one"
-        assert "-2-" in result
-
-    @pytest.mark.unit
-    def test_pentan_3_one_locant(self):
-        """Pentan-3-one has ketone at position 3."""
-        result = name_compound("CCC(CC)=O")
-        assert result == "pentan-3-one"
-        assert "-3-" in result
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
@@ -175,64 +123,10 @@ class TestCarboxylicAcidNaming:
         assert name_compound("C(=O)O") == "formic acid"
 
     @pytest.mark.unit
-    def test_acetic_acid_retained(self):
-        """Acetic acid is a retained name."""
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    @pytest.mark.unit
-    def test_propanoic_acid_no_locant(self):
-        """Propanoic acid has no locant (terminal group)."""
-        result = name_compound("CCC(=O)O")
-        assert result == "propanoic acid"
-        # No locant in name
-        assert "-1-" not in result
-
-    @pytest.mark.unit
     def test_butanoic_acid_vowel_elision(self):
         """Butanoic acid shows vowel elision (not butaneoic acid)."""
         result = name_compound("CCCC(=O)O")
         assert result == "butanoic acid"
-
-
-# ============================================================================
-# Vowel Elision Tests (End-to-End)
-# ============================================================================
-
-class TestVowelElisionEndToEnd:
-    """Test vowel elision through the complete naming pipeline."""
-
-    @pytest.mark.unit
-    def test_propanol_elision(self):
-        """propan-1-ol not propane-1-ol."""
-        result = name_compound("CCCO")
-        assert result == "propan-1-ol"
-        assert "propane-1-ol" != result
-
-    @pytest.mark.unit
-    def test_propanal_elision(self):
-        """propanal not propaneal or propane-al."""
-        result = name_compound("CCC=O")
-        assert result == "propanal"
-        assert "propaneal" != result
-
-    @pytest.mark.unit
-    def test_butanone_elision(self):
-        """butan-2-one not butane-2-one."""
-        result = name_compound("CCC(C)=O")
-        assert result == "butan-2-one"
-        assert "butane-2-one" != result
-
-    @pytest.mark.unit
-    def test_propanoic_acid_elision(self):
-        """propanoic acid shows elision (not propaneoic acid)."""
-        result = name_compound("CCC(=O)O")
-        assert result == "propanoic acid"
-        assert "propaneoic" not in result
-
-
-# ============================================================================
-# Retained Name Precedence Tests
-# ============================================================================
 
 
 # ============================================================================

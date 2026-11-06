@@ -37,7 +37,6 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from orthonym.jvm_flags import java_cmd
 from orthonym.metrics import provenance as pv
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.jars import jar_or_skip
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]

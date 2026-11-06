@@ -30,15 +30,15 @@ All names are IUPAC 2013 correct. The stereo descriptor format
 accommodate OPSIN parser limitations.
 """
 
-import os
 import re
 import subprocess
 
 import pytest
 
 from orthonym.namer import name_compound
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 from tests.support.rt_assert import assert_tier_contract
+from tests.support.pin_tiers import tier_row
 
 
 # Compounds whose PIN the PIN tier cannot build (pre-existing-failures plan,
@@ -108,23 +108,11 @@ _GERMACRANE_XFAIL = (
 
 def _java_available():
     """Check if Java runtime is available."""
-    try:
-        proc = subprocess.run(
-            ["java", "-version"],
-            capture_output=True, text=True, timeout=5,
-        )
-        return proc.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def _opsin_jar_path():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
+    return java_on_path()
 
 
 JAVA_OK = _java_available()
-OPSIN_JAR = _opsin_jar_path()
+OPSIN_JAR = jar_or_none()
 SKIP_REASON = "Java not available" if not JAVA_OK else "OPSIN JAR not found"
 CAN_RUN = JAVA_OK and OPSIN_JAR is not None
 
@@ -659,13 +647,10 @@ class TestStereoFormatGermacrane:
 
     @pytest.mark.opsin_gate
     def test_germacrane_best_effort_emits_the_systematic_name(self):
-        from orthonym import Orthonym
-        from orthonym.cli import _emit_tier_flags
         systematic = "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
         assert opsin_parse(systematic) is None  # the systematic name is no way out
         assert opsin_parse("germacrane") is None  # nor is the list name read back
-        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
-            GERMACRANE)
+        be = tier_row(GERMACRANE, "best-effort")
         # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
         assert be["name"] == systematic, be
         assert be["tier"] == "pin_unverified", be

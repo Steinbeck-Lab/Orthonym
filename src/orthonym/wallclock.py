@@ -268,10 +268,9 @@ def _restore_naming_state(snapshot) -> List[str]:
 # ---------------------------------------------------------------------------
 # ``Orthonym.name`` publishes four tier ContextVars and the request tier for the
 # length of a top-level call, and the fragment recursion keeps thread-local depth
-# counters and a visited set; the test suite's isolation guard checks exactly these
-# (``tests/conftest.py``, ``_leaked_naming_state``; a unit test keeps the tuples
-# equal). The tools also check the rest of the scaffolding ``name`` sets up and
-# tears down (the memo scope, the armed budgets, the lone-pair input scope, the
+# counters and a visited set. The tools and the test suite's isolation guard
+# (``tests/conftest.py``, ``_naming_state_isolation``) also check the rest of the
+# scaffolding ``name`` sets up and tears down (the memo scope, the armed budgets, the lone-pair input scope, the
 # caller's input) and the re-entry guards of the producers. Each value below is the
 # one it has outside a naming call.
 NAMING_TIER_CTX = ("general_fallback_ctx", "best_effort_ctx",

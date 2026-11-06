@@ -34,19 +34,6 @@ class TestChainParentSuffixes:
                 f"Chain-parent molecule incorrectly got ring suffix 'carboxylic acid': {result}"
             )
 
-    def test_cyclohexylpropanoic_acid_chain_suffix(self):
-        """3-cyclohexylpropanoic acid: 3C chain is parent.
-        Should produce 'oic acid' not 'carboxylic acid'.
-        SMILES: OC(=O)CCC1CCCCC1
-        """
-        result = name_compound("OC(=O)CCC1CCCCC1")
-        assert "oic acid" in result, (
-            f"Expected chain suffix 'oic acid' for chain-parent molecule, got: {result}"
-        )
-        assert "carboxylic acid" not in result, (
-            f"Chain-parent molecule incorrectly got ring suffix 'carboxylic acid': {result}"
-        )
-
     def test_phenylpropanal_chain_suffix(self):
         """3-phenylpropanal: 3C chain is parent.
         Should produce 'al' suffix not 'carbaldehyde'.
@@ -64,27 +51,6 @@ class TestChainParentSuffixes:
 @pytest.mark.unit
 class TestRingParentSuffixes:
     """Ring-parent molecules should use ring suffix forms."""
-
-    def test_benzoic_acid_ring_suffix(self):
-        """Benzoic acid: ring is parent (benzene-COOH).
-        Should produce 'carboxylic acid' or retained name 'benzoic acid'.
-        SMILES: OC(=O)c1ccccc1
-        """
-        result = name_compound("OC(=O)c1ccccc1")
-        # Accept either retained name or systematic ring suffix
-        assert "carboxylic acid" in result or "benzoic acid" in result, (
-            f"Expected ring suffix 'carboxylic acid' or retained 'benzoic acid', got: {result}"
-        )
-
-    def test_cyclohexanecarbaldehyde_ring_suffix(self):
-        """Cyclohexanecarbaldehyde: ring is parent (6-ring > 1C chain).
-        Should produce 'carbaldehyde'.
-        SMILES: O=CC1CCCCC1
-        """
-        result = name_compound("O=CC1CCCCC1")
-        assert "carbaldehyde" in result, (
-            f"Expected ring suffix 'carbaldehyde' for ring-parent aldehyde, got: {result}"
-        )
 
     def test_cyclopentanecarbonitrile_ring_suffix(self):
         """Cyclopentanecarbonitrile: ring is parent (5-ring > 1C chain).

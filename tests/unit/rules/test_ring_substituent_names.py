@@ -11,7 +11,6 @@ import pytest
 from orthonym.rules.ring_substituents import (
     RING_SUBSTITUENT_NAMES,
     POSITION_SPECIFIC_RINGS,
-    get_ring_substituent_name,
 )
 
 

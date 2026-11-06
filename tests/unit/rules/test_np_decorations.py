@@ -22,18 +22,10 @@ from rdkit import Chem
 
 from orthonym import name_compound
 from orthonym.rules.natural_products import name_natural_product
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
 pytestmark = pytest.mark.usefixtures("np_producer_only")
-
-
-def _mol(smiles: str):
-    """Return RDKit Mol from SMILES, raising on invalid input."""
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"Invalid SMILES: {smiles}"
-    return mol
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +213,6 @@ class TestNPDecorationEdgeCases:
     def test_decoration_does_not_break_exact_match(self):
         """Molecules with exact derivative entries still use exact match in the producer
         (the engine names morphine by its bridged fused PIN, slice S4)."""
-        from rdkit import Chem
 
         from orthonym.rules.natural_products import name_natural_product
         smiles = "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"

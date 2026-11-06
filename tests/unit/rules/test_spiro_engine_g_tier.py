@@ -22,9 +22,8 @@ and ``3-(benzenesulfonyl)-9-[...]`` for another.
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.rules.spiro import get_spiro_numbering
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate  # the names below are built with the validity gate on
 
@@ -34,7 +33,7 @@ THIOUREA_PREFIX = "({[(oxolan-2-yl)methyl]amino}(sulfanylidene)methyl)"
 
 
 def _name(smiles):
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     return row["name"], row["tier"]
 
 

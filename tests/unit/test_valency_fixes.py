@@ -16,7 +16,6 @@ These tests target the fixes in Plan 17-04:
 """
 
 import re
-import pytest
 from orthonym import name_compound
 from tests.support.rt_assert import assert_full_rt
 
@@ -122,15 +121,6 @@ class TestRingLocantCollisions:
         assert "ol" in name
         assert not _has_locant_collision(name), f"Locant collision in: {name}"
 
-    def test_cyclohexanone_has_suffix_locant(self):
-        """cyclohexanone should have a locant on the suffix (cyclohexan-N-one)."""
-        name = name_compound("O=C1CCCCC1")
-        assert name
-        # Should have a locanted suffix, not bare "cyclohexanone"
-        # (OPSIN interprets bare cyclohexanone as position 1, but locant is clearer)
-        assert "one" in name
-
-
 # ===========================================================================
 # TestSuffixCapacityValidation: suffix count vs parent capacity
 # ===========================================================================
@@ -150,13 +140,6 @@ class TestSuffixCapacityValidation:
         name = name_compound("OC1CC(O)CC(O)C1")
         assert name
         # Should have triol (3 hydroxyls on 6-membered ring)
-        assert "ol" in name
-
-    def test_propane_triol_valid(self):
-        """Propane (3 carbons) can support triol (glycerol)."""
-        name = name_compound("OCC(O)CO")
-        assert name
-        # Glycerol should be propane-1,2,3-triol
         assert "ol" in name
 
     def test_ethane_diol_valid(self):

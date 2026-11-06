@@ -29,6 +29,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.pin_tiers import tier_row
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -39,33 +40,12 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "C[S@@](=O)c1ccc(CNC(=NCCc2cccc3c2OCCO3)NC2CC2)cc1",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
 
 
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
 
 
@@ -194,7 +174,7 @@ def test_tautomer_name_pairs_through_the_standard_inchi():
 
 
 def test_aziridine_nitrogen():
-    res = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(AZIRIDINE_ROW)
+    res = tier_row(AZIRIDINE_ROW, "best-effort")
     assert res.get("name") == AZIRIDINE_NAME
     assert_full_rt(res.get("name"), AZIRIDINE_ROW)
     # The N written first is the other N configuration for CDK; RDKit reads the two
@@ -203,7 +183,7 @@ def test_aziridine_nitrogen():
     assert namer._lone_pair_configuration_verified(AZIRIDINE_NAME, AZIRIDINE_FIRST) is False
     # CDK's reading of the N-first string is the other N configuration; the engine names that one
     # (before the standard spelling compared the labels the engine gives, it named none of it).
-    first = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(AZIRIDINE_FIRST)
+    first = tier_row(AZIRIDINE_FIRST, "best-effort")
     assert first.get("name") == AZIRIDINE_FIRST_NAME, first.get("name")
     assert not is_failure_name(first.get("name"))
     assert namer._lone_pair_configuration_verified(AZIRIDINE_FIRST_NAME, AZIRIDINE_FIRST) is True

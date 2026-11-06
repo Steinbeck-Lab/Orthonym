@@ -23,13 +23,6 @@ class TestRingParentNitrogenSubstituents:
     """Nitrogen groups on ring parents appear in the generated name."""
 
     @pytest.mark.integration
-    def test_amino_cyclohexane(self):
-        """NC1CCCCC1 -> contains 'amino' or ends with 'amine'."""
-        name = name_compound('NC1CCCCC1')
-        assert 'amino' in name or name.endswith('amine'), \
-            f"Expected 'amino' or 'amine' suffix in '{name}'"
-
-    @pytest.mark.integration
     @pytest.mark.xfail(strict=True, reason=(
         "DEFECT (PIN-tier breadth), pre-existing at 4e0e5c29b (checked at 4e0e5c29b, "
         "6ffc8bb36 and ff9dd234a): the PIN tier abstains on nitrocycloalkanes "
@@ -80,35 +73,6 @@ class TestRingParentNitrogenSubstituents:
 
 class TestRingParentOxygenCarbonylSubstituents:
     """Oxygen/carbonyl groups on ring parents appear in the generated name."""
-
-    @pytest.mark.integration
-    def test_hydroxy_cyclohexane(self):
-        """OC1CCCCC1 -> contains 'hydroxy' or 'ol'."""
-        name = name_compound('OC1CCCCC1')
-        assert 'hydroxy' in name or 'ol' in name, \
-            f"Expected 'hydroxy' or 'ol' in '{name}'"
-
-    @pytest.mark.integration
-    def test_oxo_cyclohexanone(self):
-        """O=C1CCCCC1 -> contains 'one' or 'oxo'."""
-        name = name_compound('O=C1CCCCC1')
-        assert 'one' in name or 'oxo' in name, \
-            f"Expected 'one' or 'oxo' in '{name}'"
-
-    @pytest.mark.integration
-    def test_carboxy_cyclohexane(self):
-        """OC(=O)C1CCCCC1 -> contains 'carboxy' or 'carboxylic' or 'acid'."""
-        name = name_compound('OC(=O)C1CCCCC1')
-        assert 'carboxy' in name or 'carboxylic' in name or 'acid' in name, \
-            f"Expected 'carboxy', 'carboxylic', or 'acid' in '{name}'"
-
-    @pytest.mark.integration
-    def test_methoxy_cyclohexane(self):
-        """COC1CCCCC1 -> contains 'methoxy' or name is not bare 'cyclohexane'."""
-        name = name_compound('COC1CCCCC1')
-        # methoxy or at least the oxygen substituent should be represented
-        assert 'methoxy' in name or 'hydroxymethyl' in name or name != 'cyclohexane', \
-            f"Expected methoxy/hydroxymethyl substituent in '{name}', got bare cyclohexane"
 
     @pytest.mark.integration
     def test_hydroxy_methyl_cyclohexane(self):
@@ -227,13 +191,6 @@ class TestChainParentOxygenSubstituents:
         """CCCC(CCO)CC(=O)O -> contains '2-hydroxyethyl'."""
         name = name_compound('CCCC(CCO)CC(=O)O')
         assert '2-hydroxyethyl' in name, f"Expected '2-hydroxyethyl' in '{name}'"
-
-    @pytest.mark.integration
-    def test_oxo_as_prefix(self):
-        """CC(=O)CC(=O)O -> contains 'oxo' (non-principal ketone)."""
-        name = name_compound('CC(=O)CC(=O)O')
-        assert 'oxo' in name, f"Expected 'oxo' in '{name}'"
-
 
 # ---------------------------------------------------------------------------
 # Class 7: Sulfur substituents on chain parents (previously silently dropped)

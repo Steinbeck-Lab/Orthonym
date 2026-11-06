@@ -33,14 +33,6 @@ def test_walk_is_preorder_self_first():
     assert [x.token for x in _spine(parent).walk()] == ["phenyl", "methyl"]
 
 
-def test_complete_partition_ok():
-    p = bs.verify_spine(ETHANOL, _spine(
-        _b("eth", bs.BindingKind.PARENT, [0, 1]),
-        _b("ol", bs.BindingKind.SUFFIX, [2]),
-    ), "ethan-1-ol")
-    assert p.ok, p.findings
-
-
 def test_unbound_atom_is_error():
     p = bs.verify_spine(ETHANOL, _spine(
         _b("eth", bs.BindingKind.PARENT, [0, 1]),

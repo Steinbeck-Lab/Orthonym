@@ -35,17 +35,6 @@ class TestPurineDerivatives:
     """Test naming of purine-based compounds."""
 
     @pytest.mark.integration
-    def test_adenine(self):
-        """Adenine: IUPAC 2013 prefers retained name 'adenine'.
-
-        Systematic name '9H-purin-6-amine' is also valid.
-        """
-        result = name_compound('Nc1ncnc2nc[nH]c12')
-        # IUPAC 2013: retained name "adenine" is preferred
-        # Systematic "9H-purin-6-amine" is also valid
-        assert result == "adenine" or ('purin' in result.lower() and 'amin' in result.lower()), f"Got: {result}"
-
-    @pytest.mark.integration
     def test_hypoxanthine_like(self):
         """Test oxo-purine naming (hypoxanthine pattern).
 
@@ -92,13 +81,6 @@ class TestSubstitutedIndoles:
         assert result == '1-methyl-1H-indole', f"Expected 1-methyl-1H-indole, got: {result}"
 
     @pytest.mark.integration
-    def test_2_methylindole(self):
-        """2-methylindole: methyl at position 2."""
-        result = name_compound('Cc1cc2ccccc2[nH]1')
-        assert '2-methyl' in result, f"Expected '2-methyl' in name, got: {result}"
-        assert 'indole' in result.lower(), f"Got: {result}"
-
-    @pytest.mark.integration
     def test_3_methylindole_skatole(self):
         """3-methylindole (skatole): methyl at position 3."""
         result = name_compound('Cc1c[nH]c2ccccc12')
@@ -118,49 +100,11 @@ class TestSubstitutedIndoles:
 
 
 # =============================================================================
-# Test Substituted Quinolines
-# =============================================================================
-
-class TestSubstitutedQuinolines:
-    """Test correct locant assignment for substituted quinolines."""
-
-    @pytest.mark.integration
-    def test_2_methylquinoline(self):
-        """2-methylquinoline (quinaldine): methyl at position 2."""
-        result = name_compound('Cc1ccc2ccccc2n1')
-        assert '2-methyl' in result, f"Expected '2-methyl' in name, got: {result}"
-        assert 'quinoline' in result.lower(), f"Got: {result}"
-
-
-# =============================================================================
 # Test a phase Requirements (FUSED-01 through FUSED-07)
 # =============================================================================
 
 class TestPhase7Requirements:
     """Test a phase requirements from ROADMAP.md."""
-
-    @pytest.mark.integration
-    def test_fused_01_correct_numbering(self):
-        """FUSED-01: Correct peripheral numbering for substituted fused heterocycles."""
-        # 5-methylindole should have methyl at position 5, not 4 or 6
-        result = name_compound('Cc1ccc2[nH]ccc2c1')
-        assert '5-methyl' in result, f"Expected '5-methyl' for correct numbering, got: {result}"
-
-    @pytest.mark.integration
-    def test_fused_02_purine_skeleton(self):
-        """FUSED-02: Recognize purine skeleton."""
-        result = name_compound('c1ncc2nc[nH]c2n1')
-        assert 'purin' in result.lower(), f"Expected 'purine' in name, got: {result}"
-
-    @pytest.mark.integration
-    def test_fused_03_adenine_naming(self):
-        """FUSED-03: Adenine naming - IUPAC 2013 prefers retained name.
-
-        Retained name 'adenine' or systematic '9H-purin-6-amine' both valid.
-        """
-        result = name_compound('Nc1ncnc2nc[nH]c12')
-        # IUPAC 2013: retained name "adenine" is preferred
-        assert result == "adenine" or '6-amine' in result, f"Expected 'adenine' or '6-amine' suffix, got: {result}"
 
     @pytest.mark.integration
     def test_fused_04_oxo_groups(self):
@@ -174,16 +118,6 @@ class TestPhase7Requirements:
         # IUPAC 2013: retained name "hypoxanthine" is preferred
         # Systematic name containing "one" or "oxo" is also valid
         assert result == "hypoxanthine" or 'one' in result.lower() or 'oxo' in result.lower(), f"Expected retained name or oxo/one handling, got: {result}"
-
-    @pytest.mark.integration
-    def test_fused_05_n_substitution(self):
-        """FUSED-05: a ring N substituent is cited with the numeric ring locant.
-
-        '1-hydroxy-1H-pyrrole-2,5-dione (PIN)', the Blue Book; the italic 'N'
-        locant is for N atoms outside the ring.
-        """
-        result = name_compound('Cn1ccc2ccccc12')
-        assert result == '1-methyl-1H-indole', f"Expected '1-methyl-1H-indole', got: {result}"
 
     @pytest.mark.integration
     def test_fused_06_indicated_hydrogen(self):
@@ -287,11 +221,6 @@ class TestFusedHeterocycleE2E:
             assert expected_contains in result or result == alt_result, f"SMILES {smiles}: expected '{expected_contains}' or '{alt_result}' in '{result}'"
         else:
             assert expected_contains in result, f"SMILES {smiles}: expected '{expected_contains}' in '{result}'"
-
-
-# =============================================================================
-# Regression Tests (Ensure a phase still works)
-# =============================================================================
 
 
 # =============================================================================

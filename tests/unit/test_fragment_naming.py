@@ -22,6 +22,10 @@ from orthonym.assembly.fragment_naming import (
 )
 
 
+#: these tests drive the fragment recursion outside a ``name`` scope (tests/conftest.py)
+pytestmark = pytest.mark.usefixtures("reset_naming_state_after")
+
+
 @pytest.fixture(autouse=True)
 def _reset_fragment_guard():
     """Reset thread-local state before and after each test.

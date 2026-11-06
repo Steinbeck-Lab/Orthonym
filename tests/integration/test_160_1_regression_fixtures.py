@@ -201,7 +201,6 @@ class TestOxygenAttachedCarbamateBranchB:
         """OPSIN parses the corrected name back to the original structure
         per InChI L1 (formula + connectivity)."""
         import subprocess
-        import os
         from rdkit import Chem
 
         smiles = "O=C(N)OCCCC(=O)O"
@@ -271,7 +270,6 @@ class TestNSubstitutedCarbamateBranchB:
     def test_n_substituted_carbamate_opsin_roundtrip(self):
         """Generated names OPSIN-round-trip to input InChI L1."""
         import subprocess
-        import os
         from rdkit import Chem
 
         from tests.support.jars import jar_or_skip

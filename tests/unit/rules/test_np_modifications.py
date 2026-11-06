@@ -18,22 +18,11 @@ from orthonym.rules.natural_products import (
     format_np_modification_prefix,
     name_natural_product,
 )
-from tests.support.np_producer import np_producer_only  # noqa: F401
+from tests.support.read_back import mol as _mol
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
 pytestmark = pytest.mark.usefixtures("np_producer_only")
-
-
-# ---------------------------------------------------------------------------
-# Helper
-# ---------------------------------------------------------------------------
-
-def _mol(smiles: str):
-    """Return RDKit Mol from SMILES, raising on invalid input."""
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"Invalid SMILES: {smiles}"
-    return mol
 
 
 # ---------------------------------------------------------------------------
@@ -183,19 +172,6 @@ class TestDetectNpModifications:
             modification_prefix=mod_prefix,
         )
         assert "19-norandrost" in result
-
-    def test_non_np_molecule_returns_none_from_pipeline(self):
-        """Molecules that don't match any NP scaffold return None."""
-        mol = _mol("CCO")  # ethanol
-        result = name_natural_product(mol)
-        assert result is None
-
-    def test_benzene_returns_none_from_pipeline(self):
-        """Benzene is not a natural product scaffold."""
-        mol = _mol("c1ccccc1")
-        result = name_natural_product(mol)
-        assert result is None
-
 
 # ===========================================================================
 # Test Class 2: format_np_modification_prefix

@@ -39,10 +39,6 @@ class TestByteIdenticalWithOneOffer:
     def test_diverse_molecules_unchanged(self):
         # Same list L2's byte-identical test uses, so this is directly
         # comparable to the pre-L4-core behaviour it certified.
-        expected = {
-            "CCO": None,               # don't hardcode every PIN -- just
-            "c1ccccc1": None,           # assert non-empty / non-failure below
-        }
         smiles_list = [
             "CCO", "c1ccccc1", "CC(=O)Nc1ccccc1", "CC(=O)O",
             "CC(C)(C)CC(=O)O", "CC(=O)OCC", "c1ccc2[nH]ccc2c1",

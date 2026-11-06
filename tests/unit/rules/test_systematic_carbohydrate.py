@@ -61,55 +61,6 @@ HEPTOSE_ACYCLIC_SMILES = "OC[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C=O"
 HEPTOSE_ACYCLIC_HEAD_NAME = "D-glycero-L-gulo-heptose"
 
 
-def _idealize_to_parent_inline(smiles):
-    """Replicate the RESEARCH physical idealization (Pitfall 1) inline.
-
-    deoxy: add an exocyclic O on the bare terminal ring-attached CH3.
-    uronic: RemoveAtom the carbonyl =O so COOH -> CH2OH.
-    amino: SetAtomicNum(8) on the (single) nitrogen.
-    Returns the canonical SMILES of the idealized molecule (a NEW mol so CIP
-    re-runs cleanly). This proves the physical-idealization requirement; the
-    Wave-1 helper (`_idealize_to_parent`) must reproduce this behaviour.
-    """
-    m = Chem.RWMol(Chem.MolFromSmiles(smiles))
-    has_n = any(a.GetSymbol() == "N" for a in m.GetAtoms())
-    has_carbonyl = any(
-        b.GetBondType() == Chem.BondType.DOUBLE
-        and {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()} == {"C", "O"}
-        for b in m.GetBonds()
-    )
-    if has_n:
-        for a in m.GetAtoms():
-            if a.GetSymbol() == "N":
-                a.SetAtomicNum(8)
-                break
-    elif has_carbonyl:
-        # uronic: reduce the ring-attached COOH carbonyl (remove the =O atom).
-        cc = next(
-            a.GetIdx()
-            for a in m.GetAtoms()
-            if a.GetSymbol() == "C"
-            and sum(1 for n in a.GetNeighbors() if n.GetSymbol() == "O") == 2
-        )
-        dbl = next(
-            b.GetOtherAtom(m.GetAtomWithIdx(cc)).GetIdx()
-            for b in m.GetAtomWithIdx(cc).GetBonds()
-            if b.GetBondType() == Chem.BondType.DOUBLE
-        )
-        m.RemoveAtom(dbl)
-    else:
-        # deoxy: add an exocyclic O on the bare terminal (degree-1) carbon.
-        methyl = next(
-            a.GetIdx()
-            for a in m.GetAtoms()
-            if a.GetSymbol() == "C" and a.GetDegree() == 1
-        )
-        o = m.AddAtom(Chem.Atom(8))
-        m.AddBond(methyl, o, Chem.BondType.SINGLE)
-    Chem.SanitizeMol(m)
-    return Chem.MolToSmiles(m)
-
-
 @pytest.mark.unit
 class TestSystematicMonosaccharide:
     """-04 systematic monosaccharide engine (deoxy / amino / uronic)."""
@@ -166,19 +117,16 @@ class TestSystematicMonosaccharide:
         For each modified-sugar class the idealized canonical SMILES MUST equal
         clean β-D-glucopyranose — proving idealization is physical (edit +
         re-CIP), not an analytic 'modification-tolerant fingerprint' (which
-        FAILS because the modification re-ranks ring CIP). Where the engine
-        exposes a `_idealize_to_parent` helper it is preferred; otherwise the
-        inline replication asserts the same physical-idealization contract.
+        FAILS because the modification re-ranks ring CIP), through the
+        engine's `_idealize_to_parent` helper.
         """
-        clean = Chem.CanonSmiles(CLEAN_GLUCOPYRANOSE)
-        try:
-            from orthonym.data.sugar_names import _idealize_to_parent  # type: ignore
+        from orthonym.data.sugar_names import _idealize_to_parent
 
-            def idealize(smi):
-                rw = _idealize_to_parent(Chem.MolFromSmiles(smi))
-                return Chem.MolToSmiles(rw) if rw is not None else None
-        except ImportError:
-            idealize = _idealize_to_parent_inline
+        clean = Chem.CanonSmiles(CLEAN_GLUCOPYRANOSE)
+
+        def idealize(smi):
+            rw = _idealize_to_parent(Chem.MolFromSmiles(smi))
+            return Chem.MolToSmiles(rw) if rw is not None else None
 
         for smi in (DEOXY_SMILES, URONIC_SMILES, AMINO_SMILES):
             assert idealize(smi) == clean, (

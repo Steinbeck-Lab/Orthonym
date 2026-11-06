@@ -25,15 +25,9 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
 pytestmark = pytest.mark.opsin_gate
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 def _full_rt(smi, name):

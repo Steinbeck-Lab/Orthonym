@@ -32,14 +32,13 @@ Labels only: no name changes (the end checks compare every row of a dev split,
 milestone1500 and dev2000 at both tiers against a fresh run of b757091f2).
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.metrics import provenance as pv
 from tests.support.jars import jar_or_skip
 from tests.support.rt_assert import _independent_parse
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key_or_empty as _key
 
 pytestmark = [pytest.mark.integration]
 
@@ -50,15 +49,10 @@ CASE = "C1CC2CCC1(CC2)C3CCC4(CCC5(CCCC5C4C3)C)C"
 CASE_NAME = "12-(bicyclo[2.2.2]octan-1-yl)-6,9-dimethyltricyclo[7.4.0.0^2,6]tridecane"
 
 
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return inchi.MolToInchiKey(mol) if mol is not None else ""
-
-
 @pytest.mark.opsin_gate
 def test_verified_general_engine_von_baeyer_name_is_systematic_verified():
     jar_or_skip()
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(CASE)
+    row = tier_row(CASE, "best-effort")
     assert row["name"] == CASE_NAME, row
     assert row["source"] == "general_engine", row
     assert row["tier"] == "systematic_verified", row
@@ -145,7 +139,7 @@ def test_name_verified_by_the_shipped_name_check_takes_its_verified_tier(monkeyp
     jar_or_skip()
     monkeypatch.setattr(Orthonym, "name", _fake_name_with_primary_offer(
         "general_engine", "ethanol", "best_effort"))
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("CCO")
+    row = tier_row("CCO", "best-effort")
     assert row["name"] == "ethanol", row
     assert row["gate_outcome"] == pv.GATE_OUTCOME_FULL_KEY_VERIFIED, row
     assert row["tier"] == "systematic_verified", row
@@ -159,8 +153,7 @@ def test_pin_path_non_pin_name_verified_by_the_shipped_name_check_is_systematic(
     name = "(trimethylazaniumyl)acetate"
     monkeypatch.setattr(Orthonym, "name", _fake_name_with_primary_offer(
         "pin_path", name, "best_effort", non_pin_fragment="trimethylazaniumyl"))
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
-        "C[N+](C)(C)CC(=O)[O-]")
+    row = tier_row("C[N+](C)(C)CC(=O)[O-]", "best-effort")
     assert row["name"] == name, row
     assert row["gate_outcome"] == pv.GATE_OUTCOME_FULL_KEY_VERIFIED, row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
@@ -176,8 +169,7 @@ def test_no_pin_status_element_name_verified_by_the_shipped_name_check_is_system
     jar_or_skip()
     monkeypatch.setattr(Orthonym, "name", _fake_name_with_primary_offer(
         "pin_path", "trimethylalumane", "pin_verified"))
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
-        "C[Al](C)C")
+    row = tier_row("C[Al](C)C", "best-effort")
     assert row["name"] == "trimethylalumane", row
     assert row["gate_outcome"] == pv.GATE_OUTCOME_FULL_KEY_VERIFIED, row
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row

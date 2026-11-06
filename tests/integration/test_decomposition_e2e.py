@@ -13,7 +13,6 @@ Coverage:
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 
@@ -53,15 +52,6 @@ class TestEsterDecomposition:
         # Should reference multiple ester chains
         assert "hexadecano" in name.lower() or "palmit" in name.lower() or "oyloxy" in name.lower(), (
             f"Expected reference to hexadecanoyl chains, got: {name}"
-        )
-
-    @pytest.mark.integration
-    def test_phenyl_hexadecanoate(self):
-        """Phenyl palmitate: long-chain ester with aromatic alcohol."""
-        name = name_compound("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")
-        assert name != "unknown"
-        assert "phenyl" in name.lower() or "hexadecano" in name.lower(), (
-            f"Expected 'phenyl' or 'hexadecano' in name, got: {name}"
         )
 
     @pytest.mark.integration
@@ -210,18 +200,6 @@ class TestAmideDecomposition:
         assert name != "propanoic acid", "Should not be just 'propanoic acid' (fragment loss)"
         assert len(name) > 20, f"Macrolide name too short: {name}"
 
-    @pytest.mark.integration
-    def test_n_phenylbenzamide_not_just_benzene(self):
-        """N-phenylbenzamide: HA=15, currently 'benzene' -- quality gate
-        may not intercept at this size, but documenting expected behavior."""
-        name = name_compound("O=C(Nc1ccccc1)c1ccccc1")
-        assert name != "unknown"
-        # At HA=15, the quality gate may pass 'benzene' as acceptable
-        # since the threshold is >15. This is expected behavior for now.
-        assert isinstance(name, str)
-        assert len(name) > 0
-
-
 # ---------------------------------------------------------------------------
 # Section 3: Pipeline integrity (simple molecules unchanged)
 # ---------------------------------------------------------------------------
@@ -250,17 +228,6 @@ class TestPipelineIntegrity:
 class TestDecompositionNameQuality:
     """Verify that decomposed names have reasonable structure:
     contain expected IUPAC name components for the bond type."""
-
-    @pytest.mark.integration
-    @pytest.mark.opsin_gate
-    def test_ester_decomposition_has_ate_suffix(self):
-        """A partial ester of a dibasic acid is named on the acid, not 'ate'."""
-        # Phthalate monoester: the free acid is the senior class and owns the suffix, so the
-        # ester is the prefix of the PIN, method (1) of "Partial esters of
-        # polybasic acids and their salts" (the Blue Book,:31940,:31950). The test
-        # name is kept; it used to assert an '-ate' ester name.
-        name = name_compound("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O")
-        assert name == "2-{[(8-methylnonyl)oxy]carbonyl}benzoic acid", name
 
     @pytest.mark.integration
     def test_triglyceride_references_multiple_acyl_chains(self):

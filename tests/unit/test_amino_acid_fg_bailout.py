@@ -6,7 +6,6 @@ When _name_amino_acid_systematic encounters additional functional groups
 (return None) so the general polyfunctional pipeline handles them correctly.
 """
 
-import pytest
 from orthonym import name_compound
 
 

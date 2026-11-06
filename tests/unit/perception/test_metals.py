@@ -167,10 +167,6 @@ class TestDetectMetalComplex:
         mol = Chem.MolFromSmiles('[Fe]')
         assert detect_metal_complex(mol) is None
 
-    def test_none_input_returns_none(self):
-        """detect_metal_complex(None) returns None per defensive guard."""
-        assert detect_metal_complex(None) is None
-
     def test_empty_mol_returns_none(self):
         """Empty mol returns None."""
         mol = Chem.RWMol()

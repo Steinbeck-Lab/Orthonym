@@ -30,8 +30,6 @@ Hence the mononuclear-carrier branches (benzyl, '{ring-yl}methyl', the
 alpha-halogen-decorated carrier) publish NO map and keep the bare "(R)-" form.
 """
 
-import glob
-import shutil
 
 import pytest
 from rdkit import Chem
@@ -42,7 +40,7 @@ from orthonym.rules.ring_substituents import (
     _compound_ring_on_chain_substituent,
     name_ring_system_substituent,
 )
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 pytestmark = pytest.mark.unit
@@ -59,11 +57,6 @@ CHEBI_2364 = (
 )
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 @pytest.fixture
 def production_gate(opsin_gate):
     """Re-enable the production OPSIN validity gate; the suite's autouse
@@ -76,7 +69,7 @@ def production_gate(opsin_gate):
     instead of a hand-rolled setattr, which the ratchet in
     tests/unit/test_opsin_gate_test_harness.py refuses in new files (Task 12 fix
     a performance pass, wp6-tests; TRIAGE.md ' outcome')."""
-    if not shutil.which("java") or _find_opsin_jar() is None:
+    if not java_on_path() or jar_or_none() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
     assert _namer_mod._DISABLE_VALIDITY_GATE is False
 

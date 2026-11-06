@@ -6,7 +6,6 @@ in-scope inputs; and the canary corpus produces zero raises (criterion 3).
 """
 import csv
 import glob
-import os
 
 import pytest
 from rdkit import Chem
@@ -14,7 +13,7 @@ from rdkit import Chem
 from orthonym import OrthonymLimitError, classify_limit, name_compound, Orthonym
 from orthonym.errors import (
     LIMIT_CATALOG, classify_scope_limit, classify_failure_limit,
-    is_failure_name, ATOM_LIMIT,
+    is_failure_name,
 )
 
 

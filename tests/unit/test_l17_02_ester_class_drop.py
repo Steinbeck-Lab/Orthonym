@@ -29,8 +29,8 @@ Fix round of the review of that change:
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -42,23 +42,19 @@ _S_NAME = ("(3S,10S,13R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]hexadecahyd
            "4-oxo-4-{[(2R,3R,4R,5S)-3,4,5-trihydroxypiperidin-2-yl]methoxy}butanoate")
 
 
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
-
-
 @pytest.mark.parametrize("tier", _WIDER)
 def test_the_target_is_named_as_an_ester(tier):
     """ (:31663): the name is the functional class name of the ester, the acid word holding the second ester
     as 'oxo' + alkoxy; it is no PIN (an ester of one polyacid has the PIN of,:31769, which the engine
     does not build for these two alcohols), so its label is below the PIN."""
-    row = _row(_S, tier)
+    row = tier_row(_S, tier)
     assert row["name"] == _S_NAME, row
     assert row["tier"] != "pin_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], _S)
 
 
 def test_the_pin_tier_gives_no_name_for_the_target():
-    row = _row(_S, "pin")
+    row = tier_row(_S, "pin")
     assert row["tier"] == "abstain" and not row["is_pin"], row
 
 
@@ -73,7 +69,7 @@ _POLYACID_PINS = [
 @pytest.mark.parametrize("tier", ["pin"] + _WIDER)
 @pytest.mark.parametrize("smiles,name", _POLYACID_PINS)
 def test_an_ester_of_one_polyacid_is_named_from_the_acid_component(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -89,7 +85,7 @@ def test_the_pin_tier_names_the_diester_of_one_acid_with_two_alcohols(tier):
     before 'ethyl', alphanumerical order). The name is read back by OPSIN to the full InChIKey; the same shape
     with 'methyl' for the cyclohexyl is a control below and passes at every tier."""
     smiles = "CCOC(=O)CCC(=O)OC1CCCCC1"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == "cyclohexyl ethyl butanedioate", row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -127,7 +123,7 @@ def test_the_second_chain_carbonyl_is_cited_as_oxo(smiles, name):
     match = mol.GetSubstructMatches(Chem.MolFromSmarts("[CX3](=O)[OX2][#6]"))[0]
     assert name_ester(mol, match) == name
     assert_full_rt(name, smiles)
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["name"] == name and row["tier"] == "pin_verified", row
 
 
@@ -179,7 +175,7 @@ _CLASS_PINS = (_CLASS_PIN, _CLASS_PIN_DIESTER)
 
 @pytest.mark.parametrize("smiles,name", _CLASS)
 def test_an_ester_molecule_is_named_by_its_ester(smiles, name):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     if smiles not in _CLASS_PINS:
         assert row["tier"] != "pin_verified" and not row["is_pin"], row       # none of these is a PIN the PIN tier built
@@ -189,7 +185,7 @@ def test_an_ester_molecule_is_named_by_its_ester(smiles, name):
 @pytest.mark.parametrize("smiles", [s for s, _n in _CLASS if s not in _CLASS_PINS])
 def test_the_pin_tier_is_unchanged_for_the_class(smiles):
     """The class sample has no PIN at the PIN tier (it declined before the change and still does)."""
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert not row["is_pin"], row
 
 
@@ -204,7 +200,7 @@ def test_the_pin_tier_names_a_phenyl_acetate_with_an_acetyloxy_chain():
     Mutation: with the record of the cascade restored to ``probe_watched and (polycyclic or wider_tier_ctx.get)`` the row
     is ``pin_unverified`` at both tiers."""
     for tier in ("pin", "best-effort"):
-        row = _row(_CLASS_PIN_DIESTER, tier)
+        row = tier_row(_CLASS_PIN_DIESTER, tier)
         assert row["name"] == "4-[(1E)-3-(acetyloxy)prop-1-en-1-yl]phenyl acetate", row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
         assert_full_rt(row["name"], _CLASS_PIN_DIESTER)
@@ -218,7 +214,7 @@ def test_the_pin_tier_names_a_single_ester_of_a_ring_by_its_class():
     numbered from the free valence, the double bonds low ('cyclohexa-2,4-dien-1-yl', methoxy 2,4, methylidene 6: the
     locants {2,4} of the double bonds are lower than {3,5},. Read back by OPSIN to the full InChIKey, the
     stereo layer included."""
-    row = _row(_CLASS_PIN, "pin")
+    row = tier_row(_CLASS_PIN, "pin")
     assert row["name"] == "(1S)-2,4-dimethoxy-6-methylidenecyclohexa-2,4-dien-1-yl acetate", row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], _CLASS_PIN)
@@ -235,7 +231,7 @@ _CONTROLS = [
 @pytest.mark.parametrize("tier", ["pin"] + _WIDER)
 @pytest.mark.parametrize("smiles,name", _CONTROLS)
 def test_the_controls_keep_their_names(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
@@ -322,7 +318,7 @@ def test_the_glycerol_ester_of_a_polyacid_is_named_from_its_acid(smiles, name, t
     derived from a single acid are systematically named by placing the name(s) of the hydroxylic component [...] in front
     of the name of the acid component"; 'ethyl methyl butanedioate (PIN)'. The producer ``outer:lipid`` named it
     '2,3-dihydroxypropyl 4-ethoxy-4-oxobutanoate' at pin_verified."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name and row["tier"] == "pin_verified" and row["is_pin"], row
     assert row.get("producer") != "outer:lipid", row
     assert_full_rt(row["name"], smiles)
@@ -341,7 +337,7 @@ def test_the_polyester_builder_cites_different_organyl_groups_in_alphanumerical_
 # (M7) the triester of butane-1,1,3-tricarboxylic acid needs the locants of ('1,1-diethyl 3-methyl
 # butane-1,1,3-tricarboxylate (PIN)',:31783), which the builder does not cite; the name stays an ester-prefixed one
 def test_the_tricarboxylate_with_two_alcohols_keeps_its_valid_name():
-    row = _row("CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC", "best-effort")
+    row = tier_row("CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC", "best-effort")
     assert not row["is_pin"] and row["tier"] != "abstain", row
     assert_full_rt(row["name"], "CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC")
 
@@ -362,7 +358,7 @@ def test_the_acid_fragment_is_named_without_a_hydroxy_it_does_not_have():
 
 @pytest.mark.parametrize("tier", _WIDER)
 def test_the_glycoside_ester_keeps_its_ester_name_after_the_probe_rejected_a_name(tier):
-    row = _row(_ACRYLATE_GLYCOSIDE, tier)
+    row = tier_row(_ACRYLATE_GLYCOSIDE, tier)
     assert row["name"] == ("[(2R,3S,4S,5R,6S)-3,4,5-trihydroxy-6-(4-hydroxyphenoxy)oxan-2-yl]methyl "
                            "(2E)-3-(1,4-dihydroxy-6-oxocyclohex-2-en-1-yl)prop-2-enoate"), row
     assert "(oxo)methyl" not in row["name"]
@@ -406,9 +402,9 @@ _MIXED_ANION_ROWS = [
 def test_a_polyol_ester_with_two_different_anions_is_no_pin(smiles):
     """The default and PIN tiers do not ship the method (2) name as a PIN (the PIN tier gives no name, as before the
     item); the wider tier still names it, labelled below the PIN, and the name reads back."""
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert not row["is_pin"] and row["tier"] != "pin_verified", row
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and not row["is_pin"] and row["tier"] != "pin_verified", row
     assert_full_rt(row["name"], smiles)
 
@@ -450,7 +446,7 @@ def test_organyl_groups_that_need_locants_are_not_named_without_them(smiles):
     from orthonym.rules.esters import name_polyacid_polyester
     assert name_polyacid_polyester(Chem.MolFromSmiles(smiles)) is None
     for tier in ("pin", "valid", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert not row["is_pin"] and row["tier"] != "pin_verified", row
 
 
@@ -582,7 +578,7 @@ def test_the_carbamate_row_keeps_the_name_of_the_general_engine(tier):
     names the carbamate ester as the parent (lane/l17 item 3, "9 Esters", the Blue Book:
     ``tests/unit/rules/test_leads_l5_item7.py::test_a_carbamate_ester_is_the_parent_and_the_ring_one_is_its_prefix_at_best_effort``),
     and the probe does not reject it (``non_carbamate_ester_carbonyl_atoms``)."""
-    row = _row(_CARBAMATE, tier)
+    row = tier_row(_CARBAMATE, tier)
     assert row["tier"] == "systematic_verified", row
     assert "1-oxo-1,2-dihydrophthalazine" in row["name"] and "N-{" not in row["name"], row
     assert_full_rt(row["name"], _CARBAMATE)

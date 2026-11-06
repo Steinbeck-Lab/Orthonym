@@ -21,13 +21,6 @@ import pytest
 from orthonym.namer import name_compound
 
 
-@pytest.fixture()
-def _validity_gate_on(monkeypatch):
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
-
 @pytest.mark.unit
 class TestSilaneLigands:
     # (the Blue Book, "For mononuclear parent hydrides with two
@@ -114,7 +107,7 @@ class TestNestedAlkoxy:
     def test_one_level_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_depth_two_heals(self, _validity_gate_on):
+    def test_depth_two_heals(self, opsin_gate):
         # Wave2-P1ChainsA Task 12 /: the get_alkoxy_prefix
         # + _name_ether_substituted_chain recursion now expresses depth-2 nesting
         # for an ether-bearing R side. -O-CH2-O-CH2-O-CH3 on heptadecane-C9 ->
@@ -200,7 +193,7 @@ class TestMixedDiamines:
     def test_protections(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_complex_polyamine_now_heals(self, _validity_gate_on):
+    def test_complex_polyamine_now_heals(self, opsin_gate):
         # parent-choice cascade) HEALED in Wave-3: the
         # polyamine parent-selection now emits the exact Blue Book PIN
         # (BBv2 L26381 'N1-(aminomethyl)ethane-1,2-diamine (PIN)'); OPSIN-RT

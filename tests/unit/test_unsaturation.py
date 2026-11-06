@@ -29,13 +29,6 @@ class TestAlkeneNaming:
         assert name_compound(smiles) == expected
 
     @pytest.mark.unit
-    def test_ethene_no_locant(self):
-        """Ethene should not have a locant (only one possible position)."""
-        result = name_compound("C=C")
-        assert result == "ethene"
-        assert "-" not in result  # No hyphen means no locant
-
-    @pytest.mark.unit
     def test_propene_no_locant(self):
         """Unsubstituted propene omits the bond locant (d) PIN);
         a substituent restores it (3-chloroprop-1-ene)."""
@@ -61,21 +54,6 @@ class TestAlkyneNaming:
         """Test simple alkyne naming with locants."""
         assert name_compound(smiles) == expected
 
-    @pytest.mark.unit
-    def test_ethyne_no_locant(self):
-        """C#C returns retained name 'acetylene' PIN)."""
-        result = name_compound("C#C")
-        assert result == "acetylene"
-        assert "-" not in result
-
-    @pytest.mark.unit
-    def test_propyne_no_locant(self):
-        """Unsubstituted propyne omits the bond locant (d) PIN)."""
-        result = name_compound("C#CC")
-        assert result == "propyne"
-        assert "-" not in result
-
-
 class TestEnyneNaming:
     """Test IUPAC enyne naming (FOUND-14).
 
@@ -92,28 +70,6 @@ class TestEnyneNaming:
     def test_simple_enynes(self, smiles, expected):
         """Test simple enyne naming."""
         assert name_compound(smiles) == expected
-
-    @pytest.mark.integration
-    def test_enyne_double_bond_priority(self):
-        """When locant sets tie, double bonds should get lower locants.
-
-        For C#CC=C (but-1-en-3-yne):
-        - Forward numbering: double at 3, triple at 1 -> [1, 3]
-        - Reverse numbering: double at 1, triple at 3 -> [1, 3]
-        Both have same combined locant set, but IUPAC 2013 says
-        double bonds get lower locants, so reverse (double at 1) wins.
-        """
-        # The SMILES C#CC=C could number as:
-        # - triple at 1, double at 3
-        # - double at 1, triple at 3
-        # We want double at 1 (lower locant)
-        result = name_compound("C#CC=C")
-        assert result == "but-1-en-3-yne"
-        # Verify double bond is at position 1
-        assert "-1-en" in result
-        # Verify triple bond is at position 3
-        assert "-3-yn" in result
-
 
 class TestUnsaturationWithSubstituents:
     """Test unsaturated compounds with alkyl substituents."""

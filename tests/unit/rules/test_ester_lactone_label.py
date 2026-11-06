@@ -19,9 +19,9 @@ def _label(smiles, name):
     """The label-only records after the producer reports the ester of ``smiles`` (the first O-C(=O) found)."""
     pv.clear_provenance()
     mol = Chem.MolFromSmiles(smiles)
-    ester_o, carbonyl_c = None, None
+    ester_o = None
     for match in mol.GetSubstructMatches(Chem.MolFromSmarts("[CX3](=O)([#6])[OX2;!R][#6]")):
-        carbonyl_c, ester_o, alkyl_c = match[0], match[3], match[4]
+        ester_o, alkyl_c = match[3], match[4]
         break
     record_polyol_mixed_anion_non_pin(mol, alkyl_c, ester_o, name)
     return pv.get_provenance()["non_pin_labels"]

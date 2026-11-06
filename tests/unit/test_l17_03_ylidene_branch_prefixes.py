@@ -21,17 +21,13 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly.chain_decoration_prefixes import alkoxy_decoration_tokens_are_real
-from orthonym.cli import _tiered_namer
 from orthonym.errors import is_failure_name
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 _TIERS = ["pin", "best-effort"]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 def _abstains(row):
@@ -71,7 +67,7 @@ _TARGETS = [
 @pytest.mark.parametrize("smiles,name", _TARGETS)
 def test_a_decorated_chain_substituent_is_named_at_the_pin_tier(smiles, name, tier):
     """ (d) / / / (module docstring): the chain keeps its prefixes."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -100,7 +96,7 @@ _CONTROLS = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _CONTROLS)
 def test_the_controls_keep_their_names(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
@@ -117,8 +113,8 @@ _GEOMETRY = [
 
 @pytest.mark.parametrize("smiles", _GEOMETRY)
 def test_a_prefix_with_a_defined_geometry_is_not_named_without_it(smiles):
-    assert _abstains(_row(smiles, "pin"))
-    row = _row(smiles, "best-effort")
+    assert _abstains(tier_row(smiles, "pin"))
+    row = tier_row(smiles, "best-effort")
     assert row["name"], row
     assert "2E" in row["name"], row
     assert_full_rt(row["name"], smiles)
@@ -127,8 +123,8 @@ def test_a_prefix_with_a_defined_geometry_is_not_named_without_it(smiles):
 # the same compound prefix twice needs 'bis', which the simple multiplier does not spell: no PIN is shipped for it
 def test_a_repeated_compound_prefix_is_not_named_at_the_pin_tier():
     smiles = "OC(=O)c1ccc(OCC(=NO)C(=NO)C)cc1"
-    assert _abstains(_row(smiles, "pin"))
-    row = _row(smiles, "best-effort")
+    assert _abstains(tier_row(smiles, "pin"))
+    row = tier_row(smiles, "best-effort")
     assert row["name"], row
     assert_full_rt(row["name"], smiles)
 
@@ -137,8 +133,8 @@ def test_a_repeated_compound_prefix_is_not_named_at_the_pin_tier():
 # cannot yet spell the prefixes of such an R, so the PIN tier abstains and the wider tier names the molecule
 @pytest.mark.parametrize("smiles", ["OC(=O)c1ccc(OCCOCCO)cc1", "OC(=O)c1ccc(OCCOCC(C)=O)cc1"])
 def test_an_ether_inside_the_chain_is_not_named_at_the_pin_tier_by_its_decoration(smiles):
-    assert _abstains(_row(smiles, "pin"))
-    row = _row(smiles, "best-effort")
+    assert _abstains(tier_row(smiles, "pin"))
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and row["tier"] == "systematic_verified", row
     assert_full_rt(row["name"], smiles)
 
@@ -158,8 +154,8 @@ _LABELLED = [
 
 @pytest.mark.parametrize("smiles,name", _LABELLED)
 def test_the_label_of_a_name_the_pin_tier_does_not_ship_is_stated(smiles, name):
-    assert _abstains(_row(smiles, "pin"))
-    row = _row(smiles, "best-effort")
+    assert _abstains(tier_row(smiles, "pin"))
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, "pin_unverified"), row
     assert_full_rt(row["name"], smiles)
 

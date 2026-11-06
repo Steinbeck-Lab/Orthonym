@@ -9,7 +9,6 @@ Tests that _identify_ring_name correctly distinguishes:
 - Parent/child seniority (heterocyclic > carbocyclic, N > O > S)
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.fusion_descriptors import (

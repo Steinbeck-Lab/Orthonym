@@ -19,6 +19,10 @@ from orthonym.assembly.fragment_naming import (
 from orthonym import name_compound
 
 
+#: these tests drive the fragment recursion outside a ``name`` scope (tests/conftest.py)
+pytestmark = pytest.mark.usefixtures("reset_naming_state_after")
+
+
 def _inchikey(smiles: str) -> str:
     """Full (3-block) InChIKey oracle, local to this file. STRICTER than the
     shared ``canonical`` SMILES fixture: RDKit canonical SMILES is
@@ -55,7 +59,6 @@ class TestConstants:
 
     def test_max_naming_depth_is_7(self):
         assert MAX_NAMING_DEPTH == 7
-
 
     def test_basic_fragment_naming_ethanol(self):
         result = name_fragment_recursively("CCO")

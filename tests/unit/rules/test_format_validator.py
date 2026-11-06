@@ -5,7 +5,6 @@ Tests that validate_name_format correctly detects known
 OPSIN-incompatible patterns and passes valid names.
 """
 
-import pytest
 
 from orthonym.validation.format_validator import validate_name_format
 

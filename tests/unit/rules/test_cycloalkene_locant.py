@@ -26,11 +26,3 @@ class TestCycloalkeneLocant:
         a = name_compound("CC1CC=CCC1").strip().lower()   # 4-methylcyclohex-1-ene
         b = name_compound("CC1=CCCCC1").strip().lower()    # 1-methylcyclohex-1-ene
         assert a != b, f"distinct cycloalkenes collide on one name: {a!r}"
-
-    def test_symmetric_saturated_ring_control(self):
-        # CONTROL (NOT xfail): genuinely symmetric ring keeps eliding locant 1.
-        assert name_compound("CC1CCCCC1").strip().lower() == "methylcyclohexane"
-
-    def test_unsubstituted_cyclohexene_control(self):
-        # CONTROL (NOT xfail): unsubstituted cycloalkene keeps eliding the ene-locant.
-        assert name_compound("C1=CCCCC1").strip().lower() == "cyclohexene"

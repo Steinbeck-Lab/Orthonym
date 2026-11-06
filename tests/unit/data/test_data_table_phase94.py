@@ -12,7 +12,6 @@ Tests all 25 new data entries added in a phase:
 Includes OPSIN round-trip validation where supported.
 """
 
-import os
 import shutil
 import subprocess
 
@@ -20,7 +19,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
-from orthonym.data.retained_names import RETAINED_NAMES, get_retained_name
+from orthonym.data.retained_names import RETAINED_NAMES
 from orthonym.data.sugar_names import (
     ALL_SUGAR_NAMES,
     AMINO_SUGAR_NAMES,

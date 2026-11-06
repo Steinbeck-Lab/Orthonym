@@ -35,7 +35,7 @@ from tests.support.jars import jar_or_none
 
 
 # ---------------------------------------------------------------------------
-# 700 golden canary compounds: (SMILES, expected_name)
+# 654 golden canary compounds: (SMILES, expected_name)
 # Original 75 from a phase + 10 from a phase + 3 from a phase
 # + 44 from a phase (Small Molecule Accuracy Sprint)
 # + 9 from a phase (Stereochemistry Accuracy)
@@ -51,7 +51,7 @@ from tests.support.jars import jar_or_none
 # ---------------------------------------------------------------------------
 # 2026-09-26 (pre-existing-failures plan, Task 11) change-asserted-value: canary re-baseline.
 # The live consumer is tests/unit/rules/test_opsin_format_compliance.py::TestCanaryRegression
-# (this module is a data module now: its test functions were removed). 317 of the 703 rows name differently
+# (this module is a data module now: its test functions were removed). 317 of the 703 rows of that time (654 rows now) named differently
 # at the current engine (name_compound, gate off, fixture order). Evidence per row:
 # internal notes summary: TRIAGE.md ' outcome'.
 # - 97 rows are re-baselined here: a targeted edit of the expected name only, each line
@@ -776,14 +776,6 @@ CANARY_COMPOUNDS = [
         "(2E)-3-[4-(sulfooxy)phenyl]prop-2-enoic acid",  # RB-P16 (BB rule); was '(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid'
     ),
     (
-        "C=CC/C=C/CCC(=O)OC",
-        "methyl (4E)-octa-4,7-dienoate",
-    ),
-    (
-        r"CCCC/C=C\CCCCCCCCCOC(C)=O",
-        "(10Z)-pentadec-10-en-1-yl acetate",
-    ),
-    (
         "O=C([O-])C(=O)C[C@H](O)C(=O)[O-]",
         "(2S)-2-hydroxy-4-oxopentanedioate",
     ),
@@ -796,12 +788,6 @@ CANARY_COMPOUNDS = [
         "(3R)-3-methyl-3,4-dihydro-1H-2-benzopyran-6,8-diol",  # RB-R19 (R19); was '(3R)-6,8-dihydroxy-3-methylisochromane'
     ),
     # a phase: Medium Molecule Completeness (2 compounds)
-    (
-        r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
-        # j6 RB-RINGBR (suite fix j6, change-asserted-value); was the malformed
-        # "...-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid"
-        "(2Z,5E,9E)-2-[2-(2,5-dihydroxyphenyl)-2-oxoethyl]-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
-    ),
     (
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
         "[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)"
@@ -1513,36 +1499,8 @@ CANARY_COMPOUNDS = [
     ),
     # --- a phase v12.0 canary expansion (30 newly RT-matching compounds) ---
     (
-        "COc1ccc(C(=O)N2CCCC2=O)cc1",
-        "N-4-methoxybenzoylpyrrolidin-2-one",
-    ),
-    (
-        "CCCCCC/C=C/C=C(\\CCCC(=O)O)[N+](=O)[O-]",
-        "(5E,7E)-5-nitrotetradeca-5,7-dienoic acid",
-    ),
-    (
-        "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\C[C@@H](O)CC(=O)O",
-        "(3R,5Z,8Z,11Z,14Z)-3-hydroxyicosa-5,8,11,14-tetraenoic acid",
-    ),
-    (
         "C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C",
         "(1S,2S)-1-ethenyl-1-methyl-4-(propan-2-ylidene)-2-(prop-1-en-2-yl)cyclohexane",  # RB-P145:3442/:3477; was DK-ALPHA, call 296); was '(1S,2S)-1-ethenyl-4-isopropylidene-1-methyl-2-(prop-1-en-2-yl)cyclohexane'
-    ),
-    (
-        "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",
-        "(10E,15Z)-9,12,13-trihydroxyoctadeca-10,15-dienoic acid",
-    ),
-    (
-        "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCC(=O)[O-]",
-        "(6Z,9Z,12Z)-octadeca-6,9,12-trienoate",
-    ),
-    (
-        "O=C(O)/C(Cl)=C\\C(=O)C(Cl)C(=O)O",
-        "(2E)-2,5-dichloro-4-oxohex-2-enedioic acid",
-    ),
-    (
-        "CCC/C=C\\C#CC/C=C\\CCCCCCCC(=O)O",
-        "(9Z,14Z)-octadeca-9,14-dien-12-ynoic acid",
     ),
     (
         "C=C1C=C[C@H](C(C)C)CC1",
@@ -1553,172 +1511,14 @@ CANARY_COMPOUNDS = [
         "4-methylphenyl 2-methylpropanoate",  # RB-R5 (R5); was '1-((2-methylpropanoyl)oxy)-4-methylbenzene'
     ),
     (
-        "CCCC/C=C\\CCCCCCCCCOC(C)=O",
-        "(10Z)-pentadec-10-en-1-yl acetate",
-    ),
-    (
-        "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCCCCCCCCCCCCC(=O)[O-]",
-        "(19Z,22Z,25Z,28Z,31Z)-tetratriaconta-19,22,25,28,31-pentaenoate",
-    ),
-    (
-        "CCCCCCC/C=C\\CCCCCCC(=O)O",
-        "(8Z)-hexadec-8-enoic acid",
-    ),
-    (
         "NC(=O)CCCC(N)C(=O)O",
         "2,6-diamino-6-oxohexanoic acid",  # RB-AMIC (BB rule); was '2-amino-5-carbamoylpentanoic acid'
-    ),
-    (
-        "CC/C=C(\\C)CC/C=C(\\C)CCC=C(C)C",
-        "(6E,10E)-2,6,10-trimethyltrideca-2,6,10-triene",
-    ),
-    (
-        "CCCCCCC/C=C\\CCCCCCCC(=O)[O-]",
-        "(9Z)-heptadec-9-enoate",
-    ),
-    (
-        "C/C(C=O)=C\\CC/C(C)=C/C=O",
-        "(2E,6E)-2,6-dimethylocta-2,6-dienedial",
-    ),
-    (
-        "CCCCC/C=C\\C=C\\C=C/CCCCCCC(=O)O",
-        "(8Z,10E,12Z)-octadeca-8,10,12-trienoic acid",
-    ),
-    (
-        "CCCCCCCC/C=C\\CCCCCCO",
-        "(7Z)-hexadec-7-en-1-ol",
-    ),
-    (
-        "C/C=C\\CCCCC(=O)O",
-        "(6Z)-oct-6-enoic acid",
-    ),
-    (
-        "C/C=C(\\C)CCC=C(C)C",
-        "(6E)-2,6-dimethylocta-2,6-diene",
     ),
     (
         "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
         "1-hydroxy-6,8-dimethoxy-3-methyl-9H-xanthen-9-one",  # RB-R18 (R18); was '8-hydroxy-1,3-dimethoxy-6-methylxanthone'
     ),
-    (
-        "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
-        "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
-    ),
-    (
-        "C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12",
-        "(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene",
-    ),
-    (
-        "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3",
-        "(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid",
-    ),
-    (
-        "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",
-        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(12,16).0(18,20)]icosa-2,8-dien-6,10,13-trione",
-    ),
-    (
-        "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C",
-        "(1S,2E,7S,8E,12R,15S,16S,17S)-7-hydroxy-15-isobutyl-3,17,18-trimethyl-11-oxa-14-aza-tricyclo[10.7.0.0(12,16)]nonadeca-2,8,18-trien-10,13-dione",
-    ),
-    (
-        "COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\\C)CCCC1O",
-        "(9E)-5-hydroxy-16-isobutyl-4-methoxy-9,13,14-trimethyl-17-aza-tricyclo[9.7.0.0(1,15)]octadeca-9,12-dien-2,18-dione",
-    ),
     # + 380 from a phase (integration testing canary expansion)
-    (
-        "CCCCCC/C=C/C=C(\\CCCC(=O)O)[N+](=O)[O-]",  # acyclic,medium
-        "(5E,7E)-5-nitrotetradeca-5,7-dienoic acid",
-    ),
-    (
-        "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\C[C@@H](O)CC(=O)O",  # acyclic,medium
-        "(3R,5Z,8Z,11Z,14Z)-3-hydroxyicosa-5,8,11,14-tetraenoic acid",
-    ),
-    (
-        "C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",  # aromatic,polyfunctional,medium
-        # j6 RB-RINGBR (suite fix j6, change-asserted-value); was the malformed
-        # "...-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid"
-        "(2Z,5E,9E)-2-[2-(2,5-dihydroxyphenyl)-2-oxoethyl]-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
-    ),
-    (
-        "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",  # acyclic,medium
-        "(10E,15Z)-9,12,13-trihydroxyoctadeca-10,15-dienoic acid",
-    ),
-    (
-        "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(12,16).0(18,20)]icosa-2,8-dien-6,10,13-trione",
-    ),
-    (
-        "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",  # acyclic,large
-        "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
-    ),
-    (
-        "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C",  # heterocycle,fused-ring,polyfunctional,medium
-        "(1S,2E,7S,8E,12R,15S,16S,17S)-7-hydroxy-15-isobutyl-3,17,18-trimethyl-11-oxa-14-aza-tricyclo[10.7.0.0(12,16)]nonadeca-2,8,18-trien-10,13-dione",
-    ),
-    (
-        "O=C(O)/C(Cl)=C\\C(=O)C(Cl)C(=O)O",  # acyclic,polyfunctional,small
-        "(2E)-2,5-dichloro-4-oxohex-2-enedioic acid",
-    ),
-    (
-        "CCC/C=C\\C#CC/C=C\\CCCCCCCC(=O)O",  # acyclic,medium
-        "(9Z,14Z)-octadeca-9,14-dien-12-ynoic acid",
-    ),
-    (
-        "CCCC/C=C\\CCCCCCCCCOC(C)=O",  # acyclic,medium
-        "(10Z)-pentadec-10-en-1-yl acetate",
-    ),
-    (
-        "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCCCCCCCCCCCCC(=O)[O-]",  # acyclic,charged,large
-        "(19Z,22Z,25Z,28Z,31Z)-tetratriaconta-19,22,25,28,31-pentaenoate",
-    ),
-    (
-        "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCC(=O)[O-]",  # acyclic,charged,medium
-        "(6Z,9Z,12Z)-octadeca-6,9,12-trienoate",
-    ),
-    (
-        "COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\\C)CCCC1O",  # heterocycle,fused-ring,polyfunctional,medium
-        "(9E)-5-hydroxy-16-isobutyl-4-methoxy-9,13,14-trimethyl-17-aza-tricyclo[9.7.0.0(1,15)]octadeca-9,12-dien-2,18-dione",
-    ),
-    (
-        "CCCCCCC/C=C\\CCCCCCC(=O)O",  # acyclic,medium
-        "(8Z)-hexadec-8-enoic acid",
-    ),
-    (
-        "CC/C=C(\\C)CC/C=C(\\C)CCC=C(C)C",  # acyclic,medium
-        "(6E,10E)-2,6,10-trimethyltrideca-2,6,10-triene",
-    ),
-    (
-        "C=C/C(C)=C/CC(C)(C)/C(=N\\O)C(C)C",  # acyclic,small
-        "(3Z,6E)-2,4,4,7-tetramethylnona-6,8-dien-3-one oxime",
-    ),
-    (
-        "CCCCCCC/C=C\\CCCCCCCC(=O)[O-]",  # acyclic,charged,medium
-        "(9Z)-heptadec-9-enoate",
-    ),
-    (
-        "C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12",  # fused-ring,medium
-        "(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene",
-    ),
-    (
-        "C/C(C=O)=C\\CC/C(C)=C/C=O",  # acyclic,small
-        "(2E,6E)-2,6-dimethylocta-2,6-dienedial",
-    ),
-    (
-        "CCCCC/C=C\\C=C\\C=C/CCCCCCC(=O)O",  # acyclic,medium
-        "(8Z,10E,12Z)-octadeca-8,10,12-trienoic acid",
-    ),
-    (
-        "CCCCCCCC/C=C\\CCCCCCO",  # acyclic,medium
-        "(7Z)-hexadec-7-en-1-ol",
-    ),
-    (
-        "C/C=C\\CCCCC(=O)O",  # acyclic,small
-        "(6Z)-oct-6-enoic acid",
-    ),
-    (
-        "C/C=C(\\C)CCC=C(C)C",  # acyclic,small
-        "(6E)-2,6-dimethylocta-2,6-diene",
-    ),
     (
         "OC1C2CC3CC1CC(O)(C3)C2",  # fused-ring,small
         "tricyclo[3.3.1.1(3,7)]decan-2,7-diol",

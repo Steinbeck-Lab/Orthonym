@@ -18,7 +18,6 @@ differs + fail-closed recognizer).
 """
 import re
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check

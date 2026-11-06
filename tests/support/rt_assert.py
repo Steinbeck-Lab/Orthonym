@@ -98,10 +98,7 @@ def assert_rt_exact(smiles: str) -> str:
     return name
 
 
-def _full_inchikey(smi):
-    from rdkit.Chem import inchi
-    m = Chem.MolFromSmiles(smi) if smi else None
-    return inchi.MolToInchiKey(m) if m is not None else ""
+from tests.support.read_back import key_or_empty as _full_inchikey  # noqa: E402
 
 
 # A lone-pair stereocentre as the string writes it: the element and the tag of a bracket atom. RDKit reads such a

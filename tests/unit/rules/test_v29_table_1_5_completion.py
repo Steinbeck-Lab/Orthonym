@@ -115,10 +115,8 @@ def namer(monkeypatch):
     ``test_v29_replacement_prefix_totality`` on purpose: an OPSIN-verified name is
     evidence about the WITH-jar path only.
     """
-    import orthonym.namer as _namer_mod
     import orthonym.validation.opsin_roundtrip as _rt
     monkeypatch.setattr(_rt, '_find_opsin_jar', lambda *a, **k: None)
-    monkeypatch.setattr(_namer_mod, '_DISABLE_VALIDITY_GATE', True)
     from orthonym import Orthonym
     return Orthonym(general_fallback=True, _disable_opsin_validity_gate=True)
 
@@ -706,16 +704,12 @@ def _namer_name(smiles: str) -> str:
     Duplicated rather than fixtured only where a test needs one call; the
     monkeypatching is identical to the ``namer`` fixture above.
     """
-    import orthonym.namer as _namer_mod
     import orthonym.validation.opsin_roundtrip as _rt
     saved_find = _rt._find_opsin_jar
-    saved_gate = _namer_mod._DISABLE_VALIDITY_GATE
     _rt._find_opsin_jar = lambda *a, **k: None
-    _namer_mod._DISABLE_VALIDITY_GATE = True
     try:
         from orthonym import Orthonym
         return Orthonym(general_fallback=True,
                          _disable_opsin_validity_gate=True).name(smiles)
     finally:
         _rt._find_opsin_jar = saved_find
-        _namer_mod._DISABLE_VALIDITY_GATE = saved_gate

@@ -26,13 +26,9 @@ from rdkit import Chem
 import orthonym.rules.chalcones as chalcones
 from orthonym import Orthonym, name_compound
 from orthonym.rules.chalcones import name_substituted_chalcone
+from tests.support.pin_tiers import name_and_tier
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _tiered(smiles: str):
-    row = Orthonym().name_tiered(smiles)
-    return row["name"], row["tier"]
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -53,7 +49,7 @@ def _tiered(smiles: str):
     ("O=C(/C=C/c1ccc([N+](=O)[O-])cc1)c1ccccc1", "4-nitrochalcone"),
 ])
 def test_the_substituted_chalcone_is_named_on_the_retained_parent(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 def test_the_bare_chalcone_is_still_the_retained_tables():
@@ -85,4 +81,4 @@ def test_a_chalcone_with_a_stereocentre_is_declined():
 def test_the_tests_fail_without_the_class(monkeypatch):
     """The mutation check: with the producer switched off the molecule is declined at the PIN tier again."""
     monkeypatch.setattr(chalcones, "name_substituted_chalcone", lambda mol: None)
-    assert _tiered("O=C(/C=C/c1ccccc1)c1ccc(O)cc1O")[1] == "abstain"
+    assert name_and_tier("O=C(/C=C/c1ccccc1)c1ccc(O)cc1O")[1] == "abstain"

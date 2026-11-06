@@ -49,7 +49,6 @@ from orthonym.rules.polycyclic import (
     fusion_nomenclature_applies,
     retained_von_baeyer_parent,
 )
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import name_is_rt_exact
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -90,7 +89,6 @@ BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
 def _declined_pin_row(smiles):
     return declined_pin_row(
         smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
 
 
 def _row(smiles):

@@ -4,7 +4,6 @@ The new SMARTS patterns use [#6] instead of [CX4] to allow aromatic carbon
 neighbors (e.g., N-methylaniline), while excluding amides and guanidines
 via !$([NX3][CX3]=O) and !$([NX3][CX3]=[NX2]).
 """
-import pytest
 from rdkit import Chem
 from orthonym.perception.functional_groups import detect_functional_groups
 

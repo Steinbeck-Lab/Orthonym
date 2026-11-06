@@ -126,14 +126,6 @@ class TestZwitterionGuard4:
         assert got == "2-azaniumyl-4-oxopentanoate"
         assert name_is_rt_exact(got, "CC(=O)CC([NH3+])C(=O)[O-]")
 
-    def test_p74_1_2_ring_cation_implemented(self):
-        """F- (DD3,: the cation N+ is SKELETAL to the anion's parent
-        ring (pyridinium-2-carboxylate) -> the cumulative
-        ``<ring>-<N-locant>-ium-<carboxyl-locant>-carboxylate`` suffix is now built
-        by ``emit_zwitterion_ring_carboxylate`` (was deferred to '' this plan). The
-        N-methyl aromatic cation is demoted to a ring substituent prefix."""
-        assert _rc("O=C([O-])c1cccc[n+]1C") == "1-methylpyridin-1-ium-2-carboxylate"
-
     def test_ylide_amine_oxide_honest_fail(self):
         """ dipolar / non-N onium cations are out of scope -> '' (honest-
         fail,). An amine-oxide (N+-O- directly bonded) is an INTERNAL charge

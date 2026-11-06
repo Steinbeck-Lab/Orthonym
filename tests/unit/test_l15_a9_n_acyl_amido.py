@@ -19,18 +19,14 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly.substituent_naming import n_substituted_acyl_amido_prefix
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 
 #: an 'N-' locant opening the name, behind a stereodescriptor block '(2S)-' or an ester word ('methyl N-...')
 _FLOATS_N = re.compile(r"^(\([^)]*\)-)?(N-|[a-z]+ N-)")
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # (smiles, the PIN) -- every name read back whole by OPSIN to the input's full InChIKey, spelled as the book spells it
@@ -71,7 +67,7 @@ _CASES = [
 def test_tertiary_acyl_nitrogen_gets_the_n_substituted_amido_prefix(smiles, name, tier):
     """ (the Blue Book), method (1): the prefix is the complete name of the amide with the final 'e'
     changed to 'o'; '2-(N-methylpropanamido)benzene-1-sulfonic acid (PIN)' (:33040)."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -89,7 +85,7 @@ def test_a_ring_bearing_acyl_with_a_ring_prefix_of_the_rerun_is_the_pin_prefix(t
      Substituents of the types -NH-CO-R and -NH-SO2-R (the Blue Book): "Method (1) generates preferred
     IUPAC names" -- the prefix is the complete name of the amide with the final 'e' changed to 'o'; the PIN tier names it."""
     smiles, name = _PIPERAZINE
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -112,7 +108,7 @@ def test_the_float_pattern_leaves_an_n_inside_a_prefix_alone(name):
 def test_no_name_floats_n_on_a_parent_without_a_nitrogen_suffix(smiles, name):
     """The best-effort name cites no 'N-<acyl>' in front of an acid, an ester or a ring: (the Blue Book),
     a locant is placed before the part of the name it relates to, and the parent has no nitrogen suffix to relate N to."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert not _FLOATS_N.match(row["name"]), row
 
 
@@ -143,7 +139,7 @@ _AMIDE_PARENT_TIES = [
 def test_an_amide_parent_the_group_ties_is_not_named_with_the_amido_prefix(smiles, pin_name, false_name, tier):
     """ (the Blue Book): no tier ships the amido-prefix name as a PIN; the PIN tier gives the name
     or abstains, and the name OPSIN reads back to the input is the one the book's rule gives."""
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert not (row["tier"] == "pin_verified" and row["name"] == false_name), row
     if row["tier"] == "pin_verified":
         assert row["name"] == pin_name, row
@@ -208,7 +204,7 @@ def test_a_hydrazide_nitrogen_keeps_the_hydrazinyl_prefix():
     """-N(NHR)-CO-R is the hydrazin-1-yl unit,; the amido prefix is for a nitrogen whose substituent is a
     carbon group (task A9 control: the nitrogen of a hydrazide stays '1-acetyl-2-ethylhydrazin-1-yl')."""
     smiles = "CCNN(C(C)=O)c1ccc(C(=O)O)cc1"
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == ("4-(1-acetyl-2-ethylhydrazin-1-yl)benzoic acid", "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -217,7 +213,7 @@ def test_a_group_with_a_second_amide_keeps_its_acylamino_name():
     """The control: the amide name of this group could be the name of the other amide, so its name stays the one the
     wider tier gave before (the acyl is cited as '2-chloro-1-oxoethyl' there) and reads back whole."""
     smiles = "OC(=O)CCN(CC(=O)NC)C(=O)CCl"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "3-{(2-chloro-1-oxoethyl)[2-(methylamino)-2-oxoethyl]amino}propanoic acid", row
     assert_full_rt(row["name"], smiles)
 

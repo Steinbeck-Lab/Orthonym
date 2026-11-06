@@ -13,14 +13,10 @@ kind, and gives a unit whose name opens with a stereodescriptor 'bis'/'tris' lik
 """
 import pytest
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # --- the ring carboxamide whose ring has no cycloalkane or benzene name is a parent too (best-effort general engine) -------
@@ -35,7 +31,7 @@ def test_a_ring_carboxamide_of_a_heteromonocycle_is_named_with_its_n_substituent
     """ (the Blue Book): R-CO-NR'R'' cites R' and R'' with the locant N; the pyrrolidine of the Pro
     amide is the parent (1)). The monocycle producer of the general engine held the N-substituents out of
     nowhere and refused (the molecule was named on its thiazole, or with a 'carbamoyl' prefix and no amide suffix)."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] != "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -44,7 +40,7 @@ def test_a_ring_carboxamide_of_a_heteromonocycle_is_named_with_its_n_substituent
 def test_the_n_methyl_peptide_is_named_on_its_proline_carboxamide():
     smiles = ("CCCC(=O)N(C)[C@H](C(=O)N1CCC[C@H]1C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@H]"
               "(C(=O)N(C)Cc1nccs1)C(C)C)C(C)C")
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"].endswith("pyrrolidine-2-carboxamide"), row
     assert "thiazol-2-yl" in row["name"] and row["tier"] != "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -54,7 +50,7 @@ def test_the_ring_that_bears_the_amide_is_the_parent_whatever_the_other_rings_ar
     """: the benzene ring that carries the carbonyl is the parent of the benzamide, not the thiolane dioxide ring
     that holds the first atom of an N-substituent (the sulfone ring is the senior ring by."""
     smiles = "C1CS(=O)(=O)CC1N(CC2=C(C=CC=C2Cl)F)C(=O)C3=CC=CC=C3Cl"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "2-chloro-N-[(2-chloro-6-fluorophenyl)methyl]-N-(1,1-dioxothiolan-3-yl)benzene-1-carboxamide", row
     assert row["tier"] != "pin_verified", row
     assert_full_rt(row["name"], smiles)
@@ -65,7 +61,7 @@ def test_a_senior_fused_ring_keeps_the_choice_of_the_cage_producers():
     senior bicyclic ring system is the cage producers' parent, and the molecule keeps the name it had (the monocycle
     producer's name of its piperidine cited the ring stereodescriptors of the substituent in the wrong configuration)."""
     smiles = r"C\1C/C(=C\2/C=NC(=N/C2=C/C=C1)NCC3=CCC(C=C3)O)/N4CCC(CC4)C(=O)NC5=CN=CC=C5"
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and row["name"] != "unknown organic compound" and row["tier"] != "abstain", row
     assert_full_rt(row["name"], smiles)
 
@@ -127,7 +123,7 @@ def test_a_bicyclic_substituent_of_a_piperidine_carboxamide_cites_the_descriptor
     from orthonym.assembly import monocycle_ring_amide
 
     monkeypatch.setattr(monocycle_ring_amide, "is_lone_ring", lambda mol, system: True)
-    row = _row(_CIP_SMILES, "best-effort")
+    row = tier_row(_CIP_SMILES, "best-effort")
     assert row["name"] and "(1E,5E,7E)" not in row["name"], row
     assert row["name"].startswith("1-[(1Z,5E,7E)-"), row
     assert row["name"].endswith("-N-(pyridin-3-yl)piperidine-4-carboxamide"), row

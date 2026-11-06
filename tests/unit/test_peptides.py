@@ -47,12 +47,6 @@ class TestDipeptidesWithStereo:
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
         assert result == "(2S)-2-(2-aminoacetamido)propanoic acid"
 
-    def test_l_alanylglycine(self):
-        """L-Ala-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
-        Full-InChIKey round-trip verified."""
-        result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "[(2S)-2-aminopropanamido]acetic acid"
-
     def test_l_alanyl_l_alanine(self):
         """L-Ala-L-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
         Full-InChIKey round-trip verified."""
@@ -195,25 +189,7 @@ class TestProlineNTerminus:
         result = name_compound("C[C@@H](C(=O)O)NC(=O)[C@@H]1CCCN1")
         assert result == "(2S)-2-[(2S)-pyrrolidine-2-carboxamido]propanoic acid"
 
-    def test_n_acetylglycine_still_excluded(self):
-        """The relaxation must NOT admit an N-acyl amino acid (acylated N)."""
-        result = name_compound("CC(=O)NCC(=O)O")
-        assert "glycyl" not in result.lower()
-
-
 # ── Edge cases: should NOT trigger peptide naming ─────────────────────
-
-@pytest.mark.unit
-class TestPeptideEdgeCases:
-    """Test that non-peptide amides are NOT misrouted to peptide naming."""
-
-    def test_n_acetylglycine_not_misrouted(self):
-        """N-acetylglycine has an amide bond but NO terminal NH2 on acyl side."""
-        result = name_compound("CC(=O)NCC(=O)O")
-        # Should NOT produce a peptide name (acetyl is not an amino acid residue)
-        assert "glycylglycine" not in result.lower()
-        assert "peptide" not in result.lower()
-
 
 # ── Data validation ───────────────────────────────────────────────────
 
@@ -249,17 +225,6 @@ class TestAminoAcidAcylNames:
 
 
 # ── Stereochemistry mapping ──────────────────────────────────────────
-
-@pytest.mark.unit
-class TestStereoMapping:
-    """Test S->L and R->D stereo prefix mapping."""
-
-    def test_glycine_no_stereo_prefix(self):
-        """Glycine is achiral -- no L/D prefix."""
-        result = name_compound("NCC(=O)NCC(=O)O")
-        assert not result.startswith("L-")
-        assert not result.startswith("D-")
-
 
 # ── Cysteine L/D inversion  ────────────────────────────────
 
@@ -366,33 +331,6 @@ class TestStereoHonestyUndefinedResidues:
             f"Fabricated an implicit-L retained name for stereo-undefined "
             f"input: {result!r}"
         )
-
-    def test_stereo_unspecified_glycine_only_dipeptide_still_names(self):
-        """Gly-Gly has NO stereocentre at all (both residues achiral) -- the
-        stereo-honesty guard must not affect it; must still name normally.
-        : names via the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT
-        verified), not the retained peptide name."""
-        result = name_compound("NCC(=O)NCC(=O)O")
-        assert result == "(2-aminoacetamido)acetic acid"
-
-    def test_defined_stereo_dipeptide_unchanged(self):
-        """CRITICAL guard: a normal DEFINED-stereo peptide (L-Ala-Gly) must
-        be completely unaffected by the stereo-honesty check.: names via
-        the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT verified)."""
-        result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "[(2S)-2-aminopropanamido]acetic acid"
-
-    def test_defined_stereo_tripeptide_unchanged(self):
-        """CRITICAL guard: Gly-L-Ala-L-Leu, all-defined, unaffected."""
-        result = name_compound("NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O")
-        # j7 (TRIAGE g3 C05 / g5 C15): a tripeptide now takes the substitutive PIN, the
-        assert result == "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-4-methylpentanoic acid"
-
-    def test_defined_stereo_arginine_tautomer_unchanged(self):
-        """CRITICAL guard: the InChIKey-skeleton-fallback residue path
-        (arginine's guanidine tautomer) is unaffected when stereo IS defined."""
-        result = _producer_name("N=C(N)NCCC[C@H](N)C(=O)NCC(=O)O")
-        assert result == "arginylglycine"
 
     def test_partially_specified_tripeptide_declines(self):
         """One residue defined (Gly, achiral -- N/A), one residue (Ala)

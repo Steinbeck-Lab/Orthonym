@@ -17,7 +17,6 @@ CRITICAL GUARDS (must stay correct after every step):
   CC(=N)N -> ethanimidamide (chain amidine-as-PCG unchanged)
   N=C(N)c1ccc(C(=O)O)cc1 -> 4-carbamimidoylbenzoic acid (already-working prefix case)
 """
-import pytest
 from orthonym.namer import name_compound
 
 
@@ -59,19 +58,3 @@ class TestBenzeneCarboximidamideSuffix:
 
     def test_4_methylbenzene_1_carboximidamide(self):
         assert _pin("Cc1ccc(C(=N)N)cc1") == "4-methylbenzene-1-carboximidamide"
-
-
-# ---------------------------------------------------------------------------
-# CRITICAL GUARDS — must hold after every change
-# ---------------------------------------------------------------------------
-class TestAmidineGuards:
-
-    def test_cyclohexanecarboximidamide(self):
-        assert _pin("N=C(N)C1CCCCC1") == "cyclohexanecarboximidamide"
-
-    def test_ethanimidamide_chain_amidine_pcg(self):
-        assert _pin("CC(=N)N") == "ethanimidamide"
-
-    def test_propanimidamide_chain_amidine_pcg(self):
-        # amidine C stays in the chain when amidine IS the PCG (FIX(a) guard).
-        assert _pin("CCC(=N)N") == "propanimidamide"

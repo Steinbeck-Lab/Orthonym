@@ -11,13 +11,13 @@ contract: the memo must never change an emitted name.
 Measured reclaim (frozen perf_op_budget sample, default 12M/500 budget): 19/40 rows
 reclaim at 0-wrong (0 WRONG), byte-identical for everything that already completed.
 """
+import functools
 import os
 import subprocess
 import sys
 
 import pytest
 
-from orthonym import name_compound
 from orthonym.jvm_budget import jvm_slots
 
 # Fused ring systems that exercise the core matcher (indole/quinoline/carbazole/…).
@@ -59,6 +59,7 @@ def _name_smis(memo_mode, smis, best_effort=False):
     return json.loads(p.stdout.strip().splitlines()[-1])
 
 
+@functools.lru_cache(maxsize=None)
 def _name_all(memo_mode):
     """Name FUSED in a subprocess with ORTHONYM_MEMO=<mode> (read at import)."""
     return _name_smis(memo_mode, FUSED)

@@ -15,10 +15,10 @@ Each target is pinned to its exact PIN string AND verified to OPSIN-round-trip t
 input structure (0-wrong: name -> OPSIN -> canonical InChIKey == input InChIKey).
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
               allow_aromatic_general=True)
@@ -29,11 +29,6 @@ _ENGINE = Orthonym(**_FLAGS)
 
 def _name(smiles):
     return _ENGINE.name_tiered(smiles).get("name")
-
-
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
 
 
 # (input SMILES, expected PIN) — every row must ALSO OPSIN-round-trip (test below).
@@ -59,7 +54,7 @@ class TestHypervalentIodinePINs:
         assert name == expected
         parsed = opsin_parse(name)
         assert parsed, f"OPSIN could not parse {name!r}"
-        assert _inchikey(parsed) == _inchikey(smiles)
+        assert key_or_none(parsed) == key_or_none(smiles)
 
     def test_iodanium_not_iodonium(self):
         """ (the Blue Book): the PIN is the systematic 'iodanium', never the

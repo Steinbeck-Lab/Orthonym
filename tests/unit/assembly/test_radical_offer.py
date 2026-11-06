@@ -13,6 +13,7 @@ import pytest
 from rdkit import Chem
 
 from tests.support.rt_assert import name_best_effort, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -102,10 +103,8 @@ def test_a_name_that_leaves_out_stereo_the_key_cannot_see_carries_the_stereo_une
     """Four configured C=C bonds of this input are single bonds in the form of the ylidene that the name states, so the
     full InChIKey has no layer for them: the name reads back to the key and says nothing about them, and the row says
     that it states fewer stereo elements than the input (the documented ``stereo_unexpressed``, as for any producer)."""
-    from orthonym import Orthonym
-    from orthonym.tiers import emit_tier_flags
     smiles = ("[B][B]B([B])/C(=C\\1/CC(C(N1C)C)C)/C(=C(\\B([B])[B])/C(=C(\\[B][B])/C(=C(\\[B])/C2=[N+](C(C(C2)C)C)C)/C)"
               "/C#C)/C#CC")
-    row = Orthonym(style="pin", **emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and row["name"].endswith("-1,8-diyl"), row
     assert row["stereo_unexpressed"] is True and row["tier"] == "systematic_verified" and not row["is_pin"], row

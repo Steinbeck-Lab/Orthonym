@@ -62,3 +62,17 @@ def is_carbon_free(smiles: str) -> bool:
     """True iff the structure has no carbon atom (computed from the SMILES alone, not by the code under test)."""
     from rdkit import Chem
     return not any(a.GetAtomicNum() == 6 for a in Chem.MolFromSmiles(smiles).GetAtoms())
+
+
+def tier_row(smiles: str, tier: str) -> dict:
+    """``name_tiered`` of a fresh engine at ``tier`` ('pin', 'valid', 'complete', 'best-effort'): the
+    engine of the command line's ``--emit-tier`` (``cli._tiered_namer``); 'pin' is ``default_tier.default_tier_row``."""
+    from orthonym.cli import _tiered_namer
+    return _tiered_namer("pin", tier).name_tiered(smiles)
+
+
+def name_and_tier(smiles: str) -> tuple:
+    """``(name, tier)`` of a fresh default engine (``default_tier.default_tier_row``)."""
+    from tests.support.default_tier import default_tier_row
+    row = default_tier_row(smiles)
+    return row["name"], row["tier"]

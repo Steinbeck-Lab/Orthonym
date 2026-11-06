@@ -8,7 +8,6 @@ Verifies that the expanded FUSED_HETEROCYCLE_DATA dictionary:
 - Specific new entries are present and correct
 - Existing entries remain unchanged
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.data.fused_heterocycles import (
@@ -212,7 +211,6 @@ class TestSpecificNewEntries:
         assert smi in FUSED_HETEROCYCLE_DATA
         data = FUSED_HETEROCYCLE_DATA[smi]
         assert data["name"] == "indolizidine"
-
 
 
 class TestExistingEntriesUnchanged:

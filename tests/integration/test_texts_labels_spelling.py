@@ -53,13 +53,6 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "C/C=C/C=C/C(=O)[O-].C/C=C/C=C/C(=O)[O-].C/C=C/C=C/C(=O)[O-].[Al+3]",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
@@ -67,7 +60,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
 def _row(smiles, tier):
     if tier == "pin" and smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     if tier == "pin":
         return Orthonym(style="pin").name_tiered(smiles)
     return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)

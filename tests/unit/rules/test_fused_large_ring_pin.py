@@ -16,11 +16,11 @@ since the cap on the ring size was lifted, every name read back with OPSIN 2.9.0
 fused names of rings of up to seven members that were named before the change and must stay
 byte-identical (they are the OFFER-not-replace check)."""
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.read_back import key as _key
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -96,11 +96,6 @@ CONTROLS = [
     ('N=1C=CN2C1C=CC=C2', 'imidazo[1,2-a]pyridine'),
     ('S1C2=C(C=C1)SC=C2', 'thieno[3,2-b]thiophene'),
 ]
-
-
-
-def _key(smiles):
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 @pytest.fixture(scope="module")

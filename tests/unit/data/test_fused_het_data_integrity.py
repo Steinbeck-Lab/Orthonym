@@ -14,7 +14,6 @@ automatically, while still catching every different-ring-system mislabel — the
 "names a different molecule" class the Phase-0 self-consistency gate also targets.
 """
 import subprocess
-from pathlib import Path
 
 import pytest
 from rdkit import Chem

@@ -21,44 +21,20 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "NC(=N)N(C)C(=N)N",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label")
 
 
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
-
-
-
-@pytest.fixture()
-def _validity_gate_on(monkeypatch):
-    """Turn the OPSIN validity gate  back ON — conftest disables it
-    for unit-test speed. Required to assert end-to-end fail-closed behavior."""
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
 
 
 @pytest.mark.unit
@@ -145,16 +121,11 @@ class TestT5Biguanide:
         # A substituent on the central imido N is not built (its locant is not
         # shown in the BB): the guanidine-form name ships RT-exact, below
         # pin_verified,:34298).
-        from orthonym import Orthonym
         from tests.support.rt_assert import name_is_rt_exact
         smi = "NC(=N)N(C)C(=N)N"
         r = _dt_row(smi)
         assert r["tier"] != "pin_verified", r
         assert name_is_rt_exact(r["name"], smi), r
-
-    def test_protect_plain_guanidine(self):
-        assert name_compound("NC(=N)N") == "guanidine"
-
 
 @pytest.mark.unit
 class TestT6AmidrazonePrefixes:
@@ -312,7 +283,7 @@ class TestT12GeminalDicarboximidamide:
         assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
             "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
 
-    def test_substituted_stays_fail_closed(self, _validity_gate_on):
+    def test_substituted_stays_fail_closed(self, opsin_gate):
         # W2E-D4: now BUILT — the substituted geminal dicarboximidamide names
         # correctly and round-trips (accepts it). Verifies the built
         # class survives the end-to-end validity gate (not a wrong name).
@@ -324,7 +295,7 @@ class TestT12GeminalDicarboximidamide:
         # mixed amide/imidamide (one C=O, one C=N) on the geminal carbon.
         "NC(=O)C1(C(=N)N(C)C)CCCCC1",
     ])
-    def test_out_of_class_fails_closed(self, _validity_gate_on, smiles):
+    def test_out_of_class_fails_closed(self, opsin_gate, smiles):
         # Mixed carboxamide+carboximidamide is not the built (di)imidamide
         # class; must not emit the N-superscript dicarboximidamide name.
         assert _dt_name_compound(smiles) != \

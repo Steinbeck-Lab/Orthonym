@@ -14,7 +14,6 @@ from orthonym import name_compound
 from orthonym.data.retained_names import get_retained_name
 from orthonym.data.natural_products import get_scaffold_numbering, get_natural_product_name
 from orthonym.rules.natural_products import name_natural_product
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +45,7 @@ class TestDKPRetainedName:
         """DKP compound 7 (with indole + imidazole) generates name containing 'piperazin'."""
         smiles = "O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1"
         name = name_compound(smiles)
-        assert name, f"Should produce a name"
+        assert name, "Should produce a name"
         assert "piperazin" in name.lower(), (
             f"Compound 7 should contain 'piperazin' in name. Got: {name}"
         )

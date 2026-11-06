@@ -16,7 +16,7 @@ from rdkit import Chem
 
 from orthonym import name_compound
 from orthonym.assembly.handlers.organometallic import name_organometallic
-from orthonym.assembly.name_tree import NameTreeNode, NamingResult
+from orthonym.assembly.name_tree import NamingResult
 from orthonym.assembly.name_tree_to_string import name_tree_to_string
 from orthonym.routing.dispatch_table import DISPATCH_TABLE, StoutClass
 

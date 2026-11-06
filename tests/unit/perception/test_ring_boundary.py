@@ -5,7 +5,6 @@ Tests that all atoms in fused, bridged, spiro, and single ring systems
 are correctly identified, and that exocyclic atoms are excluded.
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.perception.rings import get_complete_ring_atom_set

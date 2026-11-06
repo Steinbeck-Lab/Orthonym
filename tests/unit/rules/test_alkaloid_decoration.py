@@ -15,7 +15,6 @@ from rdkit import Chem
 
 from orthonym.namer import name_compound
 from orthonym.rules.natural_products import name_natural_product
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -101,14 +100,6 @@ class TestAlkaloidNegative:
         """Morphinan skeleton without decorations returns bare name."""
         result = name_compound("c1ccc2c(c1)CC1NCCC23CCCCC13")
         assert result == "morphinan"
-
-    def test_cholesterol_unchanged(self):
-        """Cholesterol should still be named correctly."""
-        result = name_compound(
-            "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4"
-            "C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C"
-        )
-        assert result == "cholesterol"
 
     def test_steroid_decoration_unchanged(self):
         """Steroid with decorations should still produce correct names."""

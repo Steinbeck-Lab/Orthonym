@@ -160,7 +160,6 @@ def test_predicate_rejects_ring_assembly_dominant_polyfunctional():
     predicate must therefore return False so dispatch_inner reaches
     ring_assembly.
     """
-    from orthonym.namer import compute_features
     from rdkit import Chem
     smi = "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1"
     mol = Chem.MolFromSmiles(smi)

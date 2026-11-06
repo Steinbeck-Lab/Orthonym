@@ -13,7 +13,6 @@ The policy (``validation/read_back_policy.py``): ``-r`` only when the input hand
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 import orthonym.rules.phosphorus as phosphorus
 from orthonym import Orthonym
@@ -30,16 +29,13 @@ from orthonym.validation.read_back_policy import (
     reading_for,
     smiles_has_radical_electrons,
 )
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 RADICAL_ONLY_NAME = "1-[(phosphoryl)oxy]heptane"      # -O-P=O named with the three-valence prefix
 CLOSED_SHELL = "CCCCCCCOP=O"
 SENIOR_GROUP_INPUT = "COC(=O)C(CC1CCCCC1)COP=O"       # -O-P=O under an ester: the prefix is cited
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 @pytest.fixture

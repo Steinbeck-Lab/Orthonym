@@ -23,25 +23,9 @@ Every name is read back by a FRESH OPSIN call and must give the input's fixed-H 
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.read_back import same_hydron_sites
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-
-
-def _exact(name, smiles):
-    from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name, smiles)
-    return bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -76,7 +60,7 @@ def test_azolium_name_is_the_retained_parent_with_the_added_hydron(smiles, name)
     from orthonym import Orthonym
     r = Orthonym(style="pin").name_tiered(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    assert _exact(name, smiles)
+    assert same_hydron_sites(name, smiles)
 
 
 @pytest.mark.parametrize("a,b", [
@@ -110,7 +94,7 @@ def test_partially_saturated_azole_has_one_name_for_every_drawing(smiles, name):
     from orthonym import Orthonym
     r = Orthonym(style="pin").name_tiered(smiles)
     assert r["name"] == name and r["tier"] == "pin_verified", r
-    assert _exact(name, smiles)
+    assert same_hydron_sites(name, smiles)
 
 
 def test_the_azolium_centres_are_both_ring_nitrogens():
@@ -140,4 +124,4 @@ def test_names_that_already_read_back_exactly_are_kept(smiles):
     jar_or_skip()
     from orthonym import Orthonym
     r = Orthonym(style="pin").name_tiered(smiles)
-    assert r["tier"] == "pin_verified" and _exact(r["name"], smiles), r
+    assert r["tier"] == "pin_verified" and same_hydron_sites(r["name"], smiles), r

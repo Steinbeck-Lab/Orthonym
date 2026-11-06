@@ -9,13 +9,6 @@ All target names are OPSIN-RT-verified.
 """
 import pytest
 
-from orthonym import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [

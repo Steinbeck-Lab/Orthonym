@@ -13,14 +13,10 @@ are checked separately.
 """
 import pytest
 from rdkit import Chem
+from tests.support.read_back import key_or_none
 
 _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
               allow_aromatic_general=True)
-
-
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -45,7 +41,7 @@ def test_heterol_pins_round_trip(smiles, expected):
     from orthonym.validation.opsin_roundtrip import opsin_parse
     rt = opsin_parse(expected)
     got = Chem.MolFromSmiles(rt) if rt else None
-    assert got is not None and Chem.MolToInchiKey(got) == _inchikey(smiles), \
+    assert got is not None and Chem.MolToInchiKey(got) == key_or_none(smiles), \
         f"RT failed for {expected!r}"
 
 

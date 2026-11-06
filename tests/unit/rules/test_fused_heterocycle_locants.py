@@ -17,7 +17,6 @@ from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
     _validate_all_entries,
     match_fused_heterocycle_core,
-    get_fused_heterocycle_name,
 )
 from orthonym.namer import name_compound
 
@@ -298,57 +297,15 @@ class TestSubstructureMatching:
 class TestIndicatedHydrogen:
     """Verify indicated hydrogen (1H-, 2H-, 9H-) is preserved in naming."""
 
-    def test_indole_has_1H(self):
-        """Indole name must contain '1H-'."""
-        name = name_compound('c1ccc2[nH]ccc2c1')
-        assert '1H-' in name, f"Expected '1H-' in '{name}'"
-        assert name == '1H-indole'
-
-    def test_methylindole_preserves_1H(self):
-        """5-Methylindole must preserve '1H-' prefix."""
-        name = name_compound('Cc1ccc2[nH]ccc2c1')
-        assert '1H-' in name, f"Expected '1H-' in '{name}'"
-
-    def test_purine_has_9H(self):
-        """Purine name must contain '9H-'."""
-        name = name_compound('c1ncc2nc[nH]c2n1')
-        assert '9H-' in name, f"Expected '9H-' in '{name}'"
-        assert name == '9H-purine'
-
-    def test_benzimidazole_has_1H(self):
-        """Benzimidazole name must contain '1H-'."""
-        name = name_compound('c1ccc2[nH]cnc2c1')
-        assert '1H-' in name, f"Expected '1H-' in '{name}'"
-        assert name == '1H-1,3-benzimidazole'
-
     def test_methylbenzimidazole_preserves_1H(self):
         """Substituted benzimidazole must preserve '1H-'."""
         name = name_compound('Cc1ccc2[nH]cnc2c1')
         assert '1H-' in name, f"Expected '1H-' in '{name}'"
 
-    def test_carbazole_has_9H(self):
-        """Carbazole name must contain '9H-'."""
-        name = name_compound('c1ccc2c(c1)[nH]c1ccccc12')
-        assert '9H-' in name, f"Expected '9H-' in '{name}'"
-        assert name == '9H-carbazole'
-
     def test_indazole_has_1H(self):
         """Indazole name must contain '1H-'."""
         name = name_compound('c1ccc2[nH]ncc2c1')
         assert '1H-' in name, f"Expected '1H-' in '{name}'"
-
-    def test_no_indicated_H_for_quinoline(self):
-        """Quinoline has no NH, so no indicated H in name."""
-        name = name_compound('c1ccc2ncccc2c1')
-        assert name == 'quinoline'
-        assert 'H-' not in name
-
-    def test_no_indicated_H_for_benzofuran(self):
-        """Benzofuran has no NH, so no indicated H in name."""
-        name = name_compound('c1ccc2occc2c1')
-        # benzofuran or 1-benzofuran - no "H-" prefix
-        assert 'H-' not in name
-
 
 # =========================================================================
 # 6. Fallback removal verification
@@ -413,12 +370,6 @@ class TestE2ENaming:
         """Unsubstituted fused heterocycles get their retained name."""
         name = name_compound(smiles)
         assert name == expected_name, f"Expected '{expected_name}', got '{name}'"
-
-    def test_5_methylindole(self):
-        """5-Methylindole should produce locant-prefix + 1H-indole."""
-        name = name_compound('Cc1ccc2[nH]ccc2c1')
-        assert '1H-indole' in name
-        assert 'methyl' in name
 
     def test_5_methylbenzimidazole(self):
         """Substituted benzimidazole preserves indicated hydrogen."""

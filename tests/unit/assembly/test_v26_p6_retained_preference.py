@@ -95,7 +95,6 @@ gate-independent (using ``_disable_opsin_validity_gate=True``, the
 documented "test/internal mode" of the G2/P6 ladder, or a monkeypatched
 oracle for the synthetic fail-closed proof).
 """
-import glob
 import shutil
 import subprocess
 
@@ -104,10 +103,9 @@ from rdkit import Chem
 
 import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
-    default_tier_rule_applies,
 )
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
@@ -120,47 +118,12 @@ DEFAULT_TIER_DECLINES = frozenset({
     # ('C1CCN2CCCCC2C1' left this set in LO3: the default tier names it 'octahydro-2H-quinolizine',
     # the PIN, see END_TO_END_NAMES)
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_obj_name(namer_obj, smiles):
     if smiles in DEFAULT_TIER_DECLINES:
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return namer_obj.name(smiles, on_failure="label")
-
-
-def _dt_obj_row(namer_obj, smiles):
-    if smiles in DEFAULT_TIER_DECLINES:
-        return _declined_pin_row(smiles)
-    return namer_obj.name_tiered(smiles)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 pytestmark = pytest.mark.unit
@@ -210,16 +173,11 @@ END_TO_END_NAMES = {"quinolizidine": "octahydro-2H-quinolizine"}
 # --------------------------------------------------------------------------
 # Fixtures (mirror test_v26_p5_charged_general.py)
 # --------------------------------------------------------------------------
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 @pytest.fixture
 def production_gate(monkeypatch):
     """Re-enable the production OPSIN validity gate (the suite disables
     it). Skips when Java/OPSIN are unavailable."""
-    if not shutil.which("java") or _find_opsin_jar() is None:
+    if not java_on_path() or jar_or_none() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
     monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", False)
 
@@ -227,7 +185,7 @@ def production_gate(monkeypatch):
 @pytest.fixture(scope="module")
 def opsin_roundtrip():
     """name -> canonical SMILES via ONE OPSIN JVM (stdin batch)."""
-    jar = _find_opsin_jar()
+    jar = jar_or_none()
     if not shutil.which("java") or jar is None:
         pytest.skip("OPSIN/Java not available")
     names = list(_RT_NAMES.keys())

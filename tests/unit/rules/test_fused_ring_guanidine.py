@@ -32,6 +32,7 @@ from orthonym.rules.seniority import (
 )
 from tests.support.jars import jar_or_skip
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -163,9 +164,7 @@ def test_the_default_tier_names_the_ring_guanidine_and_the_name_reads_back(smile
 @pytest.mark.parametrize("smiles,name", [(TBD, RING_GUANIDINES[0][1]), (AMINO_HEXAHYDROBENZIMIDAZOLE, RING_GUANIDINES[3][1])])
 def test_the_best_effort_tier_gives_the_same_name(smiles, name):
     jar_or_skip()
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name and row["tier"] == "pin_verified", row
 
 

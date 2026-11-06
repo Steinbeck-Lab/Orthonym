@@ -71,7 +71,7 @@ class TestP45SubstitutiveFallthrough:
     # DECLINES. OPSIN parses the plan's stated PIN
     # "4,4'-oxybis(2-chlorobenzoic acid)" to a DIFFERENT molecule (the
     # truly-symmetric witness, which the namer already handles -> see
-    # test_witness_true_symmetric_works below).
+    # tests/unit/rules/test_tier5a_multiplicative.py::test_tier5a_multiplicative_heals).
     # * Both plan SMILES thus require the SUBSTITUTIVE biaryl-ether-diacid
     # decomposition (owned by the parent-selection cluster), not the
     # multiplicative path. multiplicative NEVER emits a wrong name here.
@@ -95,7 +95,7 @@ class TestP45SubstitutiveFallthrough:
         # names it. Here the prefix ring additionally carries an ortho-Cl ->
         # '(4-carboxy-2-chlorophenoxy)'. OPSIN-verified round-trip. (The prior
         # xfail PIN "4,4'-oxybis(2-chlorobenzoic acid)" is a DIFFERENT
-        # molecule -- see test_witness_true_symmetric_works.)
+        # molecule -- see test_tier5a_multiplicative.py::test_tier5a_multiplicative_heals.)
         assert name_compound("OC(=O)c1cc(Cl)ccc1Oc1ccc(C(=O)O)cc1Cl") == \
             "2-(4-carboxy-2-chlorophenoxy)-5-chlorobenzoic acid"
 
@@ -113,19 +113,6 @@ class TestP45SubstitutiveFallthrough:
         from rdkit import Chem
         m = Chem.MolFromSmiles("OC(=O)c1cc(Cl)ccc1Oc1ccc(C(=O)O)cc1Cl")
         assert name_multiplicative(m) is None
-
-    def test_witness_true_symmetric_works(self):
-        # A GENUINELY symmetric 2-chlorobenzoic-acid oxybis (O para to COOH,
-        # Cl ortho on BOTH rings) IS the multiplicative PIN and already works.
-        # productive branch; protects the direction-safe path.
-        assert name_compound("OC(=O)c1ccc(Oc2ccc(C(=O)O)c(Cl)c2)cc1Cl") == \
-            "4,4'-oxybis(2-chlorobenzoic acid)"
-
-    def test_no_cl_symmetric_works(self):
-        # Control: no-Cl symmetric oxydibenzoic acid unchanged.
-        assert name_compound("OC(=O)c1ccc(Oc2ccc(C(=O)O)cc2)cc1") == \
-            "4,4'-oxydibenzoic acid"
-
 
 @pytest.mark.unit
 class TestP45StereoConfigMismatch:

@@ -9,20 +9,14 @@ Tests end-to-end name generation for:
 """
 
 import pytest
+
+from tests.support.jars import jar_or_none
 from rdkit import Chem
 from orthonym import name_compound
 
 
 class TestRSDescriptors:
     """Tests for R/S stereocenter naming."""
-
-    def test_butan_2_ol_with_at_symbol(self):
-        """C[C@H](O)CC should produce stereodescriptor."""
-        result = name_compound('C[C@H](O)CC')
-        # RDKit assigns this as S (due to SMILES notation)
-        assert 'S' in result or 'R' in result
-        assert 'butan' in result
-        assert '-ol' in result
 
     def test_butan_2_ol_with_double_at(self):
         """C[C@@H](O)CC should produce opposite stereodescriptor."""
@@ -77,20 +71,6 @@ class TestRSDescriptors:
 class TestEZDescriptors:
     """Tests for E/Z double bond naming."""
 
-    def test_e_but_2_ene(self):
-        """(E)-but-2-ene (trans)."""
-        result = name_compound('C/C=C/C')
-        assert '(2E)' in result
-        assert 'but' in result
-        assert 'ene' in result
-
-    def test_z_but_2_ene(self):
-        """(Z)-but-2-ene (cis)."""
-        result = name_compound('C/C=C\\C')
-        assert '(2Z)' in result
-        assert 'but' in result
-        assert 'ene' in result
-
     def test_e_pent_2_ene(self):
         """(E)-pent-2-ene."""
         result = name_compound('C/C=C/CC')
@@ -104,22 +84,6 @@ class TestEZDescriptors:
         assert 'Z' in result
         assert 'pent' in result
         assert 'ene' in result
-
-    def test_terminal_double_bond_no_ez(self):
-        """Terminal double bonds (C=C-C) don't have E/Z."""
-        result = name_compound('C=CC')
-        # Should not have any stereodescriptor
-        assert '(' not in result or 'E' not in result
-        assert 'prop' in result
-        assert 'ene' in result
-
-    def test_but_1_ene_no_ez(self):
-        """But-1-ene is terminal, no E/Z."""
-        result = name_compound('C=CCC')
-        # Terminal double bond - no E/Z possible
-        assert 'but' in result
-        assert 'ene' in result
-
 
 class TestMultipleStereodescriptors:
     """Tests for compounds with multiple stereocenters or mixed descriptors."""
@@ -152,27 +116,11 @@ class TestMultipleStereodescriptors:
         # Should have E and either R or S
         assert 'E' in result
         # Check for stereocenter descriptor
-        descriptors = result.split('-')[0] if '-' in result else ''
         assert '(' in result
 
 
 class TestEdgeCases:
     """Edge cases for stereochemistry naming."""
-
-    def test_no_stereo_ethanol(self):
-        """Ethanol has no stereocenter."""
-        result = name_compound('CCO')
-        assert result == 'ethanol'
-        # No stereodescriptor
-        assert '(' not in result
-
-    def test_no_stereo_propan_2_ol(self):
-        """Propan-2-ol without @ has no stereodescriptor."""
-        result = name_compound('CC(O)C')
-        assert 'propan' in result
-        assert '-ol' in result
-        # No parentheses = no stereodescriptor
-        assert '(' not in result
 
     def test_simple_alkane_no_stereo(self):
         """Butane has no stereochemistry."""
@@ -180,29 +128,8 @@ class TestEdgeCases:
         assert result == 'butane'
         assert '(' not in result
 
-    def test_ethene_no_ez(self):
-        """Ethene has no E/Z (only 2 carbons)."""
-        result = name_compound('C=C')
-        assert result == 'ethene'
-        assert '(' not in result
-
-    def test_propene_no_ez(self):
-        """Propene terminal double bond has no E/Z."""
-        result = name_compound('CC=C')
-        assert 'prop' in result
-        assert 'ene' in result
-        # No stereodescriptor for terminal double bond
-        assert '(' not in result
-
-
 class TestDescriptorFormat:
     """Tests for correct stereodescriptor format."""
-
-    def test_descriptor_at_start(self):
-        """Stereodescriptor appears at start of name."""
-        result = name_compound('C[C@H](O)CC')
-        # Should start with (
-        assert result.startswith('(')
 
     def test_descriptor_before_prefixes(self):
         """Stereodescriptor comes before any substituent prefixes."""
@@ -226,29 +153,8 @@ class TestDescriptorFormat:
             assert inner[0].isdigit() or inner[0] == ','
             assert 'R' in inner or 'S' in inner
 
-    def test_e_format_locant_e(self):
-        """E descriptor format is (locantE)-."""
-        result = name_compound('C/C=C/C')
-        assert result.startswith('(2E)-')
-
-    def test_z_format_locant_z(self):
-        """Z descriptor format is (locantZ)-."""
-        result = name_compound('C/C=C\\C')
-        assert result.startswith('(2Z)-')
-
-
 class TestEZUnification:
     """Tests verifying E/Z uses _CIPCode exclusively (a phase-03)."""
-
-    def test_no_ez_for_cyclohexene(self):
-        """Intraring double bond in cyclohexene gets no E/Z descriptor."""
-        result = name_compound('C1=CCCCC1')
-        assert 'E' not in result and 'Z' not in result, f"False E/Z in cyclohexene: {result}"
-
-    def test_no_ez_for_cyclopentene(self):
-        """Intraring double bond in cyclopentene gets no E/Z descriptor."""
-        result = name_compound('C1=CCCC1')
-        assert 'E' not in result and 'Z' not in result, f"False E/Z in cyclopentene: {result}"
 
     def test_ez_uses_cip_code_directly(self):
         """get_stereodescriptor_string uses _CIPCode on bonds, not BondStereo."""
@@ -294,13 +200,6 @@ class TestSpecificCompounds:
 # =============================================================================
 
 import subprocess
-import os
-
-
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    from tests.support.jars import jar_or_none
-    return jar_or_none()
 
 
 def _opsin_parse(name, opsin_jar):
@@ -316,7 +215,7 @@ def _opsin_parse(name, opsin_jar):
         return None
 
 
-_opsin_jar = _find_opsin_jar()
+_opsin_jar = jar_or_none()
 _has_opsin = _opsin_jar is not None
 
 

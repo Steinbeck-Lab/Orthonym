@@ -11,7 +11,7 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-from orthonym.namer import Orthonym, _validity_gate_name_to_smiles
+from orthonym.namer import _validity_gate_name_to_smiles
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
@@ -39,26 +39,11 @@ def _declined_pin_row(smiles):
         smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
 def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
         return _declined_pin_row(smiles)["name"]
     return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
 
 
 def _pin_name(smiles):

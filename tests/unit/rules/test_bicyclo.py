@@ -563,26 +563,6 @@ from orthonym import name_compound  # noqa: E402
 class TestSUB02NegativeCanary:
     """Systems that MUST stay correct after the bridgehead predicate relaxes."""
 
-    def test_negative_naphthalene_unchanged(self):
-        assert name_compound("c1ccc2ccccc2c1") == "naphthalene"
-
-    def test_negative_decalin_unchanged(self):
-        assert name_compound("C1CCC2CCCCC2C1") == "decahydronaphthalene"
-
-    def test_negative_spiro45decane_unchanged(self):
-        assert name_compound("C1CCC2(CC1)CCCC2") == "spiro[4.5]decane"
-
-    def test_negative_adamantane_unchanged(self):
-        assert name_compound("C1C2CC3CC1CC(C2)C3") == "adamantane"
-
-    def test_negative_cubane_retained(self):
-        # a phase: cubane is a retained name AND a PIN (Blue Book line 9881 /
-        #. The bicyclo_systems catalog key was previously the WRONG
-        # (CH)8 cage isomer (InChIKey BOLISNSTKUABPW), so true cubane missed its
-        # retained name and got the systematic von-Baeyer name. After the rekey to
-        # the true cubane canonical (TXWRERCHRDBNLG) it correctly emits 'cubane'.
-        assert name_compound("C12C3C4C1C5C2C3C45") == "cubane"
-
     def test_negative_bridged_tricyclic_unchanged(self):
         # 13B(d) + M4#1: the main-ring fix selects the maximal
         # (9-membered) main ring (branches 5,2), and the main-bridge

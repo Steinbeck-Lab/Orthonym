@@ -9,9 +9,8 @@ The orientation now anchors exactly those atoms, read by the same two functions;
 tie in the locant set was decided by the spellings of the prefixes."""
 import pytest
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from tests.support.rt_assert import assert_full_rt, name_best_effort
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -51,5 +50,5 @@ def test_rows_outside_this_task_are_unchanged(smiles, name):
     # '5-(methoxycarbonyl)-3,6-dihydro-2H-pyran-6-carboxamide', names that cited the ring
     # suffix at a higher locant than (c), the Blue Book, allows) are now named by
     # the ester functional class and pinned in test_leads_l5_item22.py (leads item 22).
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row

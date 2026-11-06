@@ -41,13 +41,6 @@ substituent locants, and the Blue Book still requires the anion to win.
 
 import pytest
 
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 # (SMILES, expected PIN, Blue Book provenance)
 #

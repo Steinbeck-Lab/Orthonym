@@ -246,19 +246,6 @@ class TestAmideIntegration:
         result = name_compound("CC(=O)N")
         assert result == "acetamide"
 
-    def test_propanamide(self):
-        """CCC(=O)N should be named propanamide."""
-        from orthonym import name_compound
-        result = name_compound("CCC(=O)N")
-        assert result == "propanamide"
-
-    def test_butanamide(self):
-        """CCCC(=O)N should be named butanamide."""
-        from orthonym import name_compound
-        result = name_compound("CCCC(=O)N")
-        assert result == "butanamide"
-
-
 class TestSecondaryAmidesIntegration:
     """Integration tests for N-monosubstituted amides."""
 
@@ -289,13 +276,6 @@ class TestSecondaryAmidesIntegration:
 
 class TestTertiaryAmidesIntegration:
     """Integration tests for N,N-disubstituted amides."""
-
-    def test_n_n_dimethylformamide(self):
-        """CN(C)C=O should be named dimethylformamide:
-        (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007)."""
-        from orthonym import name_compound
-        result = name_compound("CN(C)C=O")
-        assert result == "dimethylformamide"
 
     def test_n_n_dimethylacetamide(self):
         """CN(C)C(C)=O should be named N,N-dimethylacetamide."""

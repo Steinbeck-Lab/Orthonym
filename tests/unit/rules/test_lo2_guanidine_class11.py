@@ -25,7 +25,6 @@ import pytest
 from rdkit import Chem
 
 from tests.support.pin_tiers import (
-    assert_declined_at_default,
     assert_not_pin_labelled,
     assert_pin_at_both_tiers,
     name_breadth,

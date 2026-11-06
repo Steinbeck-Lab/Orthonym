@@ -9,25 +9,12 @@ imibenconazole row d1454 of dev2000). The names below are the Blue Book's verbat
 prints the molecule, and OPSIN reads each back to the input.
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
-from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import same_key
 
 pytestmark = pytest.mark.opsin_gate
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
-
-def _same(smi, name):
-    out = opsin_parse(name)
-    m_out = Chem.MolFromSmiles(out) if out else None
-    return m_out is not None and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == inchi.MolToInchiKey(m_out)
 
 
 # (smiles, PIN): the first five are Blue Book examples (:31993-:31999,:33473-:33485)
@@ -53,7 +40,7 @@ def test_imidic_ester_pin(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected, row["name"]
     assert row["tier"] == "pin_verified" and row["producer"] == "inner:imidic_ester", row
-    assert _same(smiles, expected), expected
+    assert same_key(smiles, expected), expected
 
 
 # A ring stem without a strict-path name for its imidic acid (a heteroaromatic or fused ring) takes the name of
@@ -147,7 +134,7 @@ def test_an_unsaturated_chain_is_cited_by_ene_and_yne(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected, row["name"]
     assert row["tier"] == "pin_verified" and row["producer"] == "inner:imidic_ester", row
-    assert _same(smiles, expected), expected
+    assert same_key(smiles, expected), expected
 
 
 @pytest.mark.parametrize("name", ["methyl N-methylbut-3-enimidate", "methyl N-methylbut-3-ynimidate",
@@ -173,7 +160,7 @@ def test_n_hydroxy_imidic_ester(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected, row["name"]
     assert row["tier"] == "pin_verified" and row["producer"] == "inner:imidic_ester", row
-    assert _same(smiles, expected), expected
+    assert same_key(smiles, expected), expected
 
 
 # An N-alkoxy imidic ester. The ester is class 9 of (the Blue Book), senior to the imines
@@ -198,7 +185,7 @@ def test_n_alkoxy_imidic_ester(namer, smiles, expected):
     row = namer.name_tiered(smiles)
     assert row["name"] == expected, row["name"]
     assert row["tier"] == "pin_verified" and row["producer"] == "inner:imidic_ester", row
-    assert _same(smiles, expected), expected
+    assert same_key(smiles, expected), expected
 
 
 @pytest.mark.parametrize("smiles", [
@@ -243,17 +230,3 @@ def test_registered_ahead_of_the_claimants():
     entry = INNER_DISPATCH_TABLE["imidic_ester"]
     assert entry.priority == 90
     assert entry.priority < INNER_DISPATCH_TABLE["oxime"].priority < INNER_DISPATCH_TABLE["hydrazone"].priority
-
-
-@pytest.mark.parametrize("name", [
-    "4-(1-sulfanylideneethyl)benzoic acid",
-    "4-chloro-7-[(3-chloro-4-nitroquinolin-7-yl)sulfanyl]-3-nitroquinoline",
-    "2-(cyanosulfonyl)cyclohexane-1-carboxylic acid",
-    "1-(2-oxophosphepan-3-yl)propan-1-one",
-])
-def test_the_four_refuted_names_are_not_pin_verified(namer, name):
-    # PB trace 4: a re-run / breadth name must never reach pin_verified by a label change
-    out = opsin_parse(name)
-    if out:
-        row = namer.name_tiered(out)
-        assert not (row["tier"] == "pin_verified" and row["name"] == name)

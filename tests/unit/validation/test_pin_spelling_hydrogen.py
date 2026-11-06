@@ -12,11 +12,8 @@ in the corresponding structure". The count comes from the RDKit structure; the n
 import pytest
 from rdkit import Chem
 
-from orthonym.validation.pin_spelling import check_pin_spelling, registered_rules
-
-
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
+from orthonym.validation.pin_spelling import registered_rules
+from tests.support.read_back import spelling_rules
 
 
 def test_the_rule_is_registered():
@@ -38,7 +35,7 @@ def test_the_rule_is_registered():
     ("C1=CC2=C(C=CC(=O)C=C2)N=C1", "cyclohepta[b]pyridin-7-one"),
 ])
 def test_an_omitted_indicated_hydrogen_fails(smiles, name):
-    assert "P-14.7.1" in _rules(smiles, name)
+    assert "P-14.7.1" in spelling_rules(smiles, name)
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -54,13 +51,13 @@ def test_an_omitted_indicated_hydrogen_fails(smiles, name):
     ("c1ccc2ncccc2c1", "quinoline"),                                           #:1996 (needs none)
 ])
 def test_book_pins_pass(smiles, name):
-    assert "P-14.7.1" not in _rules(smiles, name)
+    assert "P-14.7.1" not in spelling_rules(smiles, name)
 
 
 def test_a_charged_ring_abstains():
     # 'benzo[7]annulenylium (PIN)' (:43552) is formed from the neutral parent by an operation the
     # count does not model; the check reads no charged ring
-    assert "P-14.7.1" not in _rules("c1ccc2ccc[cH+]c-2cc1", "benzo[7]annulenylium")
+    assert "P-14.7.1" not in spelling_rules("c1ccc2ccc[cH+]c-2cc1", "benzo[7]annulenylium")
 
 
 def test_a_structure_without_a_kekule_form_is_not_read_as_saturated():
@@ -91,7 +88,7 @@ _TRP = "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)"
     ("NC(N)=NCCC[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O", "histidylaspartylarginine"),
 ])
 def test_the_ring_of_a_retained_amino_acid_residue_is_not_counted(smiles, name):
-    assert "P-14.7.1" not in _rules(smiles, name)
+    assert "P-14.7.1" not in spelling_rules(smiles, name)
 
 
 @pytest.mark.parametrize("smiles,name", [
@@ -101,4 +98,4 @@ def test_the_ring_of_a_retained_amino_acid_residue_is_not_counted(smiles, name):
     ("c1ccc2[nH]ccc2c1", "indole"),
 ])
 def test_a_ring_that_is_no_retained_residue_still_needs_its_indicated_hydrogen(smiles, name):
-    assert "P-14.7.1" in _rules(smiles, name)
+    assert "P-14.7.1" in spelling_rules(smiles, name)

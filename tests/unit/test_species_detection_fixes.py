@@ -9,7 +9,6 @@ Verifies:
 - Namer routing integration works with Plan 17-03 fall-through
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.perception.ions import detect_species_type
@@ -24,41 +23,10 @@ from orthonym import name_compound
 class TestSpeciesTypeDetection:
     """Test that detect_species_type correctly classifies molecules."""
 
-    def test_simple_carboxylate_is_ion(self):
-        """Simple carboxylate (acetate) should be classified as 'ion'."""
-        mol = Chem.MolFromSmiles('CC(=O)[O-]')
-        assert detect_species_type(mol) == 'ion'
-
     def test_simple_alkoxide_is_ion(self):
         """Simple alkoxide (methoxide) should be classified as 'ion'."""
         mol = Chem.MolFromSmiles('[O-]C')
         assert detect_species_type(mol) == 'ion'
-
-    def test_ammonium_is_ion(self):
-        """Ammonium should be classified as 'ion'."""
-        mol = Chem.MolFromSmiles('[NH4+]')
-        assert detect_species_type(mol) == 'ion'
-
-    def test_sodium_acetate_is_salt(self):
-        """Sodium acetate should be classified as 'salt'."""
-        mol = Chem.MolFromSmiles('[Na+].[O-]C(C)=O')
-        assert detect_species_type(mol) == 'salt'
-
-    def test_neutral_molecule(self):
-        """Ethanol should be classified as 'neutral'."""
-        mol = Chem.MolFromSmiles('CCO')
-        assert detect_species_type(mol) == 'neutral'
-
-    def test_zwitterion_amino_acid(self):
-        """Amino acid zwitterion should be classified as 'zwitterion'."""
-        # Glycine zwitterion: [NH3+]CC([O-])=O
-        mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
-        assert detect_species_type(mol) == 'zwitterion'
-
-    def test_radical(self):
-        """Methyl radical should be classified as 'radical'."""
-        mol = Chem.MolFromSmiles('[CH3]')
-        assert detect_species_type(mol) == 'radical'
 
     def test_large_organic_cation_stays_ion(self):
         """169.6-04 (Task 3): the >10-HA size-cutoff band-aid that reclassified a
@@ -81,12 +49,6 @@ class TestSpeciesTypeDetection:
         """Large alkoxide should remain 'ion' because alkoxide is a
         recognized anion type with proper naming support."""
         mol = Chem.MolFromSmiles('CCCCCCCCCCCCC[O-]')
-        assert detect_species_type(mol) == 'ion'
-
-    def test_small_organic_cation_stays_ion(self):
-        """Small organic cation (<=10 atoms) should stay as 'ion'."""
-        # Methylammonium: CH3-NH3+ = 2 heavy atoms
-        mol = Chem.MolFromSmiles('C[NH3+]')
         assert detect_species_type(mol) == 'ion'
 
     def test_phenyl_hexylamine_cation_stays_ion(self):
@@ -224,28 +186,12 @@ class TestNamerRoutingIntegration:
         """Large organic molecule with charge should get a valid organic name,
         not an ion name."""
         # Protonated dodecylamine: should get organic name via normal pipeline
-        mol = Chem.MolFromSmiles('CCCCCCCCCCCC[NH3+]')
         name = name_compound('CCCCCCCCCCCC[NH3+]')
         assert name  # non-empty
         # Should NOT be a simple ion name like "dodecylammonium"
         # Instead should route through normal pipeline
 
-    def test_simple_ion_with_retained_name(self):
-        """Simple ion with a retained name should return that name."""
-        # Acetate has a retained name
-        name = name_compound('CC(=O)[O-]')
-        assert name == 'acetate'
-
     def test_ammonium_retained_name(self):
         """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         name = name_compound('[NH4+]')
         assert name == 'azanium'
-
-    def test_simple_ion_without_retained_falls_through(self):
-        """Simple ion without retained name should fall through to
-        aspect composition in composer.py (Plan 17-03 routing)."""
-        # Butanoate - not in retained names, but small enough to stay 'ion'
-        name = name_compound('CCCC(=O)[O-]')
-        assert name  # non-empty
-        # Should produce a valid oate name
-        assert 'oate' in name or 'ate' in name

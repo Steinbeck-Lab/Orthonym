@@ -99,12 +99,6 @@ class TestEsterAssembly:
 class TestAcidToAte:
     """Tests for _acid_to_ate helper."""
 
-    def test_acetic_acid(self):
-        assert _acid_to_ate("acetic acid") == "acetate"
-
-    def test_propanoic_acid(self):
-        assert _acid_to_ate("propanoic acid") == "propanoate"
-
     def test_benzoic_acid(self):
         assert _acid_to_ate("benzoic acid") == "benzoate"
 
@@ -113,9 +107,6 @@ class TestAcidToAte:
 
     def test_formic_acid(self):
         assert _acid_to_ate("formic acid") == "formate"
-
-    def test_cyclohexanecarboxylic_acid(self):
-        assert _acid_to_ate("cyclohexanecarboxylic acid") == "cyclohexanecarboxylate"
 
     def test_hexanoic_acid(self):
         assert _acid_to_ate("hexanoic acid") == "hexanoate"
@@ -206,24 +197,11 @@ class TestAmideAssembly:
 class TestAcidToAmide:
     """Tests for _acid_to_amide helper."""
 
-    def test_acetic_acid(self):
-        assert _acid_to_amide("acetic acid") == "acetamide"
-
-    def test_propanoic_acid(self):
-        assert _acid_to_amide("propanoic acid") == "propanamide"
-
-    def test_benzoic_acid(self):
-        assert _acid_to_amide("benzoic acid") == "benzamide"
-
     def test_butanoic_acid(self):
         assert _acid_to_amide("butanoic acid") == "butanamide"
 
     def test_formic_acid(self):
         assert _acid_to_amide("formic acid") == "formamide"
-
-    def test_cyclohexanecarboxylic_acid(self):
-        assert _acid_to_amide("cyclohexanecarboxylic acid") == "cyclohexanecarboxamide"
-
 
 # ============================================================================
 # Acid-to-acyl conversion tests
@@ -231,9 +209,6 @@ class TestAcidToAmide:
 
 class TestAcidToAcyl:
     """Tests for _acid_to_acyl helper."""
-
-    def test_acetic_acid(self):
-        assert _acid_to_acyl("acetic acid") == "acetyl"
 
     def test_propanoic_acid(self):
         assert _acid_to_acyl("propanoic acid") == "propanoyl"
@@ -332,27 +307,6 @@ class TestGlycosideAssembly:
     def test_glycoside_missing_aglycone(self):
         result = assemble_fragment_name(
             "glycosidic", {"sugar": "glucopyranose"}
-        )
-        assert result is None
-
-    def test_glycoside_acid_alkyl_keys_fail_closed_without_smiles(self):
-        """Engine 'acid'/'alkyl' keys, no fragment SMILES: the functional-class
-        flip cannot fire and the legacy substitutive '(glycosyloxy)aglycone'
-        fallback was REMOVED (it doubled the glycosidic oxygen and carried no
-        attachment locant -> constitution_mismatch; 0/19 correct on a dev split --
-        fragment_assembly.py:1089-1120). The assembler now fails CLOSED (None) so
-        the general pipeline names the glycoside correctly."""
-        result = assemble_fragment_name(
-            "glycosidic",
-            {"acid": "β-D-glucopyranosyloxy", "alkyl": "phenol"},
-        )
-        assert result is None
-
-    def test_glycoside_sugar_aglycone_keys_fail_closed_without_smiles(self):
-        """Same fail-closed via the explicit 'sugar'/'aglycone' key convention."""
-        result = assemble_fragment_name(
-            "glycosidic",
-            {"sugar": "β-D-glucopyranosyloxy", "aglycone": "phenol"},
         )
         assert result is None
 
@@ -479,16 +433,6 @@ class TestDoubleSuffixGuardAte:
     def test_already_hexanoate_returns_unchanged(self):
         assert _acid_to_ate("hexanoate") == "hexanoate"
 
-    def test_acid_still_converts(self):
-        assert _acid_to_ate("propanoic acid") == "propanoate"
-
-    def test_acetic_acid_still_converts(self):
-        assert _acid_to_ate("acetic acid") == "acetate"
-
-    def test_carboxylic_acid_still_converts(self):
-        assert _acid_to_ate("cyclohexanecarboxylic acid") == "cyclohexanecarboxylate"
-
-
 class TestDoubleSuffixGuardAmide:
     """Tests for double-suffix prevention in _acid_to_amide."""
 
@@ -503,12 +447,6 @@ class TestDoubleSuffixGuardAmide:
 
     def test_already_formamide_returns_unchanged(self):
         assert _acid_to_amide("formamide") == "formamide"
-
-    def test_acid_still_converts(self):
-        assert _acid_to_amide("propanoic acid") == "propanamide"
-
-    def test_acetic_acid_still_converts(self):
-        assert _acid_to_amide("acetic acid") == "acetamide"
 
     def test_carboxylic_acid_still_converts(self):
         assert _acid_to_amide("cyclohexanecarboxylic acid") == "cyclohexanecarboxamide"

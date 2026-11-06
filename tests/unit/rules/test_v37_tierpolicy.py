@@ -46,6 +46,7 @@ from orthonym.jvm_budget import jvm_slots
 from tests.support.jars import jar_or_skip
 from orthonym.assembly.retained_substitution import OpsinOracle
 import orthonym.assembly.t4_coverage as t4_coverage
+from tests.support.read_back import key_or_none
 
 # These assertions are ABOUT the RT/validity gate (full-InChIKey round-trip), so
 # the OPSIN gate must be ON exactly as in production (the suite disables it by
@@ -85,11 +86,6 @@ def _best_effort(smi):
 def _pin(smi):
     with wall_clock_limit(120):
         return Orthonym(style="pin").name(smi)
-
-
-def _ik(smi):
-    m = Chem.MolFromSmiles(smi)
-    return inchi.MolToInchiKey(m) if m is not None else None
 
 
 def _rt_key(oracle, name):
@@ -135,7 +131,7 @@ class TestWitnessesPromotedToComplete:
         assert not errors.is_failure_name(name), (
             f"COMPLETE tier still abstains on a promotable witness: {smi!r}")
         # 0-wrong: the promoted name must full-InChIKey round-trip to the input.
-        assert _rt_key(_oracle, name) == _ik(smi), (
+        assert _rt_key(_oracle, name) == key_or_none(smi), (
             f"promoted a name that does NOT round-trip to the input: {name!r}")
 
 
@@ -193,7 +189,7 @@ class TestUnverifiedRescueStillAbstains:
         # Broader 0-wrong guard: even with the producer sabotaged, the
         # COMPLETE tier NEVER ships the wrong molecule — it abstains or finds a
         # correct name by another (RT-verified) path.
-        wrong_ik = _ik("c1ccccc1")
+        wrong_ik = key_or_none("c1ccccc1")
         monkeypatch.setattr(
             t4_coverage, "name_t4_complete",
             lambda mol, feats, *a, **k: "benzene")
@@ -202,7 +198,7 @@ class TestUnverifiedRescueStillAbstains:
         assert k != wrong_ik, (
             f"COMPLETE tier SHIPPED the RT-failing wrong candidate: {name!r}")
         if not errors.is_failure_name(name):
-            assert k == _ik(_NOSTEREO_T4), (
+            assert k == key_or_none(_NOSTEREO_T4), (
                 f"COMPLETE tier shipped a wrong molecule: {name!r}")
 
     def test_unpatched_nostereo_witness_ships_at_complete(self, _oracle):
@@ -211,7 +207,7 @@ class TestUnverifiedRescueStillAbstains:
         # rejecting the wrong candidate, not the input being unnameable.
         name = _complete(_NOSTEREO_T4)
         assert not errors.is_failure_name(name)
-        assert _rt_key(_oracle, name) == _ik(_NOSTEREO_T4)
+        assert _rt_key(_oracle, name) == key_or_none(_NOSTEREO_T4)
 
 
 class TestDefaultPinTierByteIdentical:

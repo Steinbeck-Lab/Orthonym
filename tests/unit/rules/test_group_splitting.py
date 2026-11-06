@@ -11,7 +11,7 @@ import pytest
 from rdkit import Chem, RDLogger
 
 from orthonym import name_compound
-from orthonym.assembly.group_splitting import split_composite_fg, SplitComponent
+from orthonym.assembly.group_splitting import split_composite_fg
 
 RDLogger.logger().setLevel(RDLogger.ERROR)
 

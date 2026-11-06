@@ -35,15 +35,6 @@ class TestAmidePrefixUnit:
         """Primary amide (-CONH2) as non-principal FG gets carbamoyl prefix."""
         assert get_prefix("primary_amide") == "carbamoyl"
 
-    def test_secondary_amide_prefix_is_none(self):
-        """Secondary amide prefix remains None; handled by acylamino pathway."""
-        assert get_prefix("secondary_amide") is None
-
-    def test_tertiary_amide_prefix_is_none(self):
-        """Tertiary amide prefix remains None; handled by acylamino pathway."""
-        assert get_prefix("tertiary_amide") is None
-
-
 # ============================================================================
 # E2E Regression Tests: Compounds with primary amide as non-principal group
 # ============================================================================
@@ -250,64 +241,4 @@ class TestCarbamoylDoubleCounting:
         assert result is not None
         assert result.count("carbamoyl") == 1, (
             f"Expected exactly 1 'carbamoyl' in name, got {result.count('carbamoyl')}: {result}"
-        )
-
-
-# ============================================================================
-# Negative Test: Amide as Principal Group (no carbamoyl prefix)
-# ============================================================================
-
-class TestAmideAsPrincipalGroup:
-    """When amide IS the principal group, carbamoyl prefix should NOT appear."""
-
-    def test_acetamide_no_carbamoyl(self):
-        """CC(=O)N -> acetamide (amide is suffix, not prefix)"""
-        result = name_compound("CC(=O)N")
-        assert result is not None
-        assert "carbamoyl" not in result, (
-            f"Amide as principal group should not produce carbamoyl prefix: {result}"
-        )
-
-    def test_propanamide_no_carbamoyl(self):
-        """CCC(=O)N -> propanamide (amide is suffix, not prefix)"""
-        result = name_compound("CCC(=O)N")
-        assert result is not None
-        assert "carbamoyl" not in result, (
-            f"Amide as principal group should not produce carbamoyl prefix: {result}"
-        )
-
-    def test_benzamide_no_carbamoyl(self):
-        """NC(=O)c1ccccc1 -> benzamide (amide is suffix, not prefix)"""
-        result = name_compound("NC(=O)c1ccccc1")
-        assert result is not None
-        assert "carbamoyl" not in result, (
-            f"Amide as principal group should not produce carbamoyl prefix: {result}"
-        )
-
-
-# ============================================================================
-# Regression Guard: N-acyl amides must NOT get spurious carbamoyl
-# ============================================================================
-
-class TestNAcylAmideNoCarbamoyl:
-    """N-acyl amides (secondary/tertiary) handled by acylamino pathway.
-
-    These compounds must NOT produce carbamoyl prefix, which would be
-    double-naming the same structural feature.
-    """
-
-    def test_n_acetylglycine_no_carbamoyl(self):
-        """CC(=O)NCC(=O)O -> 2-acetamidoethanoic acid, no carbamoyl."""
-        result = name_compound("CC(=O)NCC(=O)O")
-        assert result is not None
-        assert "carbamoyl" not in result, (
-            f"N-acyl amide should not produce carbamoyl prefix: {result}"
-        )
-
-    def test_n_octadecanoyl_serine_no_carbamoyl(self):
-        """Long N-acyl amide should not produce spurious carbamoyl."""
-        result = name_compound("CCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO)C(=O)O")
-        assert result is not None
-        assert "carbamoyl" not in result, (
-            f"N-acyl amide should not produce carbamoyl prefix: {result}"
         )

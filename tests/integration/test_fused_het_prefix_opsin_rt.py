@@ -15,9 +15,8 @@ from rdkit import Chem
 from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
     FUSED_HETEROCYCLE_PREFIX_STEMS,
-    match_fused_heterocycle_core,
 )
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 # === OPSIN Setup ===
@@ -28,16 +27,7 @@ OPSIN_JAR = jar_or_none()
 
 def _opsin_available() -> bool:
     """Check if OPSIN CLI JAR is available and Java is installed."""
-    if OPSIN_JAR is None:
-        return False
-    try:
-        proc = subprocess.run(
-            ["java", "-version"],
-            capture_output=True, text=True, timeout=5
-        )
-        return proc.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    return OPSIN_JAR is not None and java_on_path()
 
 
 def _opsin_parse(name: str) -> str:

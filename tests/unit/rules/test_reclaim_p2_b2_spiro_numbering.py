@@ -56,13 +56,9 @@ from rdkit import Chem
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 pytestmark = pytest.mark.opsin_gate
-
-
-def _inchikey(smiles):
-    m = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(m) if m is not None else None
 
 
 def _roundtrips_to(name, smiles):
@@ -75,7 +71,7 @@ def _roundtrips_to(name, smiles):
     m = Chem.MolFromSmiles(out)
     if m is None:
         return False
-    return Chem.MolToInchiKey(m) == _inchikey(smiles)
+    return Chem.MolToInchiKey(m) == key_or_none(smiles)
 
 
 def _declined_strict_name(smiles):

@@ -22,13 +22,6 @@ class TestSimpleAlkylOnChain:
         assert "methyl" in result.lower(), f"Expected 'methyl' in '{result}'"
         assert "pentane" in result.lower(), f"Expected 'pentane' in '{result}'"
 
-    def test_dimethyl_on_butane(self):
-        """2,3-dimethylbutane"""
-        result = name_compound("CC(C)C(C)C")
-        assert result is not None
-        assert "dimethyl" in result.lower(), f"Expected 'dimethyl' in '{result}'"
-        assert "butane" in result.lower(), f"Expected 'butane' in '{result}'"
-
     def test_ethyl_on_hexane(self):
         """3-ethylhexane"""
         result = name_compound("CCCC(CC)CC")

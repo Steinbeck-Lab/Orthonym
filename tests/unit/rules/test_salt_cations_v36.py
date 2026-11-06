@@ -18,14 +18,8 @@ descriptor cited at ring position 3 of an azabicyclo -- a trace-B1).
 """
 import pytest
 
-from orthonym import Orthonym
 from orthonym.errors import is_failure_name
 from tests.support.default_tier import declined_pin_row
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 def _rt_full(smi, name):

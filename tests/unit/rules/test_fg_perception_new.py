@@ -7,7 +7,6 @@ a phase Plan 02: through
 -: Seniority table entries for new FGs
 """
 
-import pytest
 from rdkit import Chem
 from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.rules.seniority import SUFFIX_FORMS, PREFIX_FORMS, SENIORITY_ORDER

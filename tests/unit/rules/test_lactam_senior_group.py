@@ -26,14 +26,10 @@ Changed asserted values, none: every row is new.
 import pytest
 
 import orthonym.assembly.handlers.lactone as lactone_handler
-from orthonym import Orthonym, name_compound
+from orthonym import name_compound
+from tests.support.pin_tiers import name_and_tier
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _tiered(smiles: str):
-    row = Orthonym().name_tiered(smiles)
-    return row["name"], row["tier"]
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -58,7 +54,7 @@ def _tiered(smiles: str):
     ("O=C1CCCN1CC(=O)NC", "N-methyl-2-(2-oxopyrrolidin-1-yl)acetamide"),
 ])
 def test_a_separate_senior_group_owns_the_suffix(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -72,7 +68,7 @@ def test_a_separate_senior_group_owns_the_suffix(smiles, expected):
     ("O=C1CCC(N)N1", "5-aminopyrrolidin-2-one"),
 ])
 def test_the_lactam_stays_the_parent_when_nothing_is_senior(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -98,24 +94,24 @@ def test_the_lactam_stays_the_parent_when_nothing_is_senior(smiles, expected):
     ("O=C1CCCN1CC=O", "(2-oxopyrrolidin-1-yl)acetaldehyde"),
 ])
 def test_a_group_of_classes_11_to_15_owns_the_suffix(smiles, expected):
-    assert _tiered(smiles) == (expected, "pin_verified")
+    assert name_and_tier(smiles) == (expected, "pin_verified")
 
 
 def test_an_aldehyde_on_the_ring_is_not_a_false_pin():
     """'5-oxopyrrolidine-2-carbaldehyde' is the name; the strict path builds 'pyrrolidine-2,5-dicarbaldehyde' for it
     (the lactam C=O read as a second aldehyde), which the read-back refuses, so only the best-effort tier names it."""
-    name, tier = _tiered("O=C1CCC(C=O)N1")
+    name, tier = name_and_tier("O=C1CCC(C=O)N1")
     assert tier != "pin_verified", name
     assert name_compound("O=C1CCC(C=O)N1") == "5-oxopyrrolidine-2-carbaldehyde"
 
 
 def test_the_lactone_guard_is_unchanged():
     """The lactone handler shares the senior-group scan: its rows keep their names."""
-    assert _tiered("OC(=O)C1CCC(=O)O1") == ("5-oxooxolane-2-carboxylic acid", "pin_verified")
-    assert _tiered("O=C1CCCO1") == ("oxolan-2-one", "pin_verified")
+    assert name_and_tier("OC(=O)C1CCC(=O)O1") == ("5-oxooxolane-2-carboxylic acid", "pin_verified")
+    assert name_and_tier("O=C1CCCO1") == ("oxolan-2-one", "pin_verified")
 
 
 def test_the_tests_fail_without_the_guard(monkeypatch):
     """The mutation check: with the scan switched off the lactam parent takes the acid as 'carboxy' again."""
     monkeypatch.setattr(lactone_handler, "has_senior_group_outside", lambda *a, **k: False)
-    assert _tiered("OC(=O)C1CCC(=O)N1")[1] == "abstain"
+    assert name_and_tier("OC(=O)C1CCC(=O)N1")[1] == "abstain"

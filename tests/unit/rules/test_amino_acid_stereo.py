@@ -5,7 +5,6 @@ when stereocenters are present, and no stereo for achiral amino acids.
 """
 
 import re
-import pytest
 from orthonym.namer import name_compound
 
 
@@ -70,7 +69,7 @@ class TestAminoAcidTrivialStereo:
         full / InChIKey / mutation-test evidence). The systematic
         name is the true "no stereo in, no stereo out" answer.
         """
-        from orthonym.rules.amino_acids import name_amino_acid, _build_amino_acid_locant_map
+        from orthonym.rules.amino_acids import name_amino_acid
         from rdkit import Chem
 
         # Use non-stereo alanine SMILES to match trivial dict

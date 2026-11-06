@@ -45,13 +45,6 @@ would be satisfied by an abstention or a dropped substituent alike.
 """
 import pytest
 
-from orthonym import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
-
 
 @pytest.mark.parametrize(
     "smiles,expected",

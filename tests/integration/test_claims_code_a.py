@@ -27,18 +27,17 @@ go through the engine (``tests.support.rt_assert._independent_parse``) and compa
 full InChIKey.
 """
 import pytest
-from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym import namer
 from orthonym.metrics import provenance as pv
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import _independent_parse
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key_or_empty as _key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -66,11 +65,6 @@ def _declined_pin_row(smiles):
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return inchi.MolToInchiKey(mol) if mol is not None else ""
 
 
 def _independent_full_key(name):
@@ -241,11 +235,9 @@ def test_unverified_trivial_name_is_not_labelled_systematic_verified():
 def test_grammar_carveout_ships_at_best_effort_with_its_gate_string():
     #:50943 (relabel 2026-10-31): an inositol is no PIN, so the PIN tier declines it (it shipped there
     # pin_unverified: changed asserted value) and the best-effort tier ships it on its exact InChIKey
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     smiles = "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
     assert _pin_row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == "scyllo-inositol", row
     assert row["gate_outcome"] == "carveout:inositol", row  # gate string unchanged
     assert row["tier"] == "best_effort" and row["is_pin"] is False, row

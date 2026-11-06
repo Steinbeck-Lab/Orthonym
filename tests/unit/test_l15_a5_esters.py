@@ -12,9 +12,9 @@ skipped. The chain-ester match now declines, as the ring-acid path already did f
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from orthonym.rules.esters import name_ester
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -36,14 +36,10 @@ _PIN_CASES = [
 ]
 
 
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
-
-
 @pytest.mark.parametrize("smiles,name", _PIN_CASES)
 def test_second_ester_is_not_dropped(smiles, name):
     """Best-effort named both with the ester as a prefix (the benzoate's 'methoxycarbonyl' on a benzene)."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
 
@@ -55,7 +51,7 @@ def test_second_ester_is_not_dropped_by_the_valid_and_complete_tiers():
     'benzoic acid'): the row is a status pin of the tier label, not a fix proof; it passed before this task as well
     (open item (b) of the lane ledger)."""
     for tier in ("valid", "complete"):
-        row = _row(_DIESTER, tier)
+        row = tier_row(_DIESTER, tier)
         assert (row["name"], row["tier"]) == (
             "methyl 4-(3-methoxy-3-oxopropyl)benzene-1-carboxylate", "systematic_verified"), row
         assert_full_rt(row["name"], _DIESTER)
@@ -63,14 +59,14 @@ def test_second_ester_is_not_dropped_by_the_valid_and_complete_tiers():
 
 @pytest.mark.parametrize("tier", _TIERS)
 def test_row16_gives_the_pin(tier):
-    row = _row(_ROW16, tier)
+    row = tier_row(_ROW16, tier)
     assert (row["name"], row["tier"]) == (_ROW16_PIN, "pin_verified"), row
     assert_full_rt(row["name"], _ROW16)
 
 
 @pytest.mark.parametrize("smiles,name", _PIN_CASES)
 def test_the_pin_tier_name_is_unchanged(smiles, name):
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
@@ -97,7 +93,7 @@ _CONTROLS = [
 @pytest.mark.parametrize("tier", ["pin"] + _TIERS)
 @pytest.mark.parametrize("smiles,name,label", _CONTROLS)
 def test_controls_are_unchanged(smiles, name, label, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, label), row
     assert_full_rt(row["name"], smiles)
 
@@ -119,6 +115,6 @@ _NON_PIN_CONTROLS = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _NON_PIN_CONTROLS)
 def test_non_pin_controls_name_the_ester(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert (row["name"], row["tier"]) == (name, "pin_unverified"), row
     assert_full_rt(row["name"], smiles)

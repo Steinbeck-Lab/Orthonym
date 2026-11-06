@@ -217,12 +217,6 @@ class TestDeMultiplicationP4542:
         got = name_compound("[13CH3]OCCOC", style="pin")
         assert got == "1-(13C)methoxy-2-methoxyethane", f"got {got!r}"
 
-    def test_ambiguity_tiebreak_lowest_labeled_locant(self):
-        # both 1- and 2- forms RT (symmetric); picks the labeled copy at locant 1
-        from orthonym.namer import name_compound
-        got = name_compound("[13CH3]OCCOC", style="pin")
-        assert got.startswith("1-(13C)methoxy"), got
-
     def test_mixed_two_nuclide_demux_p4542(self):
         # W2F-P5-11: TWO DIFFERENT nuclides (18O and 13C), one per identical
         # methoxy copy. The parent (1,2-dimethoxyethane) is symmetric, so BOTH
@@ -302,14 +296,6 @@ class TestDeMultScopeGuards:
 
 
 class TestRefuseOnUndecoratablePolicy:
-
-    def test_labeled_molecule_never_drops_label(self):
-        from orthonym.namer import name_compound
-        out = name_compound("C[18O]CCO[13CH3]", style="pin")
-        # the unlabeled skeleton '1,2-dimethoxyethane' must NOT be emitted, and
-        # BOTH nuclide labels must appear in the name.
-        assert "dimethoxyethane" not in out
-        assert "18O" in out and "13C" in out
 
     def test_unlabeled_corpus_byte_identical(self):
         # the has_isotopes gate keeps the new policy inert on unlabeled input

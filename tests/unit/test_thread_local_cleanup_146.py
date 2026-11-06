@@ -7,7 +7,6 @@ the previous test's molecule-naming work).
 
 Reference: internal notes
 """
-import pytest
 
 
 def test_pool_store_cleared_between_tests():

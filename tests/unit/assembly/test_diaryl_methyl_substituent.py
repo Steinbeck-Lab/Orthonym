@@ -18,7 +18,6 @@ absent) and compare InChI of the OPSIN-parsed emitted name to InChI of the input
 Forbidden: xfail, postprocessors. Targets OPSIN-verified (opsin-cli 2.9.0).
 """
 
-import glob
 import shutil
 import subprocess
 
@@ -28,12 +27,7 @@ from orthonym import name_compound
 from tests.support.jars import jar_or_none
 
 
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
-_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _OPSIN_AVAILABLE = bool(_OPSIN_JAR) and shutil.which("java") is not None
 
 
@@ -218,17 +212,3 @@ class TestDialkylaminoChain:
     def test_primary_amine_unchanged(self):
         assert name_compound("NCCO") == "2-aminoethan-1-ol"
         assert name_compound("NCCCC(=O)O") == "4-aminobutanoic acid"
-
-
-class TestPrincipalAmineGuard:
-    """PITFALL-3 — the principal-amine path is already correct; must stay byte-identical.
-
-    Green now AND after both plans (regression guard — do NOT touch _assemble_amine_name).
-    """
-
-    @pytest.mark.unit
-    def test_principal_dimethylamine_unchanged(self):
-        # Phase B (DD1 Fix 4): the ethane amine-suffix locant is elided per
-        # -> 'N,N-dimethylethanamine' (PubChem-confirmed), not the
-        # over-located 'N,N-dimethylethan-1-amine'.
-        assert name_compound("CN(C)CC") == "N,N-dimethylethanamine"

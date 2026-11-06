@@ -31,7 +31,6 @@ import pytest
 
 from orthonym import Orthonym, OrthonymLimitError, classify_limit, name_compound
 from orthonym.errors import is_failure_name
-from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.default_tier import (
     assert_best_effort_gives,
     assert_default_tier_declines,
@@ -292,7 +291,6 @@ ETHENYLSODIUM = "C=C[Na]"
 
 
 def test_a_declined_metal_compound_does_not_say_its_element_is_unsupported(capsys):
-    from orthonym import name_with_tree
     from orthonym.cli import main
     label = "unknown organic compound"
     row = assert_default_tier_declines(ETHENYLSODIUM)

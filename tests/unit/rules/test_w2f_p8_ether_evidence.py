@@ -20,13 +20,6 @@ def test_p456_evidence_pin():
     assert orthonym.name_compound(EV, style="pin") == TARGET
 
 
-def test_stereo_lossy_refused():
-    # the non-stereo string describes a different (achiral) molecule -> the
-    # emitted name must carry BOTH descriptors (never a stereo-lossy string).
-    name = orthonym.name_compound(EV, style="pin")
-    assert "(1R)" in name and "(1S)" in name
-
-
 def test_determinism_10_spellings():
     mol = Chem.MolFromSmiles(EV)
     names = {

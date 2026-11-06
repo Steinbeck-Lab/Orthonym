@@ -17,7 +17,6 @@ import pytest
 from orthonym.validation import fullerene_read_back as reader
 from orthonym.validation.fullerene_read_back import fullerene_name_shape, fullerene_read_back
 from tests.support.fullerene_adducts import C60_SMILES, adduct
-from tests.support.fullerene_adducts import adduct
 from tests.support.jars import jar_or_skip
 
 pytestmark = pytest.mark.unit

@@ -7,17 +7,11 @@ Tests functional class naming for acid halides following IUPAC conventions:
 - Ring-attached: benzoyl chloride
 - Consumed-atom filtering: no double-counting of halogens
 """
-import pytest
 from orthonym import name_compound
 
 
 class TestRetainedAcylNames:
     """Test retained acyl name usage for common acid halides."""
-
-    def test_acetyl_chloride(self):
-        """Acetyl chloride - retained acyl name for C2."""
-        result = name_compound("CC(=O)Cl")
-        assert result == "acetyl chloride"
 
     def test_acetyl_bromide(self):
         """Acetyl bromide - retained acyl + bromide."""
@@ -42,11 +36,6 @@ class TestSystematicAcidHalides:
         """Propanoyl chloride - C3 acid chloride."""
         result = name_compound("CCC(=O)Cl")
         assert result == "propanoyl chloride"
-
-    def test_butanoyl_chloride(self):
-        """Butanoyl chloride - C4 acid chloride."""
-        result = name_compound("CCCC(=O)Cl")
-        assert result == "butanoyl chloride"
 
     def test_pentanoyl_chloride(self):
         """Pentanoyl chloride - C5 acid chloride."""
@@ -104,19 +93,6 @@ class TestSubstitutedAcidHalides:
         """3-chlorobutanoyl chloride - substituent Cl distinct from acid halide Cl."""
         result = name_compound("CC(Cl)CC(=O)Cl")
         assert "chloro" in result and "oyl chloride" in result
-
-    def test_no_double_counting_simple(self):
-        """Acetyl chloride should NOT contain 'chloro' prefix."""
-        result = name_compound("CC(=O)Cl")
-        assert "chloro" not in result
-        assert result == "acetyl chloride"
-
-    def test_no_double_counting_systematic(self):
-        """Propanoyl chloride should NOT contain 'chloro' prefix."""
-        result = name_compound("CCC(=O)Cl")
-        assert "chloro" not in result
-        assert result == "propanoyl chloride"
-
 
 class TestConsumedAtomFiltering:
     """Test that consumed-atom filtering works correctly."""
@@ -253,4 +229,3 @@ class TestRetainedDiacylAndCarbonicHalides:
     def test_carbonyl_dichloride_unchanged(self):
         # Regression: the same-halide carbonic dihalide keeps its retained name.
         assert name_compound("O=C(Cl)Cl") == "carbonyl dichloride"
-

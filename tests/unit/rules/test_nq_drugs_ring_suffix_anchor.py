@@ -9,7 +9,7 @@ amide the cited suffix of a ring whose principal group is an ester.
 import pytest
 
 from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -43,6 +43,6 @@ def test_a_lactone_with_an_amide_names_the_amide_as_the_suffix(smiles, name):
     with ``seniority._head_principal_group`` not stepping aside for a ring ester the old name returns."""
     from tests.support.rt_assert import assert_full_rt
     assert Orthonym(style="pin").name_tiered(smiles)["name"] == name
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(name, smiles)

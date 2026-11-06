@@ -8,7 +8,6 @@ first substituent prefix is preferred.
 Reference: IUPAC 2013 Blue Book,,,
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.locants import orient_chain, build_atom_to_locant

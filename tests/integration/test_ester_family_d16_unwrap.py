@@ -27,7 +27,6 @@ through ``dispatch_inner`` with a controlled handler that raises
 """
 from __future__ import annotations
 
-from dataclasses import replace
 
 import pytest
 

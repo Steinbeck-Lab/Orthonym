@@ -6,7 +6,6 @@ to sp2 (vinyl) carbons, not just sp3 and aromatic carbons. Also verifies
 that amide and guanidine exclusions are preserved (no false positives).
 """
 
-import pytest
 from rdkit import Chem
 from orthonym.perception.functional_groups import detect_functional_groups
 

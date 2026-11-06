@@ -78,12 +78,6 @@ from orthonym.assembly.substituent_naming import (
     _located_acyclic_alkyl_name,
     _name_saturated_substituted_chain,
 )
-from orthonym.namer import Orthonym
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 def _name(namer, smiles):

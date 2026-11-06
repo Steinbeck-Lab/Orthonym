@@ -9,14 +9,10 @@ phosphate (PIN)') is named as that ester. The principal group of the perception 
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
 
 
 # ---- Part B1: an acyclic ester of a phosphorus or sulfur oxoacid is senior to an amide -------------------------------
@@ -40,7 +36,7 @@ def test_an_oxoacid_ester_is_the_parent_over_an_amide(smiles, name):
     """ (:18182,:18184): class 9 esters rank above class 11 amides; (:35916) names the esters of
     the oxoacids in functional class nomenclature. The amide is cited as the amido prefix,:32991)."""
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == name, row
         assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(name, smiles)
@@ -90,19 +86,19 @@ def test_the_amido_prefix_of_an_oxoacid_ester_anion_is_cited(smiles):
     amide = mol.GetSubstructMatch(Chem.MolFromSmarts("[CX3](=O)[NX3]"))
     assert not group_is_principal(mol, set(amide))
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert "acetamido" in row["name"] and row["tier"] == "pin_verified", row
 
 
 def test_the_cyclic_esters_beside_an_amide_name_the_amide_as_the_parent():
     """A lactone, a sultone and a cyclic phosphate are heterocycles (Table 4.1, class 9 note,:18182) and class 16
     pseudoketones,:29314): the amide (class 11) is the parent, the ring a prefix of it."""
-    row = _row("CC(=O)N(C)CC1CCOC1=O", "pin")
+    row = tier_row("CC(=O)N(C)CC1CCOC1=O", "pin")
     assert row["name"] == "N-methyl-N-[(2-oxooxolan-3-yl)methyl]acetamide", row
     assert row["tier"] == "pin_verified", row
     assert_full_rt(row["name"], "CC(=O)N(C)CC1CCOC1=O")
     for smiles in ("CC(=O)N(C)CC1CCOS1(=O)=O", "CC(=O)NCC1COP(=O)(O)O1", "CC(=O)NCCOP1(=O)OCCO1"):
-        row = _row(smiles, "best-effort")
+        row = tier_row(smiles, "best-effort")
         assert row["name"] and "acetamide" in row["name"] and row["name"].startswith("N-"), row
         assert row["tier"] != "pin_verified", row
         assert_full_rt(row["name"], smiles)
@@ -115,7 +111,7 @@ def test_the_systematic_name_of_a_dipeptide_is_a_pin_of_the_project():
     from orthonym.assembly.n_acyl_amido import in_peptide
     smiles = "CC(=O)NCC(=O)NCC(=O)O"
     assert in_peptide(Chem.MolFromSmiles(smiles))
-    row = _row(smiles, "pin")
+    row = tier_row(smiles, "pin")
     assert row["name"] == "(2-acetamidoacetamido)acetic acid", row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)

@@ -44,6 +44,7 @@ Every name is read back by a FRESH OPSIN call and must give the input's full InC
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.read_back import same_hydron_sites
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -68,23 +69,6 @@ ROWS = [
 ]
 
 
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-
-
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _exact(name, smiles):
-    from tests.support.rt_assert import _independent_parse
-    parsed = _independent_parse(name, smiles)
-    return bool(parsed) and _key(parsed) == _key(smiles) and _fixed_h(parsed) == _fixed_h(smiles)
-
-
 @pytest.mark.parametrize("drawings,name", ROWS, ids=[n for _, n in ROWS])
 def test_the_bare_ring_amidinium_is_not_claimed_as_a_pin(drawings, name):
     """Default tier: a decline (the Blue Book gives no PIN, LO5). Best-effort: the ring-'ium' name, round-trip verified."""
@@ -98,4 +82,4 @@ def test_the_bare_ring_amidinium_is_not_claimed_as_a_pin(drawings, name):
         assert r["tier"] == "abstain" and r["name"] != name, (smiles, r)
         r = best_effort.name_tiered(smiles)
         assert (r["name"], r["tier"]) == (name, "systematic_verified"), (smiles, r)
-    assert _exact(name, drawings[0]), name
+    assert same_hydron_sites(name, drawings[0]), name

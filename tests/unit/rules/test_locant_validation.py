@@ -10,7 +10,6 @@ Tests cover four validation domains:
 Reference: IUPAC 2013 Blue Book,,
 """
 
-import pytest
 
 from orthonym.rules.locant_validation import (
     detect_locant_collisions,

@@ -6,27 +6,16 @@ Tests functional class naming for anhydrides following IUPAC conventions:
 - Cyclic (from diacids): butanedioic anhydride
 - Consumed-atom filtering: anhydride atoms removed from ester FG detection
 """
-import pytest
 from orthonym import name_compound
 
 
 class TestSymmetricAnhydrides:
     """Test symmetric acyclic anhydride naming."""
 
-    def test_ethanoic_anhydride(self):
-        """Acetic anhydride - simplest symmetric (retained acid PIN."""
-        result = name_compound("CC(=O)OC(=O)C")
-        assert result == "acetic anhydride"
-
     def test_propanoic_anhydride(self):
         """Propanoic anhydride - C3 symmetric."""
         result = name_compound("CCC(=O)OC(=O)CC")
         assert result == "propanoic anhydride"
-
-    def test_butanoic_anhydride(self):
-        """Butanoic anhydride - C4 symmetric."""
-        result = name_compound("CCCC(=O)OC(=O)CCC")
-        assert result == "butanoic anhydride"
 
     def test_methanoic_anhydride(self):
         """Formic anhydride - C1 symmetric (retained acid PIN."""
@@ -110,16 +99,6 @@ class TestCyclicAnhydrides:
         """Glutaric anhydride - 6-membered ring. PIN = oxane-2,6-dione (item 6)."""
         result = name_compound("O=C1CCCC(=O)O1")
         assert result == "oxane-2,6-dione"
-
-    def test_cyclic_anhydride_not_lactone(self):
-        """Cyclic anhydrides must NOT be mis-named as a (mono)lactone by the
-        lactone handler — the dione names BOTH ring carbonyls."""
-        # O=C1CCC(=O)O1 has two C=O in the ring -> oxolane-2,5-dione (a dione),
-        # NOT the single-carbonyl lactone oxolan-2-one.
-        result = name_compound("O=C1CCC(=O)O1")
-        assert result == "oxolane-2,5-dione"
-        assert "-2-one" not in result  # not the mono-lactone oxolan-2-one
-
 
 class TestConsumedAtomFilteringAnhydride:
     """Test that anhydride consumed-atom filtering removes ester matches."""

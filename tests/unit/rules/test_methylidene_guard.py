@@ -32,19 +32,16 @@ every occurrence of the substring.
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym.rules.ions import (
     _validate_anion_name,
     _validate_cation_name,
     _try_neutralize_and_name,
 )
-from orthonym.namer import Orthonym
-from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
-    default_tier_rule_applies,
 )
+from tests.support.read_back import same_key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -54,60 +51,12 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_obj_name(namer_obj, smiles):
     if smiles in DEFAULT_TIER_DECLINES:
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return namer_obj.name(smiles, on_failure="label")
-
-
-def _dt_obj_row(namer_obj, smiles):
-    if smiles in DEFAULT_TIER_DECLINES:
-        return _declined_pin_row(smiles)
-    return namer_obj.name_tiered(smiles)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
-
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    osmi = opsin_parse(name)
-    if not osmi:
-        return False
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
-        inchi.MolToInchiKey(Chem.MolFromSmiles(osmi))
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +69,7 @@ def test_one_carbon_ylidene_owner_anion_round_trips():
     smi = "SC=NOS(=O)(=O)[O-]"
     expected = "sulfanylmethylideneamino sulfate"
     # Verify RT validity independently before asserting the exact form.
-    assert _full_rt(smi, expected), (
+    assert same_key(smi, expected), (
         f"expected name {expected!r} must OPSIN round-trip to {smi!r} "
         "before it is asserted as the emitted name"
     )

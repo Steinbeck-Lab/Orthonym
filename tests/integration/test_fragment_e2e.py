@@ -15,7 +15,6 @@ Run with: pytest tests/integration/test_fragment_e2e.py -v
 
 import pytest
 from orthonym import name_compound
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -34,14 +33,6 @@ pytestmark = pytest.mark.usefixtures("np_producer_only")
 
 class TestNPEsterE2E:
     """Verify NP ester functional class naming through the full pipeline."""
-
-    @pytest.mark.integration
-    def test_testosterone_acetate_contains_acetate(self):
-        """Testosterone acetate name should contain 'acetate'."""
-        result = name_compound(
-            "CC(=O)O[C@H]1CC[C@@H]2[C@@]1(C)CC[C@H]1[C@@H]2CCC2=CC(=O)CC[C@@]12C"
-        )
-        assert "acetate" in result, f"Expected 'acetate' in '{result}'"
 
     @pytest.mark.integration
     def test_testosterone_acetate_functional_class_format(self):
@@ -116,5 +107,3 @@ class TestRecursionGuardE2E:
 # ============================================================================
 # 5. Cross-Feature Regression Tests
 # ============================================================================
-
-

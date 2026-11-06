@@ -28,12 +28,11 @@ import sys
 
 import pytest
 
-from orthonym import Orthonym
 from orthonym import decomposition as decomposition_module
 from orthonym import namer as namer_module
 from orthonym.assembly import fragment_naming as fn
-from orthonym.cli import _emit_tier_flags
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
@@ -54,7 +53,7 @@ WITNESS_NAME = (
 
 
 def _be(smiles):
-    return Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    return tier_row(smiles, "best-effort")
 
 
 def test_zinc_witness_is_named_again_at_best_effort():

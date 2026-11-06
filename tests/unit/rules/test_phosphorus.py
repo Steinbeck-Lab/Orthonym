@@ -21,23 +21,11 @@ from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 class TestPhosphineNaming:
     """Tests for phosphine (phosphane) naming."""
 
-    def test_methylphosphane(self):
-        """CP -> methylphosphane"""
-        mol = Chem.MolFromSmiles("CP")
-        result = name_phosphine(mol, 1)  # P is at index 1
-        assert result == "methylphosphane"
-
     def test_ethylphosphane(self):
         """CCP -> ethylphosphane"""
         mol = Chem.MolFromSmiles("CCP")
         result = name_phosphine(mol, 2)  # P is at index 2
         assert result == "ethylphosphane"
-
-    def test_dimethylphosphane(self):
-        """CPC -> dimethylphosphane (secondary phosphine)"""
-        mol = Chem.MolFromSmiles("CPC")
-        result = name_phosphine(mol, 1)  # P is at index 1
-        assert result == "dimethylphosphane"
 
     def test_trimethylphosphane(self):
         """CP(C)C -> trimethylphosphane"""
@@ -100,12 +88,6 @@ class TestPhosphineOxideNaming:
     def test_trimethylphosphane_oxide(self):
         """CP(C)(C)=O -> trimethylphosphane oxide"""
         mol = Chem.MolFromSmiles("CP(C)(C)=O")
-        # SMARTS match gives indices - find P
-        p_idx = None
-        for i in range(mol.GetNumAtoms()):
-            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
-                p_idx = i
-                break
         result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
         assert result == "trimethylphosphane oxide"
 

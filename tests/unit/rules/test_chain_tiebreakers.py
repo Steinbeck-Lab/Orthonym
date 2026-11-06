@@ -6,7 +6,6 @@ a phase Plan 03 Task 2: Refine chain_score to fix:
 - (h): Separate double-bond locant comparison
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.perception.chains import find_principal_chain

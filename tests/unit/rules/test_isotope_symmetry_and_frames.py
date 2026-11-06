@@ -17,10 +17,10 @@ from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.errors import is_failure_name
-from orthonym.rules import isotope_passes as P
 from orthonym.rules import isotope_scopes as S
 from orthonym.rules import isotopes as I
 from tests.support.rt_assert import name_best_effort, name_is_rt_exact
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -282,8 +282,6 @@ def test_the_copies_of_a_group_without_locants_are_cited_enclosed_first():
     ("[2H]c1ccc(cc1)[C@H](O)c1ccccc1", "(1R)-[(4-2H)phenyl](phenyl)methanol"),
 ])
 def test_a_labelled_phenyl_of_diphenylmethanol_is_enclosed(smiles, expected):
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == expected
     assert name_is_rt_exact(row["name"], smiles)

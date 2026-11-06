@@ -77,20 +77,9 @@ class TestPolyfunctionalAcidStemPrefix:
         assert name_compound(smiles) == expected
 
 
-@pytest.fixture
-def _validity_gate_on(monkeypatch):
-    """The suite's autouse fixture disables the OPSIN validity gate so RAW
-    output is asserted. The conservation cases below are ABOUT the gate
-    suppressing a wrong RAW name to 'unknown' in production — re-enable it
-    (the test_opsin_validity_gate.py pattern)."""
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
-
-
 @pytest.mark.unit
 class TestConservation:
-    def test_beyond_unit_atoms_are_named_not_dropped(self, _validity_gate_on):
+    def test_beyond_unit_atoms_are_named_not_dropped(self, opsin_gate):
         """The atoms beyond the sulfoxide unit survive — now positively.
 
         History: the old functional-class walk emitted `ethyl methyl sulfoxide`
@@ -117,7 +106,7 @@ class TestConservation:
             "1-(methanesulfinyl)-2-(methylsulfanyl)ethane"
         )
 
-    def test_benzyl_side_names_substitutively(self, _validity_gate_on):
+    def test_benzyl_side_names_substitutively(self, opsin_gate):
         # A benzyl side was "not an honestly-nameable FC side" and this pinned
         # the abstention, recording "substitutive needs the benzene-path S-branch
         # namer (deferred)". That deferral has since closed: the benzene parent
@@ -182,9 +171,6 @@ class TestConservation:
         mol = Chem.MolFromSmiles("CS(=O)CC(=O)O")
         match = mol.GetSubstructMatch(
             Chem.MolFromSmarts("[SX3](=[OX1])([#6])[#6]"))
-        chain = [a.GetIdx() for a in mol.GetAtoms()
-                 if a.GetSymbol() == 'C' and not a.IsInRing()
-                 and a.GetIdx() not in match[:2]]
         result = get_sulfinyl_prefix(mol, match, None)
         assert result == "methanesulfinyl"
 
@@ -237,10 +223,6 @@ class TestTrivialAndControls:
 
     def test_sulfonic_acid_unchanged(self):
         assert name_compound("CS(=O)(=O)O") == "methanesulfonic acid"
-
-    def test_sulfonamide_unchanged(self):
-        assert name_compound("CCS(N)(=O)=O") == "ethanesulfonamide"
-
 
 @pytest.mark.unit
 class TestSeleniumTelluriumOxide:

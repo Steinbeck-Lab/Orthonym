@@ -32,7 +32,6 @@ assertions exercise the genuine rescue + fail-closed interaction, not a
 simulated one.
 """
 
-import logging
 
 import pytest
 from rdkit import Chem

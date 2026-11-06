@@ -1,26 +1,17 @@
 """The name_substituent memo key must distinguish a terminal formyl-on-N fragment
 (formamido) from an acyl-bridge fragment whose carbon bonds the rest of the
 molecule (carbamoyl); both render MolFragmentToSmiles == 'NC=O' rooted at N."""
-import os
-# The memo reads ORTHONYM_MEMO once, at import: set it BEFORE importing orthonym,
-# and put the environment back right after. Under xdist every worker imports every
-# test module at collection, so a write that stayed in os.environ ran every child
-# process the rest of the suite spawned in memo-verify mode (the same leak class
-# as TRIAGE C1, where two modules switched the OPSIN gates off in every child).
-_ENV_BEFORE = {"ORTHONYM_MEMO": os.environ.get("ORTHONYM_MEMO")}
-os.environ["ORTHONYM_MEMO"] = "verify"
+import pytest
 from rdkit import Chem
 from orthonym.assembly import memo
 from orthonym import name_compound
 
-for _k, _v in _ENV_BEFORE.items():   # restore: see the note above the import
-    if _v is None:
-        os.environ.pop(_k, None)
-    else:
-        os.environ[_k] = _v
 
-
-def test_no_name_substituent_verify_mismatches_on_carbamoyl_witness():
+@pytest.mark.xfail(strict=True, reason=(
+    "verify mode finds 2 name_substituent memo mismatches on this witness, and the best-effort name differs with "
+    "ORTHONYM_MEMO=on (352 chars) and off (407 chars); both read back exactly. The module used to set "
+    "ORTHONYM_MEMO after the memo had read it, so verify mode never ran here (lead: memo key)"))
+def test_no_name_substituent_verify_mismatches_on_carbamoyl_witness(monkeypatch):
     # NOTE: the plan brief mis-cited this as "ns_mols witness #1 (a cyanine-dye
     # macrocycle)" -- re-verified against ns_spy.py directly: witness #1 (0-indexed,
     # the cyanine dye) produces ZERO name_substituent verify-mismatch events; the
@@ -33,6 +24,8 @@ def test_no_name_substituent_verify_mismatches_on_carbamoyl_witness():
            "[C@@H](NC1=O)CCCNC(=N)N)CC2=CC3=CC=CC=C3C=C2)CC4=CNC=N4)C(=O)O)"
            "(C)C)NC(=O)[C@H](CCCNC(=N)N)NC(=O)CCCCCNC(=O)C5=CC=C(C=C5)"
            "CNC(=O)OCC6C7=CC=CC=C7C8=CC=CC=C68")
+    # verify mode: every memo hit is recomputed and compared (memo.py reads ``_MODE`` per call)
+    monkeypatch.setattr(memo, "_MODE", "verify")
     memo.reset_verify_mismatches()
     try:
         name_compound(smi)

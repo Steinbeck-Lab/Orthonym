@@ -21,12 +21,10 @@ Test groups (Plan 02):
 """
 
 import pytest
-from orthonym import name_compound
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
-from tests.support.np_producer import np_producer_only  # noqa: F401
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -56,21 +54,14 @@ def _declined_pin_row(smiles):
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
         return _declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label", emit_tier="pin")
 
 
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
 def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import Orthonym
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
         return _declined_pin_row(smiles)
     return Orthonym(style="pin").name_tiered(smiles)
@@ -376,7 +367,6 @@ def test_carnitine_ester_zwitterion_tier_contract():
     """The strict-xfail carnitine row above, in production (gate on): a name ships,
     RT-exact, and below pin_verified PIN not verifiable; the composed
     spelling is not the order yet -- TRIAGE g4 C7)."""
-    from orthonym import Orthonym
     from tests.support.rt_assert import name_is_rt_exact
     smi = "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C"
     r = _dt_row(smi)

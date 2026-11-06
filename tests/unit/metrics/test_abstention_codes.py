@@ -270,7 +270,7 @@ class TestEndToEndCodes:
         monkeypatch.setattr(decomposition, "try_decompose",
                             lambda mol, style="pin": None)
 
-        result = namer.name(smiles)
+        namer.name(smiles)
         rec = peek_abstention()
         assert rec is not None, "downgrade gate must record a code"
         assert rec.code is AbstentionCode.COVERAGE_DOWNGRADE

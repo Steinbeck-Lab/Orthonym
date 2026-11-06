@@ -13,7 +13,6 @@ Source: internal notes "NEW test_opsin_retained_roundtrip.py".
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html retained-name PIN tier).
 """
 
-import os
 import random
 import subprocess
 
@@ -27,7 +26,7 @@ from orthonym.data.opsin_imports import (
     OPSIN_CYCLIC_GROUPS,
     OPSIN_NATURAL_PRODUCTS,
 )
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 
 
 # ---------------------------------------------------------------------------
@@ -38,16 +37,7 @@ from tests.support.jars import jar_or_none
 
 
 def _java_available() -> bool:
-    try:
-        subprocess.run(["java", "-version"], capture_output=True, timeout=10)
-        return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def _opsin_jar_path():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
+    return java_on_path()
 
 
 def _opsin_name_to_smiles(name: str, jar_path: str) -> str:
@@ -206,7 +196,7 @@ def test_aryl_groups_roundtrip(smiles, name):
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html.x
     Source: 150-internal notes + Tier 2.
     """
-    jar = _opsin_jar_path()
+    jar = jar_or_none()
     if jar is None or not _java_available():
         pytest.skip("OPSIN CLI or Java not available")
     opsin_smi = _opsin_name_to_smiles(name, jar)
@@ -225,7 +215,7 @@ def test_simple_groups_roundtrip(smiles, name):
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html.x
     Source: 150-internal notes + Tier 2.
     """
-    jar = _opsin_jar_path()
+    jar = jar_or_none()
     if jar is None or not _java_available():
         pytest.skip("OPSIN CLI or Java not available")
     opsin_smi = _opsin_name_to_smiles(name, jar)
@@ -244,7 +234,7 @@ def test_cyclic_groups_roundtrip(smiles, name):
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     Source: 150-internal notes + Tier 2.
     """
-    jar = _opsin_jar_path()
+    jar = jar_or_none()
     if jar is None or not _java_available():
         pytest.skip("OPSIN CLI or Java not available")
     opsin_smi = _opsin_name_to_smiles(name, jar)
@@ -263,7 +253,7 @@ def test_natural_products_roundtrip(smiles, name):
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (NP retained names)
     Source: 150-internal notes + Tier 2.
     """
-    jar = _opsin_jar_path()
+    jar = jar_or_none()
     if jar is None or not _java_available():
         pytest.skip("OPSIN CLI or Java not available")
     opsin_smi = _opsin_name_to_smiles(name, jar)

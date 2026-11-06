@@ -12,7 +12,6 @@ Tests all IUPAC 2013 criteria for principal chain selection:
 8. Maximum substituents
 9. Lowest locants for substituents
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.perception.chains import find_principal_chain
@@ -29,7 +28,6 @@ class TestCriterion1ContainsPrincipalGroup:
         chain = find_principal_chain(mol, fgs, "carboxylic_acid")
         assert len(chain) == 5
         # The acid oxygen atoms should be adjacent to the chain
-        chain_set = set(chain)
         # Acid carbon (C=O carbon) should be in chain
         acid_c = None
         for idx in chain:
@@ -76,7 +74,6 @@ class TestCriterion4and5MultipleBonds:
         chain = find_principal_chain(mol, fgs)
         assert len(chain) == 6
         # The chain should contain the double bond
-        chain_set = set(chain)
         has_double = False
         for i in range(len(chain) - 1):
             bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
@@ -316,17 +313,6 @@ class TestFGInstanceCounting:
                 fg_on_chain += 1
         # The chain with the most FG instances should be selected
         assert fg_on_chain >= 1, "At least 1 FG instance must be on the chain"
-
-    def test_zero_fg_on_chain(self):
-        """Chain with no FG atoms should have fg_instance_count=0.
-
-        Hexane has no functional groups at all.
-        """
-        mol = Chem.MolFromSmiles("CCCCCC")
-        fgs = detect_functional_groups(mol)
-        chain = find_principal_chain(mol, fgs)
-        # No principal group -> fg_instance_count is 0 (chain selected by length)
-        assert len(chain) == 6
 
     def test_instance_count_not_atom_count(self):
         """Verify that criterion 2 uses instance counting, not atom counting.

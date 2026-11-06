@@ -36,14 +36,12 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.perception.metals import atom_and_charge_ledger_ok
 from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 RULE = "P-68.1.6.1"
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 def _panel_smiles(panel_id, drawing):
@@ -52,10 +50,6 @@ def _panel_smiles(panel_id, drawing):
             if r["id"] == panel_id and r["drawing"] == drawing:
                 return r["smiles"]
     raise AssertionError((panel_id, drawing))
-
-
-def _key(smiles):
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 PAIRS = [   # (ionic drawing, bonded drawing of the same molecule)
@@ -72,19 +66,19 @@ def test_the_key_of_an_organozinc_cation_with_its_anion_is_the_key_of_the_bonded
 
 @pytest.mark.parametrize("ionic,bonded", PAIRS)
 def test_an_ionic_organozinc_halide_gets_the_name_of_its_bonded_drawing(ionic, bonded):
-    a, b = _row(ionic, "best-effort"), _row(bonded, "best-effort")
+    a, b = tier_row(ionic, "best-effort"), tier_row(bonded, "best-effort")
     assert a["name"] and a["name"] == b["name"]                       # one molecule, one name
     assert a["tier"] == "systematic_verified" and a["is_pin"] is False   #,
     assert_full_rt(a["name"], ionic)                                  # the key of the ionic input
     for drawing in (ionic, bonded):                                   # the default tier declines, with a reason
-        declined = _row(drawing, "pin")
+        declined = tier_row(drawing, "pin")
         assert declined["tier"] == "abstain" and declined["limit_code"] == "NO_VERIFIED_PIN"
 
 
 def test_the_ionic_organozinc_halide_of_the_panel_is_named():
     ionic = _panel_smiles("A3", "ionic")
     assert ionic == "[Cl-].[Zn+]c1ccccc1"
-    assert _row(ionic, "best-effort")["name"] == _row(_panel_smiles("A3", "bonded"), "best-effort")["name"]
+    assert tier_row(ionic, "best-effort")["name"] == tier_row(_panel_smiles("A3", "bonded"), "best-effort")["name"]
 
 
 def test_the_ionic_organozinc_hydroxide_is_named_through_its_bonded_drawing():
@@ -94,7 +88,7 @@ def test_the_ionic_organozinc_hydroxide_is_named_through_its_bonded_drawing():
     assert ionic == "CC[Zn+].[OH-]" and bonded == "CC[Zn]O"
     assert metal_offer.metal_connected_spelling_and_order(ionic) is not None          # the offer is made
     for drawing in (ionic, bonded):
-        row = _row(drawing, "best-effort")
+        row = tier_row(drawing, "best-effort")
         assert row["name"] == "ethyl(hydroxy)zinc"
         assert row["tier"] == "systematic_verified" and row["is_pin"] is False
         assert_full_rt(row["name"], drawing)
@@ -182,7 +176,7 @@ def test_the_offer_is_made_once_per_call_by_the_caller_only(monkeypatch):
         return original(smiles)
 
     monkeypatch.setattr(metal_offer, "metal_connected_spelling_and_order", counting)
-    assert _row("[Cl-].[Zn+]c1ccccc1", "best-effort")["tier"] == "systematic_verified"
+    assert tier_row("[Cl-].[Zn+]c1ccccc1", "best-effort")["tier"] == "systematic_verified"
     assert calls == ["[Cl-].[Zn+]c1ccccc1"]
 
 
@@ -193,14 +187,14 @@ def test_a_failing_connection_ships_nothing_and_the_drawing_as_written_keeps_its
     connected drawing when the connection names something."""
     smiles = "[Cl-].[Zn+]c1ccccc1"
     monkeypatch.setattr(metal_offer, "metal_connected_spelling_and_order", lambda s: None)
-    as_written = _row(smiles, "best-effort")
+    as_written = tier_row(smiles, "best-effort")
     assert as_written["name"] == "phenylzinc(1+)—chloride (1/1)" and as_written["tier"] == "systematic_verified"
     assert_full_rt(as_written["name"], smiles)
     # a string no tier names (Cl[Tc]Cl; the lone ion [Th+4] was the stand-in until lane LONE, 2026-11-01, named it
     # 'thorium(4+)')
     monkeypatch.setattr(metal_offer, "metal_connected_spelling_and_order",
                         lambda s: ("Cl[Tc]Cl", (0,)) if s == smiles else None)
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == as_written["name"] and row["tier"] == as_written["tier"] and row["is_pin"] is False
 
 
@@ -215,11 +209,11 @@ CARBANION_HALIDES = [
 
 @pytest.mark.parametrize("smiles", CARBANION_HALIDES)
 def test_a_carbanion_beside_a_halozinc_cation_is_named_as_a_salt_of_zinc(smiles):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"].startswith("zinc ") and "—" not in row["name"]
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False   #: a compound of the transition metals
     assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"                          # the default tier declines it
+    assert tier_row(smiles, "pin")["tier"] == "abstain"                          # the default tier declines it
 
 
 @pytest.mark.parametrize("smiles", CARBANION_HALIDES)
@@ -235,7 +229,7 @@ def test_the_two_drawings_of_a_carbanion_halide_get_one_name(smiles):
     halide_a.SetFormalCharge(-1)
     ionic = Chem.MolToSmiles(rw.GetMol())
     assert _key(ionic) == _key(smiles)
-    assert _row(ionic, "best-effort")["name"] == _row(smiles, "best-effort")["name"]
+    assert tier_row(ionic, "best-effort")["name"] == tier_row(smiles, "best-effort")["name"]
 
 
 def test_the_connect_step_is_not_applied_to_a_carbanion_halide_pair():

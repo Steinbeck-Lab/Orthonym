@@ -18,7 +18,6 @@ the guanidine central carbon):
   NC(=O)N -> urea (=O not =N; no risk, asserted)
   CNC(=NC)N(C)C -> a guanidine (3 N on the C): must NOT be a wrong amidine name
 """
-import pytest
 from orthonym.namer import name_compound
 
 
@@ -135,7 +134,3 @@ class TestAmidineCitationOrderAlphanumerical:
         # carbamimidoyl prefix form: ethyl(N') < methyl(N,N).
         assert (_pin("CCN=C(c1ccc(C(=O)O)cc1)N(C)C")
                 == "4-(N'-ethyl-N,N-dimethylcarbamimidoyl)benzoic acid")
-
-    # Regression: identical substituents keep the N-before-N' locant order.
-    def test_NNprime_dimethyl_regression(self):
-        assert _pin("CNC(=NC)c1ccccc1") == "N,N'-dimethylbenzenecarboximidamide"

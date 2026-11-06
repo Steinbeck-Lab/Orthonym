@@ -5,6 +5,7 @@ import pytest
 
 from orthonym.assembly.ocene_drawing import rewrite_surrogate_prefix
 from tests.support.rt_assert import assert_full_rt, name_best_effort
+from tests.support.pin_tiers import tier_row
 
 pytestmark = pytest.mark.unit
 
@@ -75,9 +76,7 @@ def test_rewrite_cites_the_ocene_in_its_place(surrogate_name, name):
     ("[CH-]1C=CC=C1.C1COCCN1C1=CC=C[CH-]1.[Fe+2]", "4-(ferrocen-1-yl)morpholine"),
 ], ids=lambda v: v)
 def test_ocenes_named_after_the_new_order(smiles, name):
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == "systematic_verified", row
 

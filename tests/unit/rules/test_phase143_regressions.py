@@ -5,7 +5,7 @@ correctly assigns IUPAC positions using Hantzsch-Widman numbering for retained-n
 heterocyclic rings used as substituents.
 """
 import pytest
-from orthonym.namer import name_compound
+from tests.support.pin_tiers import tier_row
 
 
 class TestHeterocyclicSubstituentLocants:
@@ -128,12 +128,10 @@ class TestOPSINParseRegressions:
     ], ids=["ajmaline", "tetrahydropalmatine"])
     def test_decorated_scaffold_without_numbering_is_not_named_by_its_bare_scaffold(self, smiles):
         from rdkit import Chem
-        from orthonym import Orthonym
-        from orthonym.cli import _emit_tier_flags
         from orthonym.rules.natural_products import name_natural_product
         from tests.support.rt_assert import name_is_rt_exact
 
         assert name_natural_product(Chem.MolFromSmiles(smiles)) is None
-        row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        row = tier_row(smiles, "best-effort")
         assert row["tier"] != "abstain", row
         assert name_is_rt_exact(row["name"], smiles), row["name"]

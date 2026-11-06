@@ -1,5 +1,4 @@
 """Unit tests for ion retained names data."""
-import pytest
 from rdkit import Chem
 from orthonym.data.ion_retained_names import (
     RETAINED_ANIONS,

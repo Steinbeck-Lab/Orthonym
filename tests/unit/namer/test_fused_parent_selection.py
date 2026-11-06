@@ -17,7 +17,6 @@ Source: AUTONOM-1990 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
 Source: a phase internal notes,, (bypass deletion + cascade entry).
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
 

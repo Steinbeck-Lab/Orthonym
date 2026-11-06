@@ -42,15 +42,14 @@ import random
 
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
-from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import same_key
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -71,34 +70,13 @@ DEFAULT_TIER_DECLINES = frozenset({
     "[C@H](C)(C(N[C@@H](CCCC)C(=O)O)=O)N",
     "[C@H](CC(C)C)(C(OC)=O)NC(=O)[C@H](CC(C)C)N",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
 
 
 def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
+    from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles)["name"]
     return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 # GATE ON (production default): this module tests exactly what `name_compound`
@@ -114,20 +92,6 @@ def _best_effort(smiles: str) -> str:
         general_fallback_unverified=True,
         allow_aromatic_general=True,
     )
-
-
-def _full_rt(smiles: str, name: str) -> bool:
-    """name -> OPSIN -> full InChIKey, compared to the input's InChIKey."""
-    if not name:
-        return False
-    o = opsin_parse(name)
-    if not o:
-        return False
-    mol_in = Chem.MolFromSmiles(smiles)
-    mol_out = Chem.MolFromSmiles(o)
-    if mol_in is None or mol_out is None:
-        return False
-    return inchi.MolToInchiKey(mol_in) == inchi.MolToInchiKey(mol_out)
 
 
 # Site B (ester C-terminus) + Site A (CIP-locanted, free-COOH C-terminus).
@@ -149,7 +113,7 @@ class TestSiteB_EsterCTerminus:
         result = _dt_name_compound(LEU_LEU_OME)
         assert not is_failure_name(result), result
         assert result == LEU_LEU_OME_NAME, result
-        assert _full_rt(LEU_LEU_OME, result), result
+        assert same_key(LEU_LEU_OME, result), result
 
     def test_ala_ala_methyl_ester_rt(self):
         """A second, smaller ester-C-terminus witness. Names the RIGHT
@@ -159,7 +123,7 @@ class TestSiteB_EsterCTerminus:
         result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "methyl (2R)-2-[(2S)-2-aminopropanamido]propanoate", result
-        assert _full_rt(smi, result), result
+        assert same_key(smi, result), result
 
 
 @pytest.mark.unit
@@ -172,7 +136,7 @@ class TestSiteA_CIPLocantedSplice:
         result = _dt_name_compound(ALA_NORLEUCINE)
         assert not is_failure_name(result), result
         assert result == ALA_NORLEUCINE_NAME, result
-        assert _full_rt(ALA_NORLEUCINE, result), result
+        assert same_key(ALA_NORLEUCINE, result), result
 
 
 @pytest.mark.unit
@@ -198,7 +162,7 @@ class TestNonStandardLinearPeptides:
         if is_failure_name(result):
             return  # clean abstention is acceptable
         # If a name is emitted, it MUST describe the input molecule.
-        assert _full_rt(smi, result), (smi, result)
+        assert same_key(smi, result), (smi, result)
 
 
 @pytest.mark.unit

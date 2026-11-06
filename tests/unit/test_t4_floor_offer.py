@@ -34,34 +34,6 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "CC(O)C(N)C(=O)NC(CS)C(=O)O",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-def _dt_name_compound(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
-
-
-def _dt_name(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)["name"]
-    return Orthonym(style="pin").name(smiles, on_failure="label")
-
-
-def _dt_row(smiles):
-    from orthonym import Orthonym, name_compound  # noqa: F811
-    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
-    return Orthonym(style="pin").name_tiered(smiles)
 
 
 # The L3-1 mechanism (full-InChIKey `_offer_rt_ok` + the floor offer) is
@@ -213,7 +185,7 @@ class TestByteIdentityUnderPin:
         if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
             # the default tier declines it (NO_VERIFIED_PIN); the offer pool is the
             # strict path's, read with the emission rule switched off
-            _declined_pin_row(smiles)
+            declined_pin_row(smiles)
             import orthonym.namer as _nm
             _tok = _nm._DEFAULT_TIER_POLICY_OFF.set(True)
             try:

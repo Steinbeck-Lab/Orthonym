@@ -17,8 +17,6 @@ from rdkit import Chem
 from orthonym import name_compound
 from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
-    get_fused_heterocycle_name,
-    match_fused_heterocycle_core,
 )
 
 

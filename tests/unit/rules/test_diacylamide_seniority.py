@@ -12,10 +12,10 @@ shared-nitrogen diacylamide sibling pair to cleave the LESS senior acid.
 Every emitted name OPSIN-round-trips to the input (0-wrong).
 """
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.read_back import key_or_none
 
 _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
               allow_aromatic_general=True)
@@ -24,11 +24,6 @@ _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
 @pytest.fixture(scope="module")
 def engine():
     return Orthonym(**_FLAGS)
-
-
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -40,7 +35,7 @@ def test_diacylamide_names_senior_acid_as_parent(engine, smiles, expected):
     got = engine.name_tiered(smiles)["name"]
     assert got == expected, f"{smiles}: got {got!r}"
     rt = opsin_parse(got)
-    assert rt and _inchikey(rt) == _inchikey(smiles), f"RT failed for {got!r}"
+    assert rt and key_or_none(rt) == key_or_none(smiles), f"RT failed for {got!r}"
 
 
 @pytest.mark.parametrize("smiles,expected", [

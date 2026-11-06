@@ -14,7 +14,6 @@ from orthonym.assembly.handlers.tier_a_ring import (
     _is_tier_a_ring,
     name_tier_a_ring,
 )
-from orthonym.assembly.name_tree import NamingResult
 
 
 def test_signature_shape():

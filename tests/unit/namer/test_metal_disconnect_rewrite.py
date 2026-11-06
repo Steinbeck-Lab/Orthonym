@@ -25,14 +25,11 @@ from orthonym.assembly import metal_offer
 from orthonym.cli import _emit_tier_flags
 from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 RULE = "P-68.1.6.1"
-
-
-def _row(smiles, tier):
-    return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 PAIRS = [   # (covalent drawing, ionic drawing of the same molecule)
@@ -49,11 +46,11 @@ PAIRS = [   # (covalent drawing, ionic drawing of the same molecule)
 
 @pytest.mark.parametrize("covalent,ionic", PAIRS)
 def test_a_covalent_drawing_gets_the_name_of_its_ionic_drawing(covalent, ionic):
-    a, b = _row(covalent, "best-effort"), _row(ionic, "best-effort")
+    a, b = tier_row(covalent, "best-effort"), tier_row(ionic, "best-effort")
     assert a["name"] == b["name"]                                   # one molecule, one name
     assert a["tier"] == "systematic_verified" and a["is_pin"] is False   #: the drawing is named as drawn
     assert_full_rt(a["name"], covalent)                             # the key of the covalent input
-    declined = _row(covalent, "pin")                                # the default tier declines it, with a reason
+    declined = tier_row(covalent, "pin")                                # the default tier declines it, with a reason
     assert declined["tier"] == "abstain" and declined["limit_code"] == "NO_VERIFIED_PIN"
     assert declined["spelling_failures"] and declined["spelling_failures"][0]["rule"] == RULE
 
@@ -62,7 +59,7 @@ def test_the_ionic_drawing_keeps_its_own_label_at_both_tiers():
     """The rewrite changes nothing for the drawing that has no bond to break."""
     ionic = "CC(=O)[O-].CC(=O)[O-].[Zn+2]"
     for tier in ("pin", "best-effort"):
-        row = _row(ionic, tier)
+        row = tier_row(ionic, tier)
         assert row["name"] == "zinc diacetate" and row["tier"] == "pin_verified" and row["is_pin"] is True
         assert row["spelling_failures"] == []
 
@@ -88,10 +85,10 @@ def _panel_smiles(panel_id, drawing):
     _panel_smiles("E2", "bonded 2 Zn-N"),
 ])
 def test_chelate_and_macrocycle_drawings_are_named_at_best_effort_only(smiles):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["tier"] == "systematic_verified" and row["is_pin"] is False
     assert_full_rt(row["name"], smiles)
-    assert _row(smiles, "pin")["tier"] == "abstain"
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
 
 
 def test_rewrite_needs_equal_key_and_an_admitted_metal():
@@ -176,7 +173,7 @@ def test_the_rewrite_is_idempotent_and_safe_in_a_nested_call():
     written, _ = rewrite("Cl[Zn]Cl")
     assert rewrite(written) is None                                      # an ionic drawing has no Zn-X bond to split
     # the nested entries of one call change nothing: both drawings get one name
-    assert _row("Cl[Zn]Cl", "best-effort")["name"] == _row("[Cl-].[Cl-].[Zn+2]", "best-effort")["name"]
+    assert tier_row("Cl[Zn]Cl", "best-effort")["name"] == tier_row("[Cl-].[Cl-].[Zn+2]", "best-effort")["name"]
 
 
 def test_the_offer_is_made_once_per_call_by_the_caller_only(monkeypatch):
@@ -190,14 +187,14 @@ def test_the_offer_is_made_once_per_call_by_the_caller_only(monkeypatch):
         return original(smiles)
 
     monkeypatch.setattr(metal_offer, "metal_disconnected_spelling_and_order", counting)
-    row = _row("CCS[Zn]SCC", "best-effort")
+    row = tier_row("CCS[Zn]SCC", "best-effort")
     assert row["name"] == "zinc diethanethiolate"
     assert calls == ["CCS[Zn]SCC"]
     calls.clear()
     # the twin runs for a pin_verified name; 'zinc dichloride' was the witness until 2026-11-02, when a carbon-free
     # name left the PIN label, the Blue Book,:2058), so the twin no longer runs for it: the salt of
     # an acid stands in, 'zinc diacetate', kept pin_verified by the maintainers)
-    assert _row("CC(=O)[O-].CC(=O)[O-].[Zn+2]", "best-effort")["tier"] == "pin_verified"   # the twin runs for it
+    assert tier_row("CC(=O)[O-].CC(=O)[O-].[Zn+2]", "best-effort")["tier"] == "pin_verified"   # the twin runs for it
     assert calls == ["CC(=O)[O-].CC(=O)[O-].[Zn+2]"]
 
 
@@ -237,7 +234,7 @@ def test_the_as_written_name_ships_when_the_rewrite_fails(monkeypatch):
     # admitted every metal to the element name and it became 'thorium(4+)')
     monkeypatch.setattr(metal_offer, "metal_disconnected_spelling_and_order",
                         lambda smiles: ("Cl[Tc]Cl", (0,)) if smiles == AS_WRITTEN else None)
-    row = _row(AS_WRITTEN, "best-effort")
+    row = tier_row(AS_WRITTEN, "best-effort")
     assert row["name"] == base and row["tier"] == "systematic_verified"
     assert_full_rt(row["name"], AS_WRITTEN)
 
@@ -252,13 +249,13 @@ def test_the_as_written_name_ships_when_the_rewrite_lands_lower(monkeypatch):
         return (1, 0) if string == written and rank[0] > 1 else rank
 
     monkeypatch.setattr(metal_offer, "form_result_rank", lowered)
-    row = _row(AS_WRITTEN, "best-effort")
+    row = tier_row(AS_WRITTEN, "best-effort")
     assert row["name"] == base and row["tier"] == "systematic_verified"
     assert_full_rt(row["name"], AS_WRITTEN)
 
 
 def test_equal_tiers_ship_the_rewritten_name():
-    a, b = _row(AS_WRITTEN, "best-effort"), _row(IONIC, "best-effort")
+    a, b = tier_row(AS_WRITTEN, "best-effort"), tier_row(IONIC, "best-effort")
     assert a["name"] == b["name"]                 # one molecule, one name, whatever the drawing
     assert a["tier"] == b["tier"] == "systematic_verified"
     assert_full_rt(a["name"], AS_WRITTEN)
@@ -269,7 +266,7 @@ def test_a_failing_rewrite_leaves_the_default_tier_label_of_the_drawing_as_writt
     label of the rewritten string (Cl[Tc]Cl: UNSUPPORTED_ELEMENT; the stand-in was [Th+4] until lane LONE named it)."""
     monkeypatch.setattr(metal_offer, "metal_disconnected_spelling_and_order",
                         lambda smiles: ("Cl[Tc]Cl", (0,)) if smiles == "Cl[Zn]Cl" else None)
-    row = _row("Cl[Zn]Cl", "pin")
+    row = tier_row("Cl[Zn]Cl", "pin")
     assert row["tier"] == "abstain" and row["limit_code"] == "UNNAMEABLE"
 
 

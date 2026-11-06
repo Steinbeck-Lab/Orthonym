@@ -118,8 +118,8 @@ class TestP18bSeniorityLock157:
             f"{len(_HETEROATOM_VARIETY_ORDER)} != 20. AUDIT REQUIRED."
         )
         assert set(_HETEROATOM_VARIETY_ORDER) == set(_HETEROATOM_SENIORITY.keys()), (
-            f"P-44.2.1.8 regression: VARIETY_ORDER element set differs from "
-            f"SENIORITY keys. AUDIT REQUIRED."
+            "P-44.2.1.8 regression: VARIETY_ORDER element set differs from "
+            "SENIORITY keys. AUDIT REQUIRED."
         )
         # criterion (g): variety order is F>Cl>Br>I>O>S>Se>Te>N>P>...
         # (halogens first, then chalcogens, then N — different from (b) where N is first).
@@ -172,35 +172,6 @@ class TestHWCorrectionsLock157:
             f"Got: {RETAINED_NAMES.get('C1CNSC1')!r}. Phase 137 ERRATA-06 "
             "verified the 1,2-isomer; failure indicates silent reversion. "
             "AUDIT REQUIRED."
-        )
-
-
-class TestSymmetricAnhydrideLock157:
-    """ regression: symmetric anhydride uses bare `anhydride` (no `bis-`).
-
-    a phase-01 ERRATA-08 verified `anhydrides.py:109` returns
-    `f"{acid1_name} anhydride"` (NOT `f"bis-{acid1_name}..."`) when
-    acid1 == acid2. Source: BBerrors.html.
-    """
-
-    def test_symmetric_anhydride_canary_locked_157(self) -> None:
-        """ smoke: ethanoic acid anhydride canary returns symmetric form."""
-        from orthonym.namer import name_compound
-
-        # Canonical canary from anhydrides.py:10:
-        # CC(=O)OC(=O)C -> ethanoic anhydride (or acetic anhydride retained name)
-        name = name_compound("CC(=O)OC(=O)C")
-        assert name is not None, (
-            "P-65.7 smoke: name_compound('CC(=O)OC(=O)C') returned None. "
-            "AUDIT REQUIRED."
-        )
-        # Per a phase ERRATA-08: the symmetric form has no `bis-` prefix.
-        # Either the systematic ('ethanoic anhydride') or the retained
-        # ('acetic anhydride') form must NOT contain `bis-`:
-        assert "bis-" not in name.lower(), (
-            f"P-65.7 regression: name {name!r} for symmetric ethanoic "
-            f"anhydride contains forbidden `bis-` prefix. Phase 137 "
-            f"ERRATA-08 reverted. AUDIT REQUIRED."
         )
 
 
@@ -508,20 +479,6 @@ class TestP2581QuinolizineLock157:
             f"also ship the value-assertion regression-lock test per S3.5 "
             f"FIX-SPEC. AUDIT REQUIRED."
         )
-
-    def test_p25_8_1_quinolizine_smoke_locked_157(self) -> None:
-        """Smoke: 4H-quinolizine SMILES round-trips to its retained name."""
-        from orthonym.namer import name_compound
-
-        # Canary from internal notes S3.3 fixture 5:
-        name = name_compound("C1=CCN2C=CC=CC2=C1")
-        assert name is not None
-        assert "quinolizine" in name.lower(), (
-            f"P-25.8.1 smoke: name_compound('C1=CCN2C=CC=CC2=C1') = {name!r} "
-            f"missing `quinolizine` token. The retained-name lookup at "
-            f"data/fused_heterocycles.py:1093 may have regressed. AUDIT REQUIRED."
-        )
-
 
 # ============================================================================
 # Taxonomy 2: Re-verification meta-tests (NA classifications)

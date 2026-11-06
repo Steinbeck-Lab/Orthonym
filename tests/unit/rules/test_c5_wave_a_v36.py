@@ -27,7 +27,6 @@ import subprocess
 import sys
 import textwrap
 
-import pytest
 
 # ---------------------------------------------------------------------------
 # FIX 1 -- fullerene hang bound

@@ -27,7 +27,6 @@ from orthonym.rules.ring_assemblies import (
     detect_ring_assembly,
     _is_mancude_indicated_h_state,
 )
-from tests.support.hydro_wiring import needs_wiring
 from tests.support.rt_assert import assert_full_rt
 
 
@@ -67,7 +66,6 @@ class TestMustNotMisdetect:
         assert info is None, f"{label} wrongly detected as ring assembly: {info}"
 
     @pytest.mark.unit
-    @needs_wiring
     def test_piperidine_names_as_hydro_assembly(self):
         # Leads R2A: the detector above rightly leaves pyridine + piperidine alone (they are no mancude
         # tautomer pair), and the molecule is the hydro-modified assembly of (the Blue Book
@@ -93,11 +91,6 @@ class TestSymmetricAssembliesUnchanged:
     @pytest.mark.unit
     def test_symmetric_bipyridine(self):
         assert name_compound("c1ccnc(-c2ccccn2)c1") == "2,2'-bipyridine"
-
-    @pytest.mark.unit
-    def test_biphenyl(self):
-        assert name_compound("c1ccc(-c2ccccc2)cc1") == "1,1'-biphenyl"
-
 
 class TestIndicatedHydrogenLowestLocantDeterminism:
     """ BLOCKER-3: the indicated-hydrogen locant must be the LOWEST possible

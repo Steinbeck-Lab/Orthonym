@@ -3,7 +3,6 @@ Unit tests for functional group detection.
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.perception.functional_groups import (
     detect_functional_groups,

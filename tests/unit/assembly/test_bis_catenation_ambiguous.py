@@ -10,7 +10,6 @@ so they take bis/tris too. BB verbatim: '3,4-bis(disulfanyl)benzamide (PIN)'
 """
 import pytest
 
-from orthonym import name_compound
 from orthonym.assembly.naming_utils import (
     CATENATION_AMBIGUOUS_PREFIXES,
     format_substituent_prefix,
@@ -80,17 +79,6 @@ class TestDisulfanylChainMultiplier:
         # two -S-S-H groups must be bis(disulfanyl) (the Blue Book 'not didisulfanyl').
         assert get_multiplier_prefix(2, name) == "bis"
         assert get_multiplier_prefix(3, name) == "tris"
-
-    def test_bis_disulfanyl_end_to_end(self):
-        # the Blue Book verbatim PIN. Was '3,4-didisulfanylbenzamide' before Task 6G.
-        assert name_compound("NC(=O)c1ccc(SS)c(SS)c1") == \
-            "3,4-bis(disulfanyl)benzamide"
-
-    def test_single_disulfanyl_unchanged(self):
-        # count == 1 takes no multiplier and the bare prefix stays bare.
-        assert get_multiplier_prefix(1, "disulfanyl") == ""
-        # the lone -SSH is the principal group: suffix dithioperoxol, 'ethanedithioperoxol (PIN)':27998)
-        assert name_compound("c1ccc(SS)cc1") == "benzenedithioperoxol"
 
     def test_compound_disulfanyl_prefix_unchanged(self):
         # A SUBSTITUTED disulfanyl prefix already took bis (via

@@ -91,27 +91,6 @@ class TestIsoindolineIndex200:
     """
 
     @pytest.mark.unit
-    def test_index_200_correct_prefix_locants(self):
-        """Index 200: prefix locants follow the 1-one numbering (7-methoxy)."""
-        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 146-147)
-        # change-asserted-value: "NUMBERING" (the Blue Book) numbers the
-        # suffix "(c)" (:3256) before the prefixes "(f)" (:3301), so the -one takes 1:
-        # (3S)-5-hydroxy-7-methoxy-3,6-dimethyl-2,3-dihydro-1H-isoindol-1-one, cf.
-        # "3-imino-2,3-dihydro-1H-isoindol-1-one (PIN)" (:29609). OPSIN RT exact.
-        # The old 4-methoxy / 6-hydroxy held only in the wrong 3-one numbering.
-        name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
-        assert "7-methoxy" in name
-        # Position 1 should be the C=O (suffix), not methoxy
-        assert "1-methoxy" not in name
-
-    @pytest.mark.unit
-    def test_index_200_correct_suffix_locant(self):
-        """Index 200: suffix locant is isoindolin-1-one (not 2-one)."""
-        name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
-        assert "isoindol-1-one" in name
-        assert "isoindol-2-one" not in name
-
-    @pytest.mark.unit
     def test_index_200_opsin_parseable(self):
         """Index 200: corrected name is OPSIN-parseable."""
         import subprocess

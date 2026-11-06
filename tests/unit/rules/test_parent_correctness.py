@@ -14,7 +14,6 @@ test_benchmark_multi_corpus.py convention.
 """
 
 import threading
-from pathlib import Path
 
 import pytest
 from rdkit import Chem
@@ -29,7 +28,6 @@ from orthonym.rules.parent_correctness import (
     match_token_atoms_in_mol,
     opsin_reference_mol,
     set_reference_name,
-    OPSIN_TIMEOUT,
 )
 from orthonym.assembly.coverage_scoring import CandidateName
 from tests.support.jars import jar_or_none

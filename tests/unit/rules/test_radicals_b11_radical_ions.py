@@ -10,12 +10,11 @@ from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.jvm_budget import jvm_slots
-from orthonym.jvm_bridge import opsin_stdout
-from tests.support.jars import jar_or_skip
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.read_back import same_canonical_smiles
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -30,21 +29,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C[NH2+]",
     "[NH2+]c1ccccc1",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
-
-
-def _declined_pin_row(smiles):
-    return declined_pin_row(
-        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
-
-
-
-def _strict_rt(name, smiles):
-    jar = jar_or_skip()
-    txt, _ = opsin_stdout(name, allow_radicals=True, jar_path=jar)
-    parsed = Chem.MolFromSmiles((txt or "").strip())
-    return parsed is not None and Chem.MolToSmiles(parsed) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
 
 
 def _carbon_free(smiles):
@@ -56,7 +40,7 @@ def _name(smiles):
     # 2026-11-02; PREFERRED IUPAC NAMES, the Blue Book: the label 'PIN' goes to names of compounds "that
     # also contain at least one carbon atom in their structure";:2058): the strict path's row is asserted
     if (smiles in DEFAULT_TIER_DECLINES or _carbon_free(smiles)) and default_tier_rule_applies():
-        return _declined_pin_row(smiles)
+        return declined_pin_row(smiles)
     with jvm_slots(1, purpose="test-radical-b11"):
         return Orthonym(style="pin").name_tiered(smiles)
 
@@ -72,7 +56,7 @@ def _name(smiles):
 def test_radical_ion(smiles, expected):
     row = _name(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"]
-    assert _strict_rt(expected, smiles)
+    assert same_canonical_smiles(expected, smiles)
 
 
 # 'azanidyl' is the preselected name (:43426): a carbon-free compound has a
@@ -84,7 +68,7 @@ def test_carbon_free_radical_ion_is_a_preselected_name():
     row = _name("[NH-]")
     assert row["name"] == "azanidyl" and row["tier"] == "systematic_verified"
     assert not row["is_pin"]
-    assert _strict_rt("azanidyl", "[NH-]")
+    assert same_canonical_smiles("azanidyl", "[NH-]")
 
 
 # "RADICAL IONS DERIVED FROM PARENT HYDRIDES" (the Blue Book): a radical ion is the 'yl' of its ionic
@@ -113,7 +97,7 @@ def test_the_ionic_parent_hydride_holds_the_bonds_of_the_radical_ion(smiles, exp
         assert row["name"] == expected and row["tier"] == "systematic_verified" and not row["is_pin"], row
     else:
         assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
-    assert _strict_rt(expected, smiles)
+    assert same_canonical_smiles(expected, smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -150,7 +134,7 @@ def test_suffix_parent_radical_ion_is_not_pin_verified(smiles, expected):
     row = _name(smiles)
     assert row["name"] == expected
     assert row["tier"] not in ("pin_verified", "abstain") and not row["is_pin"]
-    assert _strict_rt(expected, smiles)
+    assert same_canonical_smiles(expected, smiles)
 
 
 @pytest.mark.opsin_gate

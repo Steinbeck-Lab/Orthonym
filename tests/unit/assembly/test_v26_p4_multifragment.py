@@ -46,7 +46,6 @@ re-enable it via ``production_gate`` (skipped without Java/OPSIN). The
 direct ``rules.adducts`` function-level cases are deterministic and
 gate-independent.
 """
-import glob
 import shutil
 import subprocess
 
@@ -56,7 +55,7 @@ from rdkit import Chem
 import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
 from orthonym.rules.adducts import _name_component, name_adduct
-from tests.support.jars import jar_or_none
+from tests.support.jars import jar_or_none, java_on_path
 from tests.support.rt_assert import assert_full_rt
 
 
@@ -139,16 +138,11 @@ _RT_NAMES = dict(COVERAGE_CASES + BYTE_IDENTICAL_CASES + HYDRATE_CASES)
 # --------------------------------------------------------------------------
 # Fixtures (pattern identical to test_v26_p3_failclosed_routing.py)
 # --------------------------------------------------------------------------
-def _find_opsin_jar():
-    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
-    return jar_or_none()
-
-
 @pytest.fixture
 def production_gate(monkeypatch):
     """Re-enable the production OPSIN validity gate (the suite disables
     it). Skips when Java/OPSIN are unavailable."""
-    if not shutil.which("java") or _find_opsin_jar() is None:
+    if not java_on_path() or jar_or_none() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
     monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", False)
 
@@ -156,7 +150,7 @@ def production_gate(monkeypatch):
 @pytest.fixture(scope="module")
 def opsin_roundtrip():
     """name -> canonical SMILES via ONE OPSIN JVM (stdin batch)."""
-    jar = _find_opsin_jar()
+    jar = jar_or_none()
     if not shutil.which("java") or jar is None:
         pytest.skip("OPSIN/Java not available")
     names = list(_RT_NAMES.values())

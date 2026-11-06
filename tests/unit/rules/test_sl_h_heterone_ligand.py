@@ -38,17 +38,13 @@ are described by the compound prefixes oxophosphanyl" -- methyl 2-(cyclohexylmet
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym.rules.mononuclear_hydrides import name_heterone
 from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.pin_tiers import name_breadth, name_default
+from tests.support.read_back import key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 def _reads_back_without_radicals(name, smiles):

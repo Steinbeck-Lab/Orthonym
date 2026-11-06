@@ -6,7 +6,6 @@ Source: internal notes "Hook Point #1: fusion_descriptors.identify_parent_and_ch
 """
 import inspect
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.fusion_descriptors import identify_parent_and_child

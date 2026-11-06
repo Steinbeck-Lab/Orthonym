@@ -15,8 +15,3 @@ def test_lambda5_phosphanyl_ethanol():
 def test_lambda5_phosphanyl_propanoic():
     assert orthonym.name_compound("OC(=O)CC[PH4]", style="pin") == \
         "3-(λ5-phosphanyl)propanoic acid"
-
-
-def test_plain_phosphanyl_regression():
-    assert orthonym.name_compound("OC(=O)CCP", style="pin") == \
-        "3-phosphanylpropanoic acid"

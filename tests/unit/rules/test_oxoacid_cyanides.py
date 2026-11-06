@@ -30,9 +30,9 @@ from orthonym.data.oxoacid_cyanides import (
 )
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-from orthonym.validation.pin_spelling import check_pin_spelling
 from orthonym.perception.functional_groups import FUNCTIONAL_GROUP_SMARTS, detect_functional_groups
 from orthonym.rules.seniority import PREFIX_FORMS, SENIORITY_ORDER, SUFFIX_FORMS
+from tests.support.read_back import spelling_rules
 
 # (SMILES, expected name, governing citation)
 _BB_VERBATIM = [
@@ -238,10 +238,6 @@ def test_sulfonyl_cyanide_guard_is_the_one_of_the_other_groups(smiles):
 # --- the spelling checks: a nitrile spelling of the cyanide of an acid, or of a heteroatom, is no PIN ---
 
 
-def _rules(smiles, name):
-    return [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name, strict=True)]
-
-
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,name,rule", [
     ("N#CS(=O)c1ccccc1", "(benzenesulfinyl)methanenitrile", "P-66.5.1.3.2"),
@@ -252,7 +248,7 @@ def _rules(smiles, name):
     ("N#C[Si](C)(C)c1ccccc1", "[dimethyl(phenyl)silyl]methanenitrile", "P-66.5.1.1.3"),
 ])
 def test_nitrile_spelling_of_a_cyanide_is_flagged(smiles, name, rule):
-    assert rule in _rules(smiles, name)
+    assert rule in spelling_rules(smiles, name)
 
 
 @pytest.mark.unit
@@ -274,7 +270,7 @@ def test_nitrile_spelling_of_a_cyanide_is_flagged(smiles, name, rule):
     ("C1CC[As](=O)(C#N)C1", "1-oxo-1\u03bb5-arsolane-1-carbonitrile"),
 ])
 def test_other_names_are_not_flagged(smiles, name):
-    rules = _rules(smiles, name)
+    rules = spelling_rules(smiles, name)
     assert "P-66.5.1.3.2" not in rules and "P-67.1.2.5.1" not in rules and "P-66.5.1.1.3" not in rules
 
 

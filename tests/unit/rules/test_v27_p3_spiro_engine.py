@@ -7,7 +7,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.vonbaeyer_universal import (
-    analyze_spiro_universal, audit_spiro_descriptor, SpiroSystem,
+    analyze_spiro_universal, audit_spiro_descriptor,
 )
 
 # name -> (SMILES from OPSIN, expected descriptor, expected total_atoms)
@@ -218,9 +218,6 @@ def test_spiro_substituent_gated_off_default():
     """PIN default is byte-identical: the P3 spiro `-yl` producer is inert
     (allow_mancude default False -> carbocyclic-only path, which declines a
     HETERO spiro fragment)."""
-    from orthonym.rules.ring_substituents import (
-        _universal_spiro_substituent_name,
-    )
     mol = Chem.MolFromSmiles("C1OCCC12CCC(CC2)CC(=O)O")
     sub, attach_sub = _ring_frag_attach(mol)
     # the universal namer itself refuses aromatic-only-flagged mancude; here the

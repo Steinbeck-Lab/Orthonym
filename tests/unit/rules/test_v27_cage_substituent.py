@@ -13,7 +13,6 @@ ring system is a SUBSTITUENT (``_vonbaeyer_substituent_name`` only handles a
 had to be a prefix. These tests pin the restored symmetry AND that the PIN
 default (``allow_mancude=False``) stays byte-identical.
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.ring_substituents import (

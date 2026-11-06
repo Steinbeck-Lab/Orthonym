@@ -13,7 +13,6 @@ from orthonym.perception.chains import (
     classify_substituent,
 )
 from orthonym.namer import name_compound
-from tests.support.hydro_wiring import needs_wiring
 from tests.support.rt_assert import assert_full_rt
 
 
@@ -110,7 +109,6 @@ class TestEndToEndRingSubstituents:
             if 'hexyl' in part and 'cyclohexyl' not in part:
                 pytest.fail(f'Should not have standalone hexyl, got {result}')
 
-    @needs_wiring
     def test_piperidinyl_substituent_on_pyridine(self):
         """A piperidine ring on a pyridine ring is detected as a ring, not as pentyl.
 
@@ -161,7 +159,6 @@ class TestEdgeCases:
         shipped; the test passes cleanly.
         """
         # Naphthalene as substituent
-        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1CC(=O)O')  # naphthylacetic acid
         result = name_compound('c1ccc2ccccc2c1CC(=O)O')
         # Should recognize naphthyl, not decyl (10 carbons)
         assert 'decyl' not in result.lower(), f'Should not be decyl, got {result}'

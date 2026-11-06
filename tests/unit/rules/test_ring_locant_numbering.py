@@ -8,8 +8,6 @@ of sorted atom index positional proxy which produces incorrect locants
 when IUPAC numbering depends on heteroatom orientation.
 """
 
-import pytest
-from rdkit import Chem
 
 from orthonym.rules.parent_selection import _build_ring_pos
 

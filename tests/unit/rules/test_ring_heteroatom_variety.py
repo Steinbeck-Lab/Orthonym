@@ -8,7 +8,6 @@ seniority order (N, F, Cl, Br, I, O, S, Se, Te, P).
 Reference: IUPAC 2013 Blue Book, (g)
 """
 
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.ring_selection import ring_system_score

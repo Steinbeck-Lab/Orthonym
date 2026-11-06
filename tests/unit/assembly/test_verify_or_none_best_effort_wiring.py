@@ -24,7 +24,6 @@ ship/abstain contract) fast and deterministically, independent of that scope
 limit. One test (``test_real_dev500_witness_now_abstains``) uses the REAL,
 unmocked oracle against an actual a dev split witness for end-to-end confirmation.
 """
-from unittest import mock
 
 import pytest
 from rdkit import Chem
@@ -60,7 +59,6 @@ def test_opsin_unparseable_engine_name_now_abstains(monkeypatch):
     agree (a real name like '2-chlorobutane' genuinely parses either way).
     Mocking `verify_or_none` itself isolates exactly the wiring contract this
     test exists to check."""
-    import orthonym.namer as namer_mod
     from orthonym.validation import reconstruct as recon_mod
     _force_opsin_rejects(monkeypatch)
     monkeypatch.setattr(
@@ -79,7 +77,6 @@ def test_opsin_unparseable_engine_name_ships_when_verify_or_none_confirms(
     opsin='verified' (fix-a performance pass Finding 3: with name_facts=None the only
     reachable success is a genuine OPSIN verification, never the bare
     'unverified' claim, and never mislabeled 'verified_reconstructor')."""
-    import orthonym.namer as namer_mod
     from orthonym.validation import reconstruct as recon_mod
     _force_opsin_rejects(monkeypatch)
     monkeypatch.setattr(
@@ -97,7 +94,6 @@ def test_opsin_unparseable_engine_name_ships_when_verify_or_none_confirms(
 def test_verify_or_none_called_with_the_candidate_and_input_smiles(monkeypatch):
     """The wired call passes the CANDIDATE name and the INPUT smiles (never
     the input's graph) -- name_facts=None at this site (no extractor yet)."""
-    import orthonym.namer as namer_mod
     from orthonym.validation import reconstruct as recon_mod
     _force_opsin_rejects(monkeypatch)
     seen = {}

@@ -28,19 +28,10 @@ input's -- independent of the engine's own checks.
 import pytest
 
 from tests.support.jars import jar_or_skip
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import fixed_h as _fixed_h, key as _key
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
-
-
-def _fixed_h(smi):
-    from rdkit import Chem
-    from rdkit.Chem import inchi
-    return inchi.MolToInchi(Chem.MolFromSmiles(smi), options="/FixedH /SNon")
-
-
-def _key(smi):
-    from rdkit import Chem
-    return Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
 def _pin(smiles):
@@ -136,14 +127,12 @@ def test_diphosphonate_acid_salt_keeps_a_salt_name():
     'methylene' (:5188). The best-effort tier gives the same salt name, never the
     adduct form."""
     jar_or_skip()
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     from tests.support.rt_assert import _independent_parse
     smiles = "[Na+].[Na+].OP(=O)([O-])CP(=O)([O-])O"
     r = _pin(smiles)
     assert r["name"] == "disodium dihydrogen methylenebis(phosphonate)", r
     assert _key(_independent_parse(r["name"], smiles)) == _key(smiles)
-    be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    be = tier_row(smiles, "best-effort")
     assert be["name"] == r["name"], be
 
 
@@ -244,10 +233,8 @@ def test_best_effort_keeps_the_salt_form(smiles):
     prefix); otherwise the anion is named as drawn and the salt keeps its
     cation words, never the adduct form."""
     jar_or_skip()
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
     from tests.support.rt_assert import _independent_parse
-    be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    be = tier_row(smiles, "best-effort")
     assert be["name"].startswith("disodium ") and "sodium(1+)" not in be["name"], be
     parsed = _independent_parse(be["name"], smiles)
     assert parsed and _fixed_h(parsed) == _fixed_h(smiles)

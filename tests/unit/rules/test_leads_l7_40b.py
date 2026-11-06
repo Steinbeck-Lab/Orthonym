@@ -14,16 +14,11 @@ The engine dropped 'L-' on every residue, including residues outside Table 10.4
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
-from orthonym import Orthonym
-from orthonym.cli import _emit_tier_flags
 from orthonym.rules.peptides import _assemble_peptide_name, name_peptide
 from tests.support.rt_assert import _independent_parse
-
-
-def _key(smiles):
-    return inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))
+from tests.support.pin_tiers import tier_row
+from tests.support.read_back import key as _key
 
 
 # L-Glu-L-Orn: independent of the code under test, the expected name must read back to
@@ -124,6 +119,6 @@ class TestLOmissionLicenceIsPerPeptide:
     @pytest.mark.opsin_gate
     def test_pipeline_emits_the_corrected_spelling(self):
         # (the Blue Book) gives the peptide name no PIN; the substitutive name is the PIN, so the pipeline ships that; the residue spelling is checked on the assembler above
-        r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(GLU_ORN)
+        r = tier_row(GLU_ORN, "best-effort")
         assert r["name"] == "(4S)-4-amino-5-{[(1S)-4-amino-1-carboxybutyl]amino}-5-oxopentanoic acid", r
         assert r["tier"] == "pin_verified", r

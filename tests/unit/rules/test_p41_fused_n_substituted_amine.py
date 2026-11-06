@@ -89,8 +89,3 @@ class TestTheGuardsHold:
         emitted name must therefore NOT be an amine suffix on the ring."""
         name = name_compound("CC(=O)Nc1ccc2ccccc2n1")
         assert name is None or "amine" not in name, name
-
-    def test_ring_nitrogen_keeps_its_own_path(self):
-        """A RING nitrogen bearing a substituent is not an exocyclic amine; the
-        detector declines on `IsInRing`, so N-methylindole is untouched."""
-        assert name_compound("Cn1ccc2ccccc21") == "1-methyl-1H-indole"

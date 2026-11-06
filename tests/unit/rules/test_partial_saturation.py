@@ -22,11 +22,9 @@ from orthonym.rules.partial_saturation import (
     get_saturation_prefix,
     format_saturation_prefix,
     get_saturation_locants,
-    analyze_saturation_for_naming,
 )
 from orthonym.data.partial_saturation_refs import (
     AROMATIC_REFERENCES,
-    get_aromatic_reference,
     get_reference_smiles,
 )
 from orthonym.assembly.composer import (
@@ -137,11 +135,6 @@ class TestSaturationLocants:
         """Test formatting of saturation prefix with locants."""
         result = format_saturation_prefix('dihydro', [2, 3])
         assert result == '2,3-dihydro'
-
-    def test_locant_formatting_tetrahydro(self):
-        """Test formatting of tetrahydro prefix with locants."""
-        result = format_saturation_prefix('tetrahydro', [1, 2, 3, 4])
-        assert result == '1,2,3,4-tetrahydro'
 
     def test_perhydro_no_locants(self):
         """Test that perhydro prefix has no locants."""

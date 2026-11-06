@@ -169,7 +169,6 @@ _LEGACY_HANDROLLED = frozenset({
     "tests/conftest.py",
     "tests/integration/test_polyfunctional_split.py",
     "tests/integration/test_v29_p3reg_gate_target_oracle.py",
-    "tests/ledger/test_reaudit_w8.py",
     "tests/unit/assembly/test_ring_free_valence_class.py",
     "tests/unit/assembly/test_v26_p1_monocycle_engine.py",
     "tests/unit/assembly/test_v26_p4_multifragment.py",
@@ -183,17 +182,9 @@ _LEGACY_HANDROLLED = frozenset({
     "tests/unit/rules/test_adducts.py",
     "tests/unit/rules/test_ester_alkyl_stereo.py",
     "tests/unit/rules/test_pnictogen_oxoacids.py",
-    "tests/unit/rules/test_ring_hydrazide_nn.py",
-    "tests/unit/rules/test_tier3b_sulfoxide_substitutive.py",
-    "tests/unit/rules/test_tier4_fused_catalog.py",
-    "tests/unit/rules/test_tier5c_acyl_prefix_on_senior.py",
-    "tests/unit/rules/test_tier6_exotics.py",
     "tests/unit/rules/test_v26_p2_aromatic_vonbaeyer.py",
     "tests/unit/rules/test_v26_p3_failclosed_routing.py",
-    "tests/unit/rules/test_w2e_p1_amide.py",
     "tests/unit/rules/test_w2f_p3_polyfunctional_branch.py",
-    "tests/unit/rules/test_wave2_completion_c2.py",
-    "tests/unit/rules/test_wave2_completion_d.py",
     "tests/unit/rules/test_wave2_p5_bridged.py",
     "tests/unit/rules/test_wave2_p5_fused.py",
     "tests/unit/test_bbr_gate_stereo.py",
@@ -201,7 +192,6 @@ _LEGACY_HANDROLLED = frozenset({
     "tests/unit/test_mba172_moving_base_atom.py",
     "tests/unit/test_opsin_validity_gate.py",
     "tests/unit/test_polyfunctional_basic.py",
-    "tests/unit/validation/test_pin_conformance_packs.py",
 })
 
 

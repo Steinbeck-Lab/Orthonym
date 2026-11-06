@@ -26,7 +26,6 @@ from rdkit.Chem import inchi
 # named with the main tree's src in the child and tested the wrong code.
 _REPO = Path(__file__).resolve().parents[3]
 _SRC = _REPO / "src"
-sys.path.insert(0, str(_SRC))
 from orthonym.jvm_flags import java_cmd  # noqa: E402
 from tests.support.jars import jar_or_skip
 

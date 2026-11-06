@@ -13,16 +13,11 @@ Governing rules (the Blue Book Blue Book):
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
+from tests.support.read_back import key_or_none
 
 pytestmark = pytest.mark.unit
-
-
-def _inchikey(smiles: str):
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
 
 
 def _opsin_same_structure(name: str, smiles: str) -> bool:
@@ -32,7 +27,7 @@ def _opsin_same_structure(name: str, smiles: str) -> bool:
     parsed = opsin_parse(name)
     if not parsed:
         return False
-    return _inchikey(parsed) == _inchikey(smiles)
+    return key_or_none(parsed) == key_or_none(smiles)
 
 
 # ---------------------------------------------------------------------------

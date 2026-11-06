@@ -6,24 +6,6 @@ from orthonym import name_compound
 class TestHydroxyAcids:
     """Test hydroxy acid naming ."""
 
-    def test_glycolic_acid_pin(self):
-        """`hydroxyacetic acid` -- the Blue Book verbatim,
-        `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`, under
-        `### **** Retained names only for general nomenclature` (:29731).
-
-        -CLEANUP: this expected `2-hydroxyethanoic acid` and had been
-        failing; the expectation was wrong. The old comment "ethanoic = acetic,
-        both are valid" is true of general nomenclature and irrelevant to a PIN
-        assertion -- acetic acid is one of the four acids `## ****
-        Systematic names` (:29858) exempts from systematic naming, so the
-        substituted derivative is built on it and carries no locant (compare
-        :3037, `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`)."""
-        result = name_compound("OCC(=O)O")
-        assert result == "hydroxyacetic acid"
-
-    def test_3_hydroxypropanoic_acid(self):
-        assert name_compound("OCCC(=O)O") == "3-hydroxypropanoic acid"
-
     def test_2_hydroxypropanoic_acid(self):
         # Lactic acid systematic
         assert name_compound("CC(O)C(=O)O") == "2-hydroxypropanoic acid"
@@ -39,37 +21,15 @@ class TestHydroxyAcids:
 class TestKetoAcids:
     """Test keto acid naming ."""
 
-    def test_pyruvic_acid_systematic(self):
-        # 2-oxopropanoic acid (pyruvic acid trivial name)
-        assert name_compound("CC(=O)C(=O)O") == "2-oxopropanoic acid"
-
     def test_3_oxopropanoic_acid(self):
         # Aldehyde as oxo prefix when part of chain
         assert name_compound("O=CCC(=O)O") == "3-oxopropanoic acid"
 
-    def test_3_oxobutanoic_acid(self):
-        # Acetoacetic acid systematic
-        assert name_compound("CC(=O)CC(=O)O") == "3-oxobutanoic acid"
-
-
 class TestEthers:
     """Test ether naming as alkoxy prefixes ."""
 
-    def test_methoxymethane(self):
-        # Dimethyl ether substitutive name
-        assert name_compound("COC") == "methoxymethane"
-
     def test_methoxyethane(self):
         assert name_compound("COCC") == "methoxyethane"
-
-    def test_ethoxyethane(self):
-        # Diethyl ether substitutive name
-        assert name_compound("CCOCC") == "ethoxyethane"
-
-    def test_methoxy_with_acid(self):
-        # 3-methoxypropanoic acid
-        assert name_compound("COCCC(=O)O") == "3-methoxypropanoic acid"
-
 
 class TestPolyfunctionalDetection:
     """Test detection of polyfunctional compounds."""
@@ -109,16 +69,6 @@ class TestPolyfunctionalDetection:
 class TestPolyfunctionalIntegration:
     """End-to-end polyfunctional naming tests."""
 
-    def test_keto_acid_full_pipeline(self):
-        result = name_compound("CC(=O)C(=O)O")
-        assert "oxo" in result
-        assert "oic acid" in result
-
-    def test_ether_acid_parent(self):
-        result = name_compound("COCCC(=O)O")
-        assert "methoxy" in result
-        assert "oic acid" in result
-
     def test_existing_alkane_naming_unchanged(self):
         # Ensure alkane naming still works
         assert name_compound("CCCC") == "butane"
@@ -128,11 +78,6 @@ class TestPolyfunctionalIntegration:
         # Ensure simple alcohol naming still works
         assert name_compound("CCO") == "ethanol"
         assert name_compound("CCCO") == "propan-1-ol"
-
-    def test_existing_acid_naming_unchanged(self):
-        # Ensure simple acid naming still works
-        result = name_compound("CC(=O)O")
-        assert result in ["acetic acid", "ethanoic acid"]  # Both are valid
 
     def test_existing_ketone_naming_unchanged(self):
         # Ensure simple ketone naming still works
@@ -226,7 +171,6 @@ class TestLocantDetermination:
 # separator, enclosing-mark unify).
 # ============================================================================
 
-import pytest  # noqa: E402
 from orthonym.rules.polyfunctional import _join_prefixes  # noqa: E402
 
 

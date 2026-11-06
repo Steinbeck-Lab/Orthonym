@@ -20,20 +20,15 @@ witnesses of each class:
 """
 import pytest
 from rdkit import Chem
-from rdkit.Chem import inchi
 
 from orthonym import Orthonym, name_compound
 from orthonym.cli import _emit_tier_flags
 from orthonym.opsin_capabilities import opsin_capabilities
 from orthonym.validation.twin_spellings import twin_of
 from tests.support.rt_assert import _independent_parse
+from tests.support.read_back import key_or_empty as _key
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
-
-
-def _key(smiles):
-    mol = Chem.MolFromSmiles(smiles) if smiles else None
-    return inchi.MolToInchiKey(mol) if mol is not None else ""
 
 
 def _row(smiles, tier="pin"):

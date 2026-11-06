@@ -41,8 +41,8 @@ diacetate'), bear two valences on one atom ('cyclopropane-1,1-diylbis(methylene)
 import pytest
 from rdkit import Chem
 
-from orthonym.cli import _tiered_namer
 from tests.support.rt_assert import assert_full_rt
+from tests.support.pin_tiers import tier_row
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -53,10 +53,6 @@ _TARGET = "CC(=O)OCCc1ccccc1COC(C)=O"
 _TARGET_PIN = "2-{2-[(acetyloxy)methyl]phenyl}ethyl acetate"
 
 
-def _row(smiles, tier):
-    return _tiered_namer("pin", tier).name_tiered(smiles)
-
-
 def _matches(mol):
     return [tuple(m) for m in mol.GetSubstructMatches(_ESTER)]
 
@@ -64,7 +60,7 @@ def _matches(mol):
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_the_book_row_is_named_at_both_tiers(tier):
     """The PIN of (:31899), verified by the round trip."""
-    row = _row(_TARGET, tier)
+    row = tier_row(_TARGET, tier)
     assert row["name"] == _TARGET_PIN, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], _TARGET)
@@ -119,7 +115,7 @@ def test_the_probe_holds_no_name_of_another_molecule(smiles):
 @pytest.mark.parametrize("smiles", _RING_WITNESSES)
 def test_the_class_names_the_right_molecule_at_best_effort(smiles):
     """Every witness is named, and the name round-trips: the split is made and the ester is named by its class."""
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"], row
     assert_full_rt(row["name"], smiles)
 
@@ -143,7 +139,7 @@ _MULTIPLICATIVE = [
 @pytest.mark.parametrize("smiles,name", _MULTIPLICATIVE)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_a_polyol_of_identical_arms_is_named_by_its_multiplicative_organyl_group(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -161,7 +157,7 @@ _DIYL = [
 @pytest.mark.parametrize("smiles,name", _DIYL)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_a_polyol_of_one_substituted_chain_is_named_by_its_diyl_group(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -189,7 +185,7 @@ _BESIDE_A_GROUP = [
 @pytest.mark.parametrize("smiles,name", _RING_POLYOL + _BESIDE_A_GROUP)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_the_polyol_of_one_ring_or_beside_a_group_is_named_by_its_organyl_group(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -201,7 +197,7 @@ def test_the_ring_and_chain_book_row_is_named_by_the_functional_class(tier):
     the ring is senior to the chain)' (:31897). The ring cascade named the molecule '1-(acetyloxy)-2-[2-(acetyloxy)ethyl]
     benzene', every ester an acyloxy prefix, so the PIN tier gave no name and the wider tiers a name below the PIN."""
     smiles = "CC(=O)OCCc1ccccc1OC(C)=O"
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == "2-[2-(acetyloxy)ethyl]phenyl acetate", row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -213,8 +209,8 @@ _STEROID_DIACETATE = "CC(=O)O[C@H]1CC[C@@]2(C)C(=CC[C@@H]3[C@@H]2CC[C@]2(C)[C@@H
 def test_a_steroid_diacetate_is_no_pin_with_an_acyloxy_prefix():
     """The ring system of a steroid is one parent: '5α-cholestane-3β,6α-diyl diacetate',:31979), so the
     name '...-17-(acetyloxy)-...-3-yl acetate' of the natural-product route is no PIN at either tier."""
-    assert _row(_STEROID_DIACETATE, "pin")["tier"] == "abstain"
-    row = _row(_STEROID_DIACETATE, "best-effort")
+    assert tier_row(_STEROID_DIACETATE, "pin")["tier"] == "abstain"
+    row = tier_row(_STEROID_DIACETATE, "best-effort")
     assert row["tier"] != "pin_verified" and not row["is_pin"], row
     assert "(acetyloxy)" not in row["name"], row
     assert_full_rt(row["name"], _STEROID_DIACETATE)
@@ -224,8 +220,8 @@ def test_the_symmetric_polyol_of_two_anions_is_no_pin():
     """ (:31831): the PIN is method (1), '1,2-phenylenebis(methylene) acetate propanoate', which OPSIN 2.9.0
     cannot read; the acyloxy form is method (2), acceptable in general nomenclature only."""
     smiles = "CC(=O)OCc1ccccc1COC(=O)CC"
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    row = _row(smiles, "best-effort")
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, "best-effort")
     assert row["tier"] != "pin_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
 
@@ -257,7 +253,7 @@ def test_the_mixed_anion_row_with_unequal_arms_is_named_by_substitutive_nomencla
     being the principal one."""
     smiles = "CCC(=O)OCCc1ccccc1COC(C)=O"
     for tier in ("pin", "best-effort"):
-        row = _row(smiles, tier)
+        row = tier_row(smiles, tier)
         assert row["name"] == "2-{2-[(acetyloxy)methyl]phenyl}ethyl propanoate", row
         assert_full_rt(row["name"], smiles)
 
@@ -277,9 +273,9 @@ _CONTROLS = [
 
 @pytest.mark.parametrize("smiles,pin,best_effort", _CONTROLS)
 def test_the_controls_keep_their_names(smiles, pin, best_effort):
-    pin_row = _row(smiles, "pin")
+    pin_row = tier_row(smiles, "pin")
     assert (pin_row["name"] == pin) if pin else (pin_row["tier"] == "abstain"), pin_row
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == best_effort, row
     assert_full_rt(row["name"], smiles)
 
@@ -325,7 +321,7 @@ _CENTRAL_GROUP = [
 @pytest.mark.parametrize("smiles,name", _CENTRAL_GROUP)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_the_central_group_of_the_organyl_group_may_carry_substituents(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -347,7 +343,7 @@ _CENTRAL_RING_SYSTEM = [
 @pytest.mark.parametrize("smiles,name", _CENTRAL_RING_SYSTEM)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_the_central_group_may_be_a_ring_system_or_have_two_valences_on_one_atom(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -370,7 +366,7 @@ _CENTRAL_STEREO = [
 @pytest.mark.parametrize("smiles,name", _CENTRAL_STEREO)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_the_central_group_states_its_configuration(smiles, name, tier):
-    row = _row(smiles, tier)
+    row = tier_row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -390,14 +386,14 @@ def test_the_ring_assembly_group_is_the_book_spelling_at_the_pin_tier_and_the_re
     InChIKey) and a wider tier ships the spelling OPSIN reads, labelled below the PIN."""
     from orthonym.validation.twin_spellings import twin_of
     smiles = "CC(=O)OCc1ccc(-c2ccc(COC(C)=O)cc2)cc1"
-    pin = _row(smiles, "pin")
+    pin = tier_row(smiles, "pin")
     assert pin["name"] == "[1,1'-biphenyl]-4,4'-diylbis(methylene) diacetate", pin
     assert pin["tier"] == "pin_verified" and pin["is_pin"], pin
     twin, rules = twin_of(pin["name"])
     assert rules == ("assembly_diyl_enclosed",)
     assert twin == "([1,1'-biphenyl]-4,4'-diyl)bis(methylene) diacetate"
     assert_full_rt(twin, smiles)
-    wide = _row(smiles, "best-effort")
+    wide = tier_row(smiles, "best-effort")
     assert wide["name"] == twin, wide
     assert wide["tier"] == "systematic_verified" and not wide["is_pin"], wide
     assert_full_rt(wide["name"], smiles)
@@ -422,8 +418,8 @@ _MIXED_ANIONS_ON_A_RING = [
 
 @pytest.mark.parametrize("smiles,name", _MIXED_ANIONS_ON_A_RING)
 def test_a_wider_tier_names_the_mixed_anions_of_one_ring_by_method_two(smiles, name):
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    row = _row(smiles, "best-effort")
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] == "systematic_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
@@ -437,8 +433,8 @@ def test_a_wider_tier_names_the_mixed_anions_of_one_ring_by_method_two(smiles, n
     "CC(=O)OCc1ccccc1COC(=O)[13CH3]",
 ])
 def test_a_polyester_whose_arms_a_label_makes_unlike_keeps_its_name_below_the_pin(smiles):
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    row = _row(smiles, "best-effort")
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, "best-effort")
     assert row["name"] and row["tier"] == "systematic_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
 
@@ -448,7 +444,7 @@ def test_a_polyester_whose_arms_a_label_makes_unlike_keeps_its_name_below_the_pi
     ("CC(=O)OC([2H])([2H])c1ccccc1C([2H])([2H])OC(C)=O", "1,2-phenylenebis[(2H2)methylene] diacetate"),
 ])
 def test_a_polyester_whose_arms_a_label_keeps_alike_is_named_by_the_group(smiles, name):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert_full_rt(row["name"], smiles)
 
@@ -467,7 +463,7 @@ _ESTRADIOL = "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC(C)=O)ccc34)[C@@H]1CC[C@@H]2OC(C)=O
     (_ESTRADIOL, "estra-1,3,5(10)-triene-3,17β-diyl diacetate"),
 ])
 def test_the_e_of_a_steroid_parent_stays_before_a_multiplied_yl(smiles, name):
-    row = _row(smiles, "best-effort")
+    row = tier_row(smiles, "best-effort")
     assert row["name"] == name, row
     assert row["tier"] != "pin_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], smiles)

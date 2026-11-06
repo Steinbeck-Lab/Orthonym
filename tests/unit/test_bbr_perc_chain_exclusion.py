@@ -14,13 +14,7 @@ import inspect
 import pytest
 from rdkit import Chem
 
-from orthonym import Orthonym
 from orthonym.perception.functional_groups import get_chain_excluded_atoms
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 # --- get_chain_excluded_atoms: graph indices of prefix-only FG heteroatoms ---

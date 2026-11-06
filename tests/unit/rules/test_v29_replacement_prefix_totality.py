@@ -120,10 +120,8 @@ def namer(monkeypatch):
     mode -- and that is exactly the mode in which these wrong names shipped. A
     fix verified only with the jar present is not verified.
     """
-    import orthonym.namer as _namer_mod
     import orthonym.validation.opsin_roundtrip as _rt
     monkeypatch.setattr(_rt, '_find_opsin_jar', lambda *a, **k: None)
-    monkeypatch.setattr(_namer_mod, '_DISABLE_VALIDITY_GATE', True)
     from orthonym import Orthonym
     return Orthonym(general_fallback=True, _disable_opsin_validity_gate=True)
 

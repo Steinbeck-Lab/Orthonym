@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pytest
 
-from orthonym import Orthonym, NameTreeNode, NamingResult
+from orthonym import NameTreeNode, NamingResult
 from orthonym.assembly.name_tree_to_string import name_tree_to_string
 
 
@@ -36,11 +36,6 @@ REPRESENTATIVE_SMILES = [
     ("c1ccc(-c2ccccc2)cc1", None),  # ring assembly (biphenyl)
     ("[H][H]", None),  # simple molecule (hydrogen)
 ]
-
-
-@pytest.fixture(scope="module")
-def namer():
-    return Orthonym()
 
 
 @pytest.mark.parametrize(
