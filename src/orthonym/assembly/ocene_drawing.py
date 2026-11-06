@@ -270,7 +270,7 @@ def ocene_drawing_row(namer, smiles: str) -> Optional[dict]:
     stem, rings = found
     if len(rings) == 2:
         from .ocene_two_rings import two_ring_candidates
-        candidates = two_ring_candidates(namer, stem, [r[:3] for r in rings])
+        candidates = two_ring_candidates(namer, stem, rings)
         row = {}
     else:
         _mol, _ring, surrogate, groups = rings[0]

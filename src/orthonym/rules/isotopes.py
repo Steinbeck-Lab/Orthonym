@@ -32,6 +32,7 @@ from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_licence import apply_unit_licences, unit_has_no_free_position
 from .isotope_offsets import restrict_offsets, search_space
+from .isotope_phane_locants import composite_sort_key, composite_tokens as _phane_tokens
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 from .isotope_unit_slots import multiplied_unit_slots as _multiplied_unit_slots
@@ -645,6 +646,17 @@ _INTERIOR_LOCANT_STEM_RE = re.compile(r"-(?=[\d," + _LAMBDA + r"]+-[a-z])")
 #: deuterated OLED hosts the paper named). Every candidate stays OPSIN-RT gated.
 _RING_ASSEMBLY_STEM_RE = re.compile(r"\[(?=\d+'*(?:[,:]\d+'*)+-[a-z])")
 
+#: A ring-assembly parent that stands unbracketed after its prefixes, e.g. the ``-2,2'-`` of
+#: ``4-(trifluoromethoxy)-2,2'-bi-1,3-thiazole``. A nuclide on the assembly puts its descriptor before the
+#: whole assembly name, locants included, the Blue Book, "before the part of the compound
+#: that is isotopically substituted"), replacing the introducing hyphen:
+#: ``4-(trifluoromethoxy)(5-2H)-2,2'-bi-1,3-thiazole``. OPSIN reads no descriptor between the primed locants
+#: and the multiplying stem (``2,2'-(5-2H)bi-1,3-thiazole``), and ``_INTERIOR_LOCANT_STEM_RE`` does not take a
+#: prime, so the slot was never offered. The locant set must carry a prime and be followed by an assembly
+#: multiplier (not ``bicyclo``, not the ``bis(`` / ``tert-`` that start with one). Every candidate stays OPSIN-RT gated.
+_RING_ASSEMBLY_PARENT_RE = re.compile(
+    r"-(?=(?:\d+'*[,:])*\d+'+(?:[,:]\d+'*)*-(?:bi|ter|quater|quinque|sexi|septi|octi|novi|deci)(?!cyclo|s[(\[{]|t-))")
+
 #: The bracket of heteroatom locants that opens a fused parent after a letter ('7,14-methano[1,3]benzimidazolo
 #: [1,2-b]...', 'dihydro[1,2,4]triazolo...'): a slot OPSIN reads. After a hydro prefix it is the one the book
 #: prints ('2,3-dihydro(15N)-1H-indole (PIN)',, the Blue Book); after a bridge prefix
@@ -897,6 +909,7 @@ def _insertion_offsets(skel: str) -> List[int]:
     # A bracketed ring-assembly stem ('[1,1'-biphenyl]-4-yl'): the slot is its
     # opening bracket (``_RING_ASSEMBLY_STEM_RE``). RT-gated.
     offsets.extend(m.start() for m in _RING_ASSEMBLY_STEM_RE.finditer(skel))
+    offsets.extend(m.start() for m in _RING_ASSEMBLY_PARENT_RE.finditer(skel))
     # A fused system after its bridge prefix: the slot is its opening bracket. RT-gated.
     offsets.extend(m.start() for m in _FUSED_SYSTEM_OPENING_RE.finditer(skel))
     # A bracketed substituent ring opening with skeletal-replacement locants
@@ -2156,7 +2169,7 @@ def _find_best_placement(
     # to the drawn structure).
     _shared_position_possible = all(
         count <= maxpos for (_mass, _el), count, maxpos in keys)
-    _locants = [None] + ((list(extra_locants or []) + list(range(1, n_pos + 1)))
+    _locants = [None] + ((list(extra_locants or []) + _phane_tokens(skel, original) + list(range(1, n_pos + 1)))
                          if _shared_position_possible else [])
     # Locant-free candidates for a D on a parent nitrogen with other hydrogen-
     # bearing positions (``_nitrogen_hydrogen_needs_locant``) and locanted ones
@@ -2845,6 +2858,9 @@ def _decorate_distinct_multi_locant(
     ri = original.GetRingInfo()
     if any(ri.NumAtomRings(a) >= 2 for a in range(original.GetNumAtoms())):
         loc_tokens += [f"{base}a" for base in range(1, n + 1)]
+    composites = {str(t): t for t in _phane_tokens(skeleton, original)}      #: the atoms of a phane amplificant
+    loc_tokens += list(composites)
+    reach = LocantReach(skeleton, n, lambda locant: f"({locant}-{sym}1)")
     #: a slot in front of a substituent prefix's attachment locant is not
     # a place the Blue Book puts a descriptor (``_slot_precedes_substituent_
     # locant``), but OPSIN reads it back, and the first offset that round-trips
@@ -2869,7 +2885,10 @@ def _decorate_distinct_multi_locant(
         loc_canons: Tuple[Dict[str, str], Dict[str, str]] = ({}, {})
         for tok in loc_tokens:
             tok_cap = prime_caps.get(tok.count("'")) if "'" in tok else cap
-            if tok_cap is not None and int(tok.rstrip("'a")) > tok_cap:
+            if tok in composites:
+                if reach.beyond(off, composites[tok]):
+                    continue
+            elif tok_cap is not None and int(tok.rstrip("'a")) > tok_cap:
                 continue
             probe = probe_of(tok)
             s = _opsin_parse(skeleton[:off] + probe + skeleton[off:])
@@ -2956,6 +2975,9 @@ def _locant_sort_key(tok: str) -> tuple:
     4' immediately after 4. Key = (base_number, has_letter, letter, nprime).
     ``"2"`` -> (2,0,'',0); ``"4'"`` -> (4,0,'',1); ``"3a"`` -> (3,1,'a',0);
     ``"4'a"`` -> (4,1,'a',1)."""
+    composite = composite_sort_key(tok)         #: a phane locant '1^4' is ordered by its primary locant
+    if composite is not None:
+        return composite
     nprime = tok.count("'")
     core = tok.replace("'", "")
     # split trailing lower-case letter(s) (fusion locant like 3a / 4a)
@@ -4164,11 +4186,32 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
+    from ..opsin_capabilities import phane_names_withheld
     from .isotope_alternative import alternative_skeleton_active, decorate_alternative, has_alternative
     from .isotope_passes import decorate_passes, lone_atom_isotope_name
-    name = lone_atom_isotope_name(original) or decorate_passes(smiles, style, namer, original, stripped, label_map)
-    if name is None and not alternative_skeleton_active() and has_alternative(stripped):
-        name = decorate_alternative(stripped, lambda: decorate_passes(smiles, style, namer, original, stripped, label_map))
+    def _passes():
+        found = lone_atom_isotope_name(original) or decorate_passes(smiles, style, namer, original, stripped, label_map)
+        if found is None and not alternative_skeleton_active() and has_alternative(stripped):
+            found = decorate_alternative(stripped, lambda: decorate_passes(smiles, style, namer, original, stripped,
+                                                                           label_map))
+        return found
+
+    # A phane skeleton name carries the descriptor where the phane producers cite it (a substituted cyclophane:
+    # '1^2-(2H3)methyl-1,4(1,4)-dibenzenacyclohexaphane', (1)), so the decorator runs as the namer runs
+    # first; a skeleton whose phane name takes no descriptor (a linear phane, (2)) gives None there, and
+    # the passes run again with the phane names withheld: the name of the skeleton that a descriptor can enter.
+    name = _passes()
+    if name is None:
+        from ..assembly.memo import fresh_scope, pop_sandbox
+        _fresh = fresh_scope()      # the caches of the first pass hold names made with the phane producers on
+        try:
+            with phane_names_withheld():
+                name = _passes()
+        finally:
+            pop_sandbox(_fresh)
+    if name is None:
+        from .isotope_hydro_locants import decorate_with_hydro_locants
+        name = decorate_with_hydro_locants(stripped, _passes)
     return name
 
 
@@ -4199,9 +4242,10 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
     # ``1-`` is omitted in the unmodified PIN,. No ambient declaration then.
     from ..assembly.locant_omission import isotopic_naming_scope, isotopic_skeleton_scope
     _label_elements = {original.GetAtomWithIdx(i).GetSymbol() for i in label_map}
+    from .isotope_hydro_locants import scope_reason
     _scope = (contextlib.nullcontext() if all(
-        _element_singleton_in(original, el) for el in _label_elements)
-        else isotopic_naming_scope("isotope"))
+        _element_singleton_in(original, el) for el in _label_elements) and scope_reason() == "isotope"
+        else isotopic_naming_scope(scope_reason()))
     _shift_token = _BOND_SHIFT_PARSE_REFUSED.set(False)
     _naming_token = _SKELETON_NAMINGS.set([0])
     _radical_token = _RADICAL_READING.set(
@@ -4221,11 +4265,11 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
                 # the labelled bond; the skeleton is named again with the locant of the descriptor cited
                 # (assembly.locant_omission.scope_cites_stereo_locants). Only here, so no name built above
                 # changes, and only for a skeleton that has such a descriptor.
-                from ..assembly.locant_omission import ISOTOPIC_STEREO_LOCANTS
+                from .isotope_hydro_locants import stereo_scope_reason
                 from ..assembly.memo import fresh_scope, pop_sandbox
                 _fresh = fresh_scope()      # the caches of the scope hold names made without the locants
                 try:
-                    with isotopic_naming_scope(ISOTOPIC_STEREO_LOCANTS):
+                    with isotopic_naming_scope(stereo_scope_reason()):
                         sink = {}
                         result = _decorate_isotopic_name_inner(
                             smiles, style, namer, original, stripped, label_map, sink)

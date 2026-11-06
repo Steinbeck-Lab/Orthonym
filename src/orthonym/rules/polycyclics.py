@@ -2086,7 +2086,8 @@ def _assemble_partially_saturated_carbocycle_name(
     stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
 
     # Get locants for saturated positions
-    if is_perhydro:
+    from ..assembly.locant_omission import scope_cites_hydro_locants
+    if is_perhydro and not scope_cites_hydro_locants():
         # Fully saturated: cite the COUNT-form prefix with NO per-position hydro
         # locants -> `decahydronaphthalene`. NOT the literal 'perhydro': the
         # string `perhydro` occurs **0 times** in the Blue Book while
@@ -2103,6 +2104,11 @@ def _assemble_partially_saturated_carbocycle_name(
             return None
     else:
         locants = get_saturation_locants(mol, saturated_indices, atom_to_locant)
+        if is_perhydro:     # the isotopic scope that cites the hydro locants
+            from .partial_saturation import get_saturation_prefix
+            prefix = get_saturation_prefix(saturation_info.get('hydrogen_count', len(saturated_indices)))
+            if not prefix:
+                return None
         formatted_prefix = format_saturation_prefix(prefix, locants)
 
     # The ring principal-characteristic-group suffix at its lowest locants.

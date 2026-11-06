@@ -1422,8 +1422,11 @@ def _head_principal_group(
     return _first_principal_group(mol, functional_groups)
 
 
-#: Molecules (by ``id``) whose acyclic carboxylic ester is being offered right now (the owners of the functional-class
-#: name are named through the substituent namer, which may ask for the principal group of the same molecule again)
+#: Molecules (by the SMILES in atom order that keys the memo of the offer) whose acyclic carboxylic ester is being
+#: offered right now (the owners of the functional-class name are named through the substituent namer, which may ask for
+#: the principal group of the same molecule again, and does so on a copy of it: the polycyclic analysis of the alcohol
+#: component works on its own Mol of the same atoms, so an ``id`` of the object let that copy offer the ester again and
+#: the offers nested 33 deep for one lactam with an acetate, each of them naming the ester once more)
 _ESTER_OFFER_ACTIVE: set = set()
 
 
@@ -1436,21 +1439,24 @@ def _acyclic_ester_offered(mol, matches) -> bool:
     name that does not cite it, or cites it as a prefix of a ring parent with no ester suffix to carry it, so the lactone
     keeps its place and the ester is cited as an acyloxy prefix of the ring parent, as it was. Memoised for the naming
     call (``assembly.memo``), keyed on the atom order of the molecule and the matches."""
-    if id(mol) in _ESTER_OFFER_ACTIVE or not matches:
+    if not matches:
         return False
     from ..assembly.memo import cache_or_compute
     from rdkit import Chem
+    atom_order_smiles = Chem.MolToSmiles(mol, canonical=False)
+    if atom_order_smiles in _ESTER_OFFER_ACTIVE:
+        return False
 
     def build():
         from .esters import name_ester
-        _ESTER_OFFER_ACTIVE.add(id(mol))
+        _ESTER_OFFER_ACTIVE.add(atom_order_smiles)
         try:
             return any(name_ester(mol, m) for m in matches)
         except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
             return False
         finally:
-            _ESTER_OFFER_ACTIVE.discard(id(mol))
-    return bool(cache_or_compute("acyclic_ester_offer", (Chem.MolToSmiles(mol, canonical=False), tuple(matches)), build))
+            _ESTER_OFFER_ACTIVE.discard(atom_order_smiles)
+    return bool(cache_or_compute("acyclic_ester_offer", (atom_order_smiles, tuple(matches)), build))
 
 
 def _is_ring_ester(mol, match) -> bool:

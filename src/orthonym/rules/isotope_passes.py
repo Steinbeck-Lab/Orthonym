@@ -43,7 +43,17 @@ def lone_atom_isotope_name(original: Chem.Mol) -> Optional[str]:
 def decorate_passes(smiles: str, style: str, namer, original: Chem.Mol, stripped: Chem.Mol,
                     label_map) -> Optional[str]:
     """The name of ``original`` (``stripped`` and ``label_map`` as ``rules.isotopes.strip_isotopes``
-    returns them for it), or None."""
+    returns them for it), or None. The locants of its descriptors that cite an atom of a phane amplificant
+    are spelt as composite locants (``rules.isotope_phane_locants``,: every strategy of the passes
+    writes integers, so the spelling is settled here, on the name that any of them returns."""
+    from .isotope_phane_locants import decorated_with_composite_locants
+    return decorated_with_composite_locants(_decorate_passes(smiles, style, namer, original, stripped, label_map),
+                                            original)
+
+
+def _decorate_passes(smiles: str, style: str, namer, original: Chem.Mol, stripped: Chem.Mol,
+                     label_map) -> Optional[str]:
+    """The passes of:func:`decorate_passes`."""
     induced = induced_centres(original)
     with tautomer_passes(original) as state:
         for accept in (False, True):

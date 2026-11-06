@@ -112,6 +112,12 @@ def test_rewrite_of_a_ring_with_more_groups(name, groups, expected):
     ("CC([C-]1C=CC=C1[Se]CC2=CC=CC=C2)N(C)C.[CH-]1C=CC=C1.[Fe+2]",
      "1-[2-(benzylselanyl)ferrocen-1-yl]-N,N-dimethylethan-1-amine"),
     ("[CH-]1C=CC=C1.C1=C[C-](C(=C1)NC2=CC=C(C=C2)[N+](=O)[O-])O.[Fe+2]", "2-(4-nitroanilino)ferrocen-1-ol"),
+    # a group of one ring that has no prefix name here (an acyl group, 'ring_prefixes' is None) cannot be cited on the
+    # other ring, but the ring is still the ocenyl prefix of the ketone: only its number of groups counts
+    ("CC(C)(C)CC1=CC=C[CH-]1.CC(C)(C)C(=O)C1=CC=C[CH-]1.[Fe+2]",
+     "1-[1'-(2,2-dimethylpropyl)ferrocen-1-yl]-2,2-dimethylpropan-1-one"),
+    ("CC(C)(C)CC1=CC=C[CH-]1.CC(C)(C)C(=O)C1=CC=C[CH-]1.[Ru+2]",
+     "1-[1'-(2,2-dimethylpropyl)ruthenocen-1-yl]-2,2-dimethylpropan-1-one"),
 ])
 def test_ocenes_with_more_groups(smiles, name):
     row = name_best_effort(smiles)
@@ -126,3 +132,32 @@ def test_ocenes_with_more_groups(smiles, name):
 def test_out_of_scope_drawings_are_not_rewritten(smiles):
     from orthonym.assembly.ocene_drawing import _surrogate
     assert _surrogate(smiles) is None
+
+
+def test_a_ring_whose_group_has_no_prefix_name_is_still_the_ocenyl_ring():
+    """``two_ring_candidates`` took the number of groups of the ocenyl ring from the list of their prefix names, which
+    is None for a ring with an acyl group: ``len(None)`` aborted the naming of 61 molecules. The ring's own count
+    (``_surrogate``) stands in for it."""
+    from orthonym import Orthonym
+    from orthonym.assembly.ocene_drawing import _surrogate
+    from orthonym.assembly.ocene_two_rings import ring_prefixes, two_ring_candidates
+    from orthonym.cli import _emit_tier_flags
+    stem, rings = _surrogate("CC(C)(C)CC1=CC=C[CH-]1.CC(C)(C)C(=O)C1=CC=C[CH-]1.[Fe+2]")
+    assert sorted(r[3] for r in rings) == [1, 1]
+    assert [ring_prefixes(mol, ring) is None for mol, ring, _s, _g in rings].count(True) == 1
+    namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+    assert two_ring_candidates(namer, stem, rings) == ["1-[1'-(2,2-dimethylpropyl)ferrocen-1-yl]-2,2-dimethylpropan-1-one"]
+
+
+def test_a_failing_ocene_drawing_does_not_abort_the_naming(monkeypatch):
+    """The drawing hook is a way to a name, never a condition of one: an exception inside it leaves the input to the
+    caller, which names it as it names every other input."""
+    from orthonym.assembly import ocene_drawing
+
+    def broken(namer, smiles):
+        raise TypeError("object of type 'NoneType' has no len()")
+
+    monkeypatch.setattr(ocene_drawing, "ocene_drawing_row", broken)
+    row = name_best_effort("CC(C)(C)C[C-]1C=CC=C1.CC(C)(C)C(=O)[C-]1C=CC=C1.[Fe+2]")
+    assert row.get("source") != "ocene_drawing", row
+    assert row.get("name"), row

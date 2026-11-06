@@ -14,6 +14,11 @@ from typing import List, Optional
 
 from rdkit import Chem
 
+#: OPSIN 2.9.0 reads a simple numerical prefix only up to 50 ('pentaconta'): a name that cites an 'a' prefix more often
+#: has no reading, so it is never built here and the chain is named as the other routes name it
+#: (the same bound as ``rules.hydrocarbon_series``)
+_MAX_READABLE_COUNT = 50
+
 #: 'a' prefixes in the order of (O > S > Se > Te), each cited with its locants
 _A_PREFIX = (('O', 'oxa'), ('S', 'thia'), ('Se', 'selena'), ('Te', 'tellura'))
 
@@ -59,6 +64,9 @@ def replacement_chain_prefix(mol, sub_atoms: List[int], attach_idx: int) -> Opti
     hetero = [k for k, s in enumerate(symbols) if s != 'C']
     if len(hetero) < 4 or any(b - a == 1 for a, b in zip(hetero, hetero[1:])):
         return None
+    counts = {el: symbols.count(el) for el, _p in _A_PREFIX}
+    if any(n > _MAX_READABLE_COUNT for n in counts.values()):
+        return None
     best = None
     for order in (path, path[::-1]):
         loc = {idx: k + 1 for k, idx in enumerate(order)}
@@ -77,7 +85,35 @@ def replacement_chain_prefix(mol, sub_atoms: List[int], attach_idx: int) -> Opti
     stem = get_chain_name(len(path))
     if not stem or not stem.endswith('ane'):
         return None
-    return f"{'-'.join(parts)}{stem[:-1]}-{loc[attach_idx]}-yl"
+    name = f"{'-'.join(parts)}{stem[:-1]}-{loc[attach_idx]}-yl"
+    if attach_idx in (path[0], path[-1]) and any(
+            counts[el] + more > _MAX_READABLE_COUNT for el, more in _chain_beyond(mol, atoms, attach_idx).items()):
+        # gives the whole unbranched chain, this group and the atoms it goes on with, one 'a' name, which
+        # has a count word OPSIN cannot read: the name shipped is a valid one of the structure and is not the PIN
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
+
+
+def _chain_beyond(mol, atoms, attach_idx: int) -> dict:
+    """``{element: count}`` of the neutral divalent O, S, Se, Te atoms of the unbranched acyclic chain that goes on from
+    carbon ``attach_idx`` outside ``atoms`` (``-O-CH2-CH2-O-...``). The chain ends in carbon, the Blue Book
+    :23430), so heteroatoms after its last carbon, the oxygen bonded to a ring or a terminal -OH, are no unit of it; the
+    walk ends at a ring, a branch or any other atom."""
+    outer = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+             if nb.GetIdx() not in atoms and nb.GetAtomicNum() > 1]
+    seq, prev, here = [], attach_idx, outer[0] if len(outer) == 1 else None
+    while here is not None and here not in atoms:
+        a = mol.GetAtomWithIdx(here)
+        onward = [nb.GetIdx() for nb in a.GetNeighbors() if nb.GetIdx() != prev and nb.GetAtomicNum() > 1]
+        if (a.IsInRing() or a.GetFormalCharge() or a.GetSymbol() not in ('C', 'O', 'S', 'Se', 'Te') or len(onward) > 1
+                or any(b.GetBondType() != Chem.BondType.SINGLE for b in a.GetBonds())):
+            break
+        seq.append(a.GetSymbol())
+        prev, here = here, onward[0] if onward else None
+    while seq and seq[-1] != 'C':
+        seq.pop()
+    return {el: seq.count(el) for el, _p in _A_PREFIX}
 
 
 #: (the Blue Book) "N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O > S > Se > Te > C"

@@ -295,7 +295,7 @@ def seeded_scopes(entries):
         _seed_var.reset(token)
 
 
-def push_sandbox():
+def push_sandbox(shared=None):
     """Open a throwaway COPY of the current scope for a speculative computation.
 
     Reads still hit what the enclosing scope already holds; writes land in the
@@ -303,9 +303,21 @@ def push_sandbox():
     never be served a value the speculation computed in its own context. With no
     scope open, nothing changes (no caching, as before). Always returns a token
     for:func:`pop_sandbox`.
+
+    ``shared`` is the copy an earlier speculation of the same family opened
+    (:func:`current_scope` reads it back after the first push): the new one reads
+    and writes that copy, so speculations that ask for the same entries compute
+    them once. The caller decides which speculations are one family.
     """
+    if shared is not None:
+        return _cache_var.set(shared)
     cur = _cache_var.get()
     return _cache_var.set(dict(cur) if cur is not None else None)
+
+
+def current_scope():
+    """The dict of the open memo scope (the sandbox of a speculation inside one), or None when no scope is open."""
+    return _cache_var.get()
 
 
 def pop_sandbox(token):

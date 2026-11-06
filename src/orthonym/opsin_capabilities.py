@@ -13,6 +13,8 @@ gate, and the answer is kept per jar (and, for a built jar, in its ``.json`` fil
 cannot be answered (no in-process OPSIN, a busy JVM) reads as "cannot" for that call only and is
 not kept, so one failed call never switches a capability off for the rest of the process.
 """
+import contextlib
+import contextvars
 import json
 from pathlib import Path
 from typing import Dict
@@ -110,9 +112,26 @@ def opsin_capabilities() -> Dict[str, bool]:
     return dict(_CACHE[path])
 
 
+_PHANE_WITHHELD = contextvars.ContextVar("orthonym_phane_names_withheld", default=False)
+
+
+@contextlib.contextmanager
+def phane_names_withheld():
+    """Scope of naming a skeleton that a later step writes into: inside it ``phane_enabled`` is False, so no phane
+    producer offers a name. The isotope decorator, ``rules.isotopes``) inserts descriptors into the name of
+    the isotope-stripped skeleton; the phane producers cite no isotopic modification, so a phane skeleton name cannot
+    be labelled and the molecule would be left without a name, where the substitutive name of the same skeleton
+    takes the descriptors."""
+    token = _PHANE_WITHHELD.set(True)
+    try:
+        yield
+    finally:
+        _PHANE_WITHHELD.reset(token)
+
+
 def phane_enabled() -> bool:
-    """True when the OPSIN in use reads phane names."""
-    return opsin_capabilities()["phane"]
+    """True when the OPSIN in use reads phane names (and no scope withholds the phane producers)."""
+    return not _PHANE_WITHHELD.get() and opsin_capabilities()["phane"]
 
 
 def composite_assembly_enabled() -> bool:

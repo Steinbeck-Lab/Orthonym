@@ -46,9 +46,19 @@ from typing import Callable, Dict, Optional, Tuple
 from rdkit import Chem
 
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
+from .isotope_phane_locants import CompositeLocant
 
 #: A letter locant that cites an atom by the numeral of the atom it is attached to ('N7', 'O12')
 _NUMBERED_LETTER_LOCANT_RE = re.compile(r"[A-Z][a-z]?(\d+)")
+
+#: Whether OPSIN reads the descriptor of a composite locant, by (name, offset, descriptor, radical reading)
+#: (:meth:`LocantReach._composite_reads`); a refusal is the answer for any structure the name is read for.
+_COMPOSITE_READS: Dict[tuple, bool] = {}
+_COMPOSITE_READS_MAX = 50000
+
+#: The highest amplificant locant a composite locant is asked for (a ring system of a phane skeleton has up to 8-atom rings
+#: joined: ``validation.spelling.cyclophane``); a lettered fusion locant is asked for itself.
+_COMPOSITE_LIMIT = 40
 
 #: How many locants above the first one a part lacks are asked before the part is taken to have no more
 #: (the widest gap measured in OPSIN 2.9.0: aurone's 8 -> 21, 13; rotenane's 9 -> 21, 12; gorgostane's
@@ -166,11 +176,15 @@ class LocantReach:
         self.refused: Dict[int, set] = {}     # offset -> the locants above that one refused for a missing locant
         self.gapped: set = set()              # offsets where a locant above the first absent one is not refused so
         self._probed: set = set()
+        self._composite_dead: set = set()     # offsets where no composite locant is read
+        self._composite_caps: Dict[tuple, int] = {}    # (offset, superatom) -> the highest amplificant locant read
 
     @staticmethod
     def number_of(locant) -> Optional[int]:
-        """The numeral a locant cites: the integer itself, the digits of 'N7'; None for no locant or a
-        bare letter."""
+        """The numeral a locant cites: the integer itself, the digits of 'N7'; None for no locant, a
+        bare letter, or a composite locant of a phane amplificant ('1^4', ``rules.isotope_phane_locants``)."""
+        if isinstance(locant, CompositeLocant):
+            return None
         if isinstance(locant, int):
             return locant
         numbered = _NUMBERED_LETTER_LOCANT_RE.fullmatch(locant) if isinstance(locant, str) else None
@@ -187,8 +201,45 @@ class LocantReach:
             return False
         return _refused_for_the_locant(self.skel[:off] + self.descriptor_of(self.limit) + self.skel[off:], self.limit)
 
+    def _composite_reads(self, off: int, text: str) -> bool:
+        """Does OPSIN read the descriptor of the composite locant ``text`` at ``off``? Kept by the name and the
+        descriptor, so the searches of one molecule ask each once."""
+        from . import isotopes as _iso
+        key = (self.skel, off, self.descriptor_of(text), _iso._RADICAL_READING.get())
+        if key not in _COMPOSITE_READS:
+            if len(_COMPOSITE_READS) >= _COMPOSITE_READS_MAX:
+                _COMPOSITE_READS.clear()
+            _COMPOSITE_READS[key] = bool(_iso._opsin_parse(self.skel[:off] + key[2] + self.skel[off:]))
+        return _COMPOSITE_READS[key]
+
+    def _composite_beyond(self, off: int, locant: "CompositeLocant") -> bool:
+        """Has OPSIN been shown unable to read the composite locant ``locant`` at ``off``? The locants of an
+        amplificant are 1... n for each superatom: a place where its first atom is not read holds no
+        phane parent for any superatom, and the first atom of an amplificant past which one is not read has no more
+        (a locant with a letter is asked for itself). So the composites asked at a place that reads none cost one
+        read for all of them."""
+        primary, number, letter = locant.parts
+        if off in self._composite_dead:
+            return True
+        if letter:
+            return not self._composite_reads(off, locant.text)
+        cap = self._composite_caps.get((off, primary))
+        if cap is None:
+            if not self._composite_reads(off, f"{primary}^1"):
+                if all(key[0] != off for key in self._composite_caps):
+                    self._composite_dead.add(off)        # the first superatom asked at this place has no first atom
+                cap = 0
+            else:
+                cap = 1
+                while cap < _COMPOSITE_LIMIT and self._composite_reads(off, f"{primary}^{cap + 1}"):
+                    cap += 1
+            self._composite_caps[(off, primary)] = cap
+        return number > cap
+
     def beyond(self, off: int, locant) -> bool:
         """Has OPSIN been shown unable to read a descriptor that cites ``locant`` at ``off``?"""
+        if isinstance(locant, CompositeLocant):
+            return self._composite_beyond(off, locant)
         number = self.number_of(locant)
         if number is None:
             return False

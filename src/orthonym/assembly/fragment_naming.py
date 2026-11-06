@@ -997,16 +997,24 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     if cached is not None:
         return cached
 
+    # The isotopic scope that cites the hydro locants (``locant_omission.scope_cites_hydro_locants``, the decorator's
+    # second try) names the fragment again: a name made without the locants is not the name made with them.
+    # The same holds for the isotope decorator's pass that withholds phane names (``phane_names_withheld``).
+    from ..assembly.locant_omission import scope_cites_hydro_locants
+    from ..opsin_capabilities import _PHANE_WITHHELD
+    runtime_key = cache_key + "\x00hydro-locants" if scope_cites_hydro_locants() else cache_key
+    runtime_key = runtime_key + "\x00phane-withheld" if _PHANE_WITHHELD.get() else runtime_key
+
     # Tier 2: runtime dynamic cache — populated during this naming session
     runtime_cache = getattr(_fragment_guard, 'cache', None)
     visited = _get_visited()
     if runtime_cache is not None:
-        dynamic = runtime_cache.get(cache_key)
+        dynamic = runtime_cache.get(runtime_key)
         if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
             dynamic = None      # a refusal made in another vocabulary counts for nothing here
         if dynamic is None:
             # a name computed beside a cycle hit is served only where the same SMILES are on the visited set
-            in_context = runtime_cache.get((_CTX_KEY, cache_key))
+            in_context = runtime_cache.get((_CTX_KEY, runtime_key))
             if in_context is not None and in_context[0] <= visited:
                 dynamic = in_context[1]
                 if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
@@ -1073,7 +1081,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         _note_cycle_hit(visited_now)
         if fallback_name is not None and not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
-                _remember_fragment_name(runtime_cache, cache_key, fallback_name, visited_now)
+                _remember_fragment_name(runtime_cache, runtime_key, fallback_name, visited_now)
             return fallback_name
         # Task 0.1: fragment could not be named (depth safety net).
         from ..metrics.abstention import AbstentionCode, record_abstention
@@ -1107,12 +1115,12 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             # refused it standalone). Negative-cache it so the partition search
             # never re-descends this dead end (giant-molecule hang fix).
             if runtime_cache is not None:
-                _remember_fragment_name(runtime_cache, cache_key, (_NEG_CACHE, _refusal_vocabulary()), met)
+                _remember_fragment_name(runtime_cache, runtime_key, (_NEG_CACHE, _refusal_vocabulary()), met)
             return None
         if result:
             # Populate runtime cache with successful result
             if runtime_cache is not None:
-                _remember_fragment_name(runtime_cache, cache_key, result, met)
+                _remember_fragment_name(runtime_cache, runtime_key, result, met)
             return result
         # Task 0.1: fragment could not be named (empty result).
         # NOT negative-cached: an empty result can be depth-INDUCED (name_compound's

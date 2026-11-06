@@ -1508,12 +1508,26 @@ def promotion_site_probe():
         _PROMOTION_SITES.reset(tok)
 
 
-def _preview_site(site) -> bool:
+def _preview_site(site, shared=None) -> bool:
     """True when the promoted producer of one recorded call returns a name that
     ``promote_at_pin_tier`` keeps (or the preview cannot tell). Runs in the context
     the call ran in (its context variables, fragment-recursion depth and visited
     set) with every per-molecule cache and budget sandboxed, so nothing it computes
-    reaches the re-run or the caller."""
+    reaches the re-run or the caller.
+
+    ``shared`` (a dict the caller keeps for one ``promotion_could_change``) holds
+    the sandbox of each family of calls: the memo scope, the fragment cache and the
+    recursion state are one copy for the calls that ran in the same memo scope, at
+    the same depth, in the same run context (``assembly.memo.run_context_key``: the
+    spelling switches and tiers that key every memo entry) and in the same ambient
+    naming state (``assembly.nested_memo.ambient_naming_state``: the visited set,
+    the tier flags and every context variable a naming path branches on).
+
+    The first run reaches one promotion call over and over (42 recorded calls of one
+    fluorescein phosphate ask for 8 distinct memo entries), and each of them used to
+    name its fragments again from the scope the first run left; the later calls of a
+    family now find what the first of them named. Without ``shared`` every call has
+    a copy of its own."""
     produce, ctx, depth, visited = site
 
     def _run():
@@ -1522,25 +1536,54 @@ def _preview_site(site) -> bool:
             _fragment_guard,
             speculative_fragment_naming,
         )
-        from ..assembly.memo import pin_promotion_var, pop_sandbox, push_sandbox
+        from ..assembly.memo import (
+            current_scope,
+            pin_promotion_var,
+            pop_sandbox,
+            push_sandbox,
+        )
         tok = pin_promotion_var.set(True)
-        box = push_sandbox()
+        box = None
         try:
             with speculative_fragment_naming():
                 _fragment_guard.session_depth = depth
                 _fragment_guard.visited = None if visited is None else set(visited)
+                box = _push_preview_sandbox(shared, current_scope(), depth, _fragment_guard, push_sandbox)
                 return promote_at_pin_tier(produce) is not None
         except PerfBudgetExceeded:
             return True
         except Exception:  # noqa: BLE001 -- unknown: let the re-run decide
             return True
         finally:
-            pop_sandbox(box)
+            if box is not None:
+                pop_sandbox(box)
             pin_promotion_var.reset(tok)
     try:
         return bool(ctx.run(_run))
     except Exception:  # noqa: BLE001
         return True
+
+
+def _push_preview_sandbox(shared, scope, depth, guard, push_sandbox):
+    """Open the sandbox of one preview call (see ``_preview_site``): the copy of its family in ``shared``, or a
+    fresh copy (which becomes the family's) when it is the first of its family. Inside ``speculative_fragment_naming``,
+    whose copy of the fragment cache it adopts for the family."""
+    if shared is None or scope is None:
+        return push_sandbox()
+    from ..assembly.memo import run_context_key
+    from ..assembly.nested_memo import ambient_naming_state
+    family = (id(scope), depth, run_context_key(), ambient_naming_state())
+    held = shared.get(family)
+    if held is None:
+        token = push_sandbox()
+        from ..assembly.memo import current_scope
+        # ``scope`` is kept so that its id stays that of this scope for the life of ``shared``
+        shared[family] = (current_scope(), getattr(guard, 'cache', None), scope)
+        return token
+    box, fragment_cache, _scope = held
+    if fragment_cache is not None:
+        guard.cache = fragment_cache
+    return push_sandbox(box)
 
 
 def promotion_could_change(probe) -> bool:
@@ -1554,7 +1597,8 @@ def promotion_could_change(probe) -> bool:
         return True
     if probe.active or probe.overflow:
         return True
-    return any(_preview_site(site) for site in probe.sites)
+    shared = {}
+    return any(_preview_site(site, shared) for site in probe.sites)
 
 
 def at_pin_tier() -> bool:

@@ -41,3 +41,44 @@ def test_a_chain_with_a_senior_atom_is_not_a_prefix_of_a_carbocycle():
     from orthonym.cli import _emit_tier_flags
     row = Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered("C[Se]CC[Se]CC[Se]CC[Se]CCC1CCCCC1")
     assert "tetraselenatridecan-13-yl" not in (row["name"] or ""), row
+
+
+def _chain_on_a_ring(units: int):
+    """'C' + 'OCC' * units, bonded through an oxygen to a benzoic acid ring: the chain, its attachment carbon."""
+    m = Chem.MolFromSmiles("C" + "OCC" * units + "Oc1ccc(C(=O)O)cc1")
+    return m, list(range(1 + 3 * units)), 3 * units
+
+
+def test_the_prefix_stops_at_the_count_word_opsin_reads():
+    """OPSIN 2.9.0 reads a simple numerical prefix only up to 50 ('pentaconta'): '(...henpentacontaoxa...-yl)' reads to no
+    structure, so no such name is built and the chain is named as any other group (nested prefixes)."""
+    mol, sub, attach = _chain_on_a_ring(50)
+    name = replacement_chain_prefix(mol, sub, attach)
+    assert name.endswith("-pentacontaoxahenpentacontahectan-151-yl"), name
+    mol, sub, attach = _chain_on_a_ring(51)
+    assert replacement_chain_prefix(mol, sub, attach) is None
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("units", [51, 52, 60])
+def test_a_chain_of_more_than_fifty_heterounits_is_named_and_is_not_the_pin(units):
+    """ (the Blue Book) gives the whole unbranched chain one 'a' name, which has a count word OPSIN cannot
+    read; the chain is named with nested substituent prefixes (read back by OPSIN) and the name is no PIN: the default
+    tier declines, the best-effort tier labels it systematic_verified."""
+    from tests.support.pin_tiers import assert_declined_at_default
+    from tests.support.rt_assert import name_best_effort, name_is_rt_exact
+    smiles = "CO" + "CCO" * units
+    assert_declined_at_default(smiles)
+    row = name_best_effort(smiles)
+    assert row["tier"] == "systematic_verified" and not row["is_pin"], row
+    assert name_is_rt_exact(row["name"], smiles), row
+
+
+@pytest.mark.opsin_gate
+def test_a_chain_of_fifty_heterounits_keeps_its_pin():
+    from tests.support.pin_tiers import name_breadth, name_default
+    from tests.support.rt_assert import name_is_rt_exact
+    smiles = "CO" + "CCO" * 50
+    for row in (name_default(smiles), name_breadth(smiles)):
+        assert row["tier"] == "pin_verified" and row["name"].endswith("-pentacontaoxahenpentacontahectan-151-ol"), row
+        assert name_is_rt_exact(row["name"], smiles), row

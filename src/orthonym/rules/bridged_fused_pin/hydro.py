@@ -255,7 +255,9 @@ def hydro_text(state: HydroState, hydro_atoms, atom_to_locant: Dict[int, Any],
     word = _HYDRO.get(n)
     if word is None:
         return None
-    if state.n_double == 0 and not (set(ih) & set(need) and set(ih) - set(need)):
+    from ...assembly.locant_omission import scope_cites_hydro_locants
+    if (state.n_double == 0 and not (set(ih) & set(need) and set(ih) - set(need))
+            and not scope_cites_hydro_locants()):     # (:44180): a labelled name cites every locant
         return word
     locs = sorted((atom_to_locant[a] for a in hydro_atoms), key=loc_key)
     return f"{render_locants(locs)}-{word}"

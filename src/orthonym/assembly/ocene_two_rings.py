@@ -255,13 +255,15 @@ def _multiplied(stem: str, name: str) -> Optional[str]:
 
 def two_ring_candidates(namer, stem: str, rings) -> List[str]:
     """Candidate names, best first, for an ocene with groups on both rings; ``rings`` holds ``(cyclopentyl drawing,
-    ring atoms, its SMILES)`` of each ring. The caller ships the first that reads back to the input."""
+    ring atoms, its SMILES, number of groups)`` of each ring. The caller ships the first that reads back to the input.
+    A ring whose groups have no prefix name (``ring_prefixes`` is None) cannot be cited on the other ring, but it
+    can still be the ring written as the ocenyl prefix: its groups stay in its own name, only their number counts."""
     from rdkit import Chem
     names = []
-    for mol, ring, smi in rings:
+    for mol, ring, smi, _groups in rings:
         row = namer.name_tiered(smi)
         names.append(None if row.get('tier') == 'abstain' else row.get('name'))
-    placed = [ring_prefixes(mol, ring) for mol, ring, _s in rings]
+    placed = [ring_prefixes(mol, ring) for mol, ring, _s, _g in rings]
     forms = [_parent_form(n) for n in names]
     out = []
     if all(placed) and all(f is not None and f.group(2) == 'e' and not f.group(3) for f in forms):
@@ -280,5 +282,5 @@ def two_ring_candidates(namer, stem: str, rings) -> List[str]:
             if forms[a].group(3):
                 out.append(_suffixed(stem, forms[a], placed[b]))
         else:
-            out.append(_with_ocenyl(names[a], stem, len(placed[a]), placed[b]))
+            out.append(_with_ocenyl(names[a], stem, rings[a][3], placed[b]))
     return [n for n in dict.fromkeys(out) if n]

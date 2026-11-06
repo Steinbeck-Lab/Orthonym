@@ -27,6 +27,7 @@ as its PIN. The default tier declines it (NO_VERIFIED_PIN); a wider tier with no
 
 Kept out of ``namer.py`` so that file stays within its size budget."""
 import functools
+import logging
 import re
 from typing import NamedTuple, Optional
 
@@ -211,7 +212,14 @@ def halogen_drawing_scope(fn):
     def _wrapper(self, smiles, *args, **kwargs):
         from .fragment_naming import is_top_level_naming
         from .ocene_drawing import ocene_drawing_row      # a substituted metallocene, through its cyclopentyl drawing
-        row = (iodine_drawing_row(self, smiles) or ocene_drawing_row(self, smiles)) if is_top_level_naming() else None
+        top = is_top_level_naming()
+        row = iodine_drawing_row(self, smiles) if top else None
+        if row is None and top:
+            try:
+                row = ocene_drawing_row(self, smiles)
+            except Exception:  # noqa: BLE001 -- a drawing that fails to build is no name: the caller names the input
+                logging.getLogger(__name__).debug("ocene drawing failed for %s", smiles, exc_info=True)
+                row = None
         if row is None:
             return fn(self, smiles, *args, **kwargs)
         if kind == 'name_tiered':

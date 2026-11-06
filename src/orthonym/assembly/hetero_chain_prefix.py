@@ -55,6 +55,20 @@ def unbranched_hetero_chain_prefix(mol, sub_atoms, attach_idx) -> Optional[str]:
 def fragment_parent_to_prefix(mol, sub_atoms, attach_idx, parent_name: str, carbon_count: int) -> Optional[str]:
     """Step 5 of ``substituent_naming._name_substituent_fragment_uncached``: the prefix of the fragment from
     the name of its capped molecule ``parent_name``; None where the fragment declines."""
+    attach_symbol = mol.GetAtomWithIdx(attach_idx).GetSymbol() if attach_idx is not None else None
+    if attach_symbol is not None and attach_symbol not in ('C', 'N', 'O', 'S'):
+        # (the four common attach elements skip the test: each is in ``_ORGANIC_NONMETALS``)
+        from ..rules.ions import _ORGANIC_NONMETALS
+        if attach_symbol not in _ORGANIC_NONMETALS and not parent_name.strip().endswith(NONCARBON_PARENT_HYDRIDE_STEMS):
+            # A capped molecule whose attach atom is a metal and whose name is no parent hydride of it is named as a
+            # coordination compound ('methylidenealuminium', 'dimethylmercury'): a coordination name has no '-yl' form,
+            # and 'methylidenealuminiumyl' reads as no structure. INTRODUCTION (the Blue Book): "those of
+            # the transition elements (Groups 3 through 12) and of Groups 1 and 2, that are named additively" are that
+            # case; ORGANOMETALLIC COMPOUNDS INVOLVING THE ELEMENTS OF GROUPS 13 THROUGH 16 (:39739) names a Group
+            # 13-16 element "by prefixing the appropriate substituent names to the name of a parent hydride", which the
+            # stems above recognise and this decline leaves alone. Declined, the fragment is read by the later tiers
+            # ('1-aluminaeth-1-en-1-yl'), which the first reading would void.
+            return None
     if (attach_idx is not None and mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'C'
             and parent_name.strip().endswith(NONCARBON_PARENT_HYDRIDE_STEMS)):
         prefix = unbranched_hetero_chain_prefix(mol, sub_atoms, attach_idx)

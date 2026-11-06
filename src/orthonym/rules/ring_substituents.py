@@ -1593,6 +1593,9 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
             return None
         a2l = best[1]
         stem = parent[:-1] if parent.endswith('e') else parent  # naphthalen
+        from ..assembly.locant_omission import scope_cites_hydro_locants
+        if is_perhydro and scope_cites_hydro_locants():     #: the labels need the hydro locants
+            is_perhydro, prefix = False, ps.get_saturation_prefix(det.get('hydrogen_count', len(sp3)))
         if is_perhydro:
             # Fully-saturated fused carbocycle: cite the COUNT-form prefix
             # / the explicit-hydrogen convention this project uses

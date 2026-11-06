@@ -156,6 +156,112 @@ def _is_metal_atom_fragment(frag_mol) -> bool:
                     for a in frag_mol.GetAtoms()))
 
 
+def _ortho_fused_ring_bonds(mol) -> set:
+    """The indices of the bonds that lie in an ortho-fused (or ortho- and peri-fused) ring system of ``mol``.
+
+    A ring system is the set of rings joined by shared bonds. It is ortho-fused when it has two rings or more and
+    every two of its rings share at most one bond; a pair of rings that shares two bonds or more is bridged (a von
+    Baeyer skeleton, norbornadiene), and rings that share one atom only are spiro, so neither is in the result."""
+    rings = [set(r) for r in mol.GetRingInfo().BondRings()]
+    parent = list(range(len(rings)))
+
+    def root(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    bridged = set()
+    for i in range(len(rings)):
+        for j in range(i + 1, len(rings)):
+            shared = rings[i] & rings[j]
+            if shared:
+                parent[root(i)] = root(j)
+                if len(shared) > 1:
+                    bridged.add(i)
+                    bridged.add(j)
+    systems: Dict[int, List[int]] = {}
+    for i in range(len(rings)):
+        systems.setdefault(root(i), []).append(i)
+    fused = set()
+    for members in systems.values():
+        if len(members) > 1 and not any(i in bridged for i in members):
+            for i in members:
+                fused |= rings[i]
+    return fused
+
+
+def _hantzsch_widman_ring_bonds(mol) -> set:
+    """The indices of the bonds of the heteromonocycles of ``mol`` that a Hantzsch-Widman name covers.
+
+     Constructing and numbering Hantzsch-Widman names (the Blue Book): "Unsaturated compounds are those
+    having the maximum number of noncumulative double bonds (mancude compounds)": the name of a heteromonocycle of 3
+    to 10 members ('indigine', 'azocine') states no double-bond locant. A ring qualifies when it has no atom in
+    another ring and at least one atom that is no carbon. A carbocycle is no such ring: it is named with the locants
+    of its double bonds ('cycloocta-1,3,5,7-tetraene')."""
+    info = mol.GetRingInfo()
+    bonds = set()
+    for atoms, ring_bonds in zip(info.AtomRings(), info.BondRings()):
+        if (3 <= len(atoms) <= 10 and all(info.NumAtomRings(i) == 1 for i in atoms)
+                and any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in atoms)):
+            bonds.update(ring_bonds)
+    return bonds
+
+
+def _same_up_to_kekule_form(parsed_smiles: str, mol) -> bool:
+    """True iff ``parsed_smiles`` is ``mol`` drawn with another Kekule structure of its mancude ring systems.
+
+    A non-aromatic mancude ring system (a pentalene, a phosphapentalene) has more than one drawing of its double
+    bonds, and the canonical SMILES of each differs although they are one structure. Maximum number of
+    noncumulative double bonds (the Blue Book): "The names of polycyclic fused ring systems are considered to
+    correspond to the structure with the maximum number of noncumulative double bonds consistent with the appropriate
+    bonding number of the skeletal atoms... The stated bonding number is used in assigning noncumulative double
+    bonds": the name fixes the bonding number of each atom, not where the double bonds sit. Two molecules are one
+    structure here when every atom carries the same element, charge, isotope, hydrogen count, radical count AND
+    bonding number (the sum of its bond orders, Kekulized, hydrogens counted), and the graphs are equal once the
+    order of each ring bond that lies in an aromatic ring (as RDKit perceives it), in an ortho-fused ring system
+    (``_ortho_fused_ring_bonds``) or in a heteromonocycle of 3 to 10 members (``_hantzsch_widman_ring_bonds``) is
+    erased. With every bonding number fixed the erased orders can differ only by
+    moving the double bonds round a ring: a thiophene is never its lambda4-sulfur form, a phosphole never its
+    lambda5-phosphorus form. The rule is that of fused and Hantzsch-Widman names; a carbocycle that is not aromatic, a
+    spiro ring and a bridged skeleton state their double-bond locants in the name, so 1,2- and
+    1,8-dimethylcycloocta-1,3,5,7-tetraene stay two structures. A bond that is no ring bond, a bond to a true metal (Groups 1 to 12 and the f-block: a
+    standard InChIKey does not see it either; a Group 13-16 element has a parent hydride, so the indium of an
+    'indiginine' ring is no exception) and a stereo layer keep the strict test: a drawing with a stereocentre or a
+    stereo double bond is not compared at all."""
+    from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
+    try:
+        reread = Chem.MolFromSmiles(parsed_smiles)
+        if reread is None or '@' in parsed_smiles or '/' in parsed_smiles or '\\' in parsed_smiles:
+            return False
+        drawn_smiles = Chem.MolToSmiles(mol)
+        if '@' in drawn_smiles or '/' in drawn_smiles or '\\' in drawn_smiles:
+            return False
+
+        def _erased(m):
+            # every hydrogen a node of the graph, so that the text of the SMILES states each count
+            rw = Chem.RWMol(Chem.AddHs(m))
+            kekule_bonds = (_ortho_fused_ring_bonds(rw) | _hantzsch_widman_ring_bonds(rw)
+                            | {b.GetIdx() for b in rw.GetBonds() if b.GetIsAromatic()})
+            Chem.Kekulize(rw, clearAromaticFlags=True)
+            bonding = {a.GetIdx(): int(round(sum(b.GetBondTypeAsDouble() for b in a.GetBonds())))
+                       for a in rw.GetAtoms()}
+            for a in rw.GetAtoms():
+                a.SetNoImplicit(True)
+                a.SetNumExplicitHs(0)
+                a.SetIsAromatic(False)
+                a.SetAtomMapNum(a.GetNumRadicalElectrons() * 100 + bonding[a.GetIdx()])
+            for b in rw.GetBonds():
+                if (b.GetIdx() in kekule_bonds and b.GetBondType() in (Chem.BondType.SINGLE, Chem.BondType.DOUBLE)
+                        and b.GetBeginAtom().GetSymbol() not in _TRUE_METAL_SYMBOLS_FOR_VETO
+                        and b.GetEndAtom().GetSymbol() not in _TRUE_METAL_SYMBOLS_FOR_VETO):
+                    b.SetBondType(Chem.BondType.SINGLE)
+                b.SetIsAromatic(False)
+            return Chem.MolToSmiles(rw, canonical=True)
+        return _erased(reread) == _erased(mol)
+    except Exception:
+        return False
+
+
 def _parse_reproduces_depiction(name: str, mol) -> bool:
     """True iff OPSIN reads ``name`` back to exactly the drawn structure.
 
@@ -174,6 +280,8 @@ def _parse_reproduces_depiction(name: str, mol) -> bool:
         if not parsed:
             return False
         if _same_canonical_smiles(parsed, Chem.MolToSmiles(mol)):
+            return True
+        if _same_up_to_kekule_form(parsed, mol):
             return True
         # Dihydrogen is written '[HH]' (one atom with one hydrogen) by RDKit and '[H][H]' by OPSIN:
         # the two graphs are compared with every hydrogen an atom.

@@ -76,6 +76,7 @@ __all__ = [
     "scope_has_isotopic_modification",
     "scope_cites_stereo_locants",
     "ISOTOPIC_STEREO_LOCANTS",
+    "ISOTOPIC_STEREO_HYDRO_LOCANTS",
     "isotope_parent_positional_scope",
     "parent_scope_has_positional_isotope",
     "parent_positional_scope",
@@ -1096,7 +1097,31 @@ def scope_cites_stereo_locants() -> bool:
     C1=C2), so the descriptor of such a prefix carries its locant, and only then: the labels are stripped
     before the skeleton is named, so the decorator names the skeleton as the unmodified name has it first and
     re-runs it under this scope when nothing reads back."""
-    return _ISOTOPIC_NAMING_SCOPE.get() == ISOTOPIC_STEREO_LOCANTS
+    return _ISOTOPIC_NAMING_SCOPE.get() in (ISOTOPIC_STEREO_LOCANTS, ISOTOPIC_STEREO_HYDRO_LOCANTS)
+
+
+#: The reason of the isotopic scope the decorator re-runs a skeleton under when no descriptor reads back on a name
+#: that cites a fully saturated ring system by the count form of the hydro prefix with no locants
+#: (``decahydronaphthalene``): the hydro locants are cited (:func:`scope_cites_hydro_locants`).
+ISOTOPIC_HYDRO_LOCANTS = "isotope+hydro-locants"
+
+
+#: The reason of the stereo retry (``ISOTOPIC_STEREO_LOCANTS``) made inside the hydro-locants try
+#: (``ISOTOPIC_HYDRO_LOCANTS``): both declarations hold, so the retry keeps the hydro locants the try cites.
+ISOTOPIC_STEREO_HYDRO_LOCANTS = "isotope+stereo-locants+hydro-locants"
+
+
+def scope_cites_hydro_locants() -> bool:
+    """True inside the isotopic scope the decorator re-runs a skeleton under (``ISOTOPIC_HYDRO_LOCANTS``).
+
+     Locants, Omission of locants, (the Blue Book): "if isotopic modification
+    requires a locant to specify its position, then all locants must be specified and none are omitted". A label on
+    a ring atom that the hydro prefix of a fully saturated ring system saturates needs the locant of that atom, so
+    the hydro prefix of the skeleton cites its locants ('1,2,3,4,4a,5,6,7,8,8a-decahydro(5,5-2H2)naphthalene'),
+    which OPSIN reads where it refuses a descriptor after the count form ('decahydro(1,1-2H2)naphthalene').
+    The labels are stripped before the skeleton is named, so the decorator names the skeleton as the unmodified
+    name has it first and re-runs it under this scope when nothing reads back."""
+    return _ISOTOPIC_NAMING_SCOPE.get() in (ISOTOPIC_HYDRO_LOCANTS, ISOTOPIC_STEREO_HYDRO_LOCANTS)
 
 
 def scope_has_isotopic_modification() -> bool:
