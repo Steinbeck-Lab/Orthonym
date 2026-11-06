@@ -274,8 +274,8 @@ def test_the_producer_reads_the_scope_table(monkeypatch):
 #: Hg, Pt, Ti and (lane B2) Cd, Ni, Cu, Fe, Co, Mn, Cr are admitted to BONDED_NAMES since 2026-10-30
 #: (``BONDED_METAL_VALENCES``, ``MORE_BONDED_METAL_VALENCES``): technetium, thorium and plutonium, which no mechanism
 #: admits, take their places
-OTHER_METALS = ["O=[Tc]", "[TcH2]", "CC[Tc]O", "C[Tc]O", "CC[Th]O", "O=[Th]", "O=[Pu]", "[PuH]", "[Th]=O", "C[Mg-](C)C",
-                "CC[Mg]O", "[Pu]=O", "CC[Sn](C)(C)O", "O=[Tc]=O", "[Th]=S"]
+OTHER_METALS = ["O=[Tc]", "[TcH2]", "CC[Tc]O", "C[Tc]O", "CC[Th]O", "O=[Th]", "O=[Pu]", "[PuH]", "[Th]=O", "C[Ca-](C)C",
+                "CC[Ca]O", "[Pu]=O", "CC[Sn](C)(C)O", "O=[Tc]=O", "[Th]=S"]
 
 
 @pytest.mark.parametrize("smiles", OTHER_METALS)
@@ -326,7 +326,7 @@ def test_other_metals_are_named_as_they_are_without_the_mechanism(monkeypatch):
             assert any(metal_scope.has_mechanism(a.GetSymbol(), BONDED_NAMES) for a in mol.GetAtoms()), row["smiles"]
     assert "O=C=[Fe](=C=O)(=C=O)(=C=O)=C=O" in named_by_the_producer      # iron pentacarbonyl, drawn with double bonds
     namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    constructed = ["O=[Tc]", "CC[Tc]O", "CC[Th]O", "O=[Pu]", "C[Mg-](C)C", "[Na+].C[Mg-](C)C"]
+    constructed = ["O=[Tc]", "CC[Tc]O", "CC[Th]O", "O=[Pu]", "C[Ca-](C)C", "[Na+].C[Ca-](C)C"]
     with_scope = [identity_view(namer.name_tiered(s)) for s in constructed]
     reduced = MetalScope(METAL_SCOPE["Zn"].mechanisms - {BONDED_NAMES}, METAL_SCOPE["Zn"].valences)
     monkeypatch.setitem(METAL_SCOPE, "Zn", reduced)

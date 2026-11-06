@@ -19,7 +19,7 @@ from rdkit import Chem
 from orthonym.data import metal_scope
 from orthonym.data.metal_scope import (AMMINE, BONDED_METAL_VALENCES, BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION,
                                        DATIVE, DISCONNECT, ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE,
-                                       MORE_BONDED_METAL_VALENCES, PARENT_HYDRIDE_IONS, ZERO_VALENT,
+                                       MORE_BONDED_METAL_VALENCES, PARENT_HYDRIDE_IONS, RECONNECT_RADICAL, ZERO_VALENT,
                                        ZERO_VALENT_METALS, MetalScope, has_mechanism, has_valence,
                                        is_named_metal)
 from orthonym.perception.metals import METAL_ELEMENT_SYMBOLS, assembly_has_out_of_scope_metal
@@ -161,7 +161,7 @@ def test_zinc_has_its_mechanisms():
     assert is_named_metal("Zn") is True
     assert METAL_SCOPE["Zn"] == MetalScope(
         frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
-                   CARBANION_SALTS, ZERO_VALENT}),
+                   CARBANION_SALTS, ZERO_VALENT, RECONNECT_RADICAL}),     # RECONNECT_RADICAL: program 6, 2026-11-06
         frozenset({2}),
         complete=True)
     assert has_mechanism("Zn", MACROCYCLE) is True
@@ -175,10 +175,12 @@ def test_zinc_has_its_mechanisms():
     # lane LONE (2026-11-01): every metal is admitted to ELEMENT, so a lone atom, ion or isotope of any metal is named
     assert all(has_mechanism(s, ELEMENT) is True for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", BONDED_NAMES) is True
-    assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
+    assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED if s != "Mg")
+    assert has_mechanism("Mg", BONDED_NAMES) is True   # program 6 (2026-11-06): 'cyclohexylmagnesium bromide'
     assert has_mechanism("Zn", DISCONNECT) is True
     assert has_mechanism("Zn", CONNECT_ANION) is True
-    assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
+    assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED if s != "Mg")
+    assert has_mechanism("Mg", CONNECT_ANION) is True  # program 6: '[Br-].[Mg+]c1ccccc1' -> 'phenylmagnesium bromide'
     assert has_mechanism("Zn", ION_SALTS) is True
     assert has_mechanism("Zn", CARBANION_SALTS) is True
     assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_1 + GROUP_2 if s != "Mg")
@@ -202,10 +204,14 @@ def test_mechanism_lookup():
     assert has_mechanism("Xx", ION_SALTS) is False                         # an unknown symbol
     assert has_mechanism("Na", "no_such_mechanism") is False
     for symbol in GROUP_1 + GROUP_2:
-        extra = frozenset({MACROCYCLE, DISCONNECT}) if symbol == "Mg" else frozenset()
-        # ELEMENT since lane LONE (2026-11-01): the atom and the ion alone ('sodium(1+)')
-        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT}) | extra, \
-            symbol
+        # magnesium: porphyrins, its bonded drawings and, since program 6 (2026-11-06), the organomagnesium cation
+        # beside its anion ('cyclopropylmagnesium bromide') and its bonded names
+        extra = (frozenset({MACROCYCLE, DISCONNECT, CONNECT_ANION, BONDED_NAMES}) if symbol == "Mg"
+                 else frozenset())
+        # ELEMENT since lane LONE (2026-11-01): the atom and the ion alone ('sodium(1+)'); RECONNECT_RADICAL since
+        # program 6 (2026-11-06): '[Li].CCC[CH2]' is named through 'CCCC[Li]'
+        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT,
+                                                            RECONNECT_RADICAL}) | extra, symbol
         assert is_named_metal(symbol) is True, symbol
     assert is_named_metal("Xx") is False
 
@@ -267,8 +273,9 @@ def test_tin_and_lead_are_admitted_to_the_parent_hydride_cation_the_connection_a
     (2026-11-01), the atom and the ion alone ('tin', '(119Sn)tin': ``ELEMENT``); never ``DISCONNECT``,
     ``BONDED_NAMES`` or any other coordination mechanism."""
     for symbol in ("Sn", "Pb"):
-        assert METAL_SCOPE[symbol] == MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT}),
-                                                 frozenset({4})), symbol
+        # RECONNECT_RADICAL since program 6 (2026-11-06): the tetrabutyltin drawn as four radicals beside the atom
+        assert METAL_SCOPE[symbol] == MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT,
+                                                            RECONNECT_RADICAL}), frozenset({4})), symbol
         assert is_named_metal(symbol) is True and metal_scope.is_complete_metal(symbol) is False
         assert has_mechanism(symbol, DISCONNECT) is False and has_mechanism(symbol, BONDED_NAMES) is False
         assert has_mechanism(symbol, ION_SALTS) is False and has_mechanism(symbol, ELEMENT) is True     # lane LONE

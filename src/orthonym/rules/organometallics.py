@@ -33,7 +33,7 @@ from ..assembly.name_tree import NameTreeNode
 # Import from data layer only; forbids cross-contamination with
 # the seniority cascade (no import of rules dot seniority).
 from ..data.multipliers import multiplier_table
-from ..data.metal_scope import BONDED_NAMES, has_mechanism
+from ..data.metal_scope import BONDED_NAMES, GROUP_1, GROUP_2, has_mechanism
 from ..data.organometallics import (
     LIGAND_ETA_DEFAULTS,
     LIGAND_NAMES,
@@ -42,6 +42,12 @@ from ..data.organometallics import (
 )
 from ..data.organometallics import RETAINED_METALLOCENES  # noqa: F401 re-exported: imported FROM this module by assembly/handlers/organometallic.py, scripts/verify_orgm_canary.py
 from ..data.locant_text import render_locants
+
+#: the metals named directly (``naming_system == 'metal_direct'``) whose organyl ligand is named by the general
+#: substituent composer: the Group 12 metals, and the metals of Groups 1 and 2 ('cyclopropylmagnesium bromide',
+#: 'cyclohexyllithium'), which INTRODUCTION counts with the transition elements for the names of their
+#: organometallic compounds
+_ORGANYL_LIGAND_METALS = ('Zn', 'Cd', 'Hg') + GROUP_1 + GROUP_2
 
 # a phase Stock-notation Roman numerals (scope -3.. +8 per internal notes)
 _ROMAN_NUMERALS: Dict[int, str] = {
@@ -757,7 +763,7 @@ def _extended_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: 
         and all(s == 'C' for s in _syms))
     _g12_metalloid_ok = (
         naming_system == 'metal_direct'
-        and metal_symbol in ('Zn', 'Cd', 'Hg')
+        and metal_symbol in _ORGANYL_LIGAND_METALS
         and all(s == 'C' or is_metal_element(s) for s in _syms))
     # Breadth Job 2 (best-effort tier only): a Group-12 metal is the
     # central atom of an additive name whatever its organyl ligand
@@ -770,7 +776,7 @@ def _extended_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: 
     from ..metrics.provenance import best_effort_ctx
     _g12_functional_ok = (
         naming_system == 'metal_direct'
-        and metal_symbol in ('Zn', 'Cd', 'Hg')
+        and metal_symbol in _ORGANYL_LIGAND_METALS
         and best_effort_ctx.get())
     if a0.GetSymbol() == 'C' and (_g14_allcarbon or _g12_metalloid_ok
                                   or _g12_functional_ok):

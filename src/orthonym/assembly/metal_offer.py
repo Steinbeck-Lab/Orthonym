@@ -179,6 +179,32 @@ def metal_dative_split_spelling_and_order(
     return _metal_spelling_and_order(smiles, _DATIVE_KIND)
 
 
+def metal_radical_joined_spelling_and_order(
+        smiles: Optional[str]) -> Optional[Tuple[str, Tuple[int, ...]]]:
+    """(the string to name, the atom order) of the bonded drawing of ``smiles`` when its one metal atom has no bond
+    and its carbon radicals are the carbons that lost their bond to it, and the scope table admits the metal to
+    ``RECONNECT_RADICAL`` (``data/metal_scope.py``), else None.
+
+    The bonded drawing joins each carbon radical to the metal by a single bond that takes the carbon's radical
+    electron; no charge moves and the atoms keep their hydrogens (``[Li].CCC[CH2]`` gives ``CCCC[Li]``,
+    ``[CH]1CC1.[Br-].[Mg+]`` gives ``[Mg+]C1CC1.[Br-]``). Standard InChI ignores metal-ligand bonds and radicals, so
+    the two drawings have one standard InChIKey, and the rewrite is accepted only when, beside the equal key,
+
+    * the sites are those of:func:`perception.metals.radical_join_sites` (carbons with one radical electron
+      each, the metal's charge plus its new bonds one of its ``valences``);
+    * an independent count of atoms, charges and radical electrons holds
+      (:func:`perception.metals.atom_and_charge_ledger_ok` with ``moved_radical``: each new bond takes one radical
+      electron from its carbon, nothing else changes), on the molecule and again on the written string read back;
+    * the string reads back as the molecule (equal canonical isomeric SMILES).
+
+    A bonded drawing has no radical carbon beside a bond-free metal, so a second application finds nothing.
+     Structures for Lewis 'adducts', "One of the fundamental principles of organic chemical nomenclature
+    is to name the structure that is drawn": the caller offers the drawing as written as well
+    (:func:`name_with_metal_offer`), and the name of the bonded drawing is labelled below the PIN
+    (:func:`record_metal_rewrite_non_pin`)."""
+    return _metal_spelling_and_order(smiles, _RADICAL_KIND)
+
+
 class MetalOffer(NamedTuple):
     """The drawings the offer names beside the drawing as written: ``drawings`` are
     ``(string, atom order)`` pairs, the nearest to the caller's drawing first, the order being
@@ -195,8 +221,10 @@ def metal_offer_for(smiles: Optional[str]) -> Optional[MetalOffer]:
     A dative drawing is offered as its split drawing
     (:func:`metal_dative_split_spelling_and_order`) and, when that drawing has an ionic drawing of
     its own (:func:`metal_rewrite_spelling_and_order`: the split drawing is treated as any
-    drawing), that one as well; the order of the second is composed to the caller's atoms. Any
-    other drawing is offered its other drawing, as before."""
+    drawing), that one as well; the order of the second is composed to the caller's atoms. A drawing of carbon
+    radicals beside a bond-free metal is offered its bonded drawing
+    (:func:`metal_radical_joined_spelling_and_order`) and, in the same way, that drawing's own other drawing
+    (``[Mg+]C1CC1.[Br-]`` its ``CONNECT_ANION`` drawing). Any other drawing is offered its other drawing, as before."""
     split = metal_dative_split_spelling_and_order(smiles)
     if split is not None:
         written, order = split
@@ -204,6 +232,13 @@ def metal_offer_for(smiles: Optional[str]) -> Optional[MetalOffer]:
         if again is None:
             return MetalOffer((split,), keyless=True)
         return MetalOffer((split, (again[0], tuple(order[k] for k in again[1]))), keyless=True)
+    joined = metal_radical_joined_spelling_and_order(smiles)
+    if joined is not None:
+        written, order = joined
+        again = metal_rewrite_spelling_and_order(written)
+        if again is None:
+            return MetalOffer((joined,))
+        return MetalOffer((joined, (again[0], tuple(order[k] for k in again[1]))))
     other = metal_rewrite_spelling_and_order(smiles)
     return None if other is None else MetalOffer((other,))
 
@@ -297,22 +332,47 @@ def _find_connect_sites(mol):
     return connect_anion_to_organometal_cation_sites(mol)
 
 
+def _find_radical_sites(mol):
+    from ..perception.metals import radical_join_sites
+    return radical_join_sites(mol)
+
+
+def _join_radical_bonds(mol, sites):
+    """``mol`` with a single bond between the two atoms of each site ``(metal, carbon radical)``: the bond takes
+    the carbon's radical electron, no charge moves, the atoms keep their hydrogens, and the metal carries no
+    radical electron. Sanitized, same atom order."""
+    rw = Chem.RWMol(mol)
+    _hold_hydrogens(rw, {idx for site in sites for idx in site})
+    for metal_idx, carbon_idx in sites:
+        rw.AddBond(metal_idx, carbon_idx, Chem.BondType.SINGLE)
+        carbon = rw.GetAtomWithIdx(carbon_idx)
+        carbon.SetNumRadicalElectrons(carbon.GetNumRadicalElectrons() - 1)
+    for metal_idx in {metal_idx for metal_idx, _carbon in sites}:
+        rw.GetAtomWithIdx(metal_idx).SetNumRadicalElectrons(0)
+    new = rw.GetMol()
+    Chem.SanitizeMol(new)
+    return new
+
+
 class _RewriteKind(NamedTuple):
     """One rewrite: the sites of the molecule it acts on, the rewritten molecule, whether it forms
     the bonds of the sites (``CONNECT_ANION``) or removes them, the charge each bond of the sites
     carries in the count of atoms and charges (1 for a bond that is heterolysed or joined, 0 for
-    a dative bond), and whether the molecule has no standard InChIKey of its own (the key of the
-    rewritten drawing is then the reference key)."""
+    a dative bond), whether the molecule has no standard InChIKey of its own (the key of the
+    rewritten drawing is then the reference key), and whether each bond of the sites carries a radical
+    electron instead (``RECONNECT_RADICAL``)."""
     find_sites: Callable
     rewrite: Callable
     bonds_are_formed: bool
     moved_charge: int = 1
     keyless_input: bool = False
+    moved_radical: bool = False
 
 
 _DISCONNECT_KIND = _RewriteKind(_find_disconnect_sites, _break_bonds, False)
 _CONNECT_KIND = _RewriteKind(_find_connect_sites, _join_bonds, True)
 _DATIVE_KIND = _RewriteKind(_find_dative_sites, _remove_dative_bonds, False, 0, True)
+_RADICAL_KIND = _RewriteKind(_find_radical_sites, _join_radical_bonds, True, 0, False, True)
 
 
 def _metal_spelling_checked(mol, sites, kind) -> Optional[Tuple[str, Tuple[int, ...]]]:
@@ -329,8 +389,8 @@ def _metal_spelling_checked(mol, sites, kind) -> Optional[Tuple[str, Tuple[int, 
 
         def ledger_ok(rewritten):
             if kind.bonds_are_formed:
-                return atom_and_charge_ledger_ok(rewritten, mol, sites, kind.moved_charge)
-            return atom_and_charge_ledger_ok(mol, rewritten, sites, kind.moved_charge)
+                return atom_and_charge_ledger_ok(rewritten, mol, sites, kind.moved_charge, kind.moved_radical)
+            return atom_and_charge_ledger_ok(mol, rewritten, sites, kind.moved_charge, kind.moved_radical)
 
         if kind.keyless_input:
             new = kind.rewrite(mol, sites)

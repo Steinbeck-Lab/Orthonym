@@ -28,7 +28,8 @@ from typing import FrozenSet, List, Optional, Tuple
 from rdkit import Chem
 
 from ..data.metal_scope import (BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION, DATIVE, DISCONNECT, GROUP_13_HYDRIDE_METALS,
-                                GROUP_1, GROUP_2, ION_SALTS, has_mechanism, has_valence)
+                                GROUP_1, GROUP_2, ION_SALTS, RECONNECT_RADICAL, has_mechanism,
+                                has_valence)
 from ..data.organometallics import TERMINAL_LIGAND_PREFIXES
 from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
@@ -986,6 +987,51 @@ def connect_anion_to_organometal_cation_sites(mol: "Chem.Mol") -> Optional[List[
     return sites if len(sites) == charge else None
 
 
+#: the atoms a carbon radical may be joined to (``radical_join_sites``): the true metals, tin, lead and the Group 13
+#: metals; the metalloids (B, Si, Ge, As, Sb, Te) are part of the organic fragments
+RADICAL_JOIN_METAL_SYMBOLS: FrozenSet[str] = _TRUE_METAL_SYMBOLS_FOR_VETO | frozenset(('Sn', 'Pb') + GROUP_13_HYDRIDE_METALS)
+
+
+def radical_join_sites(mol: "Chem.Mol") -> Optional[List[Tuple[int, int]]]:
+    """The bonds that join each carbon radical of a drawing to its one metal atom, as ``(metal atom index,
+    carbon atom index)`` pairs; ``None`` when ``mol`` is not a drawing that ``RECONNECT_RADICAL``
+    (``data/metal_scope.py``) covers.
+
+    The drawing is ``[Li].CCC[CH2]`` or ``[CH]1CC1.[Br-].[Mg+]``: the metal-carbon bonds broken into a radical on
+    the carbon. ``None`` (the drawing is left as it is written) unless
+
+    * exactly one atom is a true metal, or tin, lead or a Group 13 metal, that atom has no bond and is admitted
+      to ``RECONNECT_RADICAL``;
+    * every atom with radical electrons but the metal is a carbon with exactly one radical electron and no
+      chiral tag (a carbon with two would take a single or a double bond with one key: ``[Sn].[CH2]``), and
+      there is at least one;
+    * the metal's formal charge plus its hydrogens plus the number of such carbons is one of its ``valences`` in
+      the table (the cation it would be if every bond were broken heterolytically): ``[Li].C[CH2].C[CH2]`` would
+      give ``CC[Li]CC`` with the same key and is left as it is, and so is ``[ZnH].[CH3].[CH3]``.
+
+    A standard InChIKey sees neither the radicals nor the metal bonds, but it sees the hydrogens of each carbon,
+    so the carbon that takes the bond is the one drawn. PURE: read-only inspection of ``mol``.
+    """
+    if mol is None:
+        return None
+    metals = [a for a in atoms_of(mol) if a.GetSymbol() in RADICAL_JOIN_METAL_SYMBOLS]
+    if len(metals) != 1 or metals[0].GetDegree() or not has_mechanism(metals[0].GetSymbol(), RECONNECT_RADICAL):
+        return None
+    metal = metals[0]
+    carbons = []
+    for atom in atoms_of(mol):
+        if atom.GetIdx() == metal.GetIdx() or not atom.GetNumRadicalElectrons():
+            continue
+        if (atom.GetSymbol() != 'C' or atom.GetNumRadicalElectrons() != 1
+                or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED):
+            return None
+        carbons.append(atom.GetIdx())
+    if not carbons or not has_valence(metal.GetSymbol(),
+                                      metal.GetFormalCharge() + metal.GetTotalNumHs() + len(carbons)):
+        return None
+    return [(metal.GetIdx(), idx) for idx in carbons]
+
+
 #: the most resonance structures read of one anion (``_charge_stays_on_the_donor``); a larger anion declines
 _MAX_ANION_RESONANCE_STRUCTURES = 64
 
@@ -1023,7 +1069,8 @@ def _charge_stays_on_the_donor(mol: "Chem.Mol", fragment, donor_idx: int) -> boo
 
 
 def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
-                              changed_bonds: List[Tuple[int, int]], moved_charge: int = 1) -> bool:
+                              changed_bonds: List[Tuple[int, int]], moved_charge: int = 1,
+                              moved_radical: bool = False) -> bool:
     """True when ``after`` is ``before`` with the bonds ``changed_bonds`` broken and nothing else
     changed but the charges those bonds carry. A count of atoms and charges that uses no InChI
     and shares no code with the rewrite it checks: a rewrite that keeps the standard InChIKey
@@ -1038,6 +1085,9 @@ def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
     number of hydrogens, and the formal charge (the charge before plus the declared change); then
     the bond set (``before`` minus the broken bonds), the sum of the bond orders at each atom of a
     Kekule drawing of each molecule, and the net charge.
+    With ``moved_radical`` each broken bond is a homolytic one (``RECONNECT_RADICAL``): the other atom
+    gains one radical electron for each, and the metal's radical electrons are not compared (RDKit gives
+    a bare metal atom the radical electrons of its default valence: ``[Li]`` 1, ``[Sn]`` 4).
     A bond listed twice, a bond that ``before`` does not have, or any RDKit error is False.
     PURE: read-only inspection of both molecules."""
     if before is None or after is None:
@@ -1047,6 +1097,8 @@ def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
         if after.GetNumAtoms() != count:
             return False
         delta = [0] * count
+        radicals = [0] * count
+        metals = set()
         broken = set()
         for metal_idx, other_idx in changed_bonds:
             key = frozenset((metal_idx, other_idx))
@@ -1055,10 +1107,14 @@ def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
             broken.add(key)
             delta[metal_idx] += moved_charge
             delta[other_idx] -= moved_charge
+            if moved_radical:
+                radicals[other_idx] += 1
+                metals.add(metal_idx)
         for idx in range(count):
             old, new = before.GetAtomWithIdx(idx), after.GetAtomWithIdx(idx)
             if (old.GetAtomicNum() != new.GetAtomicNum() or old.GetIsotope() != new.GetIsotope()
-                    or old.GetNumRadicalElectrons() != new.GetNumRadicalElectrons()
+                    or (idx not in metals
+                        and new.GetNumRadicalElectrons() != old.GetNumRadicalElectrons() + radicals[idx])
                     or old.GetTotalNumHs() != new.GetTotalNumHs()
                     or new.GetFormalCharge() != old.GetFormalCharge() + delta[idx]):
                 return False

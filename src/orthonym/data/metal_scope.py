@@ -141,6 +141,18 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     ``ZERO_VALENT``; never to ``DISCONNECT`` or ``BONDED_NAMES``, whose coordination names the book does not use for
     these elements. The producer is ``rules.group14_centres.emit_group_ylium``.
 
+``RECONNECT_RADICAL``
+    a drawing in which the one metal atom has no bond and each carbon that lost its bond to it is drawn as a
+    radical (``[CH]1CC1.[Br-].[Mg+]``, ``[Li].CCC[CH2]``) is named through its bonded drawing, the one that joins
+    each such carbon to the metal by a single bond and takes its radical electron (``[Mg+]C1CC1.[Br-]``,
+    ``CCCC[Li]``), when both drawings have the same standard InChIKey and an independent count of atoms, charges
+    and radical electrons agrees (``perception.metals.atom_and_charge_ledger_ok`` with ``moved_radical``). The
+    sites are those of ``perception.metals.radical_join_sites``: carbon radicals with one radical electron each,
+    and the metal's formal charge plus the new bonds one of its ``valences``. The bonded drawing is then treated
+    as any drawing (``CONNECT_ANION`` applies to it). The Blue Book names a compound with a bond between a metal
+    and carbon as an organometallic compound INTRODUCTION), and asks for the structure that is
+    drawn, so the drawing as written is named as well and the name of the bonded drawing is labelled below the PIN.
+
 A metal is ``complete`` when the plan of its phase is done: every drawing of its compounds (ionic,
 bonded, dative, an atom or an ion) is attempted by the mechanisms above, so an input of it that no
 producer names fails for want of a name and not for want of support of the element. The failure
@@ -172,6 +184,7 @@ MACROCYCLE = "macrocycle"
 DATIVE = "dative"
 ZERO_VALENT = "zero_valent"
 PARENT_HYDRIDE_IONS = "parent_hydride_ions"
+RECONNECT_RADICAL = "reconnect_radical"
 
 
 @dataclass(frozen=True)
@@ -198,7 +211,7 @@ GROUP_13_HYDRIDE_METALS = ("Al", "Ga", "In", "Tl")
 
 #: every mechanism above: the ones zinc is admitted to
 ALL_MECHANISMS = frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
-                            CARBANION_SALTS, ZERO_VALENT})
+                            CARBANION_SALTS, ZERO_VALENT, RECONNECT_RADICAL})
 
 #: the metals of PubChem's bonded drawings admitted to every mechanism, with the charges of their cations: the
 #: lane of 2026-10-30 measured them on a panel of their bonded, dative and ionic drawings (`internal notes
@@ -231,12 +244,13 @@ ELEMENT_ONLY_METALS = ("Tc", "Pm", "Th", "Pa", "Np", "Pu", "Am", "Cm", "Bk", "Cf
 METAL_SCOPE: Dict[str, MetalScope] = {
     # the hydride of a Group 1 or 2 salt (``[Na+].[H-]``), its carbanions and the neutral atom beside ions
     # ('potassium(0)'): the lane of 2026-10-30; the atom and the ion alone ('sodium(1+)'): lane LONE
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT}), frozenset({1}))
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}), frozenset({1}))
        for symbol in GROUP_1},
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT}), frozenset({2}))
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}), frozenset({2}))
        for symbol in GROUP_2},
     # magnesium porphyrins (the chlorophyll core) are named on the porphyrin dianion like zinc's
-    "Mg": MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, MACROCYCLE, DISCONNECT, ELEMENT}),
+    "Mg": MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, MACROCYCLE, DISCONNECT, ELEMENT,
+                                RECONNECT_RADICAL, CONNECT_ANION, BONDED_NAMES}),
                      frozenset({2})),
     **{symbol: MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
     **{symbol: MetalScope(frozenset({ELEMENT}), frozenset()) for symbol in ELEMENT_ONLY_METALS},
@@ -250,7 +264,8 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     "Zn": MetalScope(ALL_MECHANISMS, frozenset({2}), complete=True),
     # Group 14 metals named on their parent hydrides: the lane of 2026-10-30; the atom and the ion alone
     # ('tin', '(119Sn)tin'): lane LONE
-    **{symbol: MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT}), frozenset({4}))
+    **{symbol: MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}),
+                       frozenset({4}))
        for symbol in ("Sn", "Pb")},
 }
 

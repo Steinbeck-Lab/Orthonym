@@ -36,6 +36,7 @@ from .adduct_class import component_class_key
 # The names of the atom, the ions and the isotopes of a metal are the producer of
 # ``rules/metal_atoms.py`` (one home); the adduct components read them from there.
 from .metal_atoms import METAL_ELEMENT_NAMES as _METAL_ELEMENT_NAMES
+from .metal_atoms import NONMETAL_ELEMENT_NAMES
 from .metal_atoms import ammine_component_names
 from .metal_atoms import metal_atom_name as _metal_atom_component_name
 from .metal_macrocycles import macrocycle_component_names
@@ -917,6 +918,50 @@ def _label_mixed_adduct(name: str, ordered: List[Tuple[str, int]]) -> None:
                                  detail="the name 'water' carries no PIN label (its use as a preferred name is deferred)")
 
 
+def _element_word(atom) -> Optional[str]:
+    """The element name of a bare neutral atom, with the nuclide symbol of an isotope in parentheses before it
+    ('iron', '(57Fe)iron',; None for an atom that carries hydrogen or a charge."""
+    if atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0:
+        return None
+    symbol = atom.GetSymbol()
+    word = _METAL_ELEMENT_NAMES.get(symbol) or NONMETAL_ELEMENT_NAMES.get(symbol)
+    if word is None:
+        return None
+    isotope = atom.GetIsotope()
+    return f"({isotope}{symbol}){word}" if isotope else word
+
+
+def _element_set_name(components: List[Tuple[str, int]], frag_mols, mol) -> Optional[str]:
+    """The name of a drawing of two or more different bare atoms and nothing else (an alloy or an element set,
+    ``[Fe].[Ni]``): the element names joined by em dashes in alphanumerical order, with the proportions,
+    'iron—nickel (1/1)'; None for any other drawing, and for a name that OPSIN does not read back to exactly the
+    drawn atoms (``_parse_reproduces_depiction``). A neutral atom takes its element name here, never the radical
+    name of its parent hydride ('chlorine', not 'chloranyl'): the components of an adduct are cited by "the names
+    of individual compounds" "Mixed organic – inorganic adducts", the Blue Book), and OPSIN 2.9.0
+    reads no 'chloranyl'. The Blue Book does not name inorganic adducts: "In this subsection, only adducts formed
+    from organic compounds are considered. Inorganic adducts are discussed in ref. 12,.5." "Organic
+    adducts",:3763). The name is the best-effort tier's (the caller's ``general_fallback_unverified``) and is
+    recorded as no PIN: a compound without carbon has a preselected name at most "PRESELECTED NAMES",
+    :2062), and an inorganic adduct has no PIN either."""
+    words = []
+    for smi, count in components:
+        frag = frag_mols[smi]
+        if frag.GetNumAtoms() != 1:
+            return None
+        word = _element_word(frag.GetAtomWithIdx(0))
+        if word is None:
+            return None
+        words.append((word, count))
+    # alphanumerical order of the element names; a nuclide symbol in front does not count
+    name = _assemble_adduct_name(sorted(words, key=lambda w: (w[0].split(")")[-1], w[0])))
+    if not _parse_reproduces_depiction(name, mol):
+        return None
+    from orthonym.metrics.provenance import record_non_pin_label
+    record_non_pin_label(name, rule="P-14.8.1",
+                         detail="an adduct of elements is an inorganic adduct (IR-5.5), which has no preferred IUPAC name")
+    return name
+
+
 def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 style: str = "pin", *,
                 general_fallback: bool = False,
@@ -948,6 +993,10 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     frag_mols = {smi: Chem.MolFromSmiles(smi) for smi, _ in components}
     if any(fm is None for fm in frag_mols.values()):
         return None
+    if general_fallback_unverified:
+        element_set = _element_set_name(components, frag_mols, mol)
+        if element_set is not None:
+            return element_set
     # Breadth Job 2: the mixed organic-inorganic widening runs at the best-effort
     # tier only, the Blue Book: no PIN for a mixed organic-inorganic
     # adduct), and only for an assembly with an inorganic component: a metal atom,

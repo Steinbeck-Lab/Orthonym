@@ -113,7 +113,8 @@ def test_the_connection_needs_an_admitted_metal_and_an_allowed_valence_and_no_ch
     assert connect("C[Cd+].[Cl-]") == ("[CH3][Cd][Cl]", (0, 1, 2))                    # and since the second lane
     assert connect("C[Cu+].[Cl-]") == ("[CH3][Cu][Cl]", (0, 1, 2))
     assert connect("C[Sn+3].[Cl-].[Cl-].[Cl-]") == ("[CH3][Sn]([Cl])([Cl])[Cl]", (0, 1, 2, 3, 4))   # tin: CONNECT_ANION
-    assert connect("C[Mg+].[Br-]") is None                                             # Group 2: ION_SALTS only
+    assert connect("C[Ca+].[Br-]") is None                                             # Group 2: ION_SALTS only
+    assert connect("C[Mg+].[Br-]") == ("[CH3][Mg][Br]", (0, 1, 2))                    # magnesium: since program 6
     assert connect("C[Zn+2].[Cl-].[Cl-]") is None                                      # [Zn+3] is no valence of zinc
     assert connect("C[Zn+].[Cl-].[Br-]") is None                                       # which anion: a choice
     assert connect("C[Zn+].[CH3-]") is None                                            # a carbanion is no donor
@@ -268,7 +269,7 @@ def _constructed_other_metal_rows():
     """Cations of metals that the table does not admit to ``CONNECT_ANION``, each with an anion: the
     drawings the connection could reach if it were not bound to the table; and a zinc cation whose
     charge is no valence after the connection."""
-    return ["C[Tc+].[Cl-]", "C[Pu+].[Cl-]", "C[Mg+].[Br-]", "C[Th+].[Cl-]", "CC[Zn+2].[Cl-].[Cl-]",
+    return ["C[Tc+].[Cl-]", "C[Pu+].[Cl-]", "C[Ca+].[Br-]", "C[Th+].[Cl-]", "CC[Zn+2].[Cl-].[Cl-]",
             "C[Th+3].[Cl-].[Cl-].[Cl-]"]
 
 

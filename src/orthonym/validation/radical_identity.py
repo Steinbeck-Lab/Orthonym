@@ -42,6 +42,10 @@ dichloride' ([Sn+2].2[Cl-], parsed as Cl[Sn]Cl) stays "n/a". Transition metals
 and groups 1/2 stay excluded (Cu+2, Mn+2 and Cl[Mg] carry RDKit radical
 counts).
 
+An input whose carbon radicals are the carbons that lost their bond to its one bond-free metal atom
+(``[Li].CCC[CH2]``, the ``RECONNECT_RADICAL`` drawings of ``data/metal_scope.py``) is judged against its bonded
+drawing (``CCCC[Li]``): it is another drawing of the same compound (``_radical_joined_drawing``).
+
 One named whole-molecule exemption: dioxygen, the retained name for O2
 (data/retained_names.py), whose ground state is the triplet [O][O] while OPSIN
 draws O=O; says radical names "do not indicate nor imply an electronic
@@ -102,6 +106,43 @@ def _stereo_free_smiles(mol) -> str:
     return Chem.MolToSmiles(copy)
 
 
+def _radical_joined_drawing(input_smiles: str):
+    """The bonded drawing of an input whose carbon radicals are the carbons that lost their bond to its one
+    bond-free metal atom (``[Li].CCC[CH2]`` -> ``CCCC[Li]``, mechanism ``RECONNECT_RADICAL`` of
+    ``data/metal_scope.py``), else None. Such an input is another drawing of the compound of its bonded drawing
+    (the same standard InChIKey and an independent count of atoms, charges and radical electrons:
+    ``assembly.metal_offer.metal_radical_joined_spelling_and_order``), so a name of it is judged against the bonded
+    drawing, as the name of an ionic or a dative drawing is judged against its other drawing (user decision
+    2026-11-06). Any other radical input keeps the strict rule."""
+    from ..assembly.metal_offer import metal_radical_joined_spelling_and_order
+    joined = metal_radical_joined_spelling_and_order(input_smiles)
+    return joined[0] if joined is not None else None
+
+
+def _organic_part_smiles(mol):
+    """The canonical SMILES of ``mol`` without its metal atoms, every other atom with its hydrogens fixed and with
+    no charge and no radical electron (the bonds to the metal are the ones a drawing of the compound may break
+    heterolytically or homolytically); None when RDKit cannot write it."""
+    from ..perception.metals import RADICAL_JOIN_METAL_SYMBOLS
+    if mol is None:
+        return None
+    try:
+        rw = Chem.RWMol(mol)
+        for atom in rw.GetAtoms():
+            atom.SetNumExplicitHs(atom.GetTotalNumHs())
+            atom.SetNoImplicit(True)
+            atom.SetFormalCharge(0)
+            atom.SetNumRadicalElectrons(0)
+        for idx in sorted((a.GetIdx() for a in rw.GetAtoms() if a.GetSymbol() in RADICAL_JOIN_METAL_SYMBOLS),
+                          reverse=True):
+            rw.RemoveAtom(idx)
+        part = rw.GetMol()
+        part.UpdatePropertyCache(strict=False)
+        return Chem.MolToSmiles(part, isomericSmiles=False)
+    except (RuntimeError, ValueError):
+        return None
+
+
 def radical_identity_verdict(input_smiles: str, parsed_smiles: str) -> str:
     """:func:`_radical_identity_verdict_impl`, memoised for the life of the process:
     the verdict is a pure function of the two strings (RDKit parses and radical
@@ -135,6 +176,15 @@ def _radical_identity_verdict_impl(input_smiles: str, parsed_smiles: str) -> str
         return "n/a"
     if (Chem.MolToSmiles(mi), Chem.MolToSmiles(mo)) in _EXEMPT_PAIRS:
         return "ok"
+    joined = _radical_joined_drawing(input_smiles) if pi else None
+    if joined is not None:
+        verdict = _radical_identity_verdict_impl(joined, parsed_smiles)
+        if verdict != "n/a":
+            return verdict
+        # the key does not see on which carbon the metal sits ('[Li]CC=CC' and '[Li]C(C)C=C' share one): the
+        # parts without the metal must be one graph, with the hydrogens of every atom
+        same = _organic_part_smiles(Chem.MolFromSmiles(joined)) == _organic_part_smiles(mo)
+        return "ok" if same else "mismatch"
     if pi != po:
         return "mismatch"
     return "ok" if _stereo_free_smiles(mi) == _stereo_free_smiles(mo) else "mismatch"

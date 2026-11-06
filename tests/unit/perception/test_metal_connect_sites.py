@@ -60,7 +60,7 @@ def test_sites_of_a_drawing_that_the_connection_covers(smiles, expected):
     "C[Tc+].[Cl-]",                                       # metals that the table does not admit
     "C[Pu+].[Cl-]",                                       # (mercury, cadmium, nickel, copper are admitted since
     "C[Th+].[Cl-]",                                       # 2026-10-30)
-    "C[Mg+].[Br-]",                                       # Group 2: admitted to ION_SALTS only
+    "C[Ca+].[Br-]",                                       # Group 2: admitted to ION_SALTS only (magnesium since program 6)
     "C[Zn+].[Na+].[Cl-]",                                 # two cations
     "C[Zn+].[O-]C(=O)C[Zn+]",
     "CC[Zn]CC.[Cl-]",                                     # no positively charged metal
