@@ -931,7 +931,8 @@ CANARY_COMPOUNDS = [
         # ignored the imide ring entirely). Both forms RT-False (multi-defect:
         # the prenyloxyphenyl decoration is still dropped) -- the sentinel
         # tracks the substituent_loss class either way.
-        "3-isobutyl-2,5-dioxo-4-phenylazole",
+        # program 7 (2026-11-06): named whole and OPSIN full-InChIKey exact (the count-keyed 'pentyloxy' prefix fixed)
+        "3-{4-[(3-methylbut-2-en-1-yl)oxy]phenyl}-4-(2-methylpropyl)-1H-pyrrole-2,5-dione",
     ),
     (
         "COc1ccc(C(=O)N2CCCC2=O)cc1",  # Sentinel: substituent_loss - methoxybenzamide pyrrolidinone

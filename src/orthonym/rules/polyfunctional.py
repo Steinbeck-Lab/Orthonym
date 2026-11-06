@@ -1802,6 +1802,15 @@ def _mononuclear_prefix_texts(prefixes: List[str], chain_length: int) -> List[st
     return apply_mononuclear_enclosing(prefixes, True)
 
 
+def _label_systematic_c2_aldehyde(applies: bool) -> None:
+    """A two-carbon aldehyde that the retained-acetaldehyde arm does not name keeps a systematic 'ethanal' name, which is
+    no PIN: "acetaldehyde (PIN)" with unlimited substitution."""
+    if applies:
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label("ethanal", rule="P-66.6.1.2.1",
+                             detail="the retained 'acetaldehyde' is the PIN of the two-carbon aldehyde")
+
+
 def name_polyfunctional(features: Any) -> Optional[str]:
     """
     Generate IUPAC name for a polyfunctional compound.
@@ -2917,12 +2926,12 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             and not double_locants and not triple_locants):
         all_prefixes = [format_fg_prefix(_l3_render_from[0], [], _l3_render_from[1])]
 
-    # Aldehyde arm computed here (after any _l3 re-render of all_prefixes, so it sees
-    # the same prefix list the acid arm does). None -> fall through to systematic.
+    # Aldehyde arm (after any _l3 re-render, the acid arm's prefix list). None -> systematic.
     _ald_result = (
         _retained_acetaldehyde(mol, atom_to_locant, all_prefixes, features)
         if _aldehyde_context else None
     )
+    _label_systematic_c2_aldehyde(_aldehyde_context and _ald_result is None)
     def _systematic_assembly(prefixes):
         if _acetamide_parent:
             _n = RETAINED_C2_ACYL_BY_SUFFIX[suffix]
@@ -2971,12 +2980,12 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # alpha stereodescriptor (skip the generic stereo block below).
         _ald_name, _ald_bare_stereo = _ald_result
         name = f"{_ald_bare_stereo}{_ald_name}"
-    elif (not _n_hydroxy and not (suffix == 'nitrile' and chain_length == 2)   # an italic N locant:
+    elif (not _n_hydroxy and not (suffix == 'nitrile' and chain_length == 2) and not _aldehyde_context  #
           and _single_substitutable_atom_parent(mol, features, principal_chain,
                                                 all_prefixes, double_locants,
                                                 triple_locants, _chain_ez)):
-        # (the C2 nitrile is left out: the retained 'acetonitrile' arm above takes every
-        # shape it can; what reaches here keeps the located systematic 'ethanenitrile')
+        # (the C2 nitrile and aldehyde are left out: the retained 'acetonitrile'/'acetaldehyde' arms above take
+        # every shape they can; the rest keeps the located systematic spelling, never an unlocanted 'ethanal')
         # (the Blue Book) "All locants are omitted for parent
         # compounds when all substitutable hydrogen atoms have the same locant":
         # 'amino(oxo)ethaneperoxoic acid (PIN)' (:30182); the first prefix bare,

@@ -166,7 +166,14 @@ def name_carbamate(
         if carb_name is None:
             carb_name = _name_carbamate(features)
     if not carb_name:
-        return None
+        # the ester of a carboxylic acid on a ring nitrogen ('ethyl piperidine-1-carboxylate',
+        from ..ring_n_carboxylate import ring_n_carboxylate_ester_name
+        ring_name = ring_n_carboxylate_ester_name(features.mol, style)
+        if not ring_name or get_current_pool().add(ring_name, "carbamate", features) is None:
+            return None
+        return NamingResult(name=ring_name, tree=NameTreeNode(
+            parent_stem=ring_name, class_id="carbamate", iupac_section_cite="P-65.1.2.2.2", fragment_legacy=ring_name),
+            atom_to_locant_hint=None)
 
     carb_name = _enrich_handler_name(features, carb_name, "carbamate")
 

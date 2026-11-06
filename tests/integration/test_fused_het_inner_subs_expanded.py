@@ -12,7 +12,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
-from orthonym.assembly.composer import _detect_fused_het_inner_subs
+from orthonym.assembly.fused_het_inner_subs import detect_fused_het_inner_subs as _detect_fused_het_inner_subs
 
 
 def _setup_inner_sub_test(smiles):

@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..assembly.straight_alkyl import straight_alkyl_name
 from ..assembly.naming_utils import (
     alpha_sort_key,
     alpha_sort_key_rs,
@@ -3388,7 +3389,10 @@ def _identify_fused_substituent(
                             1: 'methoxy', 2: 'ethoxy', 3: 'propoxy',
                             4: 'butoxy', 5: 'pentyloxy', 6: 'hexyloxy',
                         }
-                        alkoxy_name = _ALKOXY.get(carbon_count)
+                        # the count names an unbranched chain bound by its end only (assembly/straight_alkyl):
+                        # 'tert-butoxy', not 'butoxy' (1), the Blue Book)
+                        straight = straight_alkyl_name(mol, alkyl_atoms) is not None
+                        alkoxy_name = _ALKOXY.get(carbon_count) if straight else None
                         if alkoxy_name is None:
                             from ..assembly.substituent_naming import name_substituent_fragment
                             rec_name = name_substituent_fragment(
@@ -3406,11 +3410,8 @@ def _identify_fused_substituent(
                                     alkoxy_name = alkoxy_prefix_from_substituent(rec_name)
                                 else:
                                     alkoxy_name = f'{rec_name}oxy'
-                            if alkoxy_name is None:
-                                try:
-                                    alkoxy_name = f'{get_alkyl_name(carbon_count)}oxy'
-                                except (ValueError, KeyError):
-                                    alkoxy_name = None
+                            if alkoxy_name is None and straight:
+                                alkoxy_name = f'{straight_alkyl_name(mol, alkyl_atoms)}oxy'
                         if alkoxy_name:
                             return {
                                 'name': alkoxy_name,
@@ -3502,10 +3503,7 @@ def _identify_fused_substituent(
                     # genuine acyclic alkyl -- see the ring guard below.
                     _named_by_carbon_count = alkyl_name is None
                     if alkyl_name is None:
-                        try:
-                            alkyl_name = get_alkyl_name(carbon_count)
-                        except (ValueError, KeyError):
-                            alkyl_name = None
+                        alkyl_name = straight_alkyl_name(mol, alkyl_atoms)  # a straight chain only
                     # (the Blue Book): 'anilino' is the retained PREFERRED
                     # PREFIX for C6H5-NH- with full substitution allowed, cited bare
                     # when it carries no locant of its own (the Blue Book) and enclosed
@@ -3576,9 +3574,8 @@ def _identify_fused_substituent(
                         mol, alkyl_atoms, cn.GetIdx(), list(excluded | {start_idx})
                     )
                     if aname is None:
-                        try:
-                            aname = get_alkyl_name(carbon_count)
-                        except (ValueError, KeyError):
+                        aname = straight_alkyl_name(mol, alkyl_atoms)  # a straight chain only
+                        if aname is None:
                             break
                     all_sub_atoms.extend(alkyl_atoms)
                     branches.append((alkyl_atoms, aname))
@@ -3618,19 +3615,16 @@ def _identify_fused_substituent(
                     _ALKYLTHIO = {
                         1: 'methylsulfanyl', 2: 'ethylsulfanyl', 3: 'propylsulfanyl',
                     }
-                    thio_name = _ALKYLTHIO.get(carbon_count)
+                    straight = straight_alkyl_name(mol, alkyl_atoms) is not None  # 'propan-2-ylsulfanyl'
+                    thio_name = _ALKYLTHIO.get(carbon_count) if straight else None
                     if thio_name is None:
-                        from ..assembly.substituent_naming import name_substituent_fragment
-                        rec_name = name_substituent_fragment(
-                            mol, alkyl_atoms, nbr.GetIdx(), list(excluded | {start_idx})
-                        )
-                        if rec_name:
-                            thio_name = f'{rec_name}sulfanyl'
-                        if thio_name is None:
-                            try:
-                                thio_name = f'{get_alkyl_name(carbon_count)}sulfanyl'
-                            except (ValueError, KeyError):
-                                thio_name = None
+                        # the composed -S-R prefix with its enclosing marks ('(propan-2-yl)sulfanyl',,
+                        # the primitive the other producers use
+                        from ..assembly.substituent_enumerator import composed_chalcogen_group_prefix
+                        thio_name = composed_chalcogen_group_prefix(
+                            mol, [start_idx] + list(alkyl_atoms), start_idx, excluded)
+                        if thio_name is None and straight:
+                            thio_name = f'{straight_alkyl_name(mol, alkyl_atoms)}sulfanyl'
                     if thio_name:
                         return {
                             'name': thio_name,
@@ -3822,15 +3816,14 @@ def _identify_alkyl_substituent(
             'atoms': all_atoms
         }
 
-    try:
-        alkyl_name = get_alkyl_name(carbon_count)
-        return {
-            'name': alkyl_name,
-            'type': 'alkyl',
-            'atoms': all_atoms
-        }
-    except ValueError:
+    alkyl_name = straight_alkyl_name(mol, all_atoms)    # the count names a straight chain only
+    if alkyl_name is None:
         return None
+    return {
+        'name': alkyl_name,
+        'type': 'alkyl',
+        'atoms': all_atoms
+    }
 
 
 def _chain_is_unbranched_alkanoyl(mol, chain_atoms, acyl_c: int) -> bool:

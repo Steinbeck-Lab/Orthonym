@@ -390,10 +390,12 @@ def test_memo_reading_run_leaves_no_trace(monkeypatch):
 # stereo layer are confirmed by the full-InChIKey round trip below.
 # Not PIN claims: the names are the systematic form.
 MAIN_PATH_ROWS = [
-    # a dev split / milestone1500
+    # a dev split / milestone1500. Program 7 (2026-11-06): the ester is the principal group, named by functional class
+    # ("All preferred IUPAC names for esters are named by functional class nomenclature",, a PIN now
+    # that the aryl and fused prefixes keep their substituents; was the systematic benzene name
     ("CO/C=C(C(=O)OC)\\C(C)=C/C=C/c1ccc(OCC=C(C)C)c(O)c1",
-     "2-hydroxy-4-[(1E,3Z,5E)-6-methoxy-5-(methoxycarbonyl)-4-methylhexa-1,3,5-trien-"
-     "1-yl]-1-[(3-methylbut-2-en-1-yl)oxy]benzene"),
+     "methyl (2E,3Z,5E)-6-{3-hydroxy-4-[(3-methylbut-2-en-1-yl)oxy]phenyl}-2-(methoxymethylidene)-3-methylhexa-3,5-"
+     "dienoate"),
     # dev2000
     ("C=CCC(=NOS(=O)(=O)O)S[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O",
      "(2R,3S,4S,5R,6S)-2-(hydroxymethyl)-6-({1-[(sulfooxy)imino]but-3-en-1-yl}"
@@ -406,7 +408,7 @@ def test_chain_prefix_rows_are_named_without_the_offer(monkeypatch, smiles, expe
     runs = _spy_clean_offer(monkeypatch)
     row = name_best_effort(smiles)
     assert row["name"] == expected
-    assert row["tier"] == "systematic_verified"
+    assert row["tier"] in ("systematic_verified", "pin_verified")
     assert_full_rt(row["name"], smiles)
     assert runs == []
 

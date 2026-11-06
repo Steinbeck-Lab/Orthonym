@@ -82,7 +82,8 @@ _UNCHANGED = [
     ("COC(=O)N(C)N", "PIN abstains"),
     ("OCCOC(=O)NNC", "PIN abstains"),
     ("OC(=O)CCOC(=O)NN", "PIN abstains"),
-    ("COC(=O)N1CCCC1", "PIN abstains"),
+    # COC(=O)N1CCCC1 is 'methyl pyrrolidine-1-carboxylate' (PIN) since program 7 (2026-11-06): the ester of the ring-
+    # nitrogen acid 'pyrrolidine-1-carboxylic acid (PIN)', the Blue Book), test_ring_n_carboxylate.py
     ("NC(=O)OCCOC(N)=O", "PIN abstains"),
 ]
 

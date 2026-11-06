@@ -141,6 +141,7 @@ from .substituent_enumerator import (
 )
 from .n_substituent_stereo import cite_n_substituent_stereo
 from .straight_alkyl import straight_alkyl_name
+from .fused_het_inner_subs import detect_fused_het_inner_subs
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment, retained_benzyl
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -2447,6 +2448,8 @@ def _name_carbamate(features: Any) -> Optional[str]:
         return None
 
     # Check N-substitution
+    if mol.GetAtomWithIdx(n_idx).IsInRing():
+        return None  # a ring through N is no pair of N-substituents ('ethyl dipentylcarbamate'): ring_n_carboxylate
     n_subs = _named_n_substituents(mol, n_idx, c_idx, carbamate_core)
     if n_subs is None:
         return None          # un-nameable N-substituent -> fail closed
@@ -8912,145 +8915,6 @@ def _count_from_prefix(text: str, base_name: str) -> int:
     return 1
 
 
-def _detect_fused_het_inner_subs(
-    mol, core_atom_set, atom_mapping, ring_atom_set, chain_set,
-    attach_ring_idx
-) -> str:
-    """Detect substituents on a fused heterocycle core and return formatted prefix string.
-
-    Finds atoms bonded to core atoms that are NOT part of the core and NOT in
-    the chain. Maps their positions to IUPAC locants via atom_mapping.
-
-    Returns:
-        Formatted inner substituent prefix string (e.g., "5-methyl-") or ""
-        if no inner substituents found.
-    """
-    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
-    _ALKOXY_DIRECT = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy'}
-
-    from ..assembly.naming_utils import get_alkyl_name
-    from ..assembly.naming_utils import get_multiplier_prefix as _gmp
-
-    sub_groups: Dict[str, List] = defaultdict(list)
-
-    for core_idx in core_atom_set:
-        if core_idx == attach_ring_idx:
-            continue  # Skip attachment point
-        iupac_locant = atom_mapping.get(core_idx)
-        if iupac_locant is None:
-            continue
-        atom = mol.GetAtomWithIdx(core_idx)
-        for nbr in atom.GetNeighbors():
-            ni = nbr.GetIdx()
-            if ni in core_atom_set or ni in chain_set or ni in ring_atom_set:
-                continue
-            sym = nbr.GetSymbol()
-            if sym in _HALOGEN_PREFIX:
-                sub_groups[_HALOGEN_PREFIX[sym]].append(iupac_locant)
-            elif sym == 'C' and not nbr.GetIsAromatic():
-                # Non-core carbon neighbor -- classify by substructure
-
-                cn_nbrs = [n for n in nbr.GetNeighbors()
-                           if n.GetIdx() != core_idx
-                           and n.GetIdx() not in core_atom_set]
-
-                # (a) Cyano detection: C with triple bond to N, no H on C
-                if (len(cn_nbrs) == 1 and cn_nbrs[0].GetSymbol() == 'N'
-                        and nbr.GetTotalNumHs() == 0):
-                    bond_cn = mol.GetBondBetweenAtoms(ni, cn_nbrs[0].GetIdx())
-                    if bond_cn and bond_cn.GetBondTypeAsDouble() == 3.0:
-                        sub_groups['cyano'].append(iupac_locant)
-                        continue
-
-                # (b) Haloalkyl detection: C bonded only to halogens (no H, no non-hal)
-                hal_map = _HALOGEN_PREFIX
-                hal_nbrs = [n for n in cn_nbrs if n.GetSymbol() in hal_map]
-                non_hal = [n for n in cn_nbrs
-                           if n.GetSymbol() not in hal_map
-                           and n.GetSymbol() != 'H']
-                if hal_nbrs and not non_hal and nbr.GetTotalNumHs() == 0:
-                    hal_counts: Dict[str, int] = defaultdict(int)
-                    for h in hal_nbrs:
-                        hal_counts[h.GetSymbol()] += 1
-                    parts = []
-                    for h_sym in sorted(hal_counts.keys(),
-                                        key=lambda s: hal_map[s]):
-                        cnt = hal_counts[h_sym]
-                        mp = _gmp(cnt, hal_map[h_sym]) if cnt > 1 else ''
-                        parts.append(f'{mp}{hal_map[h_sym]}')
-                    haloalkyl_name = '(' + ''.join(parts) + 'methyl)'
-                    sub_groups[haloalkyl_name].append(iupac_locant)
-                    continue
-
-                # (c) General alkyl using _count_pure_alkyl
-                c_count = _count_pure_alkyl(
-                    mol, ni, core_atom_set | chain_set | ring_atom_set
-                )
-                if c_count:
-                    try:
-                        sub_groups[get_alkyl_name(c_count)].append(iupac_locant)
-                    except (ValueError, KeyError):
-                        pass  # Skip unrecognizable
-
-            elif sym == 'O':
-                h_count = nbr.GetTotalNumHs()
-                o_nbrs = [n for n in nbr.GetNeighbors()
-                          if n.GetIdx() != core_idx
-                          and n.GetIdx() not in core_atom_set]
-                if h_count == 1 and len(o_nbrs) == 0:
-                    sub_groups['hydroxy'].append(iupac_locant)
-                elif (h_count == 0 and len(o_nbrs) == 1
-                      and o_nbrs[0].GetSymbol() == 'C'):
-                    # General alkoxy: count carbons in the -O-C... chain
-                    c_start_idx = o_nbrs[0].GetIdx()
-                    c_count = _count_pure_alkyl(
-                        mol, c_start_idx,
-                        core_atom_set | chain_set | ring_atom_set | {ni}
-                    )
-                    if c_count:
-                        if c_count in _ALKOXY_DIRECT:
-                            sub_groups[_ALKOXY_DIRECT[c_count]].append(
-                                iupac_locant)
-                        else:
-                            from ..data.chain_names import get_chain_prefix
-                            sub_groups[
-                                f'{get_chain_prefix(c_count)}oxy'
-                            ].append(iupac_locant)
-
-            elif sym == 'N':
-                # Nitrogen neighbor -- check nitro vs amino
-                n_nbrs = [n for n in nbr.GetNeighbors()
-                          if n.GetIdx() != core_idx
-                          and n.GetIdx() not in core_atom_set]
-                if (nbr.GetFormalCharge() == 1
-                        and len(n_nbrs) == 2
-                        and all(n.GetSymbol() == 'O' for n in n_nbrs)):
-                    sub_groups['nitro'].append(iupac_locant)
-                elif nbr.GetTotalNumHs() == 2 and len(n_nbrs) == 0:
-                    sub_groups['amino'].append(iupac_locant)
-
-    if not sub_groups:
-        return ""
-
-    # Build prefix string sorted by IUPAC alphabetization
-    from ..assembly.naming_utils import (
-        enclose_if_compound,
-        get_multiplier_prefix,
-    )
-    prefix_parts = []
-    for name in sorted(sub_groups.keys(), key=alpha_sort_key):
-        locs = sorted(sub_groups[name], key=lambda x: (int(x) if str(x).isdigit() else 999, str(x)))
-        count = len(locs)
-        loc_str = render_locants(locs)
-        if count == 1:
-            prefix_parts.append(f'{loc_str}-{enclose_if_compound(name)}')
-        else:
-            from .naming_utils import multiplied_component as _mc
-            prefix_parts.append(f'{loc_str}-{_mc(count, name, enclose_if_compound(name))}')
-
-    return '-'.join(prefix_parts) + '-' if prefix_parts else ""
-
-
 def _merge_connected_ring_groups(
     mol, ring_groups: list
 ) -> tuple:
@@ -9510,12 +9374,11 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
 
                 if attach_ring_idx is not None:
                     # Detect inner substituents on the fused het core
-                    inner_prefix = _detect_fused_het_inner_subs(
+                    inner_prefix = detect_fused_het_inner_subs(
                         features.mol, core_atom_set, atom_mapping,
                         ring_atom_set, chain_set, attach_ring_idx
                     )
-                    if inner_prefix:
-                        # Substituted fused het: compound prefix
+                    if inner_prefix:  # substituted core; None: the general ring namer below names it
                         cpx = get_substituted_fused_het_prefix(
                             core_smiles, attach_ring_idx,
                             atom_mapping, inner_prefix
@@ -9523,15 +9386,15 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                         if cpx is not None:
                             ring_sub_groups[cpx].append(locant)
                             continue
-                    # Unsubstituted fused het: simple prefix
-                    prefix = get_fused_heterocycle_prefix(
-                        core_smiles, attach_ring_idx, atom_mapping
-                    )
-                    if prefix is not None:
-                        # Fused het prefixes always need parentheses
-                        # (they contain locants and hyphens per IUPAC
-                        ring_sub_groups[f'({prefix})'].append(locant)
-                        continue
+                    elif inner_prefix == "":  # unsubstituted fused het: simple prefix
+                        prefix = get_fused_heterocycle_prefix(
+                            core_smiles, attach_ring_idx, atom_mapping
+                        )
+                        if prefix is not None:
+                            # Fused het prefixes always need parentheses
+                            # (they contain locants and hyphens per IUPAC
+                            ring_sub_groups[f'({prefix})'].append(locant)
+                            continue
         # --- End a phase fused het detection ---
 
         # Find ring attachment atom for position-specific naming

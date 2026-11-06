@@ -50,8 +50,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # canary call 678 of tests/support/canary_rt75_data.py (DK-NOTEXACT, a known
 # gate-off 0-wrong producer that the gate voids; probe 2026-09-26). When it is
 # fixed, pick another row whose ungated name is a wrong molecule.
-CANARY = "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1"
-CANARY_UNGATED_NAME = "3-(2-methylpropyl)-4-[4-(pentyloxy)phenyl]-1H-pyrrole-2,5-dione"
+#
+# Program 7 (2026-11-06): canary call 172 is named correctly with the gate off now ('3-{4-[(3-methylbut-2-en-1-yl)oxy]
+# phenyl}-4-(2-methylpropyl)-1H-pyrrole-2,5-dione', the count-keyed 'pentyloxy' prefix fixed at its producer), so the
+# pair stopped disagreeing, as designed. The new one is canary call 179 (DK-NOTEXACT in
+# tests/unit/rules/test_opsin_format_compliance.py): its ungated name is a wrong molecule and the gate voids it.
+CANARY = "CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12"
+CANARY_UNGATED_NAME = "(7aS)-N-heptanoyl-3-amino-5,6,7,7a-tetrahydro-1H-pyrrolizin-1-one"
 
 
 # ---------------------------------------------------------------------------

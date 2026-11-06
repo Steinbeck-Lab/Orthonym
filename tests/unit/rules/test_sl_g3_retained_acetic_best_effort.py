@@ -60,11 +60,13 @@ ROWS = [
     ("O=CCc1cc2ccccc2nc1CCCO", "[2-(3-hydroxypropyl)quinolin-3-yl]acetaldehyde"),
     ("NC(=O)Cc1cc2ccccc2nc1CCCO", "2-[2-(3-hydroxypropyl)quinolin-3-yl]acetamide"),
     ("CN(C)C(=O)Cc1cc2ccccc2nc1CCCO", "2-[2-(3-hydroxypropyl)quinolin-3-yl]-N,N-dimethylacetamide"),
+    # program 7 (2026-11-06): the main path names the decorated quinolinyl prefix whole now, and cites the C-2
+    # descriptor bare as for '(R)-chloro(phenyl)acetic acid' (was kept systematic: '(2R)-2-chloro-2-[...]ethanoic acid')
+    ("O=C(O)[C@H](Cl)c1cc2ccccc2nc1CCCO", "(R)-chloro[2-(3-hydroxypropyl)quinolin-3-yl]acetic acid"),
 ]
 
 # the systematic spelling stays where the retained one is not certain
 KEPT = [
-    ("O=C(O)[C@H](Cl)c1cc2ccccc2nc1CCCO", "(2R)-2-chloro-2-[2-(3-hydroxypropyl)quinolin-3-yl]ethanoic acid"),
     ("O=CC(Cl)c1cc2ccccc2nc1CCCO", "2-chloro-2-[2-(3-hydroxypropyl)quinolin-3-yl]ethanal"),
 ]
 

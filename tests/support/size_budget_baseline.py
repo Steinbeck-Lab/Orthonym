@@ -25,7 +25,7 @@ FUNCTIONS = {
     "src/orthonym/assembly/composer.py::_enrich_complex_ring_with_subs#1": 213,
     "src/orthonym/assembly/composer.py::_generate_alkyl_prefixes#1": 440,
     "src/orthonym/assembly/composer.py::_generate_ring_alkyl_prefixes#1": 237,
-    "src/orthonym/assembly/composer.py::_generate_ring_substituent_prefixes#1": 463,
+    "src/orthonym/assembly/composer.py::_generate_ring_substituent_prefixes#1": 462,
     "src/orthonym/assembly/composer.py::_name_r_group#1": 276,
     "src/orthonym/assembly/composer.py::_walk_amine_n_substituents#1": 229,
     "src/orthonym/assembly/general_engine.py::_emit_ring_from_analysis#1": 300,
@@ -86,7 +86,7 @@ FUNCTIONS = {
     "src/orthonym/rules/esters.py::name_polyfunctional_diester_free_hydroxy#1": 217,
     "src/orthonym/rules/fused_rings.py::_assemble_fused_heterocycle_name#1": 273,
     "src/orthonym/rules/fused_rings.py::_identify_functionalized_substituent#1": 328,
-    "src/orthonym/rules/fused_rings.py::_identify_fused_substituent#1": 477,
+    "src/orthonym/rules/fused_rings.py::_identify_fused_substituent#1": 470,
     "src/orthonym/rules/fused_rings.py::_name_ortho_fused_generate_and_test#1": 417,
     "src/orthonym/rules/fused_rings.py::_try_algorithmic_fusion_name#1": 210,
     "src/orthonym/rules/fused_rings.py::_try_partial_saturation_name#1": 241,
@@ -143,7 +143,7 @@ FUNCTIONS = {
 }
 
 FILES = {
-    "src/orthonym/assembly/composer.py": 12813,
+    "src/orthonym/assembly/composer.py": 12676,
     "src/orthonym/assembly/substituent_enumerator.py": 6533,
     "src/orthonym/assembly/substituent_naming.py": 9450,
     "src/orthonym/data/opsin_imports/aryl_groups.py": 7782,
@@ -153,7 +153,7 @@ FILES = {
     # ION3: +2 lines, the import and the call of the last charged rescue (rules/charged_fallback.py).
     "src/orthonym/namer.py": 10831,
     "src/orthonym/rules/benzene.py": 6060,
-    "src/orthonym/rules/fused_rings.py": 5653,
+    "src/orthonym/rules/fused_rings.py": 5628,
     "src/orthonym/rules/heterocycles.py": 5770,
     "src/orthonym/rules/ions.py": 7676,
     "src/orthonym/rules/multiplicative.py": 5249,

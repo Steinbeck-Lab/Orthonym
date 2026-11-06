@@ -410,15 +410,9 @@ CANARY_KNOWN_DEFECTS = {
         "(7E)-12-hydroxy-13-methoxy-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,9,10,11,12,13,14-decahydro-1H-cycloundeca[d]isoindole-1,15(2H)-dione",
         "DK-LARGERINGFUSED", (154, 320, 333),
     ),
-    "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1": (
-        # fix a performance pass (wp5): the ring now takes the form (was
-        # '...-2,5-dihydro-1H-pyrrole-2,5-dione'); the row stays a known defect: the
-        # gate-off raw name still says 'pentyloxy' for the prenyloxy group (wrong
-        # molecule). With the gate on the PIN tier abstains and best-effort is exact,
-        # as at the task start.
-        "3-(2-methylpropyl)-4-[4-(pentyloxy)phenyl]-1H-pyrrole-2,5-dione",
-        "DK-NOTEXACT", (172,),
-    ),
+    # canary call 172 (CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1, 'pentyloxy' for the prenyloxy group) is fixed since
+    # program 7 (2026-11-06): the fused-heterocycle prefixes name the group's shape, not its carbon count
+    # (assembly/straight_alkyl), and the raw name is OPSIN full-InChIKey exact; the row is no known defect any more
     "COc1ccc(C(=O)N2CCCC2=O)cc1": (
         "N-(4-methoxybenzoyl)pyrrolidin-2-one",
         "DK-RINGNLOC", (173, 293),
