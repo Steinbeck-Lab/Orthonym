@@ -15,6 +15,7 @@ Each assembler handles name transformations:
 """
 
 import re as _re
+from .ester_in_alcohol import label_ester_with_acid_ester_alcohol as _label_ester_with_acid_ester_alcohol
 from collections import Counter as _Counter
 from typing import Dict, List, Optional, Tuple
 
@@ -989,7 +990,7 @@ def _assemble_ester(
             alkyl_name, fragment_smiles, parent_smiles):
         name = f"{alkyl_prefix} {ate_name}"
         if not needs_proof or not parent_smiles or _name_round_trips(parent_smiles, name):
-            return name
+            return _label_ester_with_acid_ester_alcohol(name, alkyl_prefix, fragment_smiles, parent_smiles)
     # Nothing is proven. Say what the string rule would have built (never returned): the
     # decomposition search is told that this split is UNPROVEN and not simply unnamed, which
     # it bounds the search that follows by (``engine._exploration_exhausted``).

@@ -85,8 +85,9 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     :30768; ``assembly.carbamothioate_names``).
 
     True when ``pg`` ranks below the esters, the molecule has no ester of a senior acid (class 7a, below), the molecule
-    has the one carbamate and it is a chain unit: its N, C and ester chalcogen are not ring atoms (a ring N is a ring
-    carboxylate, ``pyrrolidine-1-carboxylate``, and a cyclic carbamate a heterocycle,, and the N bears no
+    has the one carbamate and its C and ester chalcogen are not ring atoms (a cyclic carbamate is a heterocycle,
+    ; a ring N is the ring carboxylate 'tert-butyl 4-hydroxypiperidine-1-carboxylate', which the handler
+    names through ``assembly.ring_n_carboxylate``,, and the N bears no
     nitrogen but the NH2 of a hydrazinecarboxylate (``assembly.carbazate_names`` names that one)."""
     from ...rules.seniority import SENIORITY_ORDER, ester_acid_rank, seniority_index
     mol = getattr(features, 'mol', None)
@@ -114,7 +115,7 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     c_atom = mol.GetAtomWithIdx(c_idx)
     ester_x = [nb.GetIdx() for nb in c_atom.GetNeighbors()
                if nb.GetSymbol() in ('O', 'S') and mol.GetBondBetweenAtoms(c_idx, nb.GetIdx()).GetBondType() == Chem.BondType.SINGLE]
-    if len(ester_x) != 1 or any(mol.GetAtomWithIdx(i).IsInRing() for i in (n_idx, c_idx, ester_x[0])):
+    if len(ester_x) != 1 or any(mol.GetAtomWithIdx(i).IsInRing() for i in (c_idx, ester_x[0])):
         return False
     from ..carbazate_names import free_hydrazine_nitrogen
     return all(nb.GetSymbol() != 'N' or nb.GetIdx() == free_hydrazine_nitrogen(mol, n_idx, c_idx)

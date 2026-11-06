@@ -354,12 +354,14 @@ def test_three_amides_name_the_senior_parent_as_a_pin(smiles, name):
 def test_the_bracketed_n_substituent_row_is_spelled_with_its_locants():
     """'2-(4-chlorophenoxy)-N-(3-methylbutyl)-N-{...}acetamide': the amide is the parent, its 2-substituent keeps its locant,
     each N-substituent is cited with N and enclosed alone. It was
-    '(4-chlorophenoxy)[N-(3-methylbutyl)](N-{...})acetamide', a name no tier labels a PIN."""
+    '(4-chlorophenoxy)[N-(3-methylbutyl)](N-{...})acetamide', a name no tier labels a PIN. The strict path now builds
+    the name (the amino group of a chain carboxamide may carry a ring, ``assembly.chain_carboxamide``): it is the PIN,
+    the parent with more substituents and the method (1) 'amino'/'oxo' prefix of."""
     smiles = "CC1=CN=C(S1)NC(=O)CN(CCC(C)C)C(=O)COC2=CC=C(C=C2)Cl"
     row = tier_row(smiles, "best-effort")
     assert row["name"] == ("2-(4-chlorophenoxy)-N-(3-methylbutyl)-N-{2-[(5-methyl-1,3-thiazol-2-yl)amino]-2-oxoethyl}"
                            "acetamide"), row
-    assert row["tier"] != "pin_verified", row
+    assert row["tier"] == "pin_verified", row
     assert_full_rt(row["name"], smiles)
 
 

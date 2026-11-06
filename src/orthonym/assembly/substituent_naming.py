@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from .chain_carboxamide import is_chain_carboxamide as _is_chain_carboxamide, pin_amide_prefix
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
@@ -1830,71 +1831,6 @@ def _ring_branch_may_need_other_parent(mol, sub_set, attach_idx, branch):
         except Exception:
             return True
     return False
-
-
-def _is_chain_carboxamide(mol, sub_atoms, attach_idx) -> bool:
-    """True for a substituent that is an acyclic carbon chain of two or more
-    carbons, attached at a carbon, ending in a carboxamide -C(=O)-N< whose N
-    carries only hydrogen or saturated carbon: "Carbamoyl and
-    amino groups may be substituted in the normal way", the Blue Book).
-    The fragment holds no other heteroatom, no ring atom, no charge and no
-    radical, so the chain's name is the method (1) 'amino' + 'oxo' form and
-    nothing else in it is decided here."""
-    try:
-        sub_set = set(sub_atoms)
-        if attach_idx not in sub_set or mol.GetAtomWithIdx(attach_idx).GetSymbol() != 'C':
-            return False
-        ring_info = mol.GetRingInfo()
-        o_atoms, n_atoms = [], []
-        for idx in sub_set:
-            a = mol.GetAtomWithIdx(idx)
-            if (ring_info.NumAtomRings(idx) or a.GetFormalCharge()
-                    or a.GetNumRadicalElectrons()):
-                return False
-            sym = a.GetSymbol()
-            if sym == 'O':
-                o_atoms.append(a)
-            elif sym == 'N':
-                n_atoms.append(a)
-            elif sym != 'C':
-                return False
-        if len(o_atoms) != 1 or len(n_atoms) != 1:
-            return False
-        o, n = o_atoms[0], n_atoms[0]
-        if o.GetDegree() != 1:
-            return False
-        cc = o.GetNeighbors()[0]
-        if (mol.GetBondBetweenAtoms(o.GetIdx(), cc.GetIdx()).GetBondType()
-                != Chem.BondType.DOUBLE or cc.GetSymbol() != 'C'
-                or mol.GetBondBetweenAtoms(n.GetIdx(), cc.GetIdx()) is None):
-            return False
-        chain_nbrs = [x for x in cc.GetNeighbors()
-                      if x.GetIdx() in sub_set and x.GetSymbol() == 'C']
-        if len(chain_nbrs) != 1 or cc.GetIdx() == attach_idx:
-            return False          # the amide carbon ends a chain of >= 2 carbons
-        # The amide carbon is reached from the attachment through carbon atoms
-        # only: an N between them is the reversed amide -NH-CO-R (an acylamino
-        # group,, not a carboxamide at the chain end.
-        seen, stack = {attach_idx}, [attach_idx]
-        while stack:
-            cur = stack.pop()
-            for x in mol.GetAtomWithIdx(cur).GetNeighbors():
-                xi = x.GetIdx()
-                if xi in sub_set and xi not in seen and x.GetSymbol() == 'C':
-                    seen.add(xi)
-                    stack.append(xi)
-        if cc.GetIdx() not in seen:
-            return False
-        for x in n.GetNeighbors():
-            if x.GetIdx() == cc.GetIdx():
-                continue
-            if x.GetSymbol() != 'C' or x.GetIdx() not in sub_set or x.GetIsAromatic():
-                return False
-            if any(b.GetBondType() != Chem.BondType.SINGLE for b in x.GetBonds()):
-                return False
-        return True
-    except Exception:
-        return False
 
 
 def _branch_and_parent_are_distinct_units(mol, sub_set, attach_idx, branch, pg_matches):
@@ -7303,8 +7239,9 @@ def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
             (sorted(_fg_branch_atoms(mol, h, attach_idx, sub_set)), r)
             for h, r in zip(heavy, subs)])
         if _anilino is not None:
-            # C6H5-N<: (the Blue Book), (:26308)
-            return built(_anilino, substituted=True)
+            # C6H5-N<: (the Blue Book), (:26308); the bare retained prefix carries no
+            # substituent and no enclosing marks ('2-anilino-2-oxoethyl (preferred prefix)',:24603)
+            return built(_anilino, substituted=_anilino != 'anilino')
         if len(subs) == 1:
             # One branch: no citation-order ambiguity only governs
             # the SECOND and further substituent of a mononuclear parent), so the
@@ -8986,7 +8923,7 @@ def _name_substituent_fragment_uncached(
     # (:32928), 'amino' and 'oxo' on the terminal atom -- '5-(2-amino-2-oxoethyl)
     # furan-2-carboxylic acid (PIN)' (:32940); the recursive path below writes the
     # method (2) form '(carbamoylmethyl)' (:32941); and the 'acylsulfanyl' prefix.
-    _fg_pin = (not _fg_best_effort and attach_idx is not None and (_is_chain_carboxamide(
+    _fg_pin = (not _fg_best_effort and attach_idx is not None and (pin_amide_prefix(
         mol, sub_atoms, attach_idx) or is_acylsulfanyl(mol, sub_atoms, attach_idx)))
     if tier_fg_engages(mol, sub_atoms, attach_idx, _fg_best_effort, _fg_pin):
         _fg_name = None

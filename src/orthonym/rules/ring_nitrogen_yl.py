@@ -87,7 +87,26 @@ def _ring_group(mol, atom_idx: int):
 
 def large_substituent_in_scope(mol, start_idx: int, sub_atoms, ring_atoms) -> bool:
     """A substituent of more than ten atoms that the benzene collector still names: a ring-nitrogen '-yl' group
-    (``ring_nitrogen_yl``) or an 'a' chain ('4-(2,5,8,11-tetraoxatridecan-13-yl)benzoic acid',."""
+    (``ring_nitrogen_yl``), an 'a' chain ('4-(2,5,8,11-tetraoxatridecan-13-yl)benzoic acid', or a
+    group without a ring atom: a chain on a ring is a substituent of the ring whatever its length,
+    (the Blue Book) "Names of cyclic hydrocarbons substituted by chains are formed by substituting chains,
+    saturated or unsaturated, into rings... This rule must be strictly applied in the context of preferred IUPAC
+    names" ('5-[(11E)-heptadec-11-en-1-yl]benzene-1,3-diol'). A chain with a double bond to oxygen (the ester, acyl or
+    acid group of carbon, phosphorus or sulfur) is left to the routes that name it as such: the substituent namer cites it as 'oxobutoxy' and the
+    like, a worse name than the ester name another route gives."""
     from .replacement_chain_prefix import replacement_chain_prefix
     return (ring_yl_in_scope(mol, start_idx, sub_atoms) or ring_yl_branch_in_scope(mol, sub_atoms, ring_atoms)
+            or _acyclic_without_carbonyl(mol, sub_atoms)
             or replacement_chain_prefix(mol, list(sub_atoms), start_idx) is not None)
+
+
+def _acyclic_without_carbonyl(mol, sub_atoms) -> bool:
+    """True when no atom of ``sub_atoms`` is a ring atom and none of them carries a double bond to oxygen (the acyl,
+    ester and acid groups of carbon, phosphorus and sulfur)."""
+    for i in sub_atoms:
+        atom = mol.GetAtomWithIdx(i)
+        if atom.IsInRing():
+            return False
+        if any(b.GetBondTypeAsDouble() == 2.0 and b.GetOtherAtom(atom).GetSymbol() == "O" for b in atom.GetBonds()):
+            return False
+    return True

@@ -83,7 +83,9 @@ def test_a_failing_book_spelling_never_costs_the_name(monkeypatch, tier):
 #: nilotinib now has its PIN and no longer reaches the terminal-fragment writer, nor do the ring acids with an N-aryl
 #: carbamoyl group (the ring handlers name them, '4-{[3-(trifluoromethyl)phenyl]carbamoyl}benzoic acid'); this acid
 #: with a glycinamide linker does, at the valid tier (traced: ``_same_reach_name`` runs)
-WITNESS = "OC(=O)c1ccc(cc1)C(=O)NCC(=O)Nc1cccc(c1)C(F)(F)F"
+# a composite fragment the terminal-fragment writer still names (the anilide of this witness used to be one; the PIN
+# tier now names its 2-anilino-2-oxoethyl group by the chain-carboxamide route, so the benzylamide stands in)
+WITNESS = "OC(=O)c1ccc(cc1)C(=O)NCC(=O)NCc1cccc(c1)C(F)(F)F"
 
 
 @pytest.mark.opsin_gate
