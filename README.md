@@ -104,7 +104,7 @@ PIN path builds it and OPSIN reads it back, and otherwise a systematic name that
 its tier. `--emit-tier pin` returns only the verified PIN, or no name, as releases up to 1.0.x did by default.
 The other tiers are asked for by name with `--emit-tier` (`name_compound(..., emit_tier=...)` in Python) and
 label every name they return. On 2,000 held-out ChEBI molecules the default names 1,994 (99.70 %) and declines 5,
-and `--emit-tier pin` names 1,229 (61.45 %) and declines 758. A name counts only when OPSIN 2.9.0 reads it back to
+and `--emit-tier pin` names 1,232 (61.60 %) and declines 755. A name counts only when OPSIN 2.9.0 reads it back to
 the molecule ([both on three sets](guide/accuracy.md#the-two-tiers)).
 
 | `--emit-tier` | Returns |

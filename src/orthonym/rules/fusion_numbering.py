@@ -209,6 +209,7 @@ def _fusion_atoms(graph: Dict[int, Dict[str, object]]) -> Set[int]:
 def _peripheral_cycle(
     mol: Chem.Mol,
     ring_atoms: Set[int],
+    allow_interior: bool = False,
 ) -> Optional[List[int]]:
     """Return the peripheral cycle of the fused system in connectivity order.
 
@@ -242,9 +243,13 @@ def _peripheral_cycle(
             peripheral_adj[b].append(a)
 
     # In a cata-fused system every atom must have exactly two peripheral
-    # neighbours (the periphery is a single simple cycle through all atoms).
-    if any(len(peripheral_adj[a]) != 2 for a in ring_atoms):
+    # neighbours (the periphery is a single simple cycle through all atoms). With
+    # ``allow_interior`` an atom with no peripheral bond is an interior atom of a
+    # peri-fused system and is left off the cycle.
+    on_cycle = {a for a in ring_atoms if peripheral_adj[a]} if allow_interior else set(ring_atoms)
+    if any(len(peripheral_adj[a]) != 2 for a in on_cycle):
         return None
+    ring_atoms = on_cycle
 
     # Walk the single cycle deterministically from the lowest atom index.
     start = min(ring_atoms)
@@ -498,6 +503,7 @@ def _indicated_h_locants(
 def compute_fused_numbering(
     mol: Chem.Mol,
     ring_system_atoms,
+    allow_peri: bool = False,
 ) -> Optional[Dict[int, _Locant]]:
     """Deterministic IUPAC fused-ring numbering for an all-6 cata-fused PAH.
 
@@ -532,7 +538,10 @@ def compute_fused_numbering(
     # (7-/8-membered rings = S2b.3, peri-fusion = S4), so this is a superset gate
     # that never regresses the all-6 path.
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['cata_fused'] and info['connected']):
+    # ``allow_peri`` (the peri-fusion producer only, issue 216): an all-six-membered
+    # ortho- and peri-fused system, its interior atoms numbered by below
+    peri = allow_peri and not info['cata_fused']
+    if not ((info['cata_fused'] or peri) and info['connected']):
         return None
     graph = info['graph']  # type: ignore[assignment]
 
@@ -547,9 +556,12 @@ def compute_fused_numbering(
     if fixed is not None:
         return fixed
 
-    periphery = _peripheral_cycle(mol, ring_atoms)
-    if periphery is None or len(periphery) != len(ring_atoms):
+    periphery = _peripheral_cycle(mol, ring_atoms, allow_interior=peri)
+    if periphery is None or (len(periphery) != len(ring_atoms) and not peri):
         return None
+    interior = ring_atoms - set(periphery)
+    if any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in interior):
+        return None    # an interior heteroatom takes the numbering rules of: not built here
 
     fusion_atoms = _fusion_atoms(graph)  # type: ignore[arg-type]
 
@@ -558,10 +570,10 @@ def compute_fused_numbering(
     # start ring is the uppermost cell, then the one furthest to the right
     #, the Blue Book), read off the cell centres.
     if info['all_six']:
-        orientations = best_orientations(mol, ring_atoms)
+        orientations = best_orientations(mol, ring_atoms, allow_peri=peri)
         layouts = [(None, coords) for coords in orientations] if orientations else []
     else:
-        got = grid_orientations(mol, ring_atoms)
+        got = grid_orientations(mol, ring_atoms, allow_peri=peri)
         layouts = got[1] if got else []
     if layouts:
         starts = []
@@ -645,4 +657,22 @@ def compute_fused_numbering(
             best_map, best_het, best_fus, best_ih = cand, het, fus, ih
             best_sig = _canon_signature(cand)
 
+    if best_map is not None and interior:
+        best_map = _with_interior_locants(mol, best_map, interior)
     return best_map
+
+
+def _with_interior_locants(mol: Chem.Mol, locants: Dict[int, _Locant], interior: Set[int]):
+    """ (the Blue Book): "Interior atoms are numbered by identifying the minimum number of bonds
+    linking them to a peripheral atom. The locant for the interior atom is that of the peripheral atom with a
+    superscript number corresponding to the number of bonds between the two atoms";: "If there is a
+    choice of locants for interior carbon atom, lower locants are selected" ('3a^1')."""
+    from .bridged_fused_pin.numbering import loc_key
+    out = dict(locants)
+    matrix = Chem.GetDistanceMatrix(mol)
+    for atom in sorted(interior):
+        dist = matrix[atom]
+        nearest = min(locants, key=lambda p: (int(dist[p]), loc_key(locants[p])))
+        loc, d = locants[nearest], int(dist[nearest])
+        out[atom] = f"{loc[0]}{loc[1]}^{d}" if isinstance(loc, tuple) else f"{loc}^{d}"
+    return out

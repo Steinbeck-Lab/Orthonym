@@ -79,12 +79,20 @@ def test_a_substituent_on_the_printed_parent_takes_the_entry_numbering():
 
 
 def test_other_interior_systems_keep_their_behaviour():
-    # two skeletons the table does not hold (a single interior nitrogen: fusion nomenclature names those,
-    #: the default tier declines and the best-effort tier gives the von Baeyer name
-    for smiles, be in (("C1=CC2=CC=CC3=CC=CC(=C1)N23", "13-azatricyclo[7.3.1.0^5,13]trideca-1(12),2,4,6,8,10-hexaene"),
-                       ("C1=CC2=CC=CN3C=CC=C(C1)C23", "1-azatricyclo[7.3.1.0^5,13]trideca-2,4,6,9,11-pentaene")):
-        assert default_tier_row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
-        assert name_best_effort(smiles)["name"] == be
+    # a skeleton the table does not hold with a saturated carbon: the default tier declines and the best-effort tier
+    # gives the von Baeyer name
+    smiles, be = "C1=CC2=CC=CN3C=CC=C(C1)C23", "1-azatricyclo[7.3.1.0^5,13]trideca-2,4,6,9,11-pentaene"
+    assert default_tier_row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
+    assert name_best_effort(smiles)["name"] == be
+
+
+def test_mancude_interior_nitrogen_system_takes_its_fusion_name():
+    # issue 216: a single interior nitrogen is named by fusion nomenclature, as the book prints
+    # '...[1,4]azaphosphinino[2,1,6-de]quinolizine (PIN)', the Blue Book); the name cites no
+    # interior locant, so OPSIN reads it directly (it was the von Baeyer
+    # '13-azatricyclo[7.3.1.0^5,13]trideca-1(12),2,4,6,8,10-hexaene' before)
+    row = default_tier_row("C1=CC2=CC=CC3=CC=CC(=C1)N23")
+    assert (row["name"], row["tier"]) == ("pyrido[2,1,6-de]quinolizine", "pin_verified"), row
 
 
 def test_a_fused_parent_of_the_shared_catalogue_is_unchanged():

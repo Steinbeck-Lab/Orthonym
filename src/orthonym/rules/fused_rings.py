@@ -54,6 +54,8 @@ from .stereochemistry import (
 )
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from .fused_interior import interior_pin_name as _interior_pin_name
+from .peri_fusion import peri_fusion_name, senior_component_ring_count
+from .fused_name_decoration import decorate_fused_name
 from .lambda_convention import HETERONE_RING_ATOMS, fused_lambda_name_and_prefix
 from ..data.locant_text import render_locants
 
@@ -307,6 +309,9 @@ def _fused_locant_num(loc):
     tuple). Fusion-letter locants sort just after their integer."""
     if isinstance(loc, tuple):
         return (loc[0], 1)
+    if isinstance(loc, str) and '^' in loc:     # an interior atom ('3a^1', after its peripheral atom
+        base, sup = loc.split('^')
+        return (int(base.rstrip('abcdefghijklmnopqrstuvwxyz')), 2 + int(sup))
     if isinstance(loc, str) and loc and loc[-1].isalpha():
         return (int(loc[:-1]), 1)
     return (int(loc), 0)
@@ -400,7 +405,7 @@ def _ring_system_automorphisms(
     return perms or [identity]
 
 
-def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
+def _select_substituent_numbering(mol, ring_atom_set: Set[int], allow_peri: bool = False):
     """Choose the peripheral numbering for a SUBSTITUTED 2-component ortho-fused
     mancude ring system and discover its substituents against it.
 
@@ -414,7 +419,7 @@ def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
     guarantees a single deterministic representative.
     """
     from .fusion_numbering import compute_fused_numbering
-    canonical = compute_fused_numbering(mol, ring_atom_set)
+    canonical = compute_fused_numbering(mol, ring_atom_set, allow_peri=allow_peri)
     if not canonical:
         return None  # engine declined -> cannot trust locants -> fail closed
     canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
@@ -1560,71 +1565,10 @@ def _try_algorithmic_fusion_name(mol, require_certified: bool = False) -> Option
             mol, parent_ring, child_ring, shared, parent_name, child_name
         )
 
-    # A ring atom with an exocyclic double bond (ketone suffix; ylidene, imino or oxo
-    # prefix): the hydrogen of the name is the mancude parent's, with the groups
-    # accommodated by / (``ring_hydrogen``); the counters below read
-    # the substituted ring instead and drop it ('pyrido[1,2-b]pyridazin-6-one' for the PIN
-    # '6H-pyrido[1,2-b]pyridazin-6-one', the Blue Book).
-    ring_h = None
-    hydro_txt = ''
-    if has_substituents:
-        ring_h = _placed_ring_hydrogen(mol, ring_atom_set, atom_to_locant, substituents)
-        if ring_h is not None:
-            from . import ring_hydrogen as _rh
-            hydro_txt = _rh.hydro_text(ring_h, atom_to_locant)
-            if hydro_txt is None:
-                ring_h, hydro_txt = None, ''
-    if ring_h is not None:
-        from .bridged_fused_pin.numbering import loc_key as _loc_key
-        indicated_h = sorted((atom_to_locant[a] for a in ring_h.indicated), key=_loc_key)
-        substituents = _hydrogen_marked_substituents(substituents, ring_h, atom_to_locant)
-    else:
-        indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
-        if not indicated_h:
-            indicated_h = _mancude_indicated_h_locants(
-                mol, ring_atom_set, atom_to_locant, has_substituents)
-    if skeleton_matched:
-        # The descriptor was accepted on the skeleton alone: ship only with the
-        # established indicated hydrogen cited,:14607), never bare.
-        _ih = _mancude_indicated_h_locants(
-            mol, ring_atom_set, atom_to_locant, has_substituents)
-        if not _ih or list(indicated_h) != list(_ih):
-            return None
-
-    #: lambda (nonstandard bonding number) tokens follow the
-    # atom's fused-system locant and are cited at the beginning of the name,
-    # after any indicated hydrogen (monocyclic precedent 1H-1lambda4-thiophene,
-    #. Fail-closed: a lambda atom without a determinate NUMERIC
-    # fused locant (or on skeletal carbon) invalidates the whole name -- the
-    # lambda-less name would denote a DIFFERENT molecule.
-    name, lam_prefix = fused_lambda_name_and_prefix(name, mol, ring_atom_set, atom_to_locant)
-    if lam_prefix is None:
+    name = decorate_fused_name(mol, ring_atom_set, name, atom_to_locant, substituents, has_substituents,
+                               skeleton_matched)
+    if name is None:
         return None
-
-    if indicated_h:
-        h_parts = render_locants(str(loc) + 'H' for loc in indicated_h)
-        name = f"{h_parts}-{lam_prefix}{name}"
-        # (the Blue Book): indicated hydrogen tells apart the
-        # isomers of the MANCUDE parent; (:17026): the degree of
-        # hydrogenation is given by 'hydro' prefixes ('6,7-dihydro-5H-benzo[7]annulene
-        # (PIN)',:17032). More indicated hydrogen than the mancude parent takes
-        # ('5H,6H,7H,8H,9H-cyclohepta[b]pyridine', '1H,2H,3H-benzo[d]imidazole') is
-        # a saturated region spelled as indicated hydrogen: valid, never the PIN.
-        if len(indicated_h) > _mancude_indicated_h_count(mol, ring_atom_set):
-            _record_non_pin_spelling(name[:-1] if name.endswith('e') else name)
-    elif lam_prefix:
-        name = f"{lam_prefix}{name}"
-    if hydro_txt:
-        name = _join_hydrogen_prefix(hydro_txt, name)
-
-    # a phase: attach the substituents discovered above against the
-    # canonical numbering, reusing the exact assembler the catalog path uses.
-    # The bare-parent `name` (with any indicated-H/lambda prefix already
-    # assembled) is the parent the assembler decorates.
-    if has_substituents:
-        name = _assemble_fused_heterocycle_name(
-            mol, name, substituents, atom_to_locant
-        )
 
     logger.debug(
         "Algorithmic fusion name for %s: %s",
@@ -2098,26 +2042,8 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     # the name of the component and are enclosed within square brackets" --
     # '[1]benzopyrano[2,3-c]pyrrole (PIN)' (:12157). And (:11982):
     # the 1,2-/1,3-azoles are components only by their Hantzsch-Widman names.
-    _HW_COMPONENT = {'oxazole': '[1,3]oxazole', 'isoxazole': '[1,2]oxazole',
-                     'thiazole': '[1,3]thiazole', 'isothiazole': '[1,2]thiazole'}
-
-    def _component(name: str) -> str:
-        # a component's own indicated hydrogen is not cited: the fused system
-        # gets its own, added below
-        core = re.sub(r'^\d+[a-z]?H-', '', name)
-        m = re.match(r'^(\d+(?:,\d+)*)-(.+)$', core)
-        return f"[{m.group(1)}]{m.group(2)}" if m else _HW_COMPONENT.get(core, core)
-
-    def _attached_prefix(name: str) -> Optional[str]:
-        core = re.sub(r'^\d+[a-z]?H-', '', name)
-        m = re.match(r'^(\d+(?:,\d+)*)-(.+)$', core)
-        if m:
-            inner = get_fusion_prefix(m.group(2))
-            return f"[{m.group(1)}]{inner}" if inner else None
-        if core in _HW_COMPONENT:
-            inner = get_fusion_prefix(_HW_COMPONENT[core].split(']', 1)[1])
-            return _HW_COMPONENT[core].split(']', 1)[0] + ']' + inner if inner else None
-        return get_fusion_prefix(core) or None
+    from .fusion_descriptors import fusion_attached_prefix as _attached_prefix
+    from .fusion_descriptors import fusion_component_name as _component
 
     # "Seniority criteria for selecting the parent component"
     # (the Blue Book): "If there is a choice for selecting the parent
@@ -2599,7 +2525,10 @@ def _name_naphtho_fused_generate_and_test(mol) -> Optional[str]:
                     candidates.add(nm)
     if not candidates:
         return None
-    return sorted(candidates, key=lambda n: (len(n), n))[0]
+    named = sorted(candidates, key=lambda n: (len(n), n))[0]
+    if senior_component_ring_count(mol, ring_sets) > 2:   # (b): acridine, not quinoline, is the parent
+        _record_non_pin_spelling(named)                     # ('naphtho[1,2-b]quinoline' for benzo[c]acridine)
+    return named
 
 
 def _core_covers_ring_system(mol, atom_mapping) -> bool:
@@ -2970,17 +2899,13 @@ def name_fused_heterocycle(mol):
         # prefix. UPGRADES the RT-true von-Baeyer degradation to the fusion PIN.
         # 0-wrong by construction (OPSIN-RT-gated); None -> caller keeps the
         # von-Baeyer no-abstain fallback.
-        naphtho = _name_naphtho_fused_generate_and_test(mol)
-        if naphtho:
-            return (naphtho, ring_atoms, {}, True)
-        # Interior-atom systems need the superscript locant of
-        # (the Blue Book, '3a^1'), which OPSIN 2.9.0 cannot read, so a
-        # general interior-atom numbering has no read-back. The parents the book
-        # prints are in data.fused_interior_pins and are named at the default
-        # tier by the lookup above (checked through their twin spelling, rule
-        # interior_phenalene); every other interior-atom system is declined here.
-        # See tests/unit/rules/test_twin_interior.py and tests/unit/rules/
-        # test_wave2_p5_fused.py::TestP25InteriorAtomNumberingFailClosed.
+        # issue 216: a bare peri-fused system of two components ('[1]benzofuro[4,3,2-bcd][1]benzofuran')
+        named = _name_naphtho_fused_generate_and_test(mol) or peri_fusion_name(mol)
+        if named:
+            return (named, ring_atoms, {}, True)
+        # A name citing an interior locant ('3a^1', OPSIN 2.9.0 reads none) is declined here, except the
+        # printed parents of data.fused_interior_pins (lookup above, twin spelling interior_phenalene).
+        # Tests: test_twin_interior.py, test_wave2_p5_fused.py::TestP25InteriorAtomNumberingFailClosed.
         return None
 
     core_name, atom_mapping, _core_smiles = core_result

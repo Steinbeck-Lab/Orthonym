@@ -217,18 +217,32 @@ def _horizontal_row_count(mol, rings_in_component):
             if i < j and len(sets[i] & sets[j]) == 2:
                 adj[i].append(j)
                 adj[j].append(i)
-    # longest simple path over the (small) fusion graph
+    # longest simple path over the (small) fusion graph that runs straight: a middle ring continues the row only
+    # when its two fusion bonds are opposite each other (anthracene 3, phenanthrene 2; (g) "the greatest
+    # number of rings in a horizontal row", the Blue Book)
     best = 1
 
-    def dfs(u, seen):
+    def straight(prev, mid, nxt):
+        ring = rings_in_component[mid]
+        n = len(ring)
+        if n % 2:
+            return False
+        pos = {a: k for k, a in enumerate(ring)}
+        bond_a = sorted(pos[a] for a in sets[mid] & sets[prev])
+        bond_b = sorted(pos[a] for a in sets[mid] & sets[nxt])
+        if set(bond_a) & set(bond_b):
+            return False
+        return {(p + n // 2) % n for p in bond_a} == set(bond_b)
+
+    def dfs(path):
         nonlocal best
-        best = max(best, len(seen))
-        for v in adj[u]:
-            if v not in seen:
-                dfs(v, seen | {v})
+        best = max(best, len(path))
+        for v in adj[path[-1]]:
+            if v not in path and (len(path) < 2 or straight(path[-2], path[-1], v)):
+                dfs(path + [v])
 
     for s in idx:
-        dfs(s, {s})
+        dfs([s])
     return best
 
 

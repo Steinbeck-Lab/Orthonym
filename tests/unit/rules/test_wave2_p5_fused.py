@@ -12,8 +12,10 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
+# 'C1=CC2=CC=CC3=CC=CC(=C1)N23' left this list (issue 216): its PIN is the fusion name
+# 'pyrido[2,1,6-de]quinolizine', the pattern of '...[1,4]azaphosphinino[2,1,6-de]quinolizine (PIN)',
+# the Blue Book), which cites no interior locant.
 DEFAULT_TIER_DECLINES = frozenset({
-    "C1=CC2=CC=CC3=CC=CC(=C1)N23",
     "C1=CC2=CC=CN3C=CC=C(C1)C23",
 })
 #... whose best-effort name is another one (it reads back exactly)

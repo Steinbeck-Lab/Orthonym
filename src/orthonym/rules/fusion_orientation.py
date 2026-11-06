@@ -795,6 +795,7 @@ def score_orientation_general(
 def best_orientations(
     mol: Chem.Mol,
     ring_atoms: Set[int],
+    allow_peri: bool = False,
 ) -> Optional[List[Dict[int, Tuple[int, int]]]]:
     """Return ALL orientations tying for best by (a)-(d).
 
@@ -811,7 +812,8 @@ def best_orientations(
       ``score_orientation_general`` selects the preferred orientation.
     """
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['cata_fused'] and info['connected']):
+    peri = allow_peri and info['all_six']      # the peri-fusion producer only (issue 216)
+    if not ((info['cata_fused'] or peri) and info['connected']):
         return None
     graph = info['graph']  # type: ignore[assignment]
 
@@ -1029,14 +1031,14 @@ def score_orientation_grid(graph, centres, coords) -> Tuple[int, ...]:
     return (-max_row,) + best
 
 
-def grid_orientations(mol: Chem.Mol, ring_atoms: Set[int]):
+def grid_orientations(mol: Chem.Mol, ring_atoms: Set[int], allow_peri: bool = False):
     """(graph, [(cell centres, atom coordinates)] of every drawing tying for best by
     , or None when the system is not cata-fused, a ring is outside
     3..GRID_MAX_RING members, or it cannot be drawn on the grid. The drawings depend
     on the ring graph only, so they are computed once per element-blind skeleton
     (``_grid_orientations_of_skeleton``) and carried over to ``mol``'s atoms."""
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['cata_fused'] and info['connected']):
+    if not ((info['cata_fused'] or allow_peri) and info['connected']):
         return None
     graph = info['graph']
     if any(not 3 <= len(r) <= GRID_MAX_RING for r in info['rings']):
@@ -1054,7 +1056,7 @@ def grid_orientations(mol: Chem.Mol, ring_atoms: Set[int]):
     sk.UpdatePropertyCache(strict=False)
     key = Chem.MolToSmiles(sk)
     order = list(sk.GetPropsAsDict(True, True).get('_smilesAtomOutputOrder', ()))
-    got = _grid_orientations_of_skeleton(key)
+    got = _grid_orientations_of_skeleton(key, allow_peri)
     if got is None or len(order) != len(idx):
         return None
     to_mol = {k: idx[order[k]] for k in range(len(order))}   # key atom -> mol atom
@@ -1072,13 +1074,13 @@ def grid_orientations(mol: Chem.Mol, ring_atoms: Set[int]):
 
 
 @_lru_cache(maxsize=2048)
-def _grid_orientations_of_skeleton(key: str):
+def _grid_orientations_of_skeleton(key: str, allow_peri: bool = False):
     """``_grid_orientations_uncached`` on the all-carbon skeleton ``key``, with each cell
     centre keyed by the ring's atom set (stable across the two graphs)."""
     km = Chem.MolFromSmiles(key)
     if km is None:
         return None
-    got = _grid_orientations_uncached(km, set(range(km.GetNumAtoms())))
+    got = _grid_orientations_uncached(km, set(range(km.GetNumAtoms())), allow_peri)
     if got is None:
         return None
     graph, layouts = got
@@ -1086,9 +1088,9 @@ def _grid_orientations_of_skeleton(key: str):
                  for centres, coords in layouts)
 
 
-def _grid_orientations_uncached(mol: Chem.Mol, ring_atoms: Set[int]):
+def _grid_orientations_uncached(mol: Chem.Mol, ring_atoms: Set[int], allow_peri: bool = False):
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['cata_fused'] and info['connected']):
+    if not ((info['cata_fused'] or allow_peri) and info['connected']):
         return None
     graph = info['graph']
     if any(not 3 <= len(r) <= GRID_MAX_RING for r in info['rings']):

@@ -10,11 +10,11 @@
     {"set": "PubChem 1,000,000", "molecules": 1000000, "named": 957523, "declined": 42468, "unreadable": 1, "other_layers": 8, "wrong": 0}
   ],
   "tiers": {
-    "source": "Orthonym main after the merges of 2026-10-31 (held-out ChEBI measured at the P-100 build, the development and drug-like sets after the natural-product names the higher-order and large-ring fusion names; their PIN-only columns on 2026-11-05, after the amide, ester and peptide parent choices); the evaluation harness at --emit-tier pin (the PIN-only tier) and --emit-tier best-effort (the default), every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
+    "source": "Orthonym main after the merges of 2026-10-31 (held-out ChEBI measured at the P-100 build, the development and drug-like sets after the natural-product names the higher-order and large-ring fusion names; their PIN-only columns on 2026-11-05, after the amide, ester and peptide parent choices; the held-out PIN-only column on 2026-11-06, after the peri-fused ring names); the evaluation harness at --emit-tier pin (the PIN-only tier) and --emit-tier best-effort (the default), every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
     "columns": ["Set", "Molecules", "Named, default", "Named, PIN-only tier", "Declined, default", "Declined, PIN-only tier", "Unreadable, default", "Unreadable, PIN-only tier"],
     "rows": [
       {"set": "Held-out ChEBI 2,000", "molecules": 2000,
-       "pin": {"named": 1229, "declined": 758, "unreadable": 13, "timed_out": 0},
+       "pin": {"named": 1232, "declined": 755, "unreadable": 13, "timed_out": 0},
        "best_effort": {"named": 1994, "declined": 5, "unreadable": 1, "timed_out": 0}, "wrong": 0},
       {"set": "ChEBI development 2,000", "molecules": 2000,
        "pin": {"named": 1219, "declined": 764, "unreadable": 17, "timed_out": 0},

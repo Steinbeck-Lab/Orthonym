@@ -317,6 +317,40 @@ def generate_fusion_descriptor(
     return f"[{child_pos_lower},{child_pos_higher}-{fusion_letter}]"
 
 
+#: 1,2- and 1,3-azoles are components only by their Hantzsch-Widman names, the Blue Book)
+HW_FUSION_COMPONENT = {'oxazole': '[1,3]oxazole', 'isoxazole': '[1,2]oxazole',
+                       'thiazole': '[1,3]thiazole', 'isothiazole': '[1,2]thiazole'}
+_INDICATED_H = re.compile(r'^\d+[a-z]?H-')
+_HETERO_LOCANTS = re.compile(r'^(\d+(?:,\d+)*)-(.+)$')
+
+
+def strip_indicated_hydrogen(name: str) -> str:
+    """A component name without its own indicated hydrogen: the fused system gets its own."""
+    return _INDICATED_H.sub('', name)
+
+
+def fusion_component_name(name: str) -> str:
+    """The parent-component spelling of a ring name: no indicated hydrogen, heteroatom locants in square brackets
+    ,:11907, '[1]benzopyrano[2,3-c]pyrrole (PIN)')."""
+    core = strip_indicated_hydrogen(name)
+    m = _HETERO_LOCANTS.match(core)
+    return f"[{m.group(1)}]{m.group(2)}" if m else HW_FUSION_COMPONENT.get(core, core)
+
+
+def fusion_attached_prefix(name: str) -> Optional[str]:
+    """The attached-component prefix of a ring name ('[1]benzofuro', '[1,3]oxazolo', 'indeno'), or None."""
+    core = strip_indicated_hydrogen(name)
+    m = _HETERO_LOCANTS.match(core)
+    if m:
+        inner = get_fusion_prefix(m.group(2))
+        return f"[{m.group(1)}]{inner}" if inner else None
+    if core in HW_FUSION_COMPONENT:
+        locants, ring = HW_FUSION_COMPONENT[core].split(']', 1)
+        inner = get_fusion_prefix(ring)
+        return f"{locants}]{inner}" if inner else None
+    return get_fusion_prefix(core) or None
+
+
 def get_fusion_prefix(ring_name: str) -> str:
     """
     Convert ring name to its fusion prefix form.
@@ -367,8 +401,12 @@ def get_fusion_prefix(ring_name: str) -> str:
     # replacing the last letter 'e' by 'o'... (or by ADDING the letter 'o'
     # when no final letter 'e' is present, i.e., pyrano from pyran)."
     name = core.lower()
-    if name.endswith('ene'):
-        return name[:-3] + 'o'
+    # an '-ene' name follows the general rule: (the Blue Book) "replacing the last letter 'e' by
+    # 'o' in the name of the component, i.e., indeno from indene" (the contracted forms naphtho, anthra,... are in
+    # FUSION_PREFIXES above); a monocyclic hydrocarbon takes 'a' ('cyclopropa', 'cyclobuta',:7685;
+    # 'cyclopropa[de]anthracene (PIN)',:7691)
+    if re.fullmatch(r'cyclo[a-z]+ene', name) and not name.endswith(('diene', 'triene', 'tetraene')):
+        return name[:-3] + 'a'
     if name.endswith('ole'):
         return name[:-1] + 'o'
     if name.endswith('ine'):

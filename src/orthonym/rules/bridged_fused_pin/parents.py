@@ -77,6 +77,10 @@ PIN_PARENT_NAMES: Dict[str, int] = {
     "triphenylene": 11467, "xanthene": 11634, "1-benzofuran": 11827,
     "2-benzofuran": 11829, "1-benzopyran": 11656, "2-benzopyran": 11682,
     "1-benzothiopyran": 11664, "3-benzoxepine": 11821, "1,3-benzoxathiole": 14575,
+    # / retained parents the list missed (issue 216): '(3) perimidine (1H-isomer shown; the PIN
+    # is 1H-perimidine)', '(10) fluoranthene (PIN)', '(7) pleiadene (PIN)', '(2) pyranthrene (PIN)',
+    # '(4) rubicene (PIN)'
+    "perimidine": 11525, "fluoranthene": 11382, "pleiadene": 11360, "pyranthrene": 11342, "rubicene": 11350,
 }
 
 #: (the Blue Book, heading:11813): a benzene ring ortho-fused to a

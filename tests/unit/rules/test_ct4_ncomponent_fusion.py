@@ -55,9 +55,12 @@ def test_naphtho_quinoline_exact_pin():
 _NAPHTHO_CLASS = {
     "c1cnc2cc3c(ccc4ccccc43)cc2c1": "naphtho[2,1-g]quinoline",
     "c1cnc2cc3ccc4ccccc4c3cc2c1":   "naphtho[1,2-g]quinoline",
-    "c1ccc2cc3nc4ccccc4nc3cc2c1":   "naphtho[2,3-b]quinoxaline",
+    # a 3-ring retained component is the parent: (b) "a component containing the greater number of
+    # rings" (the Blue Book; "6H-pyrazino[2,3-b]carbazole (PIN) [carbazole (3 rings) is senior to
+    # quinoxaline (2 rings)]",:12170), so phenazine (:11517) and acridine, not quinoxaline or quinoline
+    "c1ccc2cc3nc4ccccc4nc3cc2c1":   "benzo[b]phenazine",
     "c1ccc2cc3cc4ncncc4cc3cc2c1":   "naphtho[2,3-g]quinazoline",
-    "c1ccc2cc3nc4ccccc4cc3cc2c1":   "naphtho[2,3-b]quinoline",
+    "c1ccc2cc3nc4ccccc4cc3cc2c1":   "benzo[b]acridine",
     "c1ccc2cc3cc4cnncc4cc3cc2c1":   "naphtho[2,3-g]phthalazine",
 }
 
