@@ -58,10 +58,10 @@ def test_the_guard_is_released_when_the_offer_ends(monkeypatch):
     mol, matches = _mol_and_matches()
     monkeypatch.setattr(esters, "name_ester", lambda m, match, *a, **k: "2-hydroxyethyl acetate")
     assert seniority._acyclic_ester_offered(mol, matches) is True
-    assert not seniority._ESTER_OFFER_ACTIVE
+    assert not seniority._ESTER_OFFER_ACTIVE.get()
     monkeypatch.setattr(esters, "name_ester", lambda m, match, *a, **k: None)
     assert seniority._acyclic_ester_offered(Chem.Mol(mol), matches) is False        # a name that cannot be built: no offer
-    assert not seniority._ESTER_OFFER_ACTIVE
+    assert not seniority._ESTER_OFFER_ACTIVE.get()
 
 
 def test_a_name_that_raises_is_no_offer_and_releases_the_guard(monkeypatch):
@@ -71,7 +71,7 @@ def test_a_name_that_raises_is_no_offer_and_releases_the_guard(monkeypatch):
         raise ValueError("cannot build")
     monkeypatch.setattr(esters, "name_ester", name_ester)
     assert seniority._acyclic_ester_offered(mol, matches) is False
-    assert not seniority._ESTER_OFFER_ACTIVE
+    assert not seniority._ESTER_OFFER_ACTIVE.get()
 
 
 def test_another_molecule_is_offered_while_one_is_being_built(monkeypatch):

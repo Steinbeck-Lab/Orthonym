@@ -74,7 +74,7 @@ from .fusion_numbering import (
 
 # OPSIN 2.9.0 reads a simple numerical prefix only up to 50 ('pentaconta'); a longer
 # member cannot be read back, so it is not a member this module names.
-_MAX_N = 50
+from ..opsin_capabilities import MAX_READABLE_COUNT as _MAX_N
 
 # series -> (the ending that follows the numerical prefix, the fewest rings / carbon atoms).
 # 'acene' and 'alene' take the ending with the 'a' of the prefix elided,

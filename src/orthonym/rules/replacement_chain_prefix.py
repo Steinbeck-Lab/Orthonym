@@ -14,10 +14,9 @@ from typing import List, Optional
 
 from rdkit import Chem
 
-#: OPSIN 2.9.0 reads a simple numerical prefix only up to 50 ('pentaconta'): a name that cites an 'a' prefix more often
-#: has no reading, so it is never built here and the chain is named as the other routes name it
-#: (the same bound as ``rules.hydrocarbon_series``)
-_MAX_READABLE_COUNT = 50
+#: a name that cites an 'a' prefix more often than OPSIN has a count word for has no reading, so it is never built here
+#: and the chain is named as the other routes name it
+from ..opsin_capabilities import MAX_READABLE_COUNT as _MAX_READABLE_COUNT
 
 #: 'a' prefixes in the order of (O > S > Se > Te), each cited with its locants
 _A_PREFIX = (('O', 'oxa'), ('S', 'thia'), ('Se', 'selena'), ('Te', 'tellura'))

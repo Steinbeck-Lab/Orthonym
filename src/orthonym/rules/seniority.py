@@ -6,6 +6,7 @@ The principal group (highest seniority) becomes the suffix;
 all other groups become prefixes.
 """
 
+import contextvars
 from typing import Dict, List, Optional, Tuple
 
 from .n_substituted_acids import CN_GROUPS, group_at_rank, rank_group
@@ -1427,7 +1428,7 @@ def _head_principal_group(
 #: the principal group of the same molecule again, and does so on a copy of it: the polycyclic analysis of the alcohol
 #: component works on its own Mol of the same atoms, so an ``id`` of the object let that copy offer the ester again and
 #: the offers nested 33 deep for one lactam with an acetate, each of them naming the ester once more)
-_ESTER_OFFER_ACTIVE: set = set()
+_ESTER_OFFER_ACTIVE = contextvars.ContextVar("orthonym_ester_offer_active", default=frozenset())
 
 
 def _acyclic_ester_offered(mol, matches) -> bool:
@@ -1444,18 +1445,18 @@ def _acyclic_ester_offered(mol, matches) -> bool:
     from ..assembly.memo import cache_or_compute
     from rdkit import Chem
     atom_order_smiles = Chem.MolToSmiles(mol, canonical=False)
-    if atom_order_smiles in _ESTER_OFFER_ACTIVE:
+    if atom_order_smiles in _ESTER_OFFER_ACTIVE.get():
         return False
 
     def build():
         from .esters import name_ester
-        _ESTER_OFFER_ACTIVE.add(atom_order_smiles)
+        token = _ESTER_OFFER_ACTIVE.set(_ESTER_OFFER_ACTIVE.get() | {atom_order_smiles})
         try:
             return any(name_ester(mol, m) for m in matches)
         except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
             return False
         finally:
-            _ESTER_OFFER_ACTIVE.discard(atom_order_smiles)
+            _ESTER_OFFER_ACTIVE.reset(token)
     return bool(cache_or_compute("acyclic_ester_offer", (atom_order_smiles, tuple(matches)), build))
 
 

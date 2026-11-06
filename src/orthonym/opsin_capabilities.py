@@ -21,6 +21,10 @@ from typing import Dict
 
 from . import jars
 
+#: OPSIN 2.9.0 has a numerical term up to 50 ('pentaconta') and none above: a name with a larger count word has no
+#: reading (``rules.hydrocarbon_series``, ``rules.replacement_chain_prefix``, ``validation.long_count_read_back``)
+MAX_READABLE_COUNT = 50
+
 #: capability -> (a name only newer OPSIN reads, its structure as SMILES)
 _PROBES = {
     "phane": ("1,4(1,4)-dibenzenacyclohexaphane", "C1Cc2ccc(cc2)CCc2ccc1cc2"),

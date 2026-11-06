@@ -207,6 +207,11 @@ def _hantzsch_widman_ring_bonds(mol) -> set:
     return bonds
 
 
+def _has_stereo_text(smiles: str) -> bool:
+    """A SMILES with a stereocentre or a stereo double bond."""
+    return any(ch in smiles for ch in '@/\\')
+
+
 def _same_up_to_kekule_form(parsed_smiles: str, mol) -> bool:
     """True iff ``parsed_smiles`` is ``mol`` drawn with another Kekule structure of its mancude ring systems.
 
@@ -231,10 +236,7 @@ def _same_up_to_kekule_form(parsed_smiles: str, mol) -> bool:
     from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
     try:
         reread = Chem.MolFromSmiles(parsed_smiles)
-        if reread is None or '@' in parsed_smiles or '/' in parsed_smiles or '\\' in parsed_smiles:
-            return False
-        drawn_smiles = Chem.MolToSmiles(mol)
-        if '@' in drawn_smiles or '/' in drawn_smiles or '\\' in drawn_smiles:
+        if reread is None or _has_stereo_text(parsed_smiles) or _has_stereo_text(Chem.MolToSmiles(mol)):
             return False
 
         def _erased(m):

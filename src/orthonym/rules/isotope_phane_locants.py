@@ -68,14 +68,21 @@ class CompositeLocant(int):
         return format(self.text, spec)
 
 
+def _composite_parts(token: str) -> Optional[Tuple[int, int, str]]:
+    """``(primary locant, superscript, letter)`` of a composite locant text (``1^4``, ``2^4a``), else None."""
+    m = _COMPOSITE_RE.match(token) if "^" in token else None
+    return (int(m.group(1)), int(m.group(2)), m.group(3)) if m else None
+
+
 def composite_sort_key(token: str) -> Optional[tuple]:
     """The key of a composite locant text (``1^4``, ``2^4a``) among the keys of ``isotopes._locant_sort_key``
     (``(number, has_letter, letter, primes)``): its primary locant, then the superscript; None for a
     token that is no composite locant."""
-    m = _COMPOSITE_RE.match(token) if "^" in token else None
-    if m is None:
+    parts = _composite_parts(token)
+    if parts is None:
         return None
-    return (int(m.group(1)), 0, "", token.count("'"), int(m.group(2)), 1 if m.group(3) else 0, m.group(3))
+    primary, number, letter = parts
+    return (primary, 0, "", token.count("'"), number, 1 if letter else 0, letter)
 
 
 def _amplificant_shape(original: Chem.Mol) -> Tuple[int, bool]:
@@ -152,10 +159,7 @@ def _descriptor_locant_lists(name: str):
 
 def _seniority(locant: str) -> Optional[tuple]:
     """: the primary locant first, then the superscript; None for a locant of another kind."""
-    if locant.isdigit():
-        return (int(locant), 0, "")
-    m = _COMPOSITE_RE.match(locant)
-    return (int(m.group(1)), int(m.group(2)), m.group(3)) if m else None
+    return (int(locant), 0, "") if locant.isdigit() else _composite_parts(locant)
 
 
 def _splits(locant: str, superatoms: List[int]) -> List[str]:
