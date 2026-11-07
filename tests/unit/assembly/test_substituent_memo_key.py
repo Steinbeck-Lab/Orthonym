@@ -7,10 +7,9 @@ from orthonym.assembly import memo
 from orthonym import name_compound
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "verify mode finds 2 name_substituent memo mismatches on this witness, and the best-effort name differs with "
-    "ORTHONYM_MEMO=on (352 chars) and off (407 chars); both read back exactly. The module used to set "
-    "ORTHONYM_MEMO after the memo had read it, so verify mode never ran here (lead: memo key)"))
+# Was a strict xfail (2 name_substituent memo mismatches; the best-effort name differed with the memo on and off). Since
+# program 14 the Fmoc carbamate branch is named by one path at every tier ('{[(9H-fluoren-9-yl)methoxy]carbonyl}amino',
+# n_branch_prefixes.hetero_root_prefix), and verify mode finds no mismatch.
 def test_no_name_substituent_verify_mismatches_on_carbamoyl_witness(monkeypatch):
     # NOTE: the plan brief mis-cited this as "ns_mols witness #1 (a cyanine-dye
     # macrocycle)" -- re-verified against ns_spy.py directly: witness #1 (0-indexed,

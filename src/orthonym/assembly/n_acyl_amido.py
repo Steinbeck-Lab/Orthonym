@@ -111,7 +111,7 @@ def acylated_n_group(mol, n_idx: int, ring_atoms) -> Optional[dict]:
     if any(nb.GetAtomicNum() != 6 and nb.GetIdx() != sulfonyl for nb in nbrs):  # a hydrazine or hydroxylamine unit
         return None
     if len(nbrs) == 1 and not ureas and sulfonyl is None:  # -NH-CO-R has the prefix of the secondary amides
-        return None
+        return _carbamate_amino_group(mol, n_idx, nbrs[0].GetIdx(), ring_atoms)
     if sulfonyl is None and not ureas and not any(nb.GetAtomicNum() == 6 and any(
             o.GetAtomicNum() == 8 and mol.GetBondBetweenAtoms(nb.GetIdx(), o.GetIdx()).GetBondTypeAsDouble() == 2.0
             for o in nb.GetNeighbors()) for nb in nbrs):
@@ -529,3 +529,19 @@ def chain_acylated_n_prefix(mol, sub_set, attach_idx: int, n_idx: int, consumed)
     else:
         prefix = n_substituted_acyl_amido_prefix(mol, n_idx, group, {host})
     return (prefix, group, host) if prefix else None
+
+
+def _carbamate_amino_group(mol, n_idx: int, carbonyl_c: int, ring_atoms) -> Optional[dict]:
+    """The group -NH-CO-X-R of a ring nitrogen whose acyl is rooted at a chalcogen (a carbamate ester, Boc, Cbz, Fmoc,
+    an S-ester), as ``acylated_n_group`` returns it, else None: the prefix the chain and heteroarene parents already
+    get from ``substituent_enumerator.chalcogen_rooted_acyl_amino_core`` 'alkoxycarbonyl',:31698;
+    '(benzyloxy)carbonyl (preferred prefix)',:18116; 'N2-(tert-butoxycarbonyl)-L-lysine',:54417), so
+    '4-[(ethoxycarbonyl)amino]benzoic acid' as '4-[(ethoxycarbonyl)amino]pyridine-3-carboxylic acid'."""
+    from ..rules.benzene import _bfs_substituent_atoms
+    from .naming_utils import apply_enclosing_marks
+    from .substituent_enumerator import ACYL_CHALCOGEN_UNNAMEABLE, chalcogen_rooted_acyl_amino_core
+    sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+    core = chalcogen_rooted_acyl_amino_core(mol, carbonyl_c, n_idx, sub_atoms)
+    if not core or core is ACYL_CHALCOGEN_UNNAMEABLE:
+        return None
+    return {'name': apply_enclosing_marks(core, -1), 'atoms': sub_atoms, 'is_complex': True}

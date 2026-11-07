@@ -143,6 +143,9 @@ def name_nitrate_ester(
         return None
 
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    # nitric acid (class 7d, is junior to carbamic acid (class 7b): beside a carbamate the nitrate is no PIN
+    from .carbamate import demote_below_carbamate_parent
+    demote_below_carbamate_parent(features, final_name)
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(
@@ -161,6 +164,9 @@ def _emit(features: Any, name: str) -> Optional[NamingResult]:
     if cand is None:
         return None
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    # nitric acid (class 7d, is junior to carbamic acid (class 7b): beside a carbamate the nitrate is no PIN
+    from .carbamate import demote_below_carbamate_parent
+    demote_below_carbamate_parent(features, final_name)
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(

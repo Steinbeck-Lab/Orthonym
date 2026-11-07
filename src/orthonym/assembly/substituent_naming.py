@@ -36,7 +36,8 @@ from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import (
-    _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl, one_carbon_acyl_prefix, tier_fg_engages)
+    _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl, is_carbamate_amino_branch,
+    one_carbon_acyl_prefix, tier_fg_engages)
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
@@ -8924,8 +8925,8 @@ def _name_substituent_fragment_uncached(
     # (:32928), 'amino' and 'oxo' on the terminal atom -- '5-(2-amino-2-oxoethyl)
     # furan-2-carboxylic acid (PIN)' (:32940); the recursive path below writes the
     # method (2) form '(carbamoylmethyl)' (:32941); and the 'acylsulfanyl' prefix.
-    _fg_pin = (not _fg_best_effort and attach_idx is not None and (pin_amide_prefix(
-        mol, sub_atoms, attach_idx) or is_acylsulfanyl(mol, sub_atoms, attach_idx)))
+    _fg_pin = (not _fg_best_effort and attach_idx is not None and (pin_amide_prefix(mol, sub_atoms, attach_idx) or
+        is_acylsulfanyl(mol, sub_atoms, attach_idx) or is_carbamate_amino_branch(mol, sub_atoms, attach_idx)))
     if tier_fg_engages(mol, sub_atoms, attach_idx, _fg_best_effort, _fg_pin):
         _fg_name = None
         _fg_located = None

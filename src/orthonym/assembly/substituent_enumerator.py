@@ -2055,8 +2055,9 @@ def composed_chalcogen_group_prefix(mol, frag_atoms, chalcogen_idx, boundary):
     if not token:
         return None
     if sym == 'O':
-        # The contracted R-O- morphology, spelled by the BB-cited primitive.
-        return composed_alkoxy_prefix(token)
+        # The contracted R-O- morphology, spelled by the BB-cited primitive; a decorated phenyl is the
+        # substitutable 'phenoxy', BB 17796), not '(4-chlorophenyl)oxy'.
+        return alkoxy_prefix_from_substituent(token)
     cited = cite_organyl_in_composed_prefix(token)
     if not cited:
         return None

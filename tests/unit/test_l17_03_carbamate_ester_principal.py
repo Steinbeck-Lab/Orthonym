@@ -77,10 +77,9 @@ def test_a_carbamate_ester_with_a_junior_group_is_named_as_the_ester(smiles, nam
 
 # the carbamate is not the parent of the name here (a senior group, or a unit this handler does not build): the names are as
 # they were -- the PIN tier declines the carbazate of a substituted hydrazine, a ring-N carboxylate and a diester (no 'bis'
-# multiplier here), and a senior acid keeps the parent
+# multiplier here), and a senior acid keeps the parent. The carbazates of a substituted hydrazine ('COC(=O)N(C)N',
+# 'OCCOC(=O)NNC') have their PIN since program 14 (tests/unit/assembly/test_substituted_carbazates.py).
 _UNCHANGED = [
-    ("COC(=O)N(C)N", "PIN abstains"),
-    ("OCCOC(=O)NNC", "PIN abstains"),
     ("OC(=O)CCOC(=O)NN", "PIN abstains"),
     # COC(=O)N1CCCC1 is 'methyl pyrrolidine-1-carboxylate' (PIN) since program 7 (2026-11-06): the ester of the ring-
     # nitrogen acid 'pyrrolidine-1-carboxylic acid (PIN)', the Blue Book), test_ring_n_carboxylate.py

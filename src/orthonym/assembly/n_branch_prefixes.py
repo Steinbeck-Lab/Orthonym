@@ -66,4 +66,12 @@ def hetero_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int) -> Optio
         sulfonamido = sulfonamido_prefix(mol, attach_idx, sub_atoms, parent)
         if sulfonamido:
             return sulfonamido
+        # an -NH-CO-X-R branch (a carbamate ester: Boc, Cbz, alkoxycarbonyl) is '(tert-butoxycarbonyl)amino',
+        #:31698; 'N2-(tert-butoxycarbonyl)-L-lysine',:54417), from the enumerator's chalcogen-rooted core
+        from .substituent_enumerator import ACYL_CHALCOGEN_UNNAMEABLE, chalcogen_rooted_acyl_amino_core
+        for nb in atom.GetNeighbors():
+            if nb.GetIdx() in sub_atoms and nb.GetSymbol() == 'C':
+                core = chalcogen_rooted_acyl_amino_core(mol, nb.GetIdx(), attach_idx, sub_atoms)
+                if core and core is not ACYL_CHALCOGEN_UNNAMEABLE:
+                    return core
     return _located_fg_hetero_root(mol, sub_atoms, attach_idx)

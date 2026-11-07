@@ -1286,7 +1286,10 @@ def _alcohol_part_has_another_ester(mol, alkyl_c: int, ester_o: int) -> bool:
         nbrs = list(o.GetNeighbors())
         if not any(n.GetSymbol() == 'C' and not _is_acid_centre(mol, n) for n in nbrs):
             continue
-        if any(_is_acid_centre(mol, n) for n in nbrs):
+        acids = [n.GetIdx() for n in nbrs if _is_acid_centre(mol, n)]
+        # the other ester's alcohol carbon is on this component, not reached through its own acyl group (the
+        # tert-butyl of a Boc group on the component is the alcohol of the carbamate, not of this polyol)
+        if acids and o.GetIdx() in _fragment_atoms(mol, alkyl_c, {frozenset((acids[0], o.GetIdx()))}, {ester_o}):
             return True
     return False
 

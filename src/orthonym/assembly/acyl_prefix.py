@@ -86,6 +86,58 @@ def is_acylsulfanyl(mol, sub_atoms, attach_idx) -> bool:
         return False
 
 
+
+def is_carbamate_amino_branch(mol, sub_atoms, attach_idx) -> bool:
+    """True for a chain branch attached at an acyclic carbon (or at the nitrogen of the group itself) whose only
+    heteroatoms are one carbamate ester group -NH-CO-O-R on it (Boc, Cbz, Fmoc, alkoxycarbonyl): the '[(alkoxycarbonyl)amino]' prefix of
+    (the Blue Book), '(benzyloxy)carbonyl (preferred prefix)' (:18116), on an alkyl chain
+    ('2-[(tert-butoxycarbonyl)amino]ethyl'). The chain and the nitrogen are acyclic; R may hold rings. No charge, radical
+    or isotope."""
+    from rdkit import Chem
+    try:
+        sub_set = set(sub_atoms)
+        a0 = mol.GetAtomWithIdx(attach_idx)
+        if attach_idx not in sub_set or a0.GetSymbol() not in ('C', 'N') or a0.IsInRing():
+            return False      # attached at a chain carbon, or the group itself at its nitrogen
+        ns = [i for i in sub_set if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        if len(ns) != 1:
+            return False
+        n = mol.GetAtomWithIdx(ns[0])
+        if n.IsInRing() or n.GetTotalNumHs() != 1 or n.GetDegree() != 2:
+            return False
+        carbonyl = [x for x in n.GetNeighbors() if any(
+            o.GetSymbol() == 'O' and o.GetDegree() == 1
+            and mol.GetBondBetweenAtoms(o.GetIdx(), x.GetIdx()).GetBondType() == Chem.BondType.DOUBLE
+            for o in x.GetNeighbors())]
+        if len(carbonyl) != 1:
+            return False
+        c = carbonyl[0]
+        ester_o = [o for o in c.GetNeighbors() if o.GetSymbol() == 'O'
+                   and mol.GetBondBetweenAtoms(o.GetIdx(), c.GetIdx()).GetBondType() == Chem.BondType.SINGLE]
+        if len(ester_o) != 1 or ester_o[0].GetDegree() != 2 or c.IsInRing():
+            return False
+        oxo = next(o.GetIdx() for o in c.GetNeighbors() if o.GetIdx() != ester_o[0].GetIdx() and o.GetSymbol() == 'O')
+        # the chain side: the carbons reached from the attachment without crossing the nitrogen, all acyclic
+        chain, stack = set(), [attach_idx]
+        while stack:
+            x = stack.pop()
+            if x in chain or x == ns[0] or x not in sub_set:
+                continue
+            chain.add(x)
+            stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors())
+        if any(mol.GetAtomWithIdx(x).IsInRing() or mol.GetAtomWithIdx(x).GetSymbol() != 'C' for x in chain):
+            return False
+        allowed = {ns[0], c.GetIdx(), oxo, ester_o[0].GetIdx()}
+        for idx in sub_set:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetFormalCharge() or a.GetNumRadicalElectrons() or a.GetIsotope():
+                return False
+            if idx not in allowed and a.GetSymbol() != 'C':
+                return False
+        return True
+    except Exception:
+        return False
+
 def is_carboacyl_head(mol, frag_atoms, attach_idx) -> bool:
     """True when the attachment atom is the carbonyl carbon of a chain carboacyl branch R-CO- (R an acyclic carbon):
     a carbon outside every ring that carries one terminal =O and exactly one other carbon of the fragment, which is

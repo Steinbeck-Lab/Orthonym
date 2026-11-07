@@ -88,7 +88,7 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     has the one carbamate and its C and ester chalcogen are not ring atoms (a cyclic carbamate is a heterocycle,
     ; a ring N is the ring carboxylate 'tert-butyl 4-hydroxypiperidine-1-carboxylate', which the handler
     names through ``assembly.ring_n_carboxylate``,, and the N bears no
-    nitrogen but the NH2 of a hydrazinecarboxylate (``assembly.carbazate_names`` names that one)."""
+    nitrogen but the second nitrogen of a hydrazinecarboxylate (``assembly.carbazate_names`` names that one)."""
     from ...rules.seniority import SENIORITY_ORDER, ester_acid_rank, seniority_index
     mol = getattr(features, 'mol', None)
     fgs = getattr(features, 'functional_groups', None) or {}
@@ -97,7 +97,11 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     if mol is None or len(matches) + (thio is not None) != 1 or not _is_neutral_species(features):
         return False
     n_idx, c_idx = (matches[0][0], matches[0][1]) if matches else (thio[0], thio[1])
-    ring_carboxylic = bool(matches) and mol.GetAtomWithIdx(n_idx).IsInRing()
+    # a ring nitrogen or a hydrazine nitrogen makes the acid a carboxylic one: 'hydrazinecarboxylic acid (PIN)'
+    # (the Blue Book, "carboxylic acids expressed by suffixes are preferred to carbonic acid analogues")
+    from ..carbazate_names import hydrazine_second_nitrogen
+    ring_carboxylic = bool(matches) and (mol.GetAtomWithIdx(n_idx).IsInRing()
+                                         or hydrazine_second_nitrogen(mol, n_idx, c_idx) is not None)
     try:
         if seniority_index(pg, mol, getattr(features, 'principal_group_atoms', None)) <= SENIORITY_ORDER.index('ester') \
                 and not (ring_carboxylic and _junior_to_ring_n_carboxylic(pg)):
@@ -124,8 +128,7 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
                if nb.GetSymbol() in ('O', 'S') and mol.GetBondBetweenAtoms(c_idx, nb.GetIdx()).GetBondType() == Chem.BondType.SINGLE]
     if len(ester_x) != 1 or any(mol.GetAtomWithIdx(i).IsInRing() for i in (c_idx, ester_x[0])):
         return False
-    from ..carbazate_names import free_hydrazine_nitrogen
-    return all(nb.GetSymbol() != 'N' or nb.GetIdx() == free_hydrazine_nitrogen(mol, n_idx, c_idx)
+    return all(nb.GetSymbol() != 'N' or nb.GetIdx() == hydrazine_second_nitrogen(mol, n_idx, c_idx)
                for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors())
 
 
