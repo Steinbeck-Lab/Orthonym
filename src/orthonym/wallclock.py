@@ -147,6 +147,16 @@ class wall_clock_limit:  # noqa: N801 - used as a function-style context manager
         if not self._live:
             return
         self.fired = True
+        if (frame is not None and frame.f_code in _BOOKKEEPING_CODE
+                and frame.f_locals.get("self") is self):
+            # Landed in this limit's __enter__ after the timer was armed, or in its
+            # __exit__ before it was disarmed: a raise there leaves the with
+            # statement without the disarm, and the timer refires every ``refire``
+            # seconds in whatever runs next (seen: pytest's report rendering on a
+            # loaded CI runner). __exit__ sees ``fired`` and raises the timeout
+            # itself. An enclosing limit's alarm in an inner limit's __exit__ (its
+            # re-armed, overdue deadline) still raises at once.
+            return
         raise WallClockTimeout(self.seconds)
 
     def __exit__(self, exc_type, exc, tb) -> bool:
@@ -174,6 +184,11 @@ class wall_clock_limit:  # noqa: N801 - used as a function-style context manager
         timeout = WallClockTimeout(self.seconds)
         timeout.restored = self.restored
         raise timeout from exc
+
+
+#: The frames in which an alarm only records that it fired (see ``_on_alarm``).
+_BOOKKEEPING_CODE = frozenset({wall_clock_limit.__enter__.__code__,
+                               wall_clock_limit.__exit__.__code__})
 
 
 # ---------------------------------------------------------------------------

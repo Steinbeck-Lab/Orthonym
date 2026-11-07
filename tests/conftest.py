@@ -435,6 +435,51 @@ def _naming_state_isolation():
             "exit that leaked it.", pytrace=False)
 
 
+# A test that leaves ITIMER_REAL armed (or its SIGALRM handler installed) crashes the
+# worker later: the handler raises in whatever runs next. Seen on the 4-core CI
+# runner: a ``wall_clock_limit`` whose alarm landed in its own ``__exit__`` kept
+# refiring, and the WallClockTimeout surfaced in pytest's failure-report rendering
+# of another test. This disarms right after each phase (before its report is made)
+# and fails the test whose phase armed it. A timer already armed when the phase
+# starts (pytest-timeout's signal method) is not this test's leak and is left alone.
+def _no_leaked_alarm(item):
+    import signal
+    import threading
+    if (not hasattr(signal, "setitimer") or threading.current_thread() is not threading.main_thread()
+            or signal.getitimer(signal.ITIMER_REAL) != (0.0, 0.0)):
+        return (yield)
+    handler = signal.getsignal(signal.SIGALRM)
+    raised = True
+    try:
+        result = yield
+        raised = False
+        return result
+    finally:
+        left = signal.setitimer(signal.ITIMER_REAL, 0)  # reads and disarms in one call
+        swapped = signal.getsignal(signal.SIGALRM) is not handler
+        if swapped:
+            signal.signal(signal.SIGALRM, handler)
+        if (left != (0.0, 0.0) or swapped) and not raised:
+            pytest.fail(f"the test left a SIGALRM timer armed ({left}) or its handler "
+                        f"installed ({swapped}); it would fire in the next test or in "
+                        "pytest's own code and crash the worker.", pytrace=False)
+
+
+@pytest.hookimpl(wrapper=True, specname="pytest_runtest_setup")
+def pytest_no_leaked_alarm_in_setup(item):
+    return (yield from _no_leaked_alarm(item))
+
+
+@pytest.hookimpl(wrapper=True, specname="pytest_runtest_call")
+def pytest_no_leaked_alarm_in_call(item):
+    return (yield from _no_leaked_alarm(item))
+
+
+@pytest.hookimpl(wrapper=True, specname="pytest_runtest_teardown")
+def pytest_no_leaked_alarm_in_teardown(item):
+    return (yield from _no_leaked_alarm(item))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _opsin_cli_in_process():
     """PR runs: answer the test code's ``java -jar opsin -osmi`` calls in process.

@@ -66,6 +66,80 @@ def test_limit_raises_on_time_and_disarms():
     assert signal.getsignal(signal.SIGALRM) is before
 
 
+def test_an_alarm_in_enter_or_exit_is_recorded_not_raised():
+    """A raise from the limit's own ``__enter__`` (after the arm) or ``__exit__``
+    (before the disarm) leaves the with statement with the timer armed: it then
+    refires in whatever runs next. There the alarm only records that it fired."""
+    from types import SimpleNamespace
+
+    for method in (wall_clock_limit.__enter__, wall_clock_limit.__exit__):
+        limit = wall_clock_limit(60)
+        limit._live = True
+        own = SimpleNamespace(f_code=method.__code__, f_locals={"self": limit})
+        limit._on_alarm(signal.SIGALRM, own)
+        assert limit.fired
+        # Another (inner) limit's frame: the alarm raises there as anywhere else.
+        other = SimpleNamespace(f_code=method.__code__, f_locals={"self": wall_clock_limit(1)})
+        with pytest.raises(WallClockTimeout):
+            limit._on_alarm(signal.SIGALRM, other)
+    limit = wall_clock_limit(60)
+    limit._live = True
+    with pytest.raises(WallClockTimeout):
+        limit._on_alarm(signal.SIGALRM, sys._getframe())
+
+
+def test_an_overdue_enclosing_limit_still_fires_in_the_inner_exit():
+    """The inner limit's __exit__ re-arms the enclosing one; if its deadline passed
+    while the inner held the timer, it fires there at once, not one refire later."""
+    t0 = time.monotonic()
+    with pytest.raises(WallClockTimeout) as info:
+        with wall_clock_limit(0.05):
+            with wall_clock_limit(10):
+                end = time.perf_counter() + 0.1
+                while time.perf_counter() < end:
+                    pass
+            time.sleep(5)
+    assert info.value.seconds == 0.05
+    assert time.monotonic() - t0 < 0.9
+    assert _timer_disarmed()
+
+
+_STRESS = """
+import signal, sys, time
+from orthonym.wallclock import WallClockTimeout, wall_clock_limit
+default = signal.getsignal(signal.SIGALRM)
+leaks = timeouts = 0
+for i in range(int(sys.argv[1])):
+    t = 0.0002 + (i % 50) * 0.00002
+    try:
+        with wall_clock_limit(t):
+            end = time.perf_counter() + t
+            while time.perf_counter() < end:
+                pass
+    except WallClockTimeout:
+        timeouts += 1
+    if (signal.getitimer(signal.ITIMER_REAL) != (0.0, 0.0)
+            or signal.getsignal(signal.SIGALRM) is not default):
+        leaks += 1
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, default)
+print(leaks, timeouts)
+"""
+
+
+def test_alarms_at_the_end_of_the_body_never_leave_the_timer_armed():
+    """Limits about as long as their body, so the alarms land around the exit of the
+    with statement. Before the fix 1,665 of 20,000 left the timer armed (refiring
+    every second); run in a subprocess so a regression cannot reach this worker."""
+    env = dict(os.environ, PYTHONPATH=str(REPO / "src"))
+    out = subprocess.run([sys.executable, "-c", _STRESS, "4000"], capture_output=True,
+                         text=True, timeout=300, env=env, cwd=str(REPO))
+    assert out.returncode == 0, out.stderr[-2000:]
+    leaks, timeouts = map(int, out.stdout.split())
+    assert timeouts > 0, "no alarm fired; the test is vacuous"
+    assert leaks == 0
+
+
 def test_limit_passes_through_except_exception():
     """The defect class: a broad ``except Exception`` between the alarm and the tool
     must not catch the timeout."""
