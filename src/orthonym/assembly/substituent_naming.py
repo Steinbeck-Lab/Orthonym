@@ -36,13 +36,14 @@ from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import (
-    _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_acylsulfanyl, is_carbamate_amino_branch,
+    _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_pin_fg_branch,
     one_carbon_acyl_prefix, tier_fg_engages)
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .chain_amide_prefixes import consume_acylated_nitrogen, consume_sulfamoyl
+from .ring_acyloxy_prefixes import consume_ring_acyloxy
 from .sulfur_acid_ester_prefixes import consume_sulfur_acid_oxy
 from .chain_decoration_prefixes import (alkoxy_decoration_tokens_are_real, consume_azido, consume_substituted_imino,
                                         hand_on_numbering, unsaturated_chain_plan)
@@ -2255,11 +2256,11 @@ def _name_polyfunctional_acyclic_substituent_impl(
     def _add_prefix(carbon_idx: int, prefix: str) -> None:
         prefix_on.setdefault(carbon_idx, []).append(prefix)
 
-    # ---- Pass 0 (lane/l17 item 12,, the Blue Book): a pendant acylated nitrogen -N(R')-CO-R or
-    # -N(R')-SO2-R on a backbone carbon is the amido prefix of the whole group, as on a ring or a parent chain. Consumed
-    # first, so a ring on its acyl or on R' is part of that name and not a ring branch of the chain below. ----
+    # ---- Pass 0 (lane/l17 item 12,,:32991): an acylated N on a backbone carbon is the amido prefix of the
+    # whole group, consumed first so a ring on its acyl or R' is part of that name, not a ring branch of the chain. ----
     consume_acylated_nitrogen(mol, sub_set, attach_idx, consumed, _add_prefix)
-    if not consume_sulfur_acid_oxy(mol, sub_set, consumed, _add_prefix):   # '[(benzenesulfonyl)oxy]', ring in the acyl
+    if not (consume_sulfur_acid_oxy(mol, sub_set, consumed, _add_prefix)   # '[(benzenesulfonyl)oxy]', ring in the acyl
+            and consume_ring_acyloxy(mol, sub_set, consumed, _add_prefix)):  # 'benzoyloxy', likewise
         return None
 
     # Suite fix j6 (TRIAGE g4 C5, prenylated-phenol trienoic acid): a RING
@@ -8925,8 +8926,8 @@ def _name_substituent_fragment_uncached(
     # (:32928), 'amino' and 'oxo' on the terminal atom -- '5-(2-amino-2-oxoethyl)
     # furan-2-carboxylic acid (PIN)' (:32940); the recursive path below writes the
     # method (2) form '(carbamoylmethyl)' (:32941); and the 'acylsulfanyl' prefix.
-    _fg_pin = (not _fg_best_effort and attach_idx is not None and (pin_amide_prefix(mol, sub_atoms, attach_idx) or
-        is_acylsulfanyl(mol, sub_atoms, attach_idx) or is_carbamate_amino_branch(mol, sub_atoms, attach_idx)))
+    _fg_pin = (not _fg_best_effort and attach_idx is not None and (pin_amide_prefix(
+        mol, sub_atoms, attach_idx) or is_pin_fg_branch(mol, sub_atoms, attach_idx)))
     if tier_fg_engages(mol, sub_atoms, attach_idx, _fg_best_effort, _fg_pin):
         _fg_name = None
         _fg_located = None

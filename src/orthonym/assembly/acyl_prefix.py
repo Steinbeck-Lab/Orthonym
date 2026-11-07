@@ -138,6 +138,46 @@ def is_carbamate_amino_branch(mol, sub_atoms, attach_idx) -> bool:
     except Exception:
         return False
 
+
+def is_alkoxycarbonyl_branch(mol, sub_atoms, attach_idx) -> bool:
+    """True for an ester group -CO-O-R (or -CO-S-R) attached at its carbonyl carbon to a ring atom, R a group of carbon
+    atoms only:
+    the 'alkoxycarbonyl' ('(alkylsulfanyl)carbonyl',:18128) prefix of (the Blue Book), '2-chloro-6-(ethoxycarbonyl)benzoic acid (PIN)'
+    ,:31935). No charge, radical or isotope."""
+    from rdkit import Chem
+    try:
+        sub_set = set(sub_atoms)
+        c = mol.GetAtomWithIdx(attach_idx)
+        if attach_idx not in sub_set or c.GetSymbol() != 'C' or c.IsInRing():
+            return False
+        inner = [x for x in c.GetNeighbors() if x.GetIdx() in sub_set]
+        oxo = [x for x in inner if x.GetSymbol() == 'O' and x.GetDegree() == 1
+               and mol.GetBondBetweenAtoms(x.GetIdx(), attach_idx).GetBondType() == Chem.BondType.DOUBLE]
+        ether = [x for x in inner if x.GetSymbol() in ('O', 'S') and x.GetDegree() == 2 and not x.IsInRing()
+                 and mol.GetBondBetweenAtoms(x.GetIdx(), attach_idx).GetBondType() == Chem.BondType.SINGLE]
+        if len(oxo) != 1 or len(ether) != 1 or len(inner) != 2:
+            return False
+        # on a ring only: on a chain the decomposition and chain-end routes own the ester ('diethyl
+        # 2-methyl-3-oxobutanedioate (PIN)' lost its name when this namer took the chain branch)
+        if not any(nb.IsInRing() for nb in c.GetNeighbors() if nb.GetIdx() not in sub_set):
+            return False
+        for idx in sub_set:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetFormalCharge() or a.GetNumRadicalElectrons() or a.GetIsotope():
+                return False
+            if idx not in (oxo[0].GetIdx(), ether[0].GetIdx()) and a.GetSymbol() != 'C':
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def is_pin_fg_branch(mol, sub_atoms, attach_idx) -> bool:
+    """The branches the PIN-tier functional-group namer of ``substituent_naming`` takes besides a chain carboxamide:
+    'acylsulfanyl', '[(alkoxycarbonyl)amino]' and 'alkoxycarbonyl', the Blue Book)."""
+    return (is_acylsulfanyl(mol, sub_atoms, attach_idx) or is_carbamate_amino_branch(mol, sub_atoms, attach_idx)
+            or is_alkoxycarbonyl_branch(mol, sub_atoms, attach_idx))
+
 def is_carboacyl_head(mol, frag_atoms, attach_idx) -> bool:
     """True when the attachment atom is the carbonyl carbon of a chain carboacyl branch R-CO- (R an acyclic carbon):
     a carbon outside every ring that carries one terminal =O and exactly one other carbon of the fragment, which is

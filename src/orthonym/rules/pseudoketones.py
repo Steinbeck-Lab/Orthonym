@@ -154,7 +154,7 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
         return None
     carbonyl_c, ring_n, chalcogen = parsed
     ketone_suffix = _CHALCOGEN_KETONE_SUFFIX.get(chalcogen)
-    if ketone_suffix is None:
+    if ketone_suffix is None or _senior_to_the_pseudoketone(features, carbonyl_c):
         return None
 
     ring_atoms = _ring_system_atoms(mol, ring_n)
@@ -188,7 +188,17 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
     # (Substituted-ring pseudoketones are a follow-on, gated on the ring-substituent
     # namer gaining correct attachment numbering for symmetric N-heterocycles.)
     if set(frag) != set(ring_atoms):
-        return None
+        # a decorated ring is named by the substituent namer, which cites its attachment locant
+        # ('4-phenylpiperazin-1-yl'); the name is read back before it ships
+        from ..assembly.substituent_enumerator import name_substituent
+        ringyl = name_substituent(mol, sorted(frag), ring_n)
+        if not ringyl or " " in ringyl or ringyl == "substituent":
+            return None
+    else:
+        ringyl = None
+    methanone = _ring_acyl_methanone(mol, carbonyl_c, ring_n, set(frag), chalcogen, ringyl)
+    if methanone is not None:
+        return methanone
 
     # Acyl parent chain: longest carbon chain that excludes the entire N-side
     # fragment (ring + its substituents); the carbonyl carbon (the ketone, locant
@@ -217,7 +227,8 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
                 continue
             return None
 
-    ringyl = name_ring_system_substituent(mol, frag, ring_n)
+    if ringyl is None:
+        ringyl = name_ring_system_substituent(mol, frag, ring_n)
     if not ringyl or " " in ringyl:
         return None
 
@@ -243,7 +254,79 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
     stem_part = joined[: len(joined) - len(ketone_suffix)]  # 'ethan' / 'ethane'
     parent = f"{stem_part}-1-{ketone_suffix}"  # 'ethan-1-one' / 'ethane-1-thione'
 
-    return f"1-({ringyl}){parent}"
+    from ..assembly.naming_utils import apply_enclosing_marks
+    return f"1-{apply_enclosing_marks(ringyl, -1)}{parent}"   # nesting: '1-[(2R)-2-methylpyrrolidin-1-yl]...'
+
+
+
+def _senior_to_the_pseudoketone(features: Any, carbonyl_c: int) -> bool:
+    """True when the molecule has a group senior to a ketone, or a second ketone, other than this hidden amide: the pseudoketone is a
+    ketone,:33127), so a nitrile or an aldehyde is the principal group and the acyl group on the ring
+    nitrogen its prefix ('4-(piperidine-1-carbonyl)benzonitrile'), (:18162)."""
+    from .seniority import seniority_index
+    mol = features.mol
+    for match in mol.GetSubstructMatches(_ACYL_N):
+        if match[1] != carbonyl_c:
+            return True         # a second acylated nitrogen (an amide, urea, carbamate or a second hidden amide)
+    try:
+        ketone = seniority_index('ketone')
+    except ValueError:
+        return True
+    for name, found in (getattr(features, 'functional_groups', None) or {}).items():
+        if not [m for m in (found or ()) if carbonyl_c not in m]:
+            continue        # only this hidden amide's own match (a second amide of the same kind still counts)
+        if name in _PREFIX_ONLY_GROUPS:
+            continue
+        try:
+            if seniority_index(name) <= ketone:
+                return True     # a second ketone: the ring or chain parent of decides ('1-acetylpiperidin-4-one')
+        except ValueError:
+            return True         # a class the order does not hold (a carbamate, a urea, an ion): not decided here
+    return False
+
+
+#: an acylated nitrogen N-C(=O|S|Se|Te)
+from rdkit import Chem as _Chem  # noqa: E402
+_ACYL_N = _Chem.MolFromSmarts("[#7]-[#6]=[O,S,Se,Te]")
+
+#: groups cited only as prefixes /, never a principal group beside a ketone
+_PREFIX_ONLY_GROUPS = frozenset({
+    'B', 'Br', 'C', 'Cl', 'F', 'I', 'N', 'O', 'P', 'S', 'bromo', 'chloro', 'fluoro', 'iodo', 'alkene', 'alkyne',
+    'ether', 'aromatic_ether', 'vinyl_ether', 'nitro', 'nitroso', 'isocyanate', 'isothiocyanate',
+    'n_oxide_aliphatic', 'n_oxide_aromatic', 'n_oxide_imine'})
+
+
+def _ring_acyl_methanone(mol, carbonyl_c: int, ring_n: int, n_side: set, chalcogen: str, ringyl) -> Optional[str]:
+    """The pseudoketone of a ring acyl group on a ring nitrogen, '{R}({ring-N-yl})methanone': "'Hidden'
+    amides" (the Blue Book) "An N-acyl group attached to a nitrogen atom of a heterocyclic system is now
+    preferably named as a pseudoketone (see, ", the methanone carrying both groups as a mononuclear
+    parent ('phenyl(tetrasulfanyl)methanone (PIN)',:24934;:7272). Only when the carbonyl carbon's
+    other neighbour is a ring atom: a chain acyl keeps its chain ('1-(piperidin-1-yl)ethan-1-one (PIN)',:33129), a
+    substituted one too. None otherwise or when a part has no name."""
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    from ..assembly.substituent_enumerator import name_substituent
+    catom = mol.GetAtomWithIdx(carbonyl_c)
+    others = [nb for nb in catom.GetNeighbors() if nb.GetIdx() != ring_n and nb.GetSymbol() not in _CHALCOGENS]
+    if len(others) != 1 or not others[0].IsInRing() or others[0].GetIdx() in n_side:
+        return None
+    r_start = others[0].GetIdx()
+    r_side, stack = set(), [r_start]
+    while stack:
+        x = stack.pop()
+        if x in r_side or x == carbonyl_c:
+            continue
+        r_side.add(x)
+        stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors())
+    if r_side & n_side:
+        return None                      # the acyl and the ring nitrogen are one ring system: a lactam, not this name
+    r_name = name_substituent(mol, sorted(r_side), r_start)
+    if ringyl is None:
+        ringyl = name_ring_system_substituent(mol, sorted(n_side), ring_n)
+    if not r_name or not ringyl or r_name == "substituent" or " " in r_name + ringyl:
+        return None
+    suffix = _CHALCOGEN_KETONE_SUFFIX.get(chalcogen)
+    block = mononuclear_substituent_block([r_name, ringyl])
+    return f"{block}{apply_vowel_elision('methane', suffix)}" if block and suffix else None
 
 
 __all__ = ["is_hidden_amide", "name_pseudoketone"]

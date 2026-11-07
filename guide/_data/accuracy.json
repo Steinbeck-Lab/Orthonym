@@ -14,13 +14,13 @@
     "columns": ["Set", "Molecules", "Named, default", "Named, PIN-only tier", "Declined, default", "Declined, PIN-only tier", "Unreadable, default", "Unreadable, PIN-only tier"],
     "rows": [
       {"set": "Held-out ChEBI 2,000", "molecules": 2000,
-       "pin": {"named": 1246, "declined": 741, "unreadable": 13, "timed_out": 0},
+       "pin": {"named": 1246, "declined": 740, "unreadable": 14, "timed_out": 0},
        "best_effort": {"named": 1994, "declined": 5, "unreadable": 1, "timed_out": 0}, "wrong": 0},
       {"set": "ChEBI development 2,000", "molecules": 2000,
-       "pin": {"named": 1238, "declined": 745, "unreadable": 17, "timed_out": 0},
+       "pin": {"named": 1242, "declined": 741, "unreadable": 17, "timed_out": 0},
        "best_effort": {"named": 1993, "declined": 4, "unreadable": 3, "timed_out": 0}, "wrong": 0},
       {"set": "Drug-like PubChem 2,000", "molecules": 2000,
-       "pin": {"named": 1024, "declined": 961, "unreadable": 14, "timed_out": 1},
+       "pin": {"named": 1029, "declined": 956, "unreadable": 14, "timed_out": 1},
        "best_effort": {"named": 1961, "declined": 39, "unreadable": 0, "timed_out": 0}, "wrong": 0}
     ]
   }

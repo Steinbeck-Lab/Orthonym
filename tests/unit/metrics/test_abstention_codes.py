@@ -205,7 +205,10 @@ class TestEndToEndCodes:
     # that stood here (CID 24846373, '[4-(2-methoxy-2-oxoethyl)-5-oxido-1,2,3-oxadiazol-3-ium-3-yl]
     # cyclohexane': its ring N+=N cation is no longer classed diazonium,, so it was replaced
     # by a neutral row of the frozen unnamed panel that abstains with this code and detail under this config.
-    _RING_FALLBACK_DETAIL_SMI = "COC1=CN2C(=C(C=N2)C(=O)N3CCC4=C([C@H]3C5=CC6=CC=CC=C6C=N5)N=CN4)C=C1"   # PubChem CID 176863056
+    # PubChem CID 176863056 with a nitrile on the pyridine ring: since program 15 the plain molecule is named under this
+    # config as the hidden-amide methanone; the nitrile keeps the acyl ring N a prefix, and the unnameable
+    # fused ring branch still exhausts the best-effort ladder
+    _RING_FALLBACK_DETAIL_SMI = "COC1=CN2C(=C(C=N2)C(=O)N3CCC4=C([C@H]3C5=CC6=CC=CC=C6C=N5)N=CN4)C=C1C#N"
     # A metal coordination compound (the technetium twin of cisplatin, drawn with explicit NH3 ligands; platinum and
     # nickel are admitted to the metal mechanisms since 2026-10-30 and their twins are named): the
     # Java-free organometallic/coordination veto (namer.py, has_metal_coordination_bond;

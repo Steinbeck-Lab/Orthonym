@@ -568,6 +568,18 @@ def _acyl_group_prefix(mol, carbonyl_c: int, parent_idx: int, acyl_atoms,
         cited = cite_organyl_in_composed_prefix(alkoxy)
         # (the Blue Book) '3-(ethoxycarbonyl)phenoxy': compound
         return built(f"{cited}carbonyl", substituted=True, enclosed=True) if cited else None
+    if sym == "S":
+        # -CO-SR' '(R-sulfanyl)carbonyl', by concatenation: '(acetylsulfanyl)carbonyl (preferred prefix)'
+        # (the Blue Book), '4-[(hydroxysulfanyl)carbonyl]cyclohexanecarboxylic acid (PIN)' (:30363)
+        parts = parts_of(yi)
+        if y.IsInRing() or y.GetDegree() != 2 or len(parts) != 1 or mol.GetAtomWithIdx(parts[0][0]).GetSymbol() != "C":
+            return None
+        r_name = name_part(parts[0][1], parts[0][0])
+        from .naming_utils import enclose_if_compound
+        from .substituent_enumerator import cite_organyl_in_composed_prefix
+        cited = cite_organyl_in_composed_prefix(r_name) if r_name else None
+        return built(f"{enclose_if_compound(cited + 'sulfanyl')}carbonyl", substituted=True, enclosed=True) if cited \
+            else None
     if sym == "N":
         if y.GetTotalValence() != 3 or any(
                 b.GetBondType() != Chem.BondType.SINGLE for b in y.GetBonds()):
