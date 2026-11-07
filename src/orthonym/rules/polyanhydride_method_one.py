@@ -114,5 +114,15 @@ def record_one_link_name(mol, name: str) -> None:
     from ..perception.smarts_cache import compiled
     from .anhydrides import ANHYDRIDE_SMARTS
     pattern = compiled(ANHYDRIDE_SMARTS)
-    if pattern is not None and len(mol.GetSubstructMatches(pattern, uniquify=True)) >= 2:
+    bridges = {m[2] for m in mol.GetSubstructMatches(pattern, uniquify=True)} if pattern is not None else set()
+    # the links of a sulfonic, sulfinic, nitrous or nitric acid count as well ('acetic methanedisulfonic propanoic
+    # dianhydride (PIN)',,:32380): every acyclic O between two acid centres is one link
+    link = compiled(_ANY_ACID_LINK)
+    if link is not None:
+        bridges |= {m[1] for m in mol.GetSubstructMatches(link, uniquify=True) if not mol.GetAtomWithIdx(m[1]).IsInRing()}
+    if len(bridges) >= 2:
         record_non_pin_label(name, rule="P-65.7.6.2", detail="a polyanhydride named through one of its links")
+
+
+_ACID_CENTRE = "$([CX3]=[O,S]),$([SX4](=O)=O),$([SX3]=O),$([NX2]=O),$([NX3+](=O)[O-])"
+_ANY_ACID_LINK = f"[{_ACID_CENTRE}][OX2][{_ACID_CENTRE}]"

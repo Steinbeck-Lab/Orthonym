@@ -846,6 +846,14 @@ def _mol_elements(mol) -> _FrozenSet[int]:
 _ANHYDRIDE_BRIDGE_SMARTS = {
     # sulfonic anhydride R-SO2-O-SO2-R'; BB 32247 'benzenesulfonic anhydride')
     "sulfonic_anhydride": "[SX4](=O)(=O)[OX2][SX4](=O)(=O)",
+    # mixed anhydride of a sulfonic or sulfinic acid with a sulfinic or carboxylic acid R-S(O)x-O-CO-R',
+    # R-SO2-O-SO-R' "Mixed anhydrides", the Blue Book 'benzenesulfinic ethanesulfonic anhydride
+    # (PIN)',:32270 'chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)'). Without the fold the acyl side
+    # reads as the organyl of a sulfonate ester ('acetyl methanesulfonate'). The acyl carbon bears carbon or
+    # hydrogen only (a carboxylic or formic acid, as for the nitric anhydride below)
+    "sulfur_mixed_anhydride":
+        "[$([SX4]([#6])(=O)=O),$([SX3]([#6])=O)][OX2]"
+        "[$([SX3]([#6])=O),$([CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)]=O)]",
     # chalcogen-bridge anhydride R-CO-X-CO-R', X = S/Se/Te; BB 32292
     # 'benzoic thioanhydride'). The bridge is S/Se/Te, not O, so the base core misses it.
     "chalcogen_anhydride": "[CX3](=O)[SX2,SeX2,TeX2][CX3](=O)",

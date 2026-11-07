@@ -95,7 +95,7 @@ def _name_anhydride_impl(features) -> Optional[str]:
     # Each re-detects its own bridge on the mol; the base carbon/O core below
     # never matches them, so ordering these first is safe (they return only on a
     # genuine bridge match).
-    _sn = _name_sulfonic_anhydride(mol)          # R-SO2-O-SO2-R'
+    _sn = _name_sulfonic_anhydride(mol) or _name_sulfur_mixed_anhydride(mol)   #,
     if _sn:
         return _sn
     _cn = _name_chalcogen_anhydride(mol)         # R-CO-S/Se/Te-CO-R'
@@ -316,6 +316,44 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
     from ..assembly.naming_utils import alpha_sort_key_total
     acids = sorted([a1, a2], key=alpha_sort_key_total)   #,:32270
     return f"{acids[0]} {acids[1]} anhydride"
+
+
+_SULFUR_MIXED_ANHYDRIDE = ("[$([SX4]([#6])(=O)=O),$([SX3]([#6])=O)][OX2]"
+                           "[$([SX3]([#6])=O),$([CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)]=O)]")
+
+
+def _name_sulfur_mixed_anhydride(mol) -> Optional[str]:
+    """ "Mixed anhydrides" (the Blue Book): "Anhydrides derived from different monobasic acids are named
+    by citing in alphabetical order the names of the two acids... without the class name 'acid' followed by the class
+    name 'anhydride'": 'benzenesulfinic ethanesulfonic anhydride (PIN)' (:32261), 'chloroacetic
+    4-nitrobenzene-1-sulfonic anhydride (PIN)' (:32270). One R-S(O)x-O-X bridge (X a sulfinyl S or a carboxylic acyl C)
+    and nothing else of the kind; each side is capped with -OH and named as its acid, as in
+    :func:`_name_sulfonic_anhydride`. None when a side is not one clean acid name or the core is cyclic."""
+    matches = mol.GetSubstructMatches(_compiled_smarts(_SULFUR_MIXED_ANHYDRIDE), uniquify=True)
+    if len({frozenset(m) for m in matches}) != 1:
+        return None
+    a, bridge_o, b = matches[0]
+    if b in _bfs_side_atoms(mol, a, {bridge_o}):
+        return None
+    # a configuration at a sulfinic sulfur belongs in front of its acid word,:44642), which the acid namer
+    # does not write for the capped fragment: no name here rather than a descriptor in front of the whole name
+    if any(mol.GetAtomWithIdx(c).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for c in (a, b)):
+        return None
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from ..assembly.naming_utils import alpha_sort_key_total
+    from .esters import _extract_fragment_smiles
+    names, substituted = [], False
+    for centre in (a, b):
+        keep = _bfs_side_atoms(mol, centre, {bridge_o})
+        substituted |= any(mol.GetAtomWithIdx(i).GetAtomicNum() not in (1, 6, 8, 16) for i in keep)
+        smi = _extract_fragment_smiles(mol, set(keep), centre, cap_element=8)
+        nm = name_fragment_recursively(smi) if smi else None
+        if not nm or nm.count(" acid") != 1 or not nm.endswith(" acid") or " " in nm[:-5]:
+            return None
+        names.append(nm[:-5].strip())
+    if names[0] == names[1]:      # /: 'bis(2-chloroethane-1-sulfinic) anhydride (PIN)' (:32251)
+        return f"bis({names[0]}) anhydride" if substituted else f"{names[0]} anhydride"
+    return " ".join(sorted(names, key=alpha_sort_key_total)) + " anhydride"
 
 
 _CHALCOGEN_CLASS_TERM = {"S": "thioanhydride", "Se": "selenoanhydride",

@@ -20,7 +20,7 @@
        "pin": {"named": 1238, "declined": 745, "unreadable": 17, "timed_out": 0},
        "best_effort": {"named": 1993, "declined": 4, "unreadable": 3, "timed_out": 0}, "wrong": 0},
       {"set": "Drug-like PubChem 2,000", "molecules": 2000,
-       "pin": {"named": 1023, "declined": 962, "unreadable": 14, "timed_out": 1},
+       "pin": {"named": 1024, "declined": 961, "unreadable": 14, "timed_out": 1},
        "best_effort": {"named": 1961, "declined": 39, "unreadable": 0, "timed_out": 0}, "wrong": 0}
     ]
   }
