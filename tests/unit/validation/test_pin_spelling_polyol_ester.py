@@ -207,3 +207,37 @@ def test_identical_arms_on_a_substituted_central_group_are_a_linked_polyol(smile
 ])
 def test_unlike_arms_or_anions_leave_the_substituted_polyol_undecided(smiles):
     assert single_polyol_ester(Chem.MolFromSmiles(smiles))[0] == "other"
+
+
+@pytest.mark.parametrize("smiles, name", [
+    ("O=C(OCCSC(C)=O)N1CCCCC1", "2-(acetylsulfanyl)ethyl piperidine-1-carboxylate"),
+    ("CC(=O)OCCSC(C)=O", "2-(acetylsulfanyl)ethyl acetate"),
+    ("CC(=O)SCCSC(C)=O", "S-[2-(acetylsulfanyl)ethyl] ethanethioate"),
+    ("CC(=O)SC1CCC(CC1)OC(C)=O", "4-(acetylsulfanyl)cyclohexyl acetate"),
+])
+def test_an_s_ester_end_of_one_polyol_is_an_ester_group_too(smiles, name):
+    """ "Definitions" (:31649): esters of "chalcogen analogues of alcohols (thiols, selenols, tellurols)
+    ... are also included"; sets no oxygen-only condition, so the method (2) name with an
+    'acylsulfanyl' prefix is no PIN (the book prints no method (1) name with an S end; ruling 2026-11-07)."""
+    assert polyol_esters_by_acyloxy_prefixes(Chem.MolFromSmiles(smiles), name) not in (PASS, ABSTAIN)
+
+
+@pytest.mark.parametrize("smiles, name", [
+    ("CC(=O)SCC(=O)OC", "methyl (acetylsulfanyl)acetate"),      # the S-ester's 'alcohol' is the acid side: two components
+    ("CC(=O)SCCO", "S-(2-hydroxyethyl) ethanethioate"),         # one ester group
+    # an S-carbamoyl group is no ester of the polyol: the multiplicative name of the two acetates is the PIN
+    ("CC(=O)OCC(COC(C)=O)SC(=O)N", "2-(carbamoylsulfanyl)propane-1,3-diyl diacetate"),
+    ("CC(=O)Oc1ccc(SC(=O)N(C)C)cc1OC(C)=O", "4-[(dimethylcarbamoyl)sulfanyl]-1,2-phenylene diacetate"),
+])
+def test_an_s_ester_on_another_component_is_not_flagged(smiles, name):
+    assert polyol_esters_by_acyloxy_prefixes(Chem.MolFromSmiles(smiles), name) is PASS
+
+
+def test_a_simple_acyl_on_sulfur_is_not_enclosed():
+    """ "Parentheses" (:7232) encloses compound prefixes only: 'carbamoylamino (preferred prefix)' (:33344),
+    so 'carbamoylsulfanyl', not '(carbamoyl)sulfanyl'; a compound acyl is enclosed, '(cyclohexanecarbonyl)sulfanyl
+    (preferred prefix)' (:24615)."""
+    from tests.support.pin_tiers import tier_row
+    assert tier_row("NC(=O)SCCC(=O)O", "pin")["name"] == "3-(carbamoylsulfanyl)propanoic acid"
+    assert tier_row("OC(=O)c1ccc(SC(=O)C2CCCCC2)cc1", "pin")["name"] == \
+        "4-[(cyclohexanecarbonyl)sulfanyl]benzoic acid"
