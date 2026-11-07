@@ -57,21 +57,29 @@ from .models import P10
 #: with the general structure R-CO-O-R′ or R-S(O)x-O-R′";,:31771: "This rule applies equally to
 #: carboxylic, sulfonic, sulfinic, etc. acids"); a sulfonate matches once per =O, read once per ester O. The ester of
 #: the carboxylic acid on a ring nitrogen ('piperidine-1-carboxylate') is a carboxylic ester too (:24910
-#: 'tetraazane-1-carboxylic acid (PIN) [... the carboxylic acid is senior to the carbonic acid derivative]')
+#: 'tetraazane-1-carboxylic acid (PIN) [... the carboxylic acid is senior to the carbonic acid derivative]'). The ester
+#: of a thiol (R-CO-S-C) counts as well: "Definitions" (:31649) "Esters derived from... chalcogen
+#: analogues of alcohols (thiols, selenols, tellurols)... are also included", and sets no oxygen-only
+#: condition; the book prints no method (1) name with an S end, so such a name is no PIN either (ruling 2026-11-07).
+#: (:18172) "Chalcogen analogues follow each of the corresponding oxygen acids" orders the anions of a
+#: method (2) name; it does not take the S-ester out of the polyol
 _ESTER = Chem.MolFromSmarts(
     "[$([CX3;H1,$([CX3][#6])]),$([CX3;!R][N;R;X3]),$([SX4]([#6])(=[OX1])=[OX1]),$([SX3]([#6])=[OX1])]"
-    "(=[OX1])[OX2][#6]")
+    "(=[OX1])[OX2,SX2][#6]")
 
 #: groups senior to the esters, Table 4.1): an ion (the nitro group and the N-oxide are no ion of the class), a
 #: carboxylic, sulfur, phosphorus or boron acid group, an anhydride
 _SENIOR = tuple(Chem.MolFromSmarts(s) for s in (
     "[+,-;!$([N+]~[O-]);!$([O-]~[N+])]",
     "[CX3,SX4,SX3,PX4,PX3,BX3,AsX4,AsX3](=[O,S])[OX2H1,SX2H1]",
-    "[CX3](=O)[OX2][CX3,SX4,PX4]=O"))
+    "[CX3](=O)[OX2,SX2][CX3,SX4,PX4]=O"))
 
 #: an acyloxy prefix as the reader of the name sees it: 'acetyloxy', 'hexadecanoyloxy', '[(9Z)-octadec-9-enoyl]oxy',
 #: '(2-methylpropanoyl)oxy', 'benzoyloxy', 'formyloxy', '(methanesulfonyl)oxy'
 _ACYLOXY = re.compile(r"(?:oyl|acetyl|formyl|carbonyl|sulfonyl|sulfinyl)[\]\)\}]*oxy")
+#: the S-ester as a prefix, 'acetylsulfanyl'; read only when the molecule has an S-ester group (a carbamoyl or
+#: hydrazinecarbonyl on S is no ester of the polyol: '2-(carbamoylsulfanyl)propane-1,3-diyl diacetate')
+_ACYLSULFANYL = re.compile(r"(?:oyl|acetyl|formyl|carbonyl)[\]\)\}]*sulfanyl")
 
 
 def _words(name):
@@ -358,7 +366,8 @@ def polyol_esters_by_acyloxy_prefixes(mol, name):
     words = _words(name)
     if len(words) < 2 or not words[-1].rstrip("])}").endswith("ate"):
         return ABSTAIN
-    cited = [w for w in words[:-1] if _ACYLOXY.search(w)]
+    s_ester = any(mol.GetAtomWithIdx(m[2]).GetSymbol() == "S" for m in mol.GetSubstructMatches(_ESTER))
+    cited = [w for w in words[:-1] if _ACYLOXY.search(w) or (s_ester and _ACYLSULFANYL.search(w))]
     if not cited:
         return PASS
     return SpellingFailure(

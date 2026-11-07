@@ -1157,11 +1157,12 @@ def get_sulfanyl_prefix(
             # (PIN)' (section " Diacyl derivatives of trioxidane and chalcogen
             # analogues",:32358, example:32368). A literal '(' put a parenthesis
             # directly inside a parenthesis.
+            # A simple acyl prefix stays bare: 'carbamoylamino (preferred prefix)' (:33344), not '(carbamoyl)'.
             from ..rules.ions import _acyl_on_chalcogen_prefix
-            from .naming_utils import apply_enclosing_marks
+            from .naming_utils import enclose_if_compound
             acyl = _acyl_on_chalcogen_prefix(mol, sub_carbon, sulfur_idx)
             if acyl:
-                acyl = apply_enclosing_marks(acyl, -1)
+                acyl = enclose_if_compound(acyl)
         if not acyl:
             return None
         return f"{acyl}{suffix}"
