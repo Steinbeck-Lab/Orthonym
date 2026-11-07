@@ -50,6 +50,7 @@ _HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide
 # 'NC-SH thiocyanic acid (PIN)'). Scoped ONLY to cyanic/thiocyanic this cycle
 # also lists carbonic/boric/phosphinous mixed anhydrides -- those
 # need their own acid-parent naming and are out of scope here).
+_ACYL_O = "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2]"
 _MIXED_INORGANIC_ANHYDRIDE_SMARTS = {
     "cyanic": "[CX3](=O)[OX2][CX2]#[NX1]",
     "thiocyanic": "[CX3](=O)[SX2][CX2]#[NX1]",
@@ -61,6 +62,9 @@ _MIXED_INORGANIC_ANHYDRIDE_SMARTS = {
     # in 'benzoic phosphinous anhydride (PIN)',:32280); OPSIN 2.9.0 reads it to
     # CC(=O)ON=O
     "nitrous": "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][NX2]=[OX1]",
+    # the hypohalous acids X-OH:35520-:35528); 'benzoic hypoiodous anhydride (PIN)':35998)
+    **{w: f"{_ACYL_O}[{x}X1]" for w, x in (("hypofluorous", "F"), ("hypochlorous", "Cl"), ("hypobromous", "Br"),
+                                          ("hypoiodous", "I"))},
 }
 
 
@@ -95,7 +99,9 @@ def _name_anhydride_impl(features) -> Optional[str]:
     # Each re-detects its own bridge on the mol; the base carbon/O core below
     # never matches them, so ordering these first is safe (they return only on a
     # genuine bridge match).
-    _sn = _name_sulfur_linked_polyanhydride(mol) or _name_sulfonic_anhydride(mol) or _name_sulfur_mixed_anhydride(mol)
+    from .chalcogen_peroxyanhydrides import name_sulfonyl_acyl_chalcogenoanhydride   # R-SO2-S-C(=S)-R'
+    _sn = (_name_sulfur_linked_polyanhydride(mol) or _name_sulfonic_anhydride(mol) or _name_sulfur_mixed_anhydride(mol)
+           or name_sulfonyl_acyl_chalcogenoanhydride(mol))
     if _sn:
         return _sn
     _cn = _name_chalcogen_anhydride(mol)         # R-CO-S/Se/Te-CO-R'
@@ -104,7 +110,9 @@ def _name_anhydride_impl(features) -> Optional[str]:
     _tn = _name_thioacyl_anhydride(mol)          # /.3 R-C(=X)-Y-C(=X)-R'
     if _tn:
         return _tn
-    _pn = _name_peroxy_anhydride(mol)            # R-CO-OO-CO-R'
+    from .chalcogen_peroxyanhydrides import name_chalcogen_peroxy_anhydride   # -SS-, -OS-, -SSe-
+    from .noncarbon_acid_anhydrides import noncarbon_peroxyanhydride   # R2B-OO-BR2
+    _pn = _name_peroxy_anhydride(mol) or name_chalcogen_peroxy_anhydride(mol) or noncarbon_peroxyanhydride(mol)
     if _pn:
         return _pn
     _mi = _name_mixed_inorganic_anhydride(mol)   # R-CO-O/S-C#N (cyanic/thiocyanic)
@@ -780,6 +788,10 @@ def _name_mixed_inorganic_anhydride(mol) -> Optional[str]:
     mixed anhydrides (carbonic/boric/phosphinous/...) are out of scope this
     cycle. Returns None (fall through) when no acyl-[O,S]-C#N core is present,
     or when the acyl side cannot be named."""
+    # a second anhydride link makes a dianhydride, the Blue Book), not '<acid> cyanic anhydride'
+    if any(mol.HasSubstructMatch(_compiled_smarts(sm)) for sm in (ANHYDRIDE_SMARTS, _CHALCOGEN_ANHYDRIDE_SMARTS,
+                                                                    _PEROXY_ANHYDRIDE_SMARTS)):
+        return None
     for inorganic_word, smarts in _MIXED_INORGANIC_ANHYDRIDE_SMARTS.items():
         pat = _compiled_smarts(smarts)
         if pat is None:
@@ -787,6 +799,9 @@ def _name_mixed_inorganic_anhydride(mol) -> Optional[str]:
         matches = mol.GetSubstructMatches(pat, uniquify=True)
         if not matches:
             continue
+        if len(matches) != 1 or sum(len(mol.GetSubstructMatches(_compiled_smarts(o), uniquify=True))
+                                    for o in _MIXED_INORGANIC_ANHYDRIDE_SMARTS.values()) != 1:
+            return None
         m = matches[0]                       # (c1, =O, bridge[O|S], C#N carbon, N)
         c1, o1, bridge = m[0], m[1], m[2]
         acid1, _sub1 = _name_acyl_acid(mol, c1, bridge, o1)

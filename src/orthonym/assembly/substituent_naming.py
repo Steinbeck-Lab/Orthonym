@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from .pseudohalide_prefix import pseudohalide_prefix
 from .chain_carboxamide import is_chain_carboxamide as _is_chain_carboxamide, pin_amide_prefix
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
@@ -8170,8 +8171,8 @@ def _name_substituent_fragment_uncached(
         Raw prefix name (e.g., "methyl", "propan-2-yl", "2-methylpropyl")
         WITHOUT enclosing marks. Returns None if naming fails.
     """
-    if not sub_atoms:
-        return None
+    if not sub_atoms or (pseudo := pseudohalide_prefix(mol, sub_atoms, attach_idx)):   # 'cyanato'
+        return pseudo if sub_atoms else None
 
     # ---- free-valence gate (the SAME gate name_substituent carries) ----
     # This is the project's OTHER general substituent chokepoint: it takes

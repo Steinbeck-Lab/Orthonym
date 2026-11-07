@@ -120,3 +120,48 @@ def mixed_noncarbon_anhydride(mol, ester_o: int, e_idx: int, acid_name: str) -> 
     words = sorted([acid_name[:-len(_ACID)], other[:-len(_ACID)]],
                    key=lambda w: (re.sub("[^a-z]", "", w.lower()), cip_descriptor_rank_key(w)))
     return f"{words[0]} {words[1]} anhydride"
+
+
+#: E-O-O-E' with E, E' the acid centres of monobasic noncarbon oxoacids (checked by the writer)
+NONCARBON_PEROXY_SMARTS = "[P,As,Sb,B;!R][OX2][OX2][P,As,Sb,B;!R]"
+_NONCARBON_PEROXY = Chem.MolFromSmarts(NONCARBON_PEROXY_SMARTS)
+
+
+def noncarbon_peroxyanhydride(mol) -> Optional[str]:
+    """'dimethylborinic peroxyanhydride' for R2E-O-O-ER2, else None.
+
+     "Anhydrides of mononuclear noncarbon oxoacids" (the Blue Book), named as the anhydrides of the
+    carboxylic acids: '(CH3)2B-O-O-B(CH3)2 dimethylborinic peroxyanhydride (PIN)' (:36000); the class word of a -O-O-
+    link is 'peroxyanhydride':32340); two different acids in alphanumerical order:32253)."""
+    from ..assembly.fragment_naming import name_fragment_recursively
+    matches = mol.GetSubstructMatches(_NONCARBON_PEROXY, uniquify=True)
+    if len(matches) != 1 or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    e1, o1, o2, e2 = matches[0]
+    words = []
+    for e, o, other_o in ((e1, o1, o2), (e2, o2, o1)):
+        if not is_monobasic_noncarbon_acid_centre(mol, o, e):
+            return None
+        rw = Chem.RWMol(mol)
+        rw.RemoveBond(o, other_o)
+        try:
+            Chem.SanitizeMol(rw)
+        except (ValueError, RuntimeError):
+            return None
+        frag = next((f for f in Chem.GetMolFrags(rw, asMols=False) if e in f), None)
+        if frag is None or other_o in frag:
+            return None
+        if mol.GetAtomWithIdx(e).GetSymbol() == "B":
+            name = _borinic_acid_name(mol, o, e)
+        else:
+            try:
+                name = name_fragment_recursively(Chem.MolFragmentToSmiles(rw, frag))
+            except Exception:
+                return None
+        if not name or not name.endswith(_ACID) or " " in name[:-len(_ACID)]:
+            return None
+        words.append(name[:-len(_ACID)])
+    if words[0] == words[1]:
+        return f"{words[0]} peroxyanhydride"
+    words.sort(key=lambda w: re.sub("[^a-z]", "", w.lower()))
+    return f"{words[0]} {words[1]} peroxyanhydride"

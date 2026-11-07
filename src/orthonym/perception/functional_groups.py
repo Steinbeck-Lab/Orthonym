@@ -861,6 +861,9 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
     # The -O-O- bridge cannot match the single-O base core (no single O bonded to
     # both carbonyls), so this NEVER double-fires as a plain anhydride.
     "peroxy_anhydride": "[CX3](=O)[OX2][OX2][CX3](=O)",
+    # (the Blue Book): -SS-, -SeSe-, -TeTe- junctions ('acetic dithioperoxyanhydride (PIN)':32354);
+    # the mixed ones (-OS-, 'thioperoxyanhydride') OPSIN 2.9.0 does not read
+    "chalcogen_peroxy_anhydride": "[CX3;$([CX3]=[O,S,Se,Te]),$([CX3](=[NX2H1])[NX3])](=[O,S,Se,Te,NX2])[$([SX2]-[SX2]),$([SeX2]-[SeX2]),$([TeX2]-[TeX2])]-[SX2,SeX2,TeX2][CX3;$([CX3]=[O,S,Se,Te]),$([CX3](=[NX2H1])[NX3])]=[O,S,Se,Te,NX2]",
     # W8-P4 /: mixed organic/cyanic(-thio) acid anhydride
     # R-CO-O-C#N / R-CO-S-C#N (BB 30979/32279 'CH3-CO-O-CN acetic cyanic
     # anhydride (PIN)'). Neither side is a second carbonyl, so the base
@@ -882,6 +885,13 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
     # '-ous' inorganic acid as in 'benzoic phosphinous anhydride (PIN)',:32280)
     "nitrous_anhydride":
         "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][NX2]=[OX1]",
+    # R-SO2-S-C(=S)-R' ('benzenecarbothioic ethanesulfonic thioanhydride (PIN)',:32296)
+    "sulfonyl_acyl_chalcogenoanhydride":
+        "[$([SX4]([#6])(=O)=O),$([SX3]([#6])=O)][SX2,SeX2,TeX2][CX3;$([CX3][#6]),$([CH1])]=[O,S,Se]",
+    # R2E-O-O-ER2 of monobasic noncarbon acids ('dimethylborinic peroxyanhydride (PIN)',:36000)
+    "noncarbon_peroxy_anhydride": "[P,As,Sb,B;!R]([#6])[OX2][OX2][P,As,Sb,B;!R][#6]",
+    # an acyl-O-halogen: the anhydride of a hypohalous acid ('benzoic hypoiodous anhydride (PIN)',:35998)
+    "hypohalous_anhydride": "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][F,Cl,Br,I;X1]",
     # D /.2/.3, /.3): thio/seleno-ACYL anhydrides
     # R-C(=X1)-Y-C(=X2)-R' where an acyl chalcogen X1/X2 is S or Se (a
     # '...thioic'/'...selenoic' acid component, BB 32451/32455/32467), with an
@@ -902,6 +912,12 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
 # D: the two broad thio/seleno-acyl SMARTS overlap the base O-bridge and
 # chalcogen-bridge matches, so their fold is DEDUPED by atom-set (below).
 _BROAD_ACYL_ANHYDRIDE = {"thioacyl_oxo_anhydride", "thioacyl_chalcogen_anhydride"}
+#: the bridges folded into the 'anhydride' class only when no group senior to the anhydrides is present: beside one,
+#: the substitutive read of the molecule stands ('4-(acetyldisulfanyl)-4-oxobutanoic acid')
+SUBSTITUTIVE_ANHYDRIDE_BRIDGES = frozenset({
+    "chalcogen_anhydride", "thioacyl_chalcogen_anhydride", "nitric_anhydride", "nitrous_anhydride",
+    "chalcogen_peroxy_anhydride", "hypohalous_anhydride", "noncarbon_peroxy_anhydride",
+    "sulfonyl_acyl_chalcogenoanhydride"})
 _COMPILED_ANHYDRIDE_BRIDGE = {}
 for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
     _bpat = Chem.MolFromSmarts(_bsmarts)
@@ -1040,8 +1056,7 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     # unconditionally, matching the base O-bridge (fail-closed, never wrong).
     # The nitric mixed anhydride joins it too: under a senior group its
     # substitutive read ('3-(nitrooxy)-3-oxopropanoic acid') is the one built.
-    _SUBSTITUTIVE_BRIDGE = {"chalcogen_anhydride", "thioacyl_chalcogen_anhydride",
-                            "nitric_anhydride", "nitrous_anhydride"}
+    _SUBSTITUTIVE_BRIDGE = SUBSTITUTIVE_ANHYDRIDE_BRIDGES
     # D: dedup the BROAD acyl folds by atom-set against everything already
     # in the 'anhydride' bucket (base O-bridge FG + the earlier bridge keys), so
     # a (=O,=O) match is not double-added -- only the new thio/seleno-acyl motifs.

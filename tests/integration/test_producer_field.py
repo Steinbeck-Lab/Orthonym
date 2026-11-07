@@ -37,7 +37,8 @@ def test_producer_of_the_shipped_name(smiles, tier, expected):
 
 
 # a NO_VERIFIED_PIN decline, an UNNAMEABLE decline, and a natural-product name the default tier withholds
-@pytest.mark.parametrize("smiles", [LABELLED_ESTER, "CC(=O)OCl", HEROIN])
+# (the UNNAMEABLE row was 'CC(=O)OCl' until 'acetic hypochlorous anhydride' became its PIN,
+@pytest.mark.parametrize("smiles", [LABELLED_ESTER, "CCOCl", HEROIN])
 def test_producer_is_null_when_nothing_ships(smiles):
     r = row(smiles, "pin")
     assert r["tier"] == "abstain" and r["producer"] is None, r
@@ -153,7 +154,7 @@ CAFFEINE = "Cn1cnc2c1c(=O)n(C)c(=O)n2C"
 SPELLING = "ethyl alcohol"
 
 
-@pytest.mark.parametrize("smiles", ["CCO", "c1ccccc1", "CC(=O)Nc1ccc(O)cc1", LABELLED_ESTER, "CC(=O)OCl"])
+@pytest.mark.parametrize("smiles", ["CCO", "c1ccccc1", "CC(=O)Nc1ccc(O)cc1", LABELLED_ESTER, "CCOCl"])
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_named_rows_have_a_producer(smiles, tier):
     # the last two are declines at the default tier and named at best-effort: both sides of the converse

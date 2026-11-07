@@ -126,7 +126,7 @@ PAIRS = [
     ("C=C[C@@]1(O)CC(C#N)=CC1=O", "best-effort", "engine:general"),
     ("O=C(O)c1ccccc1SCCCN1C(=O)c2cccc3cccc(c23)C1=O", "best-effort", "engine:general"),
     ("FOc1ccccc1", "best-effort", "engine:general"),
-    ("CC(=O)OCl", "best-effort", "engine:general"),
+    ("CCOCl", "best-effort", "engine:general"),   # was CC(=O)OCl, now the anhydride PIN
     ("NCC(CN)CN", "best-effort", "engine:general"),
     # the isotope decorator, which names a labelled molecule before the outer classes see it
     ("Cl[12CH](Cl)Cl", "pin", "isotope"),
