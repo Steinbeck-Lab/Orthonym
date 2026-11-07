@@ -51,9 +51,16 @@ from rdkit import Chem
 from ..pin_spelling import ABSTAIN, PASS, SpellingFailure, register
 from .models import P10
 
-#: a carboxylic ester group R-C(=O)-O-C (R a carbon or the hydrogen of a formate); a carbonate or a carbamate
-#: has no carbon on its carbonyl carbon and is not one
-_ESTER = Chem.MolFromSmarts("[CX3;H1,$([CX3][#6])](=[OX1])[OX2][#6]")
+#: an ester group (acid centre, =O, ester O, alcohol C): a carboxylic ester R-C(=O)-O-C (R a carbon or the hydrogen of
+#: a formate; a carbonate or a carbamate has no carbon on its carbonyl carbon and is not one), or the ester of a
+#: sulfonic or sulfinic acid R-S(=O)x-O-C. names the esters of both alike,:31696: "an ester
+#: with the general structure R-CO-O-R′ or R-S(O)x-O-R′";,:31771: "This rule applies equally to
+#: carboxylic, sulfonic, sulfinic, etc. acids"); a sulfonate matches once per =O, read once per ester O. The ester of
+#: the carboxylic acid on a ring nitrogen ('piperidine-1-carboxylate') is a carboxylic ester too (:24910
+#: 'tetraazane-1-carboxylic acid (PIN) [... the carboxylic acid is senior to the carbonic acid derivative]')
+_ESTER = Chem.MolFromSmarts(
+    "[$([CX3;H1,$([CX3][#6])]),$([CX3;!R][N;R;X3]),$([SX4]([#6])(=[OX1])=[OX1]),$([SX3]([#6])=[OX1])]"
+    "(=[OX1])[OX2][#6]")
 
 #: groups senior to the esters, Table 4.1): an ion (the nitro group and the N-oxide are no ion of the class), a
 #: carboxylic, sulfur, phosphorus or boron acid group, an anhydride
@@ -63,8 +70,8 @@ _SENIOR = tuple(Chem.MolFromSmarts(s) for s in (
     "[CX3](=O)[OX2][CX3,SX4,PX4]=O"))
 
 #: an acyloxy prefix as the reader of the name sees it: 'acetyloxy', 'hexadecanoyloxy', '[(9Z)-octadec-9-enoyl]oxy',
-#: '(2-methylpropanoyl)oxy', 'benzoyloxy', 'formyloxy'
-_ACYLOXY = re.compile(r"(?:oyl|acetyl|formyl)[\]\)\}]*oxy")
+#: '(2-methylpropanoyl)oxy', 'benzoyloxy', 'formyloxy', '(methanesulfonyl)oxy'
+_ACYLOXY = re.compile(r"(?:oyl|acetyl|formyl|carbonyl|sulfonyl|sulfinyl)[\]\)\}]*oxy")
 
 
 def _words(name):
@@ -149,7 +156,7 @@ def single_polyol_ester(mol):
         return "none", 0
     bonds = []
     for acyl, _o_dbl, o_ester, alcohol in matches:
-        if not mol.GetBondBetweenAtoms(acyl, o_ester).IsInRing():
+        if not mol.GetBondBetweenAtoms(acyl, o_ester).IsInRing() and (acyl, o_ester, alcohol) not in bonds:
             bonds.append((acyl, o_ester, alcohol))
     if not bonds:
         return "none", 0

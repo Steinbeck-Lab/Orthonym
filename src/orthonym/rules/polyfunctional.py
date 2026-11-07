@@ -3427,7 +3427,8 @@ def _branch_holds_oxoacid_group(mol, sub_atoms) -> bool:
     instead of skipping it turned the default-tier decline of 'OC(=O)CCOP(=O)(O)OCCN' into a
     pin_verified name and kept the glycerophospholipids out of the weaver."""
     from .oxoacid_group_prefix import is_oxoacid_centre
-    return any(is_oxoacid_centre(mol, a) for a in sub_atoms)
+    from ..assembly.sulfur_acid_ester_prefixes import is_sulfur_acid_ester_centre   #: named, not left
+    return any(is_oxoacid_centre(mol, a) and not is_sulfur_acid_ester_centre(mol, a) for a in sub_atoms)
 
 
 def _generate_alkyl_prefixes_for_polyfunctional(
@@ -3777,8 +3778,8 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                             break
                     _attach_sym = mol.GetAtomWithIdx(_attach).GetSymbol() if _attach is not None else ''
                     # Skip S-attached branches if S is part of a named FG
-                    # (sulfoxide, sulfone, thioether) -- already named by FG prefix system
-                    _S_FG_NAMES = {'sulfoxide', 'sulfone', 'thioether'}
+                    # (sulfoxide, sulfone, thioether, sulfonic/sulfinic ester -- named by FG prefix system
+                    _S_FG_NAMES = {'sulfoxide', 'sulfone', 'thioether', 'sulfonic_ester', 'sulfinic_ester'}
                     _skip_s_branch = False
                     if _attach is not None and _attach_sym == 'S':
                         _all_fgs = features.functional_groups if hasattr(features, 'functional_groups') else {}

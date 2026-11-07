@@ -852,7 +852,7 @@ def get_sulfinyl_prefix(
 
 
 def _acid_stem_oxide_prefix(
-    mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str,
+    mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str, parent_idx: Optional[int] = None,
 ) -> Optional[str]:
     """Shared Wave2 builder: '{parent-hydride-stem}sulfinyl/sulfonyl'
     (methanesulfinyl / benzenesulfonyl / cyclohexanesulfinyl) with the
@@ -871,7 +871,7 @@ def _acid_stem_oxide_prefix(
         # rewriting the suffix. Returns None (fail closed) on anything that does
         # not name as a clean '... sulfinic/sulfonic acid'.
         return _acid_stem_unsaturated_oxide_prefix(
-            mol, sub_carbon, sulfur_idx, oxide_kind
+            mol, sub_carbon, sulfur_idx, oxide_kind, parent_idx
         )
     stem, _kind, _atoms = side
     from .naming_utils import should_omit_locant_one
@@ -2128,6 +2128,9 @@ def get_substituent_prefix_form(
         return get_sulfinyl_prefix(mol, atoms, principal_chain, suffix="tellurinyl")
     if fg_name == "tellurone":
         return get_sulfonyl_prefix(mol, atoms, principal_chain, suffix="telluronyl")
+    if fg_name in ("sulfonic_ester", "sulfinic_ester"):     #: '(methanesulfonyl)oxy', 'methoxysulfonyl'
+        from .sulfur_acid_ester_prefixes import get_sulfur_acid_ester_prefix
+        return get_sulfur_acid_ester_prefix(mol, atoms, principal_chain, "sulfonyl" if fg_name == "sulfonic_ester" else "sulfinyl")
     if fg_name == "thioether":
         return get_sulfanyl_prefix(mol, atoms, principal_chain)
     # functional-group perception fix (169.7): Se/Te ether analogues → (alkyl)selanyl/tellanyl.

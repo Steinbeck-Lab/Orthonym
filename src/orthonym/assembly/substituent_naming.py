@@ -2702,6 +2702,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
     try:
         from ..rules.lipids import _acyloxy_for_site
         from .naming_utils import enclose_if_compound as _enclose_if_compound
+        from .sulfur_acid_ester_prefixes import consume_sulfur_acid_oxy
     except Exception:
         _acyloxy_import_ok = False
     if _acyloxy_import_ok:
@@ -2786,11 +2787,10 @@ def _name_polyfunctional_acyclic_substituent_impl(
             consumed.update(acyl_side)
             _add_prefix(host_c, token)
             _acyloxy_tokens[token] = _acyloxy_tokens.get(token, 0) + 1
-        # A COMPOUND acyloxy prefix that repeats needs bis/tris, which the simple
-        # assembly multiplier below cannot spell -- fail closed rather than emit
-        # the wrong 'di(acetyloxy)'. (Single occurrence per token is the tail-row
-        # shape; a multiplicative acyloxy is a follow-on.)
-        if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
+        # A COMPOUND acyloxy prefix that repeats needs bis/tris, which the assembly multiplier below cannot spell: fail
+        # closed, not 'di(acetyloxy)'. Sulfonic/sulfinic esters, '(methanesulfonyl)oxy', likewise.
+        if any(cnt >= 2 for cnt in _acyloxy_tokens.values()) or not consume_sulfur_acid_oxy(
+                mol, sub_set, consumed, _add_prefix):
             return None
 
     # ---- Pass 1c2 (a phase Wave 2, #5b, /: a pendant

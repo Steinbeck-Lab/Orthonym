@@ -2301,6 +2301,13 @@ def name_noncarbon_ester(mol, match: tuple, siblings: tuple = ()) -> Optional[st
                 from ..metrics.provenance import record_non_pin_label
                 record_non_pin_label(one_cut)
             return one_cut
+        # one group cut, the others prefixes ('(methanesulfonyl)oxy'): the group of the lowest canonical rank is no
+        # choice of (the senior ester is the parent of the PIN), so the name is labelled below the PIN
+        one_cut = _name_noncarbon_ester_cuts(mol, group[:1])
+        if one_cut:
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(one_cut, "P-65.6.3.3.4.2", "the ester the name is built on is not chosen by seniority")
+        return one_cut
     return _name_noncarbon_ester_cuts(mol, group[:1])
 
 

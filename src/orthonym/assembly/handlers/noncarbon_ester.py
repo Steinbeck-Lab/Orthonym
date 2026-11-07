@@ -49,6 +49,10 @@ def name_noncarbon_ester_handler(
     cand = pool.add(name, "noncarbon_ester", features)
     if cand is None:
         return None
+    # the ester of a ring-nitrogen carboxylic acid is senior to a sulfonic or sulfinic ester class 7a, carboxylic
+    # first): the name built on the sulfur acid ester is no PIN when the carbamate handler could not spell that one
+    from .carbamate import demote_below_carbamate_parent
+    demote_below_carbamate_parent(features, cand.name)
     return NamingResult(
         name=cand.name,
         tree=NameTreeNode(

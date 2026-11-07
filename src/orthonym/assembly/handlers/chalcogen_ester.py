@@ -96,6 +96,8 @@ def name_chalcogen_ester(
             cand = pool.add(name, "chalcogen_ester", features)
             if cand is None:
                 return None
+            from .carbamate import demote_below_carbamate_parent
+            demote_below_carbamate_parent(features, cand.name)
             return NamingResult(
                 name=cand.name,
                 tree=NameTreeNode(parent_stem=cand.name, class_id="chalcogen_ester",
@@ -180,6 +182,10 @@ def name_chalcogen_ester(
     final_name = cand.name if acid_stereo_placed else _inject_stereo_if_missing(
         features, cand.name, atom_to_locant=None,
     )
+    # the ester of a ring-nitrogen carboxylic acid is senior to a thio ester class 7a, carboxylic before its
+    # chalcogen analogues): the name built on the thio ester is no PIN when the molecule has one
+    from .carbamate import demote_below_carbamate_parent
+    demote_below_carbamate_parent(features, final_name)
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="chalcogen_ester", iupac_section_cite="P-65.6", fragment_legacy=final_name),

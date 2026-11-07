@@ -96,19 +96,26 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     thio = _thiocarbamate_unit(features)
     if mol is None or len(matches) + (thio is not None) != 1 or not _is_neutral_species(features):
         return False
+    n_idx, c_idx = (matches[0][0], matches[0][1]) if matches else (thio[0], thio[1])
+    ring_carboxylic = bool(matches) and mol.GetAtomWithIdx(n_idx).IsInRing()
     try:
-        if seniority_index(pg, mol, getattr(features, 'principal_group_atoms', None)) <= SENIORITY_ORDER.index('ester'):
+        if seniority_index(pg, mol, getattr(features, 'principal_group_atoms', None)) <= SENIORITY_ORDER.index('ester') \
+                and not (ring_carboxylic and _junior_to_ring_n_carboxylic(pg)):
             return False
     except ValueError:
         return False
-    n_idx, c_idx = (matches[0][0], matches[0][1]) if matches else (thio[0], thio[1])
     # the esters rank among themselves by their acid (rules.seniority.ESTER_ACID_ORDER): carbamic acid is a carbonic acid
     # (class 7b), below the carboxylic, sulfonic and sulfinic acids of class 7a, so the ester of one of those is the
     # parent. The groups perception reads on the carbamothioate's own carbonyl carbon (its S-ester is also a 'thioester')
-    # are not such an ester.
+    # are not such an ester. The acid on a ring nitrogen is a carboxylic acid, not a carbonic one (the Blue Book,
+    # 'tetraazane-1-carboxylic acid (PIN) [not (triazan-1-yl)carbamic acid; the carboxylic acid is senior to the carbonic
+    # acid derivative]'; 'pyrrolidine-1-carboxylic acid (PIN)'), first of class 7a (:18172), so only the
+    # ester of another carboxylic acid can be senior to it (:func:`_junior_to_ring_n_carboxylic`).
     carbamate_rank = ester_acid_rank('carbamate')
     for name, found in fgs.items():
         rank = ester_acid_rank(name)
+        if ring_carboxylic and _junior_to_ring_n_carboxylic(name):
+            continue
         if rank is not None and rank < carbamate_rank and any(
                 m[0] != c_idx and not _is_carbamoyl_carbon(mol, m[0]) for m in found or ()):
             return False
@@ -120,6 +127,23 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     from ..carbazate_names import free_hydrazine_nitrogen
     return all(nb.GetSymbol() != 'N' or nb.GetIdx() == free_hydrazine_nitrogen(mol, n_idx, c_idx)
                for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors())
+
+
+#: the class-7a ester groups whose acid is a carboxylic acid with oxygen only class 7a, the Blue Book:
+#: "carboxylic..., sulfonic, sulfinic..., each followed in turn by the corresponding peroxy, imidic, and hydrazonic acids.
+#: Chalcogen analogues follow each of the corresponding oxygen acids"): only these can outrank the ester of a ring-nitrogen
+#: carboxylic acid, by the seniority of their parent (``decomposition.ester_in_alcohol``).
+_CARBOXYLIC_OXYGEN_ESTERS = frozenset({'ester', 'pseudoester'})
+
+
+def _junior_to_ring_n_carboxylic(fg_name: str) -> bool:
+    """True when ``fg_name`` is a class-7a ester whose acid follows a carboxylic acid in class 7a
+    (:18172): the esters of the imidic and chalcogen analogues of carboxylic acids ('S-... ethanethioate') and of the
+    sulfonic and sulfinic acids ('... methanesulfonate'). The ester of a ring-nitrogen carboxylic acid is senior to
+    them whatever its ring ('tert-butyl 4-[(methanesulfonyl)oxy]piperidine-1-carboxylate', not '1-(tert-butoxycarbonyl)
+    piperidin-4-yl methanesulfonate')."""
+    from ...rules.seniority import ester_acid_rank
+    return ester_acid_rank(fg_name) == 0 and fg_name not in _CARBOXYLIC_OXYGEN_ESTERS
 
 
 def _is_carbamoyl_carbon(mol, idx: int) -> bool:

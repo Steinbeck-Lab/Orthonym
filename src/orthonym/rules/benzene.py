@@ -2934,10 +2934,12 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 # which OPSIN cannot parse. Caller skips None gracefully.
                 return None
 
-            # O-S neighbors: sulfanyloxy / sulfinyloxy / sulfonyloxy
+            # O-S neighbors: the ester of a sulfonic/sulfinic acid '[(methanesulfonyl)oxy]', sulfooxy...
             if nbr_symbol == 'S':
-                s_atom = nbr
-                # Check oxidation state of sulfur (count =O bonds)
+                from ..assembly.sulfur_acid_ester_prefixes import ring_sulfur_acid_oxy
+                s_atom, _sx = nbr, ring_sulfur_acid_oxy(mol, o_idx, ring_atoms, sub_atoms)
+                if _sx:
+                    return _sx
                 s_double_o = sum(
                     1 for nb in s_atom.GetNeighbors()
                     if nb.GetSymbol() == 'O' and nb.GetIdx() != o_idx
@@ -2947,7 +2949,6 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     # -O-S-: sulfanyloxy (IUPAC
                     return {'name': 'sulfanyloxy', 'atoms': sub_atoms}
                 elif s_double_o == 1:
-                    # -O-S(=O)-: sulfinyloxy
                     return {'name': 'sulfinyloxy', 'atoms': sub_atoms}
                 elif s_double_o >= 2:
                     # -O-SO2-OH is the preselected prefix 'sulfooxy'
@@ -2968,7 +2969,6 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     if (len(s_oh) == 1 and s_atom.GetDegree() == 4
                             and s_atom.GetFormalCharge() == 0):
                         return {'name': 'sulfooxy', 'atoms': sub_atoms}
-                    # -O-S(=O)(=O)-: sulfonyloxy
                     return {'name': 'sulfonyloxy', 'atoms': sub_atoms}
 
             # O-P neighbors: phosphonooxy (IUPAC

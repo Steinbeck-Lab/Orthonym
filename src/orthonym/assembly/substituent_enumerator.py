@@ -54,6 +54,7 @@ from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
 from .n_unit_prefix import n_unit_prefix
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
 from .substituent_prefix_forms import _check_substituent_prefix_form
+from .sulfur_acid_ester_prefixes import sulfur_acid_branch_prefix as _sulfur_acid_branch
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from ..metrics.provenance import best_effort_ctx  # perf lever A10 (2026-09-13): hoisted (14,478 executions per 300 molecules)
 from ..metrics.provenance import (  # a lever: breadth flags enter the name_substituent memo key
@@ -2299,6 +2300,8 @@ def name_acid_linked_branch(mol, frag_atoms, attach_idx, principal_group,
             return None
     sym = a.GetSymbol()
     centre = mol.GetAtomWithIdx(inner[0]).GetSymbol()
+    if sym == 'O' and centre == 'S' and (_sx := _sulfur_acid_branch(mol, frag, attach_idx)):
+        return _sx                          # the ester of a sulfonic or sulfinic acid, '(methanesulfonyl)oxy'
     if sym == 'O' and functional_groups and any(
             attach_idx in m
             for matches in functional_groups.values() for m in (matches or ())):
@@ -2451,6 +2454,11 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     except Exception:
         # Defensive: any unexpected SMARTS / RDKit error falls through to Tier-1
         pass
+
+    # Tier 0.54,: the ester of a sulfonic or sulfinic acid: '(methanesulfonyl)oxy', '(methoxysulfonyl)'
+    _sx = _sulfur_acid_branch(mol, frag_atoms_set, attach_idx)
+    if _sx:
+        return _sx
 
     # ---- Tier 0.55 (a phase,: S-oxoacid acyl-oxy/-amino ----
     # An -O-S(oxoacid) or -NH-S(oxoacid) tail, where the parent carries a group
@@ -3097,19 +3105,10 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # attached via the carbonyl C, keeping -OH -> `carboxy` (guard above)
     # attached via the ester O, keeping -O- -> `<acyl>oxy` (here)
     #
-    # Measured: `-O-C(=O)CH3` came out `acetyl`, which is `-C(=O)CH3`, an oxygen
-    # SHORT -- and OPSIN confirms the two differ, `(acetyl)benzene` parsing to
-    # `C(C)(=O)C1=CC=CC=C1` against `(acetyloxy)benzene`'s
-    # `C(C)(=O)OC1=CC=CC=C1`. So this is a wrong molecule, not a spelling choice.
-    #
-    # Composing acyl + `oxy` is the nomenclature operation specifies
-    # for an ester cited as a prefix, NOT string surgery on an emitted name: the
-    # acyl morpheme is looked up for the fragment and the `oxy` morpheme is
-    # appended, which is how the prefix is formed.
-    #
-    # Longer acyloxy chains (`-OC(=O)CH2CH3`) never reach here -- the chain path
-    # already spells them `2-oxo-1-oxabutyl`, verified RT-exact -- so this fires
-    # only for the short acids the retained table intercepts first.
+    # Measured: `-O-C(=O)CH3` came out `acetyl`, which is `-C(=O)CH3`, an oxygen SHORT (OPSIN: `(acetyl)benzene`
+    # `C(C)(=O)C1=CC=CC=C1` against `(acetyloxy)benzene` `C(C)(=O)OC1=CC=CC=C1`): a wrong molecule, not a spelling.
+    # Composing acyl + `oxy` is the operation specifies for an ester cited as a prefix, not string
+    # surgery. Longer acyloxy chains (`-OC(=O)CH2CH3`) never reach here: the chain path spells them RT-exact.
     try:
         if len(frag_atoms_set) >= 3:
             _o = mol.GetAtomWithIdx(attach_idx)

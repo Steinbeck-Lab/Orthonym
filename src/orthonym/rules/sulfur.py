@@ -395,7 +395,7 @@ _OXIDE_ACID_SUFFIX = {
 
 
 def _acid_stem_unsaturated_oxide_prefix(
-    mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str,
+    mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str, parent_idx: Optional[int] = None,
 ) -> Optional[str]:
     """ acid-stem prefix ('prop-2-ene-1-sulfinyl') for an arm that
     ``_classify_oxide_side`` declines (unsaturated / branched / hetero).
@@ -453,6 +453,11 @@ def _acid_stem_unsaturated_oxide_prefix(
         n.GetIdx() for n in s_atom.GetNeighbors()
         if n.GetSymbol() in ("C", "N") and n.GetIdx() not in arm
     ]
+    # The ester oxygen of a sulfonic or sulfinic acid ester R-S(=O)x-O-R' is the parent-side neighbour only when
+    # the caller names it (``parent_idx``, the '(R-sulfonyl)oxy' prefix of: the acid is R-S(=O)x-OH.
+    if parent_idx is not None:
+        parent_c = [parent_idx] if (mol.GetBondBetweenAtoms(sulfur_idx, parent_idx) is not None
+                                    and parent_idx not in arm and not parent_c) else []
     if len(parent_c) != 1:
         return None  # not the R-S(=O)x-R'/N< shape we cap
     rw = Chem.RWMol(mol)
