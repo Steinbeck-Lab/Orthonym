@@ -5,6 +5,35 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.1.0...v1.2.0) (2026-11-07)
+
+
+### Features
+
+* name element sets and radical drawings of organometallic compounds ([#221](https://github.com/Steinbeck-Lab/Orthonym/issues/221)) ([bf11b15](https://github.com/Steinbeck-Lab/Orthonym/commit/bf11b159a719c582c2867719316d97ddb7705aa9))
+* name hydride element sets and mixtures by their components ([#222](https://github.com/Steinbeck-Lab/Orthonym/issues/222)) ([d537374](https://github.com/Steinbeck-Lab/Orthonym/commit/d537374375df607d90019adddc75c759ee473744))
+* nomenclature coverage and correctness updates ([#210](https://github.com/Steinbeck-Lab/Orthonym/issues/210)) ([765871c](https://github.com/Steinbeck-Lab/Orthonym/commit/765871c1442ccc9ee1a9c3424c8b933c1ce88aad))
+* nomenclature coverage and correctness updates ([#223](https://github.com/Steinbeck-Lab/Orthonym/issues/223)) ([4b0b007](https://github.com/Steinbeck-Lab/Orthonym/commit/4b0b0078cfaf6aad442e4cf711d358add5de2f96))
+* nomenclature coverage and correctness updates ([#229](https://github.com/Steinbeck-Lab/Orthonym/issues/229)) ([74e20fe](https://github.com/Steinbeck-Lab/Orthonym/commit/74e20fe98d615c4882a3ace29553ab05e919dd76))
+* **polycycles:** the main ring of a ring system of 16 or more rings is a longest cycle ([#208](https://github.com/Steinbeck-Lab/Orthonym/issues/208)) ([fa34061](https://github.com/Steinbeck-Lab/Orthonym/commit/fa3406187509d4d37c3f61c308bb4225d35448c9))
+* **prefixes:** acyl branches on ring acids take their acyl prefix at the PIN tier ([#209](https://github.com/Steinbeck-Lab/Orthonym/issues/209)) ([5148dbc](https://github.com/Steinbeck-Lab/Orthonym/commit/5148dbc63830b50828672b3c519e4639467000d1))
+
+
+### Bug Fixes
+
+* nomenclature correctness updates ([#205](https://github.com/Steinbeck-Lab/Orthonym/issues/205)) ([7959540](https://github.com/Steinbeck-Lab/Orthonym/commit/7959540becfd0c9a7776eee2fda427f72dda49ac))
+* nomenclature correctness updates ([#207](https://github.com/Steinbeck-Lab/Orthonym/issues/207)) ([d8c252e](https://github.com/Steinbeck-Lab/Orthonym/commit/d8c252e60da8c65f1bb7f7c7d22e93fc97c1df40))
+* nomenclature correctness updates ([#211](https://github.com/Steinbeck-Lab/Orthonym/issues/211)) ([f2850fb](https://github.com/Steinbeck-Lab/Orthonym/commit/f2850fb03506be5fe0d91c355b58f3f1eb8b50af))
+* nomenclature correctness updates ([#212](https://github.com/Steinbeck-Lab/Orthonym/issues/212)) ([a49cc8a](https://github.com/Steinbeck-Lab/Orthonym/commit/a49cc8a31d79c2e4fd9a5950590640cda4afe5f3))
+* nomenclature correctness updates ([#213](https://github.com/Steinbeck-Lab/Orthonym/issues/213)) ([26100cd](https://github.com/Steinbeck-Lab/Orthonym/commit/26100cdda90e20ae333dc7608774aad71a307641))
+* nomenclature correctness updates ([#214](https://github.com/Steinbeck-Lab/Orthonym/issues/214)) ([d9a7f82](https://github.com/Steinbeck-Lab/Orthonym/commit/d9a7f827b8bac8d6e1b7516c265aa2b2487eb856))
+* nomenclature correctness updates ([#215](https://github.com/Steinbeck-Lab/Orthonym/issues/215)) ([e600de0](https://github.com/Steinbeck-Lab/Orthonym/commit/e600de04fa2769125629ada61fb2c9c20543d71d))
+* nomenclature correctness updates ([#224](https://github.com/Steinbeck-Lab/Orthonym/issues/224)) ([b71fc2b](https://github.com/Steinbeck-Lab/Orthonym/commit/b71fc2b45815954011d54f2a3b5abc65a7d97d93))
+* nomenclature correctness updates ([#225](https://github.com/Steinbeck-Lab/Orthonym/issues/225)) ([2b7db7f](https://github.com/Steinbeck-Lab/Orthonym/commit/2b7db7f919973c0afac2200a18608da72eecd962))
+* nomenclature correctness updates ([#226](https://github.com/Steinbeck-Lab/Orthonym/issues/226)) ([ac50e48](https://github.com/Steinbeck-Lab/Orthonym/commit/ac50e4843c6cf5b7db88b9f0ea7b3ed72b7dcc1e))
+* nomenclature correctness updates ([#227](https://github.com/Steinbeck-Lab/Orthonym/issues/227)) ([6480930](https://github.com/Steinbeck-Lab/Orthonym/commit/6480930f8e93f73a8fd60acd838a17e0bfff7907))
+* nomenclature correctness updates ([#228](https://github.com/Steinbeck-Lab/Orthonym/issues/228)) ([5812618](https://github.com/Steinbeck-Lab/Orthonym/commit/5812618a9da071abc4e957cccd2888d910c82c63))
+
 ## [1.1.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.9...v1.1.0) (2026-11-03)
 
 
