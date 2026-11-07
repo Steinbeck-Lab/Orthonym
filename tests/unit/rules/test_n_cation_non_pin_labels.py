@@ -46,9 +46,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CCC[N+](C)(C)CC(=O)[O-]",
     "CC[N+](C)(C)CC(=O)[O-]",
     "CC[N+](CC)(CC)CC(=O)[O-]",
-    "C[NH+](C)CCC(=O)O",
-    "C[NH2+]CCC(=O)O",
-    "[NH3+]CCC(=O)O",
 })
 
 
@@ -69,12 +66,8 @@ def _row(smiles, namer=None):
 @pytest.mark.parametrize("smiles,expected", [
     ("CC[N+](CC)(CC)CC(=O)[O-]", "(triethylazaniumyl)acetate"),
     (_PC, "[(2R)-2,3-bis(hexadecanoyloxy)propyl] 2-(trimethylazaniumyl)ethyl phosphate"),
-    #: the cation is principal; an azaniumyl prefix on a neutral parent is not a PIN.
-    # With an oxoacid on the cation the aminium-principal PIN is not built (the charged
-    # router's zwitterion step ionizes that acid suffix), so the demoted swap ships.
-    ("C[NH2+]CCC(=O)O", "3-(methylazaniumyl)propanoic acid"),
-    ("C[NH+](C)CCC(=O)O", "3-(dimethylazaniumyl)propanoic acid"),
-    ("[NH3+]CCC(=O)O", "3-azaniumylpropanoic acid"),
+    # The protonated amines beside a carboxylic acid ('3-azaniumylpropanoic acid') now get the
+    # aminium-principal PIN, the Blue Book): tests/unit/rules/test_protonated_aminium.py.
 ])
 def test_unverifiable_pin_form_ships_demoted(smiles, expected):
     row = _row(smiles)

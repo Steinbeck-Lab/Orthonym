@@ -293,11 +293,15 @@ def test_fg_substituted_ring_cation_fails_closed():
     """: the ring -ium emitter must NOT compose a malformed
     `<ring>-<locant>-ol-<locant>-ium` for a ring cation that also bears a
     principal-group FG (-ol/-al). It fails closed (the FG case is /
-    territory). Direct emitter check: returns '' rather than a malformed string."""
+    territory). Direct emitter check: returns '' rather than a malformed string.
+
+    Program 17: the cation is senior to the group, the Blue Book), which is then a prefix of
+    the ring-'ium' parent ('4-carboxy-1-methylpyridin-1-ium chloride (PIN)':29914), built in one numbering
+    (``rules.ring_ium_prefixes``); a hydroxy group on an sp2 ring atom still declines (a tautomer competes)."""
     from rdkit import Chem
     from orthonym.rules.ions import _emit_ring_cumulative_suffix
     from orthonym.perception.ions import get_ion_sites
-    for smi in ["Oc1ccc[nH+]c1", "O=Cc1ccc[nH+]c1"]:
+    for smi, expected in [("Oc1ccc[nH+]c1", ""), ("O=Cc1ccc[nH+]c1", "3-formylpyridin-1-ium")]:
         m = Chem.MolFromSmiles(smi)
         ci = get_ion_sites(m)["cations"][0]["atom_idx"]
-        assert _emit_ring_cumulative_suffix(m, ci, "ium") == ""
+        assert _emit_ring_cumulative_suffix(m, ci, "ium") == expected

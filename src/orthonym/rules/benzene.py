@@ -38,6 +38,7 @@ from ..assembly.naming_utils import (
 )
 from .benzene_prefix_forms import dichalcoganyl_prefix, hydroxy_is_principal, pnictogen_oxoacid_prefix
 from .benzene_acid_suffixes import ACID_SUFFIX_FGS, ACID_SUFFIX_SMARTS
+from .benzene_amine_cation import amine_takes_suffix, demote_suffixes_below_amine
 from .hydroximic_acids import (
     BENZENE_SUFFIX_NAMES, DEMOTED_PREFIX, IMIDIC_DEMOTED_PREFIX, UNHANDLED, acid_suffix_extra, claims_benzene_group,
     name_imidic_on_benzene,
@@ -347,6 +348,8 @@ def benzene_prefix_suffix_promotion(
         return 'ol', frozenset({'hydroxy'})
     if _own in _OL_JUNIOR_SUFFIXES and _own in suffix_names:
         return _own, frozenset()       # a junior principal group already holds the suffix slot
+    if amine_takes_suffix(_own, has_amine_candidates, suffix_names, _SUFFIX_TO_PREFIX):   # a forced amine: anilinium
+        return 'amine', frozenset()
 
     #: the guard is "no suffix SENIOR to -ol", not "no suffix at all" -- a
     # junior -thiol holding the slot is demoted to `sulfanyl` instead of blocking.
@@ -4199,15 +4202,12 @@ def _name_substituted_benzene(
     # When a suffix SENIOR to -ol is present (acid, aldehyde, etc.), hydroxyl stays
     # as prefix "hydroxy" -- correct per IUPAC seniority rules.
 
-    # --- C4 /: reclassify an amine as the '-amine'
-    # (aniline) SUFFIX when it IS the molecule-level principal group. ---
-    # ``benzene_prefix_suffix_promotion`` returns 'amine' only when NOTHING else
-    # holds the suffix -- including the '-ol' it would itself have promoted -- so
-    # any senior group (acid/aldehyde/nitrile/ol/etc.) keeps the amine as its
-    # 'amino'/(N-alkylamino)/anilino PREFIX -> 4-aminophenol, 4-aminobenzoic acid,
-    # 4-(N-methylamino)benzoic acid stay unchanged. The two promotions are mutually
-    # exclusive by construction now, not by statement order.
+    # --- C4 /: the amine is the '-amine' (aniline) SUFFIX when it IS the principal group:
+    # nothing else holds the suffix, or it is the forced amine of a cation ('4-carboxyanilinium'). ---
     if _promoted_suffix == 'amine':
+        if not demote_suffixes_below_amine(suffix_groups, prefix_groups, n_substituents_map,
+                                           demoted_prefix_overrides, _SUFFIX_TO_PREFIX):
+            return ''
         amine_locants = sorted(amine_candidates.keys())
         # Remove each promoted amine from its prefix group (by locant), so the
         # amine no longer appears as a substituent prefix.

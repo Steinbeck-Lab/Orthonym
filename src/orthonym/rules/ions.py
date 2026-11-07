@@ -4256,14 +4256,11 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
             Chem.SanitizeMol(ring_mol)
         except (RuntimeError, ValueError):
             return ylium_as_ring_substituent(mol, center_idx) if suffix == 'ylium' else ''
-        # Fail-closed (code-review) when the neutral ring carries a
-        # principal characteristic group (-ol / -al / -one / -oic acid / -amine
-        # / -nitrile …): the `<ring-stem>-<locant>-<suffix>` append is only
-        # well-formed for a BARE ring parent (stem + detachable PREFIXES); an FG
-        # suffix corrupts it (`pyridin-3-ol-1-ium`). Those are /
-        # territory -> legacy (on HEAD they are 'unknown' too, so no regression).
+        # Code-review: when the neutral ring carries a principal characteristic group the append below is
+        # malformed (`pyridin-3-ol-1-ium`); an '-ium' is senior to the group, which is a prefix (ring_ium_prefixes).
         if _ring_bears_principal_group(ring_mol, set(ring_system)):
-            return ''
+            from .ring_ium_prefixes import ring_ium_with_prefixes
+            return ring_ium_with_prefixes(mol, ring_mol, ring_system, center_idx) if suffix == 'ium' else ''
         # (c) before (e): a hydro monocycle's '-ium' is numbered with its hydro prefixes
         # in one numbering (ring_cation_hydro), not the neutral ring's name and a second locant.
         one_numbering = (hydro_ring_cation_name(mol, ring_mol, ring_system, center_idx)
@@ -4835,6 +4832,7 @@ def _p74_ring_substituent_groups(mol, ring_system, locants, skip_atoms):
     caller's numbering: ``{token: [locant,...]}``, ``None`` to FAIL CLOSED. The tokens come
     from ``name_substituent``; see ``_p74_ring_substituent_prefix``, which formats them."""
     from ..assembly.substituent_enumerator import name_substituent
+    from .ring_ium_prefixes import ring_acyl_token
     ring = set(ring_system)
     groups = {}
     for ring_atom in sorted(ring):
@@ -4853,7 +4851,7 @@ def _p74_ring_substituent_groups(mol, ring_system, locants, skip_atoms):
                 return None
             if any(mol.GetAtomWithIdx(k).GetFormalCharge() for k in sub_atoms):
                 return None
-            token = name_substituent(mol, sorted(sub_atoms), nbi)
+            token = ring_acyl_token(mol, nbi, ring_atom, sub_atoms) or name_substituent(mol, sorted(sub_atoms), nbi)
             # 'substituent' is the module's documented unnameable sentinel.
             if not token or token == 'substituent':
                 return None

@@ -3033,6 +3033,12 @@ def _aminium_or_azaniumyl(neutral_name: str, sites, mol) -> str:
         return name_aminium_cation(neutral_name)
     is_principal = (low == 'ammonia' or low.endswith('amine')
                     or low.endswith('amin') or low.endswith('ane'))
+    if (not is_principal) and n_cation_sites == 1:
+        # the PIN: the cation is the principal group; also when the neutral name is a retained name with
+        # no 'amino' prefix ('glycine' -> '1-carboxymethanaminium', not the 'glycinium', no PIN)
+        from .protonated_aminium import name_protonated_aminium
+        if (aminium := name_protonated_aminium(mol, sites['cations'][0])) and _cation_name_rt_ok(aminium, mol):
+            return aminium   # read back here: a name of another molecule must not displace the branches below
     if (not is_principal) and n_cation_sites == 1 and low.count('amino') == 1:
         swapped = neutral_name.replace('amino', 'azaniumyl', 1)
         # Valid (the caller round-trips it) but never a PIN: a cation is senior
