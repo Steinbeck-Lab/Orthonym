@@ -35,3 +35,11 @@ def test_a_bare_ring_cation_keeps_the_neutral_ring_route():
 def test_a_protonated_enamine_ring_nitrogen_claims_no_pin():
     # the resonance form is an iminium; (d) (the Blue Book) does not decide it (LO5 decision)
     assert tier_row("CC1(CC(=CC(=N)C1)[NH+]2CCCCC2)C", "pin")["tier"] != "pin_verified"
+
+
+def test_an_azonia_name_is_never_labelled_the_pin():
+    # 'SKELETAL REPLACEMENT ('a') NOMENCLATURE FOR CATIONS' (the Blue Book): "Method (1) gives preferred
+    # IUPAC names" (:41769; '1-methyl-1-azabicyclo[2.2.1]heptan-1-ium chloride (PIN)', not '...azoniabicyclo...')
+    row = tier_row("OC(=O)C1C[NH+]2CCC1CC2", "best-effort")
+    assert "azonia" in row["name"] and row["tier"] != "pin_verified", row
+    assert tier_row("C1C[NH+]2CCC1CC2", "pin")["name"] == "1-azabicyclo[2.2.2]octan-1-ium"

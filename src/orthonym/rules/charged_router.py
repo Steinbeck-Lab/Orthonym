@@ -2692,6 +2692,12 @@ def _ring_aza_cation_name(neutral_name: str, mol) -> str:
                      f'{locs[0]}-azonia', neutral_name, count=1))
     for cand in candidates:
         if cand and _cation_name_rt_ok(cand, mol):
+            if 'azonia' in cand:
+                # 'SKELETAL REPLACEMENT ('a') NOMENCLATURE FOR CATIONS' (the Blue Book): "Method (1)
+                # gives preferred IUPAC names" (:41769, '1-methyl-1-azabicyclo[2.2.1]heptan-1-ium chloride (PIN)');
+                # the cationic 'azonia' prefix (method 2) is valid, never the PIN
+                from ..metrics.provenance import record_non_pin_fragment
+                record_non_pin_fragment('azonia')
             return cand
     return ''
 
