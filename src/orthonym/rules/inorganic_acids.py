@@ -2537,9 +2537,10 @@ def name_inorganic_acid(mol) -> Optional[str]:
     if b_amine is not None:
         return b_amine
     # W3-P10: mixed acyl/phosphoric anhydride named substitutively as
-    # an (acyloxy)phosphonic acid (acid senior to anhydride).
+    # an (acyloxy)phosphonic acid (acid senior to anhydride); the boric analogues.
+    from .acyloxy_boron_acids import name_acyloxy_boron_acid
     from .phosphorus import name_acyloxy_phosphonic_acid
-    axp = name_acyloxy_phosphonic_acid(mol)
+    axp = name_acyloxy_phosphonic_acid(mol) or name_acyloxy_boron_acid(mol)
     if axp is not None:
         return axp
     # W3-P10.x): di-/polynuclear oxoacid derivatives (Engine B):

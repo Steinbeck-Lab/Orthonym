@@ -11,8 +11,11 @@ the molecule, and passes for every name below although none is the PIN.
 
 * the roadmap N8 (b) rows: (c), (f) (the Blue Book,:3256,:3301), (:21604,
   :21624).
-* '2-(pentyloxycarbonyl)benzoic acid': (:7232) with (:27667), the PIN
-  spelling is '2-[(pentyloxy)carbonyl]benzoic acid'.
+* '1,3-di(2-methylundecane-2-sulfinyl)propan-2-ol' (druglike2000):, a substituted prefix
+  after 'di' takes 'bis' and enclosing marks.
+* '2-(pentyloxycarbonyl)benzoic acid' (a dev split) was lowered here by (:7232) with
+   (:27667); the producer now builds the PIN '2-[(pentyloxy)carbonyl]benzoic acid'
+  (``test_the_check_still_fails_the_unenclosed_alkoxy_the_producer_no_longer_builds``).
 """
 import pytest
 from tests.support.default_tier import strict_path_row
@@ -42,8 +45,13 @@ LOWERED = [
      "1-(1-phenylpiperazin-4-yl)-3-[(1,2,3,4-tetrahydronaphthalen-1-yl)oxy]propan-2-ol", "P-14.4"),
     ("COC(=O)C(C)Cc1c(C)nn(-c2ccccc2Cl)c1C",
      "methyl 2-{[1-(2-chlorophenyl)-3,5-dimethyl-1H-pyrazol-4-yl]methyl}propanoate", "P-45.2.1"),
-    ("CCCCCOC(=O)c1ccccc1C(=O)O", "2-(pentyloxycarbonyl)benzoic acid", "P-16.5.1.1"),
+    ("CCCCCCCCCC(C)(C)S(=O)CC(CS(=O)C(C)(C)CCCCCCCCC)O",
+     "1,3-di(2-methylundecane-2-sulfinyl)propan-2-ol", "P-16.3.5"),
 ]
+
+#: the straight-chain alkoxycarbonyl prefix of five carbons or more was written without the
+#: enclosing marks of a compound prefix; ``get_alkoxycarbonyl_prefix`` now encloses it
+ALKOXY_ROW = ("CCCCCOC(=O)c1ccccc1C(=O)O", "2-(pentyloxycarbonyl)benzoic acid", "P-16.5.1.1")
 
 
 #: the row is lowered before the spelling checks run: the chain-parent check of the
@@ -102,6 +110,21 @@ def test_the_check_still_fails_the_numbering_the_producer_no_longer_builds():
     smiles, old_name, rule = FIXED_ROW
     assert rule in [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), old_name)]
     new_name = ("1-(4-phenylpiperazin-1-yl)-3-[(1,2,3,4-tetrahydronaphthalen-1-yl)oxy]propan-2-ol")
+    assert check_pin_spelling(Chem.MolFromSmiles(smiles), new_name, strict=True) == []
+    for row in (default_tier_row(smiles), strict_path_row(smiles)):
+        assert (row["name"], row["tier"]) == (new_name, "pin_verified"), row
+        assert not row.get("spelling_failures"), row
+    assert_best_effort_gives(smiles, new_name)
+
+
+def test_the_check_still_fails_the_unenclosed_alkoxy_the_producer_no_longer_builds():
+    """ "Parentheses" (the Blue Book): "Parentheses are used around compound...
+    prefixes", and 'pentyloxy' is one (only 'methoxy'... 'butoxy' are contracted,
+    :27667), so '2-(pentyloxycarbonyl)benzoic acid' is not the PIN; the producer now encloses it and
+    the name is pin_verified with no failure at the default tier and at best-effort."""
+    smiles, old_name, rule = ALKOXY_ROW
+    assert rule in [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), old_name)]
+    new_name = "2-[(pentyloxy)carbonyl]benzoic acid"
     assert check_pin_spelling(Chem.MolFromSmiles(smiles), new_name, strict=True) == []
     for row in (default_tier_row(smiles), strict_path_row(smiles)):
         assert (row["name"], row["tier"]) == (new_name, "pin_verified"), row

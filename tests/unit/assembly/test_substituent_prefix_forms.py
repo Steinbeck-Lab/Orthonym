@@ -53,6 +53,15 @@ class TestAlkoxycarbonyl:
         result = get_alkoxycarbonyl_prefix(mol, atoms, principal_chain=None)
         assert result == "ethoxycarbonyl", f"got {result!r}"
 
+    def test_compound_alkoxy_is_enclosed(self):
+        """ "Parentheses" (the Blue Book): "Parentheses are used around compound...
+        prefixes": 'pentyloxy' is one, 'butoxy' is contracted and stays bare."""
+        for smiles, expected in (("CCCCCOC(=O)C", "(pentyloxy)carbonyl"), ("CCCCOC(=O)C", "butoxycarbonyl"),
+                                 ("CCCCCCCCCCCCCCCCCCCCCCOC(=O)C", "(docosyloxy)carbonyl")):
+            mol = Chem.MolFromSmiles(smiles)
+            result = get_alkoxycarbonyl_prefix(mol, _match_atoms(mol, "ester"), principal_chain=None)
+            assert result == expected, f"{smiles}: got {result!r}"
+
     def test_lactone_negative_returns_none(self):
         """Cyclic ester (lactone) returns None per Guard 1."""
         mol = Chem.MolFromSmiles("O=C1OCCC1")  # gamma-butyrolactone

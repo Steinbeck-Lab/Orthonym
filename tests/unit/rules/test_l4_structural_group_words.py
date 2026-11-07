@@ -53,8 +53,9 @@ ROWS = [
     ("O=C(OCc1ccc(C)cc1)c1ccccc1C(=O)O",
      "2-{[(4-methylphenyl)methoxy]carbonyl}benzoic acid"),
     ("O=C(OCCc1ccccc1)c1ccccc1C(=O)O", "2-[(2-phenylethoxy)carbonyl]benzoic acid"),
-    # the unbranched chain keeps the count spelling it always had
-    ("CCCCCCCCCCOC(=O)c1ccccc1C(=O)O", "2-(decyloxycarbonyl)benzoic acid"),
+    # the unbranched chain keeps its count spelling, enclosed as a compound prefix from five carbons
+    # "Parentheses", the Blue Book; 'methoxy'... 'butoxy' are contracted,
+    ("CCCCCCCCCCOC(=O)c1ccccc1C(=O)O", "2-[(decyloxy)carbonyl]benzoic acid"),
     ("CCCCOC(=O)c1ccccc1C(=O)O", "2-(butoxycarbonyl)benzoic acid"),
     # --- aryl ether: a decorated fused / heterocyclic aryl is named, never dropped -----------
     ("OC(=O)CCCOc1ccc(Cl)c2cccnc12", "4-[(5-chloroquinolin-8-yl)oxy]butanoic acid"),

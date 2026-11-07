@@ -95,7 +95,7 @@ def _name_anhydride_impl(features) -> Optional[str]:
     # Each re-detects its own bridge on the mol; the base carbon/O core below
     # never matches them, so ordering these first is safe (they return only on a
     # genuine bridge match).
-    _sn = _name_sulfonic_anhydride(mol) or _name_sulfur_mixed_anhydride(mol)   #,
+    _sn = _name_sulfur_linked_polyanhydride(mol) or _name_sulfonic_anhydride(mol) or _name_sulfur_mixed_anhydride(mol)
     if _sn:
         return _sn
     _cn = _name_chalcogen_anhydride(mol)         # R-CO-S/Se/Te-CO-R'
@@ -321,6 +321,36 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
 _SULFUR_MIXED_ANHYDRIDE = ("[$([SX4]([#6])(=O)=O),$([SX3]([#6])=O)][OX2]"
                            "[$([SX3]([#6])=O),$([CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)]=O)]")
 
+
+#: one link of a poly-anhydride: an acyclic O between two acid centres, a carboxylic C or a sulfonic/sulfinic S
+_ACID_CENTRE_C_S = "$([CX3]([#6,#1])=O),$([CH1]=O),$([SX4]([#6])(=O)=O),$([SX3]([#6])=O)"
+_C_S_ACID_LINK = f"[{_ACID_CENTRE_C_S}][OX2;!R][{_ACID_CENTRE_C_S}]"
+
+
+def _name_sulfur_linked_polyanhydride(mol) -> Optional[str]:
+    """ "Di- and polyanhydrides" (the Blue Book): "Di- and polyanhydrides have two or more -CO-O-CO-
+    or related groups, such as -SO2-O-SO2-": 'acetic methanedisulfonic propanoic dianhydride (PIN)' (:32388), and by
+    method (1) of 'acetic butanedioic [(acetyloxy)sulfonyl]methanesulfonic dianhydride (PIN)' (:32417).
+    Two or more links, at least one at a sulfur centre (the all-carboxylic case is the -CO-O-CO- walk below); the
+    name is the one:func:`_offered_poly_anhydride` builds and reads back. None for a configuration at a sulfinic S
+    , as in:func:`_name_sulfur_mixed_anhydride`)."""
+    pattern = _compiled_smarts(_C_S_ACID_LINK)
+    if pattern is None:
+        return None
+    links = {o: (a, o, b) for a, o, b in mol.GetSubstructMatches(pattern, uniquify=True)}
+    centres = {c for a, _, b in links.values() for c in (a, b)}
+    if len(links) < 2 or all(mol.GetAtomWithIdx(c).GetSymbol() == "C" for c in centres):
+        return None
+    if any(mol.GetAtomWithIdx(c).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for c in centres):
+        return None
+    # a residue linked at a carboxylic C and at a sulfur centre names one of them as a prefix ('diacetic
+    # 3-sulfopropanoic dianhydride'), a form the book never gives (as a carboxy prefix,:32433)
+    bridges = set(links)
+    for c in centres:
+        side = _bfs_side_atoms(mol, c, bridges)
+        if len({mol.GetAtomWithIdx(x).GetSymbol() for x in centres & set(side)}) > 1:
+            return None
+    return _offered_poly_anhydride(mol, list(links.values()), "dianhydride")
 
 def _name_sulfur_mixed_anhydride(mol) -> Optional[str]:
     """ "Mixed anhydrides" (the Blue Book): "Anhydrides derived from different monobasic acids are named
@@ -1084,7 +1114,10 @@ def _name_peroxy_anhydride(mol) -> Optional[str]:
         if acids[0][1]:
             return f"bis({acids[0][0]}) peroxyanhydride"
         return f"{acids[0][0]} peroxyanhydride"
-    names = sorted(a[0] for a in acids)
+    # (:32253) "citing in alphabetical order the names of the two acids", alphanumerical order without the
+    # locants and marks: 'chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)' (:32270)
+    from ..assembly.naming_utils import alpha_sort_key_total
+    names = sorted((a[0] for a in acids), key=alpha_sort_key_total)
     return f"{names[0]} {names[1]} peroxyanhydride"
 
 

@@ -286,8 +286,9 @@ def test_the_vocabulary_reads_the_carbamic_esters_and_the_substituted_formic_aci
 
 
 # (F2) the pseudoesters of boron: the group 'boranetriyl' and the one-cut fallback of the mixed hub esters
+# B(OAc)3 left this list (program 12): "Anhydrides of mononuclear noncarbon oxoacids" (:35982) names it
+# 'acetic boric trianhydride (PIN)' (:35994), now its PIN (tests/unit/rules/test_acyloxy_boron_acids.py)
 _BORON_AND_MIXED = {
-    "CC(=O)OB(OC(C)=O)OC(C)=O": "boranetriyl triacetate",
     "CC(=O)OB(OC(C)=O)OC(=O)c1ccccc1": "(acetyloxy)(benzoyloxy)boranyl acetate",
     "CC(=O)O[Si](C)(OC(C)=O)OC(=O)c1ccccc1": "(acetyloxy)(benzoyloxy)(methyl)silyl acetate",
 }

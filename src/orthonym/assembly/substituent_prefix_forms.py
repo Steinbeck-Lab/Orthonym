@@ -586,23 +586,23 @@ def get_alkoxycarbonyl_prefix(
             return None
         return f"{enclose_if_compound(alkoxy)}carbonyl"
 
-    # Build the alkoxycarbonyl name from ALKOXY_NAMES (same table as ethers)
+    # Build the alkoxycarbonyl name from ALKOXY_NAMES (same table as ethers).
+    # "Parentheses" (the Blue Book): "Parentheses are used around compound... prefixes":
+    # '[(pentyloxy)carbonyl]', while the contracted 'methoxy'... 'butoxy' are simple.
+    from .naming_utils import enclose_if_compound
     if carbon_count in ALKOXY_NAMES:
-        alkoxy = ALKOXY_NAMES[carbon_count]
-        return f"{alkoxy}carbonyl"
+        return f"{enclose_if_compound(ALKOXY_NAMES[carbon_count])}carbonyl"
 
     # For larger/unknown sizes, build from alkyl name
     try:
         alkyl_name = get_alkyl_name(carbon_count)
-        if alkyl_name.endswith("yl"):
-            return f"{alkyl_name[:-2]}yloxy" + "carbonyl"
-        return f"{alkyl_name}oxy" + "carbonyl"
+        alkoxy = f"{alkyl_name[:-2]}yloxy" if alkyl_name.endswith("yl") else f"{alkyl_name}oxy"
+        return f"{enclose_if_compound(alkoxy)}carbonyl"
     except (ValueError, KeyError):
         try:
             from ..data.chain_names import get_chain_prefix
 
-            prefix = get_chain_prefix(carbon_count)
-            return f"{prefix}yloxycarbonyl"
+            return f"{enclose_if_compound(get_chain_prefix(carbon_count) + 'yloxy')}carbonyl"
         except (ValueError, KeyError):
             return None
 
