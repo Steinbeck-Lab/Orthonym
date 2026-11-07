@@ -52,14 +52,20 @@ def test_sulfooxy_unchanged():
     assert (row["name"], row["tier"]) == ("4-(sulfooxy)benzoic acid", "pin_verified"), row
 
 
-@pytest.mark.parametrize("smiles", [
-    # the carbamate route cannot spell the ring branch: the sulfonate name is no PIN
-    "CC(C)(C)OC(=O)N1CCC[C@H]1COS(=O)(=O)c1ccc(C)cc1",
-    "CC(C)(C)OC(=O)N1CCC(CC1)CCOS(=O)(=O)c1ccccc1",
+@pytest.mark.parametrize("smiles,expected", [
+    # a ring in the acid side of a sulfonate on a branch: the group is one prefix, consumed before the ring branches of
+    # the chain are read (substituent_naming Pass 0)
+    ("CC(C)(C)OC(=O)N1CCC[C@H]1COS(=O)(=O)c1ccc(C)cc1",
+     "tert-butyl (2S)-2-{[(4-methylbenzene-1-sulfonyl)oxy]methyl}pyrrolidine-1-carboxylate"),
+    ("CC(C)(C)OC(=O)N1CCC(CC1)CCOS(=O)(=O)c1ccccc1",
+     "tert-butyl 4-{2-[(benzenesulfonyl)oxy]ethyl}piperidine-1-carboxylate"),
+    ("OC(=O)C1CCC(CCOS(=O)(=O)c2ccccc2)CC1", "4-{2-[(benzenesulfonyl)oxy]ethyl}cyclohexane-1-carboxylic acid"),
+    ("OC(=O)C1CCC(CC(C(=O)O)COS(=O)(=O)c2ccccc2)CC1",
+     "4-{3-[(benzenesulfonyl)oxy]-2-carboxypropyl}cyclohexane-1-carboxylic acid"),
 ])
-def test_sulfonate_beside_a_ring_n_ester_is_no_pin(smiles):
+def test_sulfonate_with_a_ring_in_a_branch(smiles, expected):
     row = tier_row(smiles, "pin")
-    assert row["tier"] != "pin_verified" or "carboxylate" in row["name"], row
+    assert (row["name"], row["tier"]) == (expected, "pin_verified"), row
 
 
 def test_chain_carbamate_stays_junior_to_the_sulfonate():

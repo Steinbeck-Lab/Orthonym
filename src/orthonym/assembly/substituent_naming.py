@@ -42,6 +42,7 @@ from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .chain_amide_prefixes import consume_acylated_nitrogen, consume_sulfamoyl
+from .sulfur_acid_ester_prefixes import consume_sulfur_acid_oxy
 from .chain_decoration_prefixes import (alkoxy_decoration_tokens_are_real, consume_azido, consume_substituted_imino,
                                         hand_on_numbering, unsaturated_chain_plan)
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
@@ -2257,6 +2258,8 @@ def _name_polyfunctional_acyclic_substituent_impl(
     # -N(R')-SO2-R on a backbone carbon is the amido prefix of the whole group, as on a ring or a parent chain. Consumed
     # first, so a ring on its acyl or on R' is part of that name and not a ring branch of the chain below. ----
     consume_acylated_nitrogen(mol, sub_set, attach_idx, consumed, _add_prefix)
+    if not consume_sulfur_acid_oxy(mol, sub_set, consumed, _add_prefix):   # '[(benzenesulfonyl)oxy]', ring in the acyl
+        return None
 
     # Suite fix j6 (TRIAGE g4 C5, prenylated-phenol trienoic acid): a RING
     # branch on an acyclic backbone carbon is a ring substituent prefix of the
@@ -2702,7 +2705,6 @@ def _name_polyfunctional_acyclic_substituent_impl(
     try:
         from ..rules.lipids import _acyloxy_for_site
         from .naming_utils import enclose_if_compound as _enclose_if_compound
-        from .sulfur_acid_ester_prefixes import consume_sulfur_acid_oxy
     except Exception:
         _acyloxy_import_ok = False
     if _acyloxy_import_ok:
@@ -2788,9 +2790,8 @@ def _name_polyfunctional_acyclic_substituent_impl(
             _add_prefix(host_c, token)
             _acyloxy_tokens[token] = _acyloxy_tokens.get(token, 0) + 1
         # A COMPOUND acyloxy prefix that repeats needs bis/tris, which the assembly multiplier below cannot spell: fail
-        # closed, not 'di(acetyloxy)'. Sulfonic/sulfinic esters, '(methanesulfonyl)oxy', likewise.
-        if any(cnt >= 2 for cnt in _acyloxy_tokens.values()) or not consume_sulfur_acid_oxy(
-                mol, sub_set, consumed, _add_prefix):
+        # closed, not 'di(acetyloxy)'. (Sulfonic/sulfinic esters, '(methanesulfonyl)oxy': Pass 0, same guard.)
+        if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
             return None
 
     # ---- Pass 1c2 (a phase Wave 2, #5b, /: a pendant

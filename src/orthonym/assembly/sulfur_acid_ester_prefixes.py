@@ -145,7 +145,8 @@ def consume_sulfur_acid_oxy(mol, sub_set, consumed, add_prefix) -> bool:
         nbrs = [n.GetIdx() for n in a.GetNeighbors()]
         hosts = [n for n in nbrs if mol.GetAtomWithIdx(n).GetSymbol() == "C"]
         sulfur = [n for n in nbrs if mol.GetAtomWithIdx(n).GetSymbol() == "S"]
-        if len(hosts) != 1 or len(sulfur) != 1 or not set(nbrs) <= sub_set or hosts[0] in consumed:
+        if (len(hosts) != 1 or len(sulfur) != 1 or not set(nbrs) <= sub_set or hosts[0] in consumed
+                or mol.GetAtomWithIdx(hosts[0]).IsInRing()):   # a ring host: the ring branch names the group
             continue
         acid_side = _forms()._collect_fragment_atoms(mol, sulfur[0], {idx})
         if not acid_side <= sub_set or hosts[0] in acid_side or acid_side & consumed:
