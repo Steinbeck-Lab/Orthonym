@@ -242,7 +242,7 @@ def _name_anhydride_impl(features) -> Optional[str]:
         # unsubstituted symmetric acid keeps '{acid} anhydride' (acetic /
         # propanoic / benzoic).
         if sub1:
-            return f"bis({acid1_name}) anhydride"
+            return f"{_bis(acid1_name)} anhydride"
         return f"{acid1_name} anhydride"
     else:
         # Mixed/asymmetric anhydride: alphabetical order /.
@@ -252,6 +252,26 @@ def _name_anhydride_impl(features) -> Optional[str]:
         # two acids that differ only in configuration: the descriptor order
         acids = sorted([acid1_name, acid2_name], key=alpha_sort_key_total)
         return f"{acids[0]} {acids[1]} anhydride"
+
+
+def _bis(acid: str) -> str:
+    """'bis' + the acid word in the next enclosing mark: 'bis(chloroacetic)', 'bis[(2S)-2-aminopropanoic]'
+     nesting;, the Blue Book)."""
+    opening, closing = ("{", "}") if "[" in acid else ("[", "]") if "(" in acid else ("(", ")")
+    return f"bis{opening}{acid}{closing}"
+
+
+def _side_has_stereo(mol, carbonyl: int, bridge: int) -> bool:
+    side = _bfs_side_atoms(mol, carbonyl, {bridge})
+    return (any(mol.GetAtomWithIdx(k).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for k in side)
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()
+                   if b.GetBeginAtomIdx() in side and b.GetEndAtomIdx() in side))
+
+
+def _stereo_acid_word(mol, carbonyl: int, bridge_o: int) -> Optional[str]:
+    """The acid word (name without 'acid', with its descriptors) of the acyl side of ``carbonyl``, or None."""
+    named = _residue_acid_name(mol, sorted(_bfs_side_atoms(mol, carbonyl, {bridge_o})), [carbonyl])
+    return named[0] if named else None
 
 
 def _bfs_side_atoms(mol, start: int, blocked: set) -> set:
@@ -319,7 +339,7 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
         return None
     if a1 == a2:
         if sub1:
-            return f"bis({a1}) anhydride"
+            return f"{_bis(a1)} anhydride"
         return f"{a1} anhydride"
     from ..assembly.naming_utils import alpha_sort_key_total
     acids = sorted([a1, a2], key=alpha_sort_key_total)   #,:32270
@@ -390,7 +410,7 @@ def _name_sulfur_mixed_anhydride(mol) -> Optional[str]:
             return None
         names.append(nm[:-5].strip())
     if names[0] == names[1]:      # /: 'bis(2-chloroethane-1-sulfinic) anhydride (PIN)' (:32251)
-        return f"bis({names[0]}) anhydride" if substituted else f"{names[0]} anhydride"
+        return f"{_bis(names[0])} anhydride" if substituted else f"{names[0]} anhydride"
     return " ".join(sorted(names, key=alpha_sort_key_total)) + " anhydride"
 
 
@@ -885,7 +905,7 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
     if acid1 == acid2:
         # Symmetric-substituted -> bis(...) extends to chalcogen anhydrides).
         if sub1:
-            return f"bis({acid1}) {class_term}"
+            return f"{_bis(acid1)} {class_term}"
         return f"{acid1} {class_term}"
     from ..assembly.naming_utils import alpha_sort_key_total
     acids = sorted([acid1, acid2], key=alpha_sort_key_total)   #,:32270
@@ -1032,7 +1052,7 @@ def _name_thioacyl_anhydride(mol) -> Optional[str]:
     if acid1 == acid2:
         # Symmetric; a symmetrically SUBSTITUTED acid -> 'bis(...)'.
         if sub1:
-            return f"bis({acid1}) {class_word}"
+            return f"{_bis(acid1)} {class_word}"
         return f"{acid1} {class_word}"
     from ..assembly.naming_utils import alpha_sort_key_total
     acids = sorted([acid1, acid2], key=alpha_sort_key_total)
@@ -1127,7 +1147,7 @@ def _name_peroxy_anhydride(mol) -> Optional[str]:
         acids.append((nm, sub))
     if acids[0][0] == acids[1][0]:
         if acids[0][1]:
-            return f"bis({acids[0][0]}) peroxyanhydride"
+            return f"{_bis(acids[0][0])} peroxyanhydride"
         return f"{acids[0][0]} peroxyanhydride"
     # (:32253) "citing in alphabetical order the names of the two acids", alphanumerical order without the
     # locants and marks: 'chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)' (:32270)
@@ -1290,6 +1310,22 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
 
 
 def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
+    """:func:`_name_acyl_acid_plain`, except that a side with a stereo element is named from its free acid with its
+    configuration (:func:`_stereo_acid_word`; (None, False) when that fails): / (the Blue Book),
+    each acid word carries its own descriptors ('acetic (2S)-2-methylbutanoic anhydride', 'acetic
+    (2S)-2-methylbutanoic thioanhydride'), never one block in front of the whole name. The 'substituted' flag is the
+    plain namer's: a descriptor is no substituent 'bis' for a substituted acid; other callers, such as the
+    polyol esters, multiply with it: 'ethane-1,2-diyl di[(2E)-but-2-enoate]')."""
+    name, substituted = _name_acyl_acid_plain(mol, carbonyl_c, bridge_o, carbonyl_o)
+    if name is None or not _side_has_stereo(mol, carbonyl_c, bridge_o):
+        return name, substituted
+    word = _stereo_acid_word(mol, carbonyl_c, bridge_o)
+    if not word:
+        return None, False
+    return word, substituted
+
+
+def _name_acyl_acid_plain(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     """Name an acyl fragment as its corresponding acid, with substituent prefixes.
 
     Uses _integrate_universal_prefixes (per) to discover branch

@@ -47,12 +47,15 @@ def name_anhydride(
     pool = get_current_pool()
     pool.add(anhydride_name, "anhydride", features)
     # composer.py:943 inline: _inject_stereo_if_missing(features, pool.best.name, atom_to_locant=None)
-    # (the Blue Book): the acid groups of a di- or polyanhydride are cited as separate words, each
-    # a name with its own descriptors ('bis[(2S)-2-aminopropanoic] hexanedioic dianhydride'): no front block of
-    # the whole name,:44643) is added to it
-    from ...validation.anhydride_acids import is_poly_anhydride_name
+    # (the Blue Book): the acid groups of an anhydride are cited as separate words, each a name with
+    # its own descriptors ('bis[(2S)-2-aminopropanoic] hexanedioic dianhydride'): no front block of the whole name
+    #,:44643) is added to it. A mixed anhydride too: the front block put the descriptor of
+    # '2-methylbutanoic' on 'acetic' ('(2S)-acetic 2-methylbutanoic anhydride', labelled pin_verified) or cited it
+    # twice ('(2S)-methanesulfonic (2S)-2-methylbutanoic anhydride'); a descriptor an acid word lacks is caught by
+    # the read-back, never fronted. A one-word name (a cyclic anhydride named as a ring dione,
+    # '(3R)-3-methyloxolane-2,5-dione') is the parent's name and keeps the parent's block (review 2026-11-08)
     final_name = pool.best().name
-    if not is_poly_anhydride_name(final_name):
+    if " " not in final_name:
         final_name = _inject_stereo_if_missing(features, final_name, atom_to_locant=None)
     return NamingResult(
         name=final_name,
