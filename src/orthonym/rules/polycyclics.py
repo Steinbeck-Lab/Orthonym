@@ -41,6 +41,8 @@ from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..assembly.naming_utils import _join_multiplied_suffix
+
 from ..assembly.naming_utils import (
     alpha_sort_key,
     format_substituent_prefix,
@@ -302,6 +304,8 @@ _PAH_AMINE_PRINCIPAL_KEYS = frozenset({
 # promoting a RING substituent would be wrong. Widen only on a measurement, never on a
 # guess.
 _PAH_OL_PRINCIPAL_KEYS = frozenset({'phenol'})
+#: the hydroxy compounds and chalcogen analogues class 17): a ring -OH/-SH of this class is never a bare prefix
+_ALCOHOL_CLASS_KEYS = frozenset({'phenol', 'alcohol', 'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'thiol'})
 
 
 def _promoted_amine_anchor(mol, core_atoms: Set[int], principal_group: Optional[str]) -> Set[int]:
@@ -376,7 +380,6 @@ def _pah_numbering_anchors(mol, core_atoms: Set[int], principal_group: Optional[
     # nitrile) is tracked separately so it can claim the lowest locant FIRST
     # (c)) — the PCG-anchor.
     _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
-    _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
     attach_atoms = set()
     suffix_atoms = set()
     suffix_kinds: Dict[int, Set[str]] = {}
@@ -405,8 +408,9 @@ def _pah_numbering_anchors(mol, core_atoms: Set[int], principal_group: Optional[
             # suffix-word promotion runs later, ~:1266), so anchor it explicitly
             # -- mirrors the Fix 2 amine carve-out. Whole-class: any senior ring
             # `-ol` on a fused polycyclic bearing a junior prefix.
-            elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
-                is_pcg = True
+            elif sub and ((sub.get('name') == 'hydroxy' and principal_group in _PAH_OL_PRINCIPAL_KEYS)
+                          or (sub.get('name'), principal_group) == ('sulfanyl', 'thiol')):
+                is_pcg = True      # a ring -SH that is the principal group, the same way ('naphthalene-2-thiol')
         if is_attach:
             attach_atoms.add(idx)
         if is_pcg:
@@ -1049,6 +1053,8 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
                 return {'name': 'sulfo', 'atoms': _sulfo_atoms}
             return {'name': 'sulfonic acid', 'atoms': _sulfo_atoms,
                     'is_suffix': True, 'suffix_type': 'sulfonic_acid'}
+        if start_atom.GetDegree() == 1 and start_atom.GetTotalNumHs() == 1 and not start_atom.GetFormalCharge():
+            return {'name': 'sulfanyl', 'atoms': [start_idx]}   # -SH: the '-thiol' suffix when principal (below)
         # A sulfide / sulfinyl / sulfonyl group is prefix-only ('methylsulfanyl',
         # 'methanesulfonyl'); anything else stays fail-closed.
         return _identify_pah_prefix_only_chain(mol, start_idx, _frag_atoms)
@@ -1443,6 +1449,21 @@ def _identify_pah_functionalized_chain(
     return None
 
 
+def _promote_ring_suffix_words(principal_group, prefix_groups, suffix_groups) -> bool:
+    """A ring -OH, -SH or -NH2 that is the principal group becomes the '-ol', '-thiol' or '-amine' suffix when no senior
+    suffix is present, in that order classes 17 and 19, the Blue Book,:18192; the chalcogen analogue after
+    -OH): 'naphthalen-1-ol (PIN)' (:26819), 'naphthalene-2-thiol', 'naphthalen-2-amine'. False when a ring hydroxy or
+    sulfanyl of the principal class is left a prefix with no suffix (an alcohol principal group this writer does not
+    express, '9-hydroxy-9H-fluorene'): the caller declines."""
+    for prefix, suffix, principal in (('hydroxy', 'ol', principal_group in _PAH_OL_PRINCIPAL_KEYS),
+                                      ('sulfanyl', 'thiol', principal_group == 'thiol'),
+                                      ('amino', 'amine', principal_group in _PAH_AMINE_PRINCIPAL_KEYS)):
+        if principal and prefix in prefix_groups and not suffix_groups:
+            suffix_groups[suffix] = prefix_groups.pop(prefix)
+    return suffix_groups or not (principal_group in _ALCOHOL_CLASS_KEYS
+                                 and ('hydroxy' in prefix_groups or 'sulfanyl' in prefix_groups))
+
+
 def name_substituted_polycyclic(
     mol,
     pah_name: str,
@@ -1593,15 +1614,8 @@ def name_substituted_polycyclic(
     # and the amine promotion is guarded by `not suffix_groups`, so promoting the ol
     # first makes an amino+ol PAH correctly render as `x-aminonaphthalen-y-ol` instead
     # of the previous double-prefix fail-closed.
-    if (principal_group in _PAH_OL_PRINCIPAL_KEYS
-            and 'hydroxy' in prefix_substituent_groups
-            and not suffix_groups):
-        suffix_groups['ol'] = prefix_substituent_groups.pop('hydroxy')
-
-    if (principal_group in _PAH_AMINE_PRINCIPAL_KEYS
-            and 'amino' in prefix_substituent_groups
-            and not suffix_groups):
-        suffix_groups['amine'] = prefix_substituent_groups.pop('amino')
+    if not _promote_ring_suffix_words(principal_group, prefix_substituent_groups, suffix_groups):
+        return None
 
     # Sort locants within each group
     for name in prefix_substituent_groups:
@@ -1754,7 +1768,7 @@ def name_substituted_polycyclic(
             # carboxylic acid. Ordering is asserted directly by
             # test_retained_name_pin_status.py::TestSuffixPriorityOrder, because no
             # end-to-end test can reach it.
-            'ol',
+            'ol', 'thiol',
             'amine',  # Fix 2: amine is the lowest suffix; only chosen when
                       # promoted (i.e. no senior suffix present).
         ]
@@ -1777,7 +1791,7 @@ def name_substituted_polycyclic(
 
         # Assemble: prefix-part + parent-locant-suffix
         # e.g., "naphthalene-2-carboxylic acid", "3-chloronaphthalene-2-carbaldehyde"
-        suffix_part = f"-{locant_str}-{multiplier}{chosen_suffix}"
+        suffix_part = f"-{locant_str}-{_join_multiplied_suffix(multiplier, chosen_suffix)}"   # 'tetrol' (c))
 
         # Any remaining suffix groups become prefixes (carboxy, formyl, etc.)
         _SUFFIX_TO_PREFIX = {
@@ -1786,7 +1800,7 @@ def name_substituted_polycyclic(
             'carboxamide': 'carbamoyl',
             'carbonitrile': 'cyano',
             'amine': 'amino',  # Fix 2: demote cleanly if a senior suffix coexists
-            'ol': 'hydroxy',   # Task 10: demote cleanly if a senior suffix coexists
+            'ol': 'hydroxy', 'thiol': 'sulfanyl',   # Task 10: demote cleanly if a senior suffix coexists
         }
         for suf_name, suf_locants in suffix_groups.items():
             if suf_name == chosen_suffix:
@@ -2157,7 +2171,7 @@ def _assemble_partially_saturated_carbocycle_name(
             return None  # too many suffix groups for this scoped path
         _stem, _elides = _PARTIAL_SAT_PCG_SUFFIX[pcg_kind]
         _loc_str = render_locants(_locant_display(l) for l in pcg_locants)
-        pcg_suffix = f"-{_loc_str}-{_mult}{_stem}"
+        pcg_suffix = f"-{_loc_str}-{_join_multiplied_suffix(_mult, _stem)}"
         # (a): elide the parent's terminal 'e' before a vowel-initial
         # suffix. A multiplying prefix ('di', 'tri', 'tetra') is
         # consonant-initial, so it keeps the 'e' -- `naphthalen-2-ol` but

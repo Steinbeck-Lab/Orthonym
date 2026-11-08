@@ -2111,16 +2111,22 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     from ..rules.fused_forms import fused_system_form, locant_key
     from .substituent_enumerator import discover_substituents, name_substituent
 
-    if getattr(features, 'principal_group', None) and not suppress_principal_group:
-        return _refuse("fused parent with a suffix (the fusion producers' scope)")
     ring_set = set(ring_atoms)
+    plan = None     # a simple suffix group on the ring ('naphthalene-2-carboxylic acid', ``fused_ring_suffix``)
+    if getattr(features, 'principal_group', None) and not suppress_principal_group:
+        from .fused_ring_suffix import fused_suffix_plan
+        plan = fused_suffix_plan(mol, features, ring_set) if allow_aromatic_general else None
+        if plan is None:
+            return _refuse("fused parent with a suffix (the fusion producers' scope)")
     from .halogen_ring_ions import fused_ring_ion_view, fused_ring_ion_parent
     ion_view = fused_ring_ion_view(mol, ring_set) if allow_charged else None
+    if plan and ion_view is not None:
+        return _refuse("fused ring ion with a suffix: the cation ranks first (P-41 :18158)")
     if ion_view is None and (Chem.GetFormalCharge(mol) != 0 or _has_ionic_centres(mol)):
         return _refuse("fused parent with a charge")
     carriers = [a for a in sorted(ring_set)
                 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
-                if nb.GetIdx() not in ring_set and nb.GetAtomicNum() > 1]
+                if nb.GetIdx() not in ring_set and nb.GetAtomicNum() > 1 and not (plan and nb.GetIdx() in plan[2])]
     suffix_atoms = (_ketone_class_ring_suffix_atoms(mol, features, ring_set)
                     if suppress_principal_group and getattr(features, 'principal_group', None)
                     else None)
@@ -2132,7 +2138,8 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
             [a for a in carriers if a not in suffix_atoms])
     form = None
     if ketone_form is None:
-        form = fused_system_form(ion_view or mol, sorted(ring_set), None, carriers)
+        form = fused_system_form(ion_view or mol, sorted(ring_set), None, carriers,
+                                 suffix_atoms=plan[1] if plan else ())
         if form is None:
             return None
     a2l = dict((ketone_form or form).numbering)
@@ -2150,6 +2157,8 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     suffix_o: set = set()
     for sub in subs:
         frag = set(sub.frag_atoms)
+        if plan and frag <= plan[2]:
+            continue        # the suffix group, cited after the parent below
         if (ketone_form is not None and sub.attach_mol_idx in suffix_atoms
                 and len(frag) == 1
                 and mol.GetAtomWithIdx(next(iter(frag))).GetAtomicNum() == 8):
@@ -2185,6 +2194,13 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     else:
         parent = form.parent
         bindings.append(TokenBinding(tuple(sorted(ring_set)), parent, 'parent'))
+        if plan:
+            sfx = _ring_suffix_text(plan[0], [a2l[a] for a in plan[1]])
+            if sfx is None:
+                return _refuse("fused suffix multiplicity")
+            first_alpha = next((c for c in sfx if c.isalpha()), '')
+            parent = (parent[:-1] if parent.endswith('e') and first_alpha in 'aeiouy' else parent) + sfx
+            bindings.append(TokenBinding(tuple(sorted(plan[2])), plan[0], 'suffix'))
     if ion_view is not None:
         ionic = fused_ring_ion_parent(parent, mol, ring_set, a2l, _append_charge_suffix)
         if ionic is None:
@@ -2194,8 +2210,21 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
         bindings.append(TokenBinding((), '', 'charge', charge_atom_ids=charge_atom_ids))
     name = (joined + ('-' if parent[:1].isdigit() else '') + parent) if joined else parent
     name = _apply_parent_stereo(name, mol, a2l)
+    if plan and not _same_skeleton(name, mol):
+        return None     # the parent resolver can drop an inner ring bond ('azulene' for 4-5-5): keep the von Baeyer route
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
                                stereo_atom_to_locant=dict(a2l))
+
+
+def _same_skeleton(name: str, mol) -> bool:
+    """True when ``name`` reads back (OPSIN) to the constitution of ``mol`` (the first block of the InChIKey)."""
+    try:
+        from ..validation.opsin_roundtrip import opsin_parse
+        osmi = opsin_parse(name)
+        om = Chem.MolFromSmiles(osmi) if osmi else None
+        return om is not None and Chem.MolToInchiKey(om)[:14] == Chem.MolToInchiKey(mol)[:14]
+    except Exception:  # noqa: BLE001 - a name that cannot be read back is not used
+        return False
 
 
 #: Perceived classes that are NOT entries of ``SENIORITY_ORDER`` (the perception reads them as a

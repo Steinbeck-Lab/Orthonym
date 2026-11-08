@@ -172,8 +172,11 @@ def _halogen_benzo_parents(mol, ring):
     return halogen_benzo_candidates(mol, ring)
 
 
+_ITALIC_STEM = re.compile(r'^(?:as|s)-')
+
+
 def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
-                      branch_atoms: Sequence[int] = ()) -> Optional[FusedForm]:
+                      branch_atoms: Sequence[int] = (), suffix_atoms: Sequence[int] = ()) -> Optional[FusedForm]:
     """The fusion name and numbering of the ring system ``ring_atoms``, or ``None``.
 
     ``branch_atoms`` lists the ring atoms that carry a substituent prefix, once per prefix
@@ -201,7 +204,7 @@ def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optiona
     from . import ring_hydrogen as rh_rule
     from .bridged_fused_pin import hydro
     from .monocycle_forms import free_valence_carries_indicated_hydrogen
-    needed = list(branch_atoms)
+    needed = list(branch_atoms) + list(suffix_atoms)
     if free_valence_atom is not None:
         needed.append(free_valence_atom)
     ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
@@ -260,13 +263,16 @@ def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optiona
                       if free_valence_atom is not None else ())
             prefix_key = tuple(sorted(locant_key(a2l[a]) for a in branch_atoms))
             tie = tuple(ranks[a] for a in sorted(ring, key=lambda x: locant_key(a2l[x])))
-            key = (ih_key, fv_key, added_key if fv_added else (), hydro_key, prefix_key, stem, tie)
+            # (c): the atoms of a suffix group take the lowest locants after indicated hydrogen
+            sfx_key = tuple(sorted(locant_key(a2l[a]) for a in suffix_atoms))
+            key = (ih_key, sfx_key, fv_key, added_key if fv_added else (), hydro_key, prefix_key, stem, tie)
             if best is None or key < best[0]:
                 # (:16880) the hydro prefixes precede the indicated hydrogen;
                 # a hyphen only before a stem that starts with a locant
                 # ('4,5,6,7-tetrahydro-1,3-benzoxazole'), none before a bracket
                 # ('3,4-dihydro[1,3]dioxolo[4′,5′:3,4]matridine', the Blue Book)
-                glue = "-" if pre and not pre.endswith("-") and stem[:1].isdigit() else ""
+                # and before an italic prefix: 'dodecahydro-as-indacene' (d), the Blue Book)
+                glue = "-" if pre and not pre.endswith("-") and (stem[:1].isdigit() or _ITALIC_STEM.match(stem)) else ""
                 # `stem` is the catalogue's parent name (data, not an emitted name): a
                 # digit in it is a fusion locant the name cites,:2869)
                 cites_locant = bool(pre) or any(ch.isdigit() for ch in stem)
@@ -383,7 +389,8 @@ def fused_system_ketone_form(mol, ring_atoms: Iterable[int], suffix_atoms: Itera
             tie = tuple(ranks[a] for a in sorted(ring, key=lambda x: locant_key(a2l[x])))
             key = (ih_key, suffix_key, added_key, hydro_key, prefix_key, stem, tie)
             if best is None or key < best[0]:
-                glue = "-" if pre and not pre.endswith("-") and stem[:1].isdigit() else ""
+                # and before an italic prefix: 'dodecahydro-as-indacene' (d), the Blue Book)
+                glue = "-" if pre and not pre.endswith("-") and (stem[:1].isdigit() or _ITALIC_STEM.match(stem)) else ""
                 locs = render_locants(str(a2l[a]) for a in sorted(suffix, key=lambda x: locant_key(a2l[x])))
                 added = rh_rule.added_text(rh, a2l)
                 if added:

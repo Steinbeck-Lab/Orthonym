@@ -74,6 +74,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_prefixes",
     "orthonym.validation.spelling.checks_pseudohalide",
     "orthonym.validation.spelling.checks_carbamothioic",
+    "orthonym.validation.spelling.checks_multiplier_elision",
     "orthonym.validation.spelling.checks_one_carbon_parent",
     "orthonym.validation.spelling.checks_heterone",
     "orthonym.validation.spelling.checks_placement",

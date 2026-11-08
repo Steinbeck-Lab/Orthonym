@@ -262,10 +262,12 @@ _PASS_3_ROWS = [
     ("CCCCCCCCCCCCCCCCCCN(C(CC(=O)O)C(=O)O)C(=O)C(CC(=O)N)S(=O)(=O)O",
      "N-(4-amino-4-oxo-2-sulfobutanoyl)-2-(octadecylamino)butanedioic acid",
      "2-[(4-amino-4-oxo-2-sulfobutanoyl)(octadecyl)amino]butanedioic acid"),
+    # complete: the general engine's fused parent cites its suffix ('fused_ring_suffix'); a ring N takes its number
     ("CCC[C@@H](C(=O)OCC)N[C@H](C)C(=O)N1[C@H]2CCCC[C@H]2C[C@H]1C(=O)O",
      "(2S,3aS,7aS)-N-[(2R)-2-{[(2S)-1-ethoxy-1-oxopentan-2-yl]amino}propanoyl]octahydro-1H-indole-2-ca"
      "rboxylic acid",
-     _SAME),
+     "(2S,3aS,7aS)-1-[(2R)-2-{[(2S)-1-ethoxy-1-oxopentan-2-yl]amino}propanoyl]octahydro-1H-indole-2-ca"
+     "rboxylic acid"),
     ("NC(=O)[C@@H]1CCC[NH2+]C1",
      "(3R)-3-carbamoylpiperidin-1-ium",
      _SAME),
