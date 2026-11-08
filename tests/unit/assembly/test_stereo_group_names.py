@@ -2,7 +2,7 @@
 (orthonym.assembly.stereo_group_names; program 20, from the SureChEMBL study).
 
  'Relative configuration', (the Blue Book): "This prefix 'rel' with plain
-stereodescriptors is preferred in preferred IUPAC names"; 'Racemates' (:45930): "This prefix 'rac'
+stereodescriptors is preferred in preferred IUPAC names"; 'Racemates' (:45914): "This prefix 'rac'
 with plain stereodescriptors is preferred in preferred IUPAC names... the stereodescriptor... is cited for
 the chirality center having the lowest locant". Each expected name below is a (PIN) example of the book.
 """
@@ -10,7 +10,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
-from orthonym.assembly.stereo_group_names import _forms, general_form, leading_descriptor
+from orthonym.assembly.stereo_group_names import _forms, _partial_forms, general_form, leading_descriptor
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -27,7 +27,7 @@ BOOK = [
     ("OC(=O)[C@H]1CCC[C@@H]1Cl |o1:3,7|", "rel-(1R,2S)-2-chlorocyclopentane-1-carboxylic acid"),
     #:45925
     ("OC(=O)[C@H]1CCC[C@@H]1Cl |&1:3,7|", "rac-(1R,2S)-2-chlorocyclopentane-1-carboxylic acid"),
-    #:45934
+    #:45931
     ("C[C@H](O)[C@H](C)Br |&1:1,3|", "rac-(2R,3R)-3-bromobutan-2-ol"),
     #:45940
     ("C[C@@H](Br)CC |&1:1|", "rac-(2R)-2-bromobutane"),
@@ -99,7 +99,7 @@ def test_leading_descriptor(name, code):
     ("methyl (1R,2S)-2-[(1'R)-x]", "rel", None),
 ])
 def test_general_form(name, prefix, expected):
-    #:45918 ('R*', 'S*'),:45930 ('RS', 'SR'): the general forms
+    #:45901 ('R*', 'S*'),:45914 ('RS', 'SR'): the general forms
     assert general_form(name, prefix) == expected
 
 
@@ -122,3 +122,78 @@ def test_a_block_left_plain_never_ships():
 
 def test_a_non_tetrahedral_centre_is_outside_the_scope():
     assert _forms("C[C@H](O)[C@@H](C)Cl.[Pt@SP1](Cl)(Cl)(N)N |&1:1,3|") is None
+
+
+# ---- part 2: one group beside absolute centres:45910,:45914) ----------------------------------
+
+def _invert(smiles, atoms):
+    body, _, ext = smiles.partition(" |")
+    mol = Chem.MolFromSmiles(body)
+    for k in atoms:
+        atom = mol.GetAtomWithIdx(k)
+        atom.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CCW
+                          if atom.GetChiralTag() == Chem.ChiralType.CHI_TETRAHEDRAL_CW
+                          else Chem.ChiralType.CHI_TETRAHEDRAL_CW)
+    return Chem.MolToSmiles(mol, canonical=False) + " |" + ext
+
+
+@pytest.mark.parametrize("smiles, members, expected, tier", [
+    # the book's own example (:45912), named as a checked systematic name by the engine
+    ("CC[C@H](C)O[C@H]1C[C@@H](Cl)C[C@@H]([N+](=O)[O-])C1 |o1:5,7,10|", [5, 7, 10],
+     None, None),
+    ("C[C@H](O)C[C@@H](C)[C@H](C)Cl |o1:4,6|", [4, 6], "(2S,4R*,5S*)-5-chloro-4-methylhexan-2-ol", "pin_verified"),
+    ("C[C@H](O)C[C@@H](C)[C@H](C)Cl |&1:4,6|", [4, 6], "(2S,4RS,5SR)-5-chloro-4-methylhexan-2-ol",
+     "systematic_verified"),
+    ("C[C@H](O)C[C@@H](C)CC |&1:4|", [4], "(2S,4RS)-4-methylhexan-2-ol", "systematic_verified"),
+])
+def test_a_group_beside_absolute_centres(smiles, members, expected, tier):
+    wide = Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
+    names = {wide.name_tiered(s)["name"] for s in (smiles, _invert(smiles, members))}
+    assert len(names) == 1, names                 # the same name whichever member configuration was drawn
+    if expected:
+        row = wide.name_tiered(smiles)
+        assert (row["name"], row["tier"]) == (expected, tier)
+    else:
+        assert names.pop().startswith("(1R*,"), names
+
+
+def test_the_book_example_of_starred_descriptors():
+    wide = Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
+    found = set()
+    for a in ("@", "@@"):
+        for b in ("@", "@@"):
+            for c in ("@", "@@"):
+                found.add(wide.name_tiered(f"CC[C@H](C)O[C{a}H]1C[C{b}H](Cl)C[C{c}H]([N+](=O)[O-])C1 |o1:5,7,10|")["name"])
+    assert "(1R*,3R*,5S*)-1-{[(2S)-butan-2-yl]oxy}-3-chloro-5-nitrocyclohexane" in found
+    assert len(found) == 4 and all(n.startswith("(1R*,") for n in found)
+
+
+def test_partial_scope():
+    assert _partial_forms("C[C@H](O)C[C@@H](C)CC |o1:4|") is None          # one OR centre: nothing to state
+    assert _partial_forms("C[C@H](O)[C@@H](C)Cl |o1:1,3|") is None         # no absolute centre: part 1
+    assert _partial_forms("C[C@H](O)C[C@@H](C)[C@H](C)Cl |&1:4,&2:6|") is None   # two groups
+    assert _partial_forms("C[C@H](O)C[C@@H](C)[C@H](C)Cl |o1:4,6|")[0] == "rel"
+    # an OR group of the PIN-only call keeps its PIN form; an AND group is not given there
+    assert Orthonym().name_tiered("C[C@H](O)C[C@@H](C)[C@H](C)Cl |o1:4,6|")["name"] == \
+        "(2S,4R*,5S*)-5-chloro-4-methylhexan-2-ol"
+    assert Orthonym().name_tiered("C[C@H](O)C[C@@H](C)[C@H](C)Cl |&1:4,6|")["tier"] == "abstain"
+
+
+def test_review_cases_of_part_2():
+    wide = Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
+    # C-4 is pseudoasymmetric in one form only: a name leaving it out would fit two inputs, so nothing is built
+    for smiles in ("C[C@H](Br)[C@H](Cl)[C@H](O)[C@H](Cl)[C@H](Br)C |o1:1,3|",
+                   "C[C@H](Br)[C@H](Cl)[C@@H](O)[C@H](Cl)[C@H](Br)C |o1:1,3|"):
+        assert "*" not in (Orthonym().name_tiered(smiles)["name"] or "")
+        assert "*" not in (wide.name_tiered(smiles)["name"] or "")
+    # a symmetric molecule: every redrawing (atom order) of one input gives one name
+    import random
+    base = Chem.MolFromSmiles("C[C@H](Cl)[C@H](Cl)CC[C@H](Cl)[C@H](Cl)C |o1:1,3|")
+    rng = random.Random(7)
+    drawings = []
+    for _ in range(6):
+        order = list(range(base.GetNumAtoms()))
+        rng.shuffle(order)
+        drawings.append(Chem.MolToCXSmiles(Chem.RenumberAtoms(base, order)))
+    names = {wide.name_tiered(s)["name"] for s in drawings}
+    assert names == {"(2R*,3S*,6S,7R)-2,3,6,7-tetrachlorooctane"}, names

@@ -78,11 +78,13 @@ class StereoBlockUnits:
     copies of its group the name cites the block for (1 outside a multiplied group).
     ``units``: the stereo units of the input the reading binds to the tokens of the
     block, ``multiplicity`` per token, as ``('a', atom_idx)`` (a stereocentre) or
-    ``('b', bond_idx)`` (a double bond), in ascending order."""
+    ``('b', bond_idx)`` (a double bond), in ascending order. ``token_units``: the same units
+    per token of the block, in the order of its tokens (``multiplicity`` each)."""
     text: str
     span: Tuple[int, int]
     multiplicity: int
     units: Tuple[Tuple[str, int], ...]
+    token_units: Tuple[Tuple[Tuple[str, int], ...], ...] = ()
 
 
 #: ``(word, count)`` of every multiplying prefix, longest word first (set on first use).
@@ -317,11 +319,12 @@ def stereo_block_units(name: str, smiles: Optional[str],
                     if tried[key]:
                         block_units: List[List[tuple]] = [[] for _ in located]
                         for (_l, _c, _m, bi), part in zip(tokens, combo):
-                            block_units[bi].extend(part)
+                            block_units[bi].append(tuple(part))
                         return [StereoBlockUnits(
                                     text=text, span=(s, e),
                                     multiplicity=multiplicity[bi],
-                                    units=tuple(sorted(block_units[bi])))
+                                    units=tuple(sorted(u for part in block_units[bi] for u in part)),
+                                    token_units=tuple(block_units[bi]))
                                 for bi, (s, e, text) in enumerate(located)]
         return None
     except Exception:

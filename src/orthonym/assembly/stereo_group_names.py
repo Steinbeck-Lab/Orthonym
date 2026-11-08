@@ -9,7 +9,7 @@ Book names both with plain CIP descriptors and a prefix:
   enantiomer... This prefix 'rel' with plain stereodescriptors is preferred in preferred IUPAC names";
   "rel-(1R,2S)-2-chlorocyclopentane-1-carboxylic acid (PIN)... [not rel-(1S,2R)-2-chlorocyclopentane-1-carboxylic
   acid]".
-- "Racemates" (:45930): "Racemates may be denoted by using the prefix 'rac' cited at the front of the name
+- "Racemates" (:45914, text:45916): "Racemates may be denoted by using the prefix 'rac' cited at the front of the name
   of one enantiomer... This prefix 'rac' with plain stereodescriptors is preferred in preferred IUPAC names...
   When a racemate is described, the stereodescriptor, such as 'R' or 'RS', is cited for the chirality center having
   the lowest locant"; "rac-(2R,3R)-3-bromobutan-2-ol (PIN)", "rac-(2R)-2-bromobutane (PIN)".
@@ -209,6 +209,186 @@ def general_form(name: str, prefix: str) -> Optional[str]:
     return rewritten
 
 
+# ---- part 2: one AND or OR group beside absolute centres ---------------------------------------------------------
+#
+# (the Blue Book, example:45912): "In compounds containing chirality centers with known absolute configurations and a
+# stereochemically unrelated set of chirality centers with known relative configuration, the 'R*' and 'S*' descriptors
+# must be used to designate the latter", "(1R*,3R*,5S*)-1-{[(2S)-butan-2-yl]oxy}-3-chloro-5-nitrocyclohexane (PIN)".
+# An OR group of two or more centres beside absolute ones is that set (PIN form); an AND group beside them is a mixture
+# of the two diastereomers, written with 'RS'/'SR' for its centres, general nomenclature, below the PIN). An
+# OR group of one centre says nothing that a name can state (its configuration is not known): not built. The
+# descriptors to rewrite are found by the reading the descriptor check accepted
+# (validation.stereo_descriptors.stereo_block_units, per token), never from a locant read out of the string.
+
+def _output_order(mol) -> Optional[list]:
+    try:
+        return [int(x) for x in mol.GetProp("_smilesAtomOutputOrder").strip("[]").split(",") if x.strip()]
+    except Exception:
+        return None
+
+
+def _cip_labels(mol) -> dict:
+    """RDKit's CIP labels (rdCIPLabeler, bounded as in perception.centres_bridge): in process, no JVM per call; the
+    scope has no lone-pair centre, where it and the centres engine read a string differently. Past the bound: raises,
+    and the caller declines."""
+    from rdkit.Chem import rdCIPLabeler
+    work = Chem.RWMol(mol)
+    work.SetStereoGroups([])
+    work = work.GetMol()
+    rdCIPLabeler.AssignCIPLabels(work, maxRecursiveIterations=1_250_000)
+    return {a.GetIdx(): a.GetProp("_CIPCode") for a in work.GetAtoms() if a.HasProp("_CIPCode")}
+
+
+def _outside_labels_unchanged(mol, members) -> bool:
+    """Every atom outside the group has the same CIP label (or none) in both forms: the absolute centres are
+    "stereochemically unrelated" to the group, and no centre is a stereocentre, or a pseudoasymmetric
+    one, in one form only (review 2026-11-08: C-4 of 2,6-dibromo-3,5-dichloroheptan-4-ol is 'r'/'s' in one form and
+    no centre in the other, so a name leaving it out fit two inputs)."""
+    try:
+        inverted = Chem.RWMol(mol)
+        for k in members:
+            atom = inverted.GetAtomWithIdx(k)
+            atom.SetChiralTag(_TETRAHEDRAL[atom.GetChiralTag()])
+        before, after = _cip_labels(mol), _cip_labels(inverted.GetMol())
+        outside = (set(before) | set(after)) - set(members)
+        return all(before.get(k) == after.get(k) for k in outside)
+    except Exception:
+        return False
+
+
+def _symmetric_member_sets(form: str, members) -> list:
+    """``members`` and its images under the automorphisms of ``form`` that keep its configuration: in a symmetric
+    molecule the group may be drawn at either end, and every drawing must meet the same candidates (core principle 4;
+    review 2026-11-08)."""
+    try:
+        mol = Chem.MolFromSmiles(form)
+        images = {frozenset(members)}
+        for match in mol.GetSubstructMatches(mol, useChirality=True, uniquify=False, maxMatches=256):
+            images.add(frozenset(match[k] for k in members))
+        return sorted(images, key=sorted)
+    except Exception:
+        return [frozenset(members)]
+
+
+def _partial_forms(smiles: str):
+    """(prefix, [(SMILES, group atoms in that SMILES),...] for the drawn structure and the one with the group's centres
+    inverted) for a string whose stereo is absolute centres plus exactly one AND or OR group, else None."""
+    if not isinstance(smiles, str) or "|" not in smiles:
+        return None
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+            return None
+        groups = [g for g in mol.GetStereoGroups() if g.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE]
+        if len(groups) != 1 or list(groups[0].GetBonds()):
+            return None
+        kind = groups[0].GetGroupType()
+        prefix, least = ("rel", 2) if kind == Chem.StereoGroupType.STEREO_OR else ("rac", 1)
+        members = {atom.GetIdx() for atom in groups[0].GetAtoms() if atom.GetChiralTag() in _TETRAHEDRAL}
+        if len(members) < least or len(members) != len(list(groups[0].GetAtoms())):
+            return None
+        if any(a.GetChiralTag() not in _TETRAHEDRAL and a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+               for a in mol.GetAtoms()):
+            return None
+        centres = {a.GetIdx() for a in mol.GetAtoms() if a.GetChiralTag() in _TETRAHEDRAL}
+        if not centres - members or any(mol.GetAtomWithIdx(k).GetTotalDegree() == 3 for k in centres):
+            return None                       # no absolute centre (part 1), or a lone-pair centre
+        forms = []
+        for invert in (False, True):
+            rw = Chem.RWMol(mol)
+            rw.SetStereoGroups([])
+            if invert:
+                for k in members:
+                    atom = rw.GetAtomWithIdx(k)
+                    atom.SetChiralTag(_TETRAHEDRAL[atom.GetChiralTag()])
+            out = rw.GetMol()
+            written = Chem.MolToSmiles(out)
+            order = _output_order(out)
+            if order is None or len(order) != out.GetNumAtoms():
+                return None
+            forms.append((written, {k for k, old in enumerate(order) if old in members}))
+        if Chem.CanonSmiles(forms[0][0]) == Chem.CanonSmiles(forms[1][0]):
+            return None                       # inverting the group gives the same compound
+        if not _outside_labels_unchanged(mol, members):
+            return None
+        return prefix, forms
+    except Exception:
+        return None
+
+
+def group_descriptor_form(name: str, smiles: str, members, prefix: str) -> Optional[str]:
+    """``name`` (a name of ``smiles``) with the descriptors of exactly the ``members`` centres starred ('rel') or
+    doubled ('rac'), the others kept; None when the reading does not bind every member to its own descriptor, a
+    descriptor binds a member and another unit, or the first rewritten descriptor is not R."""
+    from ..rules.stereochemistry import strip_stereo_blocks
+    from ..validation.stereo_descriptors import stereo_block_units
+    try:
+        blocks = stereo_block_units(name, smiles, strip_stereo_blocks(name)[0])
+    except Exception:
+        return None
+    if not blocks:
+        return None
+    swap = {"R": "R*", "S": "S*"} if prefix == "rel" else {"R": "RS", "S": "SR"}
+    out, last, first, bound = [], 0, None, set()
+    for block in blocks:
+        start, end = block.span
+        items = [item.strip() for item in block.text[1:-1].split(",")]
+        if len(items) != len(block.token_units):
+            return None
+        rewritten = []
+        for item, units in zip(items, block.token_units):
+            inside = {idx for kind, idx in units if kind == "a" and idx in members}
+            if inside:
+                found = _BLOCK_ITEM.match(item)
+                if len(inside) != len(units) or not found or found.group(2) not in swap:
+                    return None
+                first = first or found.group(2)
+                item = found.group(1) + swap[found.group(2)]
+                bound |= inside
+            rewritten.append(item)
+        out.append(name[last:start] + "(" + ",".join(rewritten) + ")-")
+        last = end
+    if bound != set(members) or first != "R":
+        return None
+    return "".join(out) + name[last:]
+
+
+def _cleared(smiles: str, members) -> Optional[str]:
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        for k in members:
+            mol.GetAtomWithIdx(k).SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+        return Chem.MolToSmiles(mol)
+    except Exception:
+        return None
+
+
+def _partial_group_name(smiles, name_one, name_of, with_name, to_smiles, general: bool):
+    built = _partial_forms(smiles)
+    if built is None:
+        return None
+    prefix, forms = built
+    if prefix == "rac" and not general:
+        return None                           # 'RS' is general nomenclature: not at a PIN-only call
+    found = []
+    for form, drawn_members in forms:
+        result = name_one(form)
+        name = name_of(result)
+        if not name:
+            continue
+        want = _inchi(form)
+        if not want or _inchi(to_smiles(name)) != want:
+            continue
+        for members in _symmetric_member_sets(form, drawn_members):
+            rewritten = group_descriptor_form(name, form, members, prefix)
+            if rewritten and _inchi(to_smiles(rewritten)) in (want, _inchi(_cleared(form, members))):
+                found.append((rewritten, result if prefix == "rel" else _below_pin(result)))
+    if not found:
+        return None
+    rewritten, result = min(found, key=lambda pair: pair[0])
+    return with_name(result, rewritten)
+
+
 def stereo_group_name(smiles, name_one: Callable[[str], object], name_of: Callable[[object], Optional[str]],
                       with_name: Callable[[object, str], object],
                       to_smiles: Callable[[str], Optional[str]], general: bool = False):
@@ -221,7 +401,15 @@ def stereo_group_name(smiles, name_one: Callable[[str], object], name_of: Callab
         return None
     forms = _forms(smiles)
     if forms is None:
-        return None
+        if _partial_forms(smiles) is None:
+            return None
+        _ACTIVE.on = True
+        try:
+            return _partial_group_name(smiles, name_one, name_of, with_name, to_smiles, general)
+        except Exception:
+            return None
+        finally:
+            _ACTIVE.on = False
     prefix, drawn, mirror = forms
     _ACTIVE.on = True
     try:

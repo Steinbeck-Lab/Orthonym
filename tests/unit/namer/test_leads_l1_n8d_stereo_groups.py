@@ -38,7 +38,7 @@ GROUPED = [
 ]
 
 # an ester name does not start with its descriptor block, where the book places 'rac': the wider tiers give the
-# general form 'RS':45930 "the stereodescriptors such as 'RS', 'SR', etc. that may be used in general
+# general form 'RS':45914 "the stereodescriptors such as 'RS', 'SR', etc. that may be used in general
 # nomenclature"), labelled below the PIN; the PIN-only tier declines as before (program 20)
 GENERAL = [
     ("CC(C)[C@@H](C(=O)OC)N |&1:3|", "methyl (2RS)-2-amino-3-methylbutanoate"),
@@ -156,8 +156,12 @@ def test_a_mixed_string_keeps_the_absolute_members(tier):
     if tier == "pin":
         assert row["tier"] == "abstain" and row["limit_code"] == "NO_VERIFIED_PIN"
         return
-    assert row["name"] == "(2S)-4-methylhexan-2-ol"
-    assert opsin_key(row["name"]) == mol_key_without_stereo_of(smiles, [4])
+    # change-asserted-value (program 20 part 2, 2026-11-08): was '(2S)-4-methylhexan-2-ol' (atom 4 left out).
+    # 'Racemates' (the Blue Book): 'RS' "may be used in general nomenclature"; the AND group beside the absolute
+    # C-2 is a mixture of the 4R and 4S diastereomers: '(2S,4RS)', below the PIN. Independent check: OPSIN reads the
+    # name with atom 4 left out as the structure without its configuration (below).
+    assert (row["name"], row["tier"]) == ("(2S,4RS)-4-methylhexan-2-ol", "systematic_verified")
+    assert opsin_key(row["name"].replace(",4RS", "")) == mol_key_without_stereo_of(smiles, [4])
 
 
 def test_a_group_with_no_stereo_element_changes_nothing():
@@ -247,8 +251,10 @@ def test_the_group_of_a_meso_compound_clears_nothing():
 
 @pytest.mark.parametrize("smiles, expected", [
     # one centre of two: inverting it gives the other diastereomer, not the same compound (the chiral
-    # diol with both centres in one group is named 'rac-'/'rel-' now: PREFIXED above)
-    ("C[C@H](O)[C@H](O)C |&1:1|", "(2R)-butane-2,3-diol"),
+    # diol with both centres in one group is named 'rac-'/'rel-' now: PREFIXED above). change-asserted-value
+    # (program 20 part 2): was '(2R)-butane-2,3-diol' (the AND centre left out); the group beside the absolute
+    # centre is the mixture of the (R,R) diol and the meso diol: 'RS':45914, general nomenclature).
+    ("C[C@H](O)[C@H](O)C |&1:1|", "(2R,3RS)-butane-2,3-diol"),   # same from every drawing (review 2026-11-08)
 ])
 def test_a_group_that_does_not_invert_to_itself_is_still_cleared(smiles, expected):
     assert namer._enhanced_stereo_cleared_spelling(smiles) is not None
