@@ -423,9 +423,8 @@ def test_the_name_does_not_depend_on_the_drawing(smiles):
     assert "dianhydride" in name and name.index("(2R)") < name.index("(2S)") if "(2R)" in name else True, name
 
 
-@pytest.mark.xfail(reason="the general engine numbers the 1,4-disubstituted chain by atom order where two groups differ in "
-                          "configuration only (P-31.1.4.3.4): the best-effort names of main vary the same way "
-                          "('1-{[(2S)-...]}-4-{[(2R)-...]}' and the reverse); not a producer of this lane", strict=False)
+# the xfail (general engine numbered the chain by atom order where two groups differ in configuration only) is
+# lifted: the three rows pass on lane/p7 (re-probed 2026-11-08, program 20)
 @pytest.mark.parametrize("smiles", DETERMINISM_ROWS)
 def test_the_best_effort_name_does_not_depend_on_the_drawing(smiles):
     names = {name_best_effort(s)["name"] for s in _orderings(smiles, 8, 11)}

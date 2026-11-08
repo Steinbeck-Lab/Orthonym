@@ -10,13 +10,16 @@ enantiomer; the members of an absolute (``a``) group and the ungrouped centres k
 Blue Book 'Racemates' (the Blue Book),:45916: 'Racemates may be denoted by using
 the prefix rac cited at the front of the name of one enantiomer... This prefix rac with plain
 stereodescriptors is preferred in preferred IUPAC names'; the example at:45940 is
-'rac-(2R)-2-bromobutane (PIN)'. 'Relative configuration' (:45901) for 'rel'. That PIN
-spelling is NOT built (the InChIKey round trip cannot see a stereo group, so it needs its own
-check); the name without the group's configuration is recorded as a non-PIN name, the default
-tier declines it with the rule, and the wider tiers keep it.
+'rac-(2R)-2-bromobutane (PIN)'. 'Relative configuration' (:45901) for 'rel'.
 
-Every emitted name is read back by OPSIN's own StdInChIKey and compared with RDKit's InChIKey of
-the structure with the group members cleared; it must NOT be the key of either enantiomer.
+Program 20 (2026-11-08) builds that PIN spelling when the whole configuration is one AND or OR group
+(``orthonym.assembly.stereo_group_names``: 'rac-'/'rel-' + the name of the enantiomer whose leading
+descriptor is R, checked by its own read-back); those rows moved to PREFIXED below. Every other string
+with a group (one OR centre, a group beside absolute centres, a name that does not start with its
+descriptor block) is still named with the group members' configuration cleared: recorded as a non-PIN
+name, declined by the default tier with the rule, kept by the wider tiers. Such a name is read back by
+OPSIN's own StdInChIKey and compared with RDKit's InChIKey of the structure with the group members
+cleared; it must NOT be the key of either enantiomer.
 """
 import pytest
 from rdkit import Chem
@@ -30,10 +33,42 @@ pytestmark = pytest.mark.opsin_gate
 
 # (input, atom indices of the AND/OR group members, name at the wider tiers)
 GROUPED = [
-    ("C[C@H](O)CC |&1:1|", [1], "butan-2-ol"),
+    # one OR centre has no relative configuration relates a unit to another): no 'rel'
     ("C[C@H](O)CC |o1:1|", [1], "butan-2-ol"),
-    ("N[C@@H](C)C(=O)O |&1:1|", [1], "2-aminopropanoic acid"),
-    ("C[C@H](O)[C@@H](C)CC |&1:1,3|", [1, 3], "3-methylpentan-2-ol"),
+]
+
+# an ester name does not start with its descriptor block, where the book places 'rac': the wider tiers give the
+# general form 'RS':45930 "the stereodescriptors such as 'RS', 'SR', etc. that may be used in general
+# nomenclature"), labelled below the PIN; the PIN-only tier declines as before (program 20)
+GENERAL = [
+    ("CC(C)[C@@H](C(=O)OC)N |&1:3|", "methyl (2RS)-2-amino-3-methylbutanoate"),
+    ("CC(C)(C)OC(=O)N1[C@@H](C)CC[C@H]1c1cccc(N)c1 |o1:8,12|",
+     "tert-butyl (2R*,5R*)-2-(3-aminophenyl)-5-methylpyrrolidine-1-carboxylate"),
+]
+
+
+@pytest.mark.parametrize("smiles, expected", GENERAL)
+def test_a_group_inside_the_name_takes_the_general_form_below_the_pin(smiles, expected):
+    row = assert_default_tier_declines(smiles)
+    assert [f["rule"] for f in row["spelling_failures"]] == ["P-93.1.3"]
+    for tier in WIDER:
+        got = _engine(tier).name_tiered(smiles)
+        assert (got["name"], got["tier"], got["is_pin"]) == (expected, "systematic_verified", False), (tier, got)
+
+# change-asserted-value (program 20, 2026-11-08): these were GROUPED rows ('butan-2-ol',
+# '2-aminopropanoic acid', '3-methylpentan-2-ol' declined at the default tier). Source:
+# 'Racemates' (the Blue Book) "This prefix rac with plain stereodescriptors is preferred in
+# preferred IUPAC names... the stereodescriptor... is cited for the chirality center having the lowest
+# locant", ':45940 rac-(2R)-2-bromobutane (PIN)'. Independent check: OPSIN reads the name without 'rac-'
+# to the drawn structure or its mirror image (RDKit keys, test below). Mutation: the code before program
+# 20 fails every row (it declines them).
+PREFIXED = [
+    ("C[C@H](O)CC |&1:1|", "rac-(2R)-butan-2-ol"),
+    ("N[C@@H](C)C(=O)O |&1:1|", "rac-(2R)-2-aminopropanoic acid"),
+    ("C[C@H](O)[C@@H](C)CC |&1:1,3|", "rac-(2R,3R)-3-methylpentan-2-ol"),
+    # the (R,R)/(S,S) diol is chiral: both centres in one group is a racemate or an unknown enantiomer
+    ("C[C@H](O)[C@@H](O)C |&1:1,3|", "rac-(2R,3R)-butane-2,3-diol"),
+    ("C[C@H](O)[C@@H](O)C |o1:1,3|", "rel-(2R,3R)-butane-2,3-diol"),
 ]
 WIDER = ["valid", "complete", "best-effort"]
 
@@ -41,6 +76,32 @@ WIDER = ["valid", "complete", "best-effort"]
 def _engine(tier):
     return (Orthonym(style="pin") if tier == "pin"
             else Orthonym(style="pin", **_emit_tier_flags(tier)))
+
+
+def _mirror_key(smiles):
+    mol = Chem.MolFromSmiles(smiles.split(" |")[0])
+    for atom in mol.GetAtoms():
+        if atom.GetChiralTag() == Chem.ChiralType.CHI_TETRAHEDRAL_CW:
+            atom.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+        elif atom.GetChiralTag() == Chem.ChiralType.CHI_TETRAHEDRAL_CCW:
+            atom.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CW)
+    return rdkit_key(Chem.MolToSmiles(mol))
+
+
+@pytest.mark.parametrize("tier", ["pin", *WIDER])
+@pytest.mark.parametrize("smiles, expected", PREFIXED)
+def test_a_whole_molecule_group_is_named_rac_or_rel(smiles, expected, tier):
+    row = _engine(tier).name_tiered(smiles)
+    assert (row["name"], row["tier"], row["is_pin"]) == (expected, "pin_verified", True), (tier, row)
+    plain = expected.split("-", 1)[1]
+    # the name without the prefix is one of the two enantiomers the group allows
+    assert opsin_key(plain) in (rdkit_key(smiles.split(" |")[0]), _mirror_key(smiles))
+    o = _engine(tier)
+    assert o.name(smiles) == expected
+    assert o.name_with_confidence(smiles)["name"] == expected
+    assert o.name_with_tree(smiles).name == expected
+    if tier == "pin":
+        assert name_compound(smiles) == expected
 
 
 @pytest.mark.parametrize("smiles, members, expected", GROUPED)
@@ -185,10 +246,8 @@ def test_the_group_of_a_meso_compound_clears_nothing():
 
 
 @pytest.mark.parametrize("smiles, expected", [
-    # the (R,R)/(S,S) diol is chiral: a group over both centres is a racemate or an unknown enantiomer
-    ("C[C@H](O)[C@@H](O)C |&1:1,3|", "butane-2,3-diol"),
-    ("C[C@H](O)[C@@H](O)C |o1:1,3|", "butane-2,3-diol"),
-    # one centre of two: inverting it gives the other diastereomer, not the same compound
+    # one centre of two: inverting it gives the other diastereomer, not the same compound (the chiral
+    # diol with both centres in one group is named 'rac-'/'rel-' now: PREFIXED above)
     ("C[C@H](O)[C@H](O)C |&1:1|", "(2R)-butane-2,3-diol"),
 ])
 def test_a_group_that_does_not_invert_to_itself_is_still_cleared(smiles, expected):

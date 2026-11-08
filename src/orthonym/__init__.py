@@ -34,6 +34,9 @@ __author__ = "Kohulan Rajan"
 from .assembly.name_tree import NameTreeNode, NamingResult
 from .errors import OrthonymLimitError
 from .namer import Orthonym, classify_limit, name_compound, name_with_tree
+from .assembly.stereo_group_names import install as _install_stereo_group_names
+
+_install_stereo_group_names(Orthonym)  # 'rel-'/'rac-' names of a whole-molecule stereo group,
 
 __all__ = [
     "name_compound",

@@ -163,9 +163,9 @@ def _decline_stereo_it_cannot_compare(mol: Chem.Mol) -> None:
         if group.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE:
             raise InvalidInputError(
                 "Invalid molecule: it has an AND (racemic) or OR (unknown enantiomer) "
-                "stereo group, which a SMILES string does not hold; it would be named as "
-                "one enantiomer. Clear the configuration of the group's atoms to name "
-                "the molecule without it.")
+                "stereo group, which the plain SMILES written for a Mol does not hold; it would be "
+                "named as one enantiomer. Pass it as a CXSMILES string (Chem.MolToCXSmiles), or "
+                "clear the configuration of the group's atoms to name the molecule without it.")
     for atom in mol.GetAtoms():
         tag = atom.GetChiralTag()
         if tag not in _COMPARABLE_OR_UNNAMED:

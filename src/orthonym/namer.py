@@ -1660,8 +1660,8 @@ def _enhanced_stereo_cleared_spelling(
     absolute ('a') group and the ungrouped stereo elements keep theirs. The PIN
     names the group: 'Racemates' (the Blue Book), ':45940
     rac-(2R)-2-bromobutane (PIN)', and 'Relative configuration'
-    (:45901); that spelling is not built, so the name is recorded as a non-PIN one
-    (:func:`_record_stereo_group_non_pin`) and the default tier declines it.
+    (:45901); built when one group holds the whole configuration (assembly.stereo_group_names,
+    installed on the public calls), else the name is recorded as a non-PIN one (below).
 
     The cleared structure is written once from RDKit's reading (the same atoms, in
     RDKit's non-canonical order); a lone-pair stereocentre (:func:`_lone_pair_

@@ -143,7 +143,9 @@ def test_composes_with_a_stereo_group():
         assert namer._LP_INPUT.rewrite[3] is True
     finally:
         namer._lone_pair_input_exit(opened)
+    # the whole configuration is one AND group: 'rac-' + the R enantiomer's name, the Blue Book
+    # 'rac-(2R)-2-bromobutane (PIN)'; program 20, was 'butan-2-ol' declined at the default tier)
     row = _engine("best-effort").name_tiered(smiles)
-    assert row["name"] == "butan-2-ol" and row["tier"] == "systematic_verified"
+    assert row["name"] == "rac-(2R)-butan-2-ol" and row["tier"] == "pin_verified"
     default = _engine("pin").name_tiered(smiles)
-    assert default["tier"] == "abstain" and default["limit_code"] == "NO_VERIFIED_PIN"
+    assert default["name"] == "rac-(2R)-butan-2-ol" and default["tier"] == "pin_verified"
