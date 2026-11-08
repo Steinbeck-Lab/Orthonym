@@ -5128,7 +5128,7 @@ def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
         # every currently-parseable name is byte-identical.
         if not _is_fully_enclosed(name):
             display_name = enclose_if_compound(name)
-    elif is_complex_substituent(name):
+    elif is_complex_substituent(name) or enclose_if_compound(name) != name:   # '(methoxycarbonyl)', (:31886)
         # Suite fix j6: the mark escalates past the name's own marks,
         # the Blue Book) -- '3-[2-(2,4-dimethylphenyl)-2-oxoethyl]', not
         # '3-(2-(...)-2-oxoethyl)'; a name without marks still gets '(...)'.

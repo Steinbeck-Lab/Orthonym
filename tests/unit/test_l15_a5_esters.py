@@ -45,15 +45,13 @@ def test_second_ester_is_not_dropped(smiles, name):
 
 
 def test_second_ester_is_not_dropped_by_the_valid_and_complete_tiers():
-    """The decomposition names the diester in these tiers with 'benzene-1-carboxylate' (a systematic spelling: the
-    acid half 'benzoic acid' has no producer there); both ester groups stay in the name and the read-back is exact.
-    This is a known non-PIN (the book's name is 'methyl 4-(3-methoxy-3-oxopropyl)benzoate', retained
-    'benzoic acid'): the row is a status pin of the tier label, not a fix proof; it passed before this task as well
-    (open item (b) of the lane ledger)."""
+    """Both ester groups stay in the name at these tiers, and the name is now the book's: the chain ester is the
+    'alkoxy...oxo' prefix of the benzoate ('methyl 4-(3-methoxy-3-oxopropyl)benzoate', retained 'benzoic
+    acid';:31709, ``assembly.alkoxy_oxo_branch``), where the decomposition used to write
+    'benzene-1-carboxylate'."""
     for tier in ("valid", "complete"):
         row = tier_row(_DIESTER, tier)
-        assert (row["name"], row["tier"]) == (
-            "methyl 4-(3-methoxy-3-oxopropyl)benzene-1-carboxylate", "systematic_verified"), row
+        assert (row["name"], row["tier"]) == ("methyl 4-(3-methoxy-3-oxopropyl)benzoate", "pin_verified"), row
         assert_full_rt(row["name"], _DIESTER)
 
 

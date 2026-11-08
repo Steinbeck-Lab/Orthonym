@@ -578,6 +578,9 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         return None
     catom, hub, hub_frag, chain = parts
     if hub.GetSymbol() in _CHALCOGEN_HUBS:
+        from .chalcogen_peroxyanhydrides import name_chalcogen_peroxy_anhydride
+        if name_chalcogen_peroxy_anhydride(mol):
+            return None     # an acyl-S-S-acyl molecule is an anhydride (class 8,:18181), senior to a pseudoketone (:18189)
         longer = _longer_acyl_on_the_oxygen_end(mol, catom, hub, len(chain))
         if longer is not None:
             return _group16_pseudoketone_name(mol, *longer)

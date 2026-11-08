@@ -19,8 +19,12 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_carbamic_acid(features: Any) -> bool:
-    """Mirrors composer.py:855 (``features.principal_group == 'carbamic_acid'``)."""
-    return getattr(features, 'principal_group', None) == 'carbamic_acid'
+    """Mirrors composer.py:855 (``features.principal_group == 'carbamic_acid'``); also a principal thio acid on a carbamic
+    nitrogen, 'diethylcarbamodithioic acid' (``assembly.carbamothioic_acid_names``,:30768)."""
+    if getattr(features, 'principal_group', None) == 'carbamic_acid':
+        return True
+    from ..carbamothioic_acid_names import carbamothioic_unit
+    return carbamothioic_unit(features) is not None
 
 
 def name_carbamic_acid(
@@ -37,11 +41,18 @@ def name_carbamic_acid(
         _name_carbamic_acid,
     )
 
-    carbamic_name = _name_carbamic_acid(features)
+    spelled = None
+    if getattr(features, 'principal_group', None) == 'carbamic_acid':
+        carbamic_name = _name_carbamic_acid(features)
+    else:
+        # the thio acid name spells every atom (an unnamed N-substituent declines it): no enrichment may cite one again
+        from ..carbamothioic_acid_names import carbamothioic_acid_name
+        carbamic_name = carbamothioic_acid_name(features)
+        spelled = set(range(features.mol.GetNumAtoms()))
     if not carbamic_name:
         return None
 
-    carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid")
+    carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid", already_spelled_atoms=spelled)
 
     pool = get_current_pool()
     cand = pool.add(carbamic_name, "carbamic_acid", features)

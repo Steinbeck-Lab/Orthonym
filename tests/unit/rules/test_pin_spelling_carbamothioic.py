@@ -37,6 +37,8 @@ def test_not_the_pin(smiles, name):
     ("NC(=O)S", "carbamothioic S-acid"),
     ("SC(=O)S", "carbonodithioic S,S-acid"),
     ("OC(=S)O", "carbonothioic O,O-acid"),
+    ("CCN(CC)C(=S)S", "diethylcarbamodithioic acid"),
+    ("CNC(=S)O", "methylcarbamothioic O-acid"),
 ])
 def test_the_pin_passes(smiles, name):
     assert carbamothioic_acid_check(Chem.MolFromSmiles(smiles), name) is None

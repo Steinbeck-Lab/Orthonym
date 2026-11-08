@@ -89,12 +89,15 @@ def name_chalcogen_peroxy_anhydride(mol) -> Optional[str]:
     for c, x, e in ((c1, x1, e1), (c2, x2, e2)):
         if mol.GetAtomWithIdx(x).GetSymbol() == "N":
             name, substituted = _carbamimidic_component(mol, c, x, e)
-        elif any(nb.GetSymbol() == "N" for nb in mol.GetAtomWithIdx(c).GetNeighbors()):
-            # a carbamic or carbamothioic side: the acid namer spells it '(diethylamino)methanethioic', not the
-            # 'diethylcarbamothioic' of the book; no name rather than a non-PIN acid word as a PIN
-            return None
         else:
             name, substituted = _name_acyl_acid_component(mol, c, x, e)
+            hetero = [nb for nb in mol.GetAtomWithIdx(c).GetNeighbors() if nb.GetIdx() not in (x, e) and nb.GetSymbol() != "C"]
+            if hetero and (hetero[0].GetSymbol() != "N" or (name and "carbam" not in name)):
+                # a carbamic or carbonic side spelt on formic acid ('(diethylamino)methanethioic', 'ethoxymethanethioic'),
+                # "Substitution of formic acid is not recommended":30756): no name rather than a non-PIN word
+                return None
+            if hetero:
+                substituted = hetero[0].GetDegree() > 1    # the carbamic N is the acid's own atom: 'carbamothioic' is bare
         if not name:
             return None
         acids.append((name, substituted))

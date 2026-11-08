@@ -90,7 +90,24 @@ def test_an_imidic_side_keeps_its_route():
     assert tier_row("CC(=N)SSC(C)=N", "pin")["name"] == "1-(ethanimidoyldisulfanyl)ethan-1-imine"
 
 
-def test_a_carbamothioic_side_claims_no_pin():
-    # disulfiram: the acid namer spells the side '(diethylamino)methanethioic', not the book's 'diethylcarbamothioic'
-    #; the writer declines rather than ship that acid word as a PIN (end check P18/end1)
-    assert tier_row("CCN(CC)C(=S)SSC(=S)N(CC)CC", "pin")["tier"] != "pin_verified"
+@pytest.mark.parametrize("smiles,expected", [
+    # disulfiram and thiram: each side is named as its acid 'diethylcarbamothioic':30768,
+    # ``assembly.carbamothioic_acid_names``), a substituted symmetric pair takes 'bis' ('bis(chloroacetic) anhydride
+    # (PIN)',:32249)
+    ("CCN(CC)C(=S)SSC(=S)N(CC)CC", "bis(diethylcarbamothioic) dithioperoxyanhydride"),
+    ("CN(C)C(=S)SSC(=S)N(C)C", "bis(dimethylcarbamothioic) dithioperoxyanhydride"),
+    # the carbamic N is the acid's own atom: an unsubstituted pair is bare, as 'acetic dithioperoxyanhydride' (:32354)
+    ("NC(=S)SSC(N)=S", "carbamothioic dithioperoxyanhydride"),
+    # an anhydride is senior to the pseudoketone '1-[(dimethylcarbamothioyl)disulfanyl]ethan-1-one':18169)
+    ("CN(C)C(=S)SSC(=O)C", "acetic dimethylcarbamothioic dithioperoxyanhydride"),
+])
+def test_a_carbamothioic_side_is_named_as_its_acid(smiles, expected):
+    for tier in ("pin", "best-effort"):
+        row = tier_row(smiles, tier)
+        assert (row["name"], row["tier"]) == (expected, "pin_verified"), row
+
+
+@pytest.mark.parametrize("smiles", ["CCOC(=S)SSC(=S)OCC", "CCN(CC)C(=S)SSC(=S)OCC"])
+def test_a_carbonic_side_spelt_on_formic_acid_is_no_pin(smiles):
+    # 'ethoxymethanethioic' substitutes formic acid, "not recommended":30756): no PIN label
+    assert tier_row(smiles, "pin")["tier"] != "pin_verified"

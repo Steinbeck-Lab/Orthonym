@@ -70,6 +70,8 @@ MEASURED_LIVE = [
 NOW_DERIVED = {
     "CC(=O)Nc1ccc(O)cc1": "N-(4-hydroxyphenyl)acetamide",
     "O=C(O)CC(O)(CC(=O)O)C(=O)O": "2-hydroxypropane-1,2,3-tricarboxylic acid",
+    # thiuram disulfide: the dithioperoxyanhydride of carbamothioic acid:32346,:30768)
+    "NC(=S)SSC(N)=S": "carbamothioic dithioperoxyanhydride",
 }
 
 

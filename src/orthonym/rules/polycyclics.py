@@ -1003,8 +1003,10 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
         _prefix_only = _identify_pah_prefix_only_chain(mol, start_idx, _frag_atoms)
         if _prefix_only:
             return _prefix_only
-        # Try functionalized chain (hydroxymethyl, carboxymethyl, etc.)
-        return _identify_pah_functionalized_chain(mol, start_idx, core_atoms)
+        # Try functionalized chain (hydroxymethyl, carboxymethyl, etc.), then the shared prefix ('methoxycarbonyl')
+        from .pah_shared_prefix import shared_pah_prefix
+        return (_identify_pah_functionalized_chain(mol, start_idx, core_atoms)
+                or shared_pah_prefix(mol, start_idx, core_atoms, _frag_atoms))
 
     # Nitrogen groups
     if symbol == 'N':

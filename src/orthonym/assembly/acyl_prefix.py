@@ -161,11 +161,13 @@ def is_alkoxycarbonyl_branch(mol, sub_atoms, attach_idx) -> bool:
         # 2-methyl-3-oxobutanedioate (PIN)' lost its name when this namer took the chain branch)
         if not any(nb.IsInRing() for nb in c.GetNeighbors() if nb.GetIdx() not in sub_set):
             return False
+        from .alkoxy_oxo_branch import acyl_oxo_on_link
+        keep = {oxo[0].GetIdx(), ether[0].GetIdx(), acyl_oxo_on_link(mol, ether[0], attach_idx)}
         for idx in sub_set:
             a = mol.GetAtomWithIdx(idx)
             if a.GetFormalCharge() or a.GetNumRadicalElectrons() or a.GetIsotope():
                 return False
-            if idx not in (oxo[0].GetIdx(), ether[0].GetIdx()) and a.GetSymbol() != 'C':
+            if idx not in keep and a.GetSymbol() != 'C':
                 return False
         return True
     except Exception:
@@ -174,9 +176,11 @@ def is_alkoxycarbonyl_branch(mol, sub_atoms, attach_idx) -> bool:
 
 def is_pin_fg_branch(mol, sub_atoms, attach_idx) -> bool:
     """The branches the PIN-tier functional-group namer of ``substituent_naming`` takes besides a chain carboxamide:
-    'acylsulfanyl', '[(alkoxycarbonyl)amino]' and 'alkoxycarbonyl', the Blue Book)."""
+    'acylsulfanyl', '[(alkoxycarbonyl)amino]', 'alkoxycarbonyl' and 'alkoxy...oxo', the Blue Book)."""
+    from .alkoxy_oxo_branch import is_alkoxy_oxo_chain_branch
     return (is_acylsulfanyl(mol, sub_atoms, attach_idx) or is_carbamate_amino_branch(mol, sub_atoms, attach_idx)
-            or is_alkoxycarbonyl_branch(mol, sub_atoms, attach_idx))
+            or is_alkoxycarbonyl_branch(mol, sub_atoms, attach_idx)
+            or is_alkoxy_oxo_chain_branch(mol, sub_atoms, attach_idx))
 
 def is_carboacyl_head(mol, frag_atoms, attach_idx) -> bool:
     """True when the attachment atom is the carbonyl carbon of a chain carboacyl branch R-CO- (R an acyclic carbon):

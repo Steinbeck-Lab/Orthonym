@@ -676,7 +676,8 @@ def unlocanted_prefix_block(prefix_texts: List[str],
         # _is_fully_enclosed only inspects the FIRST char, so it misses this (the
         # token starts with 'b'/'t', not a bracket) -> 'bis(2-hydroxyethoxy)acetic
         # acid', not '[bis(2-hydroxyethoxy)]acetic acid' (the Blue Book PIN).
-        for _m in ('bis', 'tris', 'tetrakis', 'pentakis', 'hexakis'):
+        # 'di(propan-2-yl)' too: the multiplier stays outside the marks:7272, 'di(propan-2-yl)stibinous',:35996)
+        for _m in ('bis', 'tris', 'tetrakis', 'pentakis', 'hexakis', 'di', 'tri', 'tetra'):
             if tok.startswith(_m) and _is_fully_enclosed(tok[len(_m):]):
                 return True
         return False

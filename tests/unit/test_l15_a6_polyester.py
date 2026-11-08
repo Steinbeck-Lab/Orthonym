@@ -184,14 +184,15 @@ def test_the_pyranopyranone_octenoate_keeps_its_name_beside_a_lactone(tier):
 
 def test_a_ring_acid_word_never_drops_the_chain_ester_beside_it():
     """The senior ester of 'methyl 4-(3-methoxy-3-oxopropyl)benzoate' is the benzoate: a ring is senior to a
-    chain). Where the prefix pipeline names no ester prefix (the PIN tier), its ring acid word was 'methyl benzoate',
-    another molecule: the match declines, as the chain acid does, and the decomposition names the molecule."""
+    chain). Where the prefix pipeline named no ester prefix, its ring acid word was 'methyl benzoate', another molecule;
+    the chain ester is now the 'alkoxy...oxo' prefix at every tier:31709), so the ring ester match names
+    the whole molecule."""
     from orthonym.rules.esters import name_ester
     smiles = "COC(=O)CCc1ccc(cc1)C(=O)OC"
     mol = Chem.MolFromSmiles(smiles)
     ring_ester, = (m for m in mol.GetSubstructMatches(_ESTER)
                    if any(n.GetIsAromatic() for n in mol.GetAtomWithIdx(m[0]).GetNeighbors()))
-    assert name_ester(mol, ring_ester) is None
+    assert name_ester(mol, ring_ester) == "methyl 4-(3-methoxy-3-oxopropyl)benzoate"
     for tier in ("pin", "best-effort"):
         row = tier_row(smiles, tier)
         assert (row["name"], row["tier"]) == ("methyl 4-(3-methoxy-3-oxopropyl)benzoate", "pin_verified"), row
