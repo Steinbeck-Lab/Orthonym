@@ -331,7 +331,8 @@ def test_three_amides_are_never_named_on_the_junior_acetamide_as_a_pin(smiles):
         assert not (row["tier"] == "pin_verified" and (row["name"] or "").endswith("acetamide")), row
         if row["tier"] != "abstain":
             assert_full_rt(row["name"], smiles)
-    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    # the PIN tier now names the senior propanamide too (its amide N-branch is a chain carboxamide, ``decorated_n_branch``)
+    assert tier_row(smiles, "pin")["name"] == tier_row(smiles, "best-effort")["name"]
     best = tier_row(smiles, "best-effort")
     assert best["name"] and best["name"].endswith("-N-methylpropanamide"), best
     assert best["name"].startswith("N-"), best

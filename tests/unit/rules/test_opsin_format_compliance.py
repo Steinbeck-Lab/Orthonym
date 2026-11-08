@@ -199,6 +199,10 @@ class TestNoBarePhenylamino:
 # acidic or middle residue) now give their substitutive PIN, the Blue Book, gives the peptide names no PIN;
 #,:32920), each OPSIN 2.9.0 full-InChIKey exact (fresh java run); tag 'L8 item 22'.
 
+# Program 18 (2026-11-08, change-asserted-value): the six peptide rows 239, 255, 258, 495, 565, 700 (DK-PEP; a middle residue beside a
+# carboxyalkyl amide N, or a reversed amide beside the chain amide) now give their substitutive PIN:2052 gives the peptide names no PIN;:32928,
+# ``assembly.decorated_n_branch``), each OPSIN 2.9.0 full-InChIKey exact.
+
 # Class -> reason (Task 11, 2026-09-26). The reasons, the Blue Book lines and the best-effort
 # evidence per row are in internal notes (disposition 'known-defect').
 _CANARY_DEFECT_REASONS = {
@@ -433,18 +437,6 @@ CANARY_KNOWN_DEFECTS = {
         "unknown organic compound",
         "DK-NOTEXACT", (202, 316, 338),
     ),
-    "N[C@@H](CC(=O)O)C(=O)NCC(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
-        "aspartylglycyltryptophan",
-        "DK-PEP", (239,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
-        "aspartylvalylphenylalanine",
-        "DK-PEP", (255,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
-        "glutamylvalylphenylalanine",
-        "DK-PEP", (258,),
-    ),
     "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
         "(2S)-2-(phenylalanylglutamylamino)butanedioic acid",
         "DK-PEP", (277,),
@@ -529,10 +521,6 @@ CANARY_KNOWN_DEFECTS = {
         "(2R,5S,9R,12R)-13,13-dimethyl-7-oxatetracyclo[7.5.0.0^1,5.0^2,12]tetradecane-4,8-dione",
         "DK-VBFUSED", (486,),
     ),
-    "N[C@@H](CO)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
-        "serylaspartylhistidine",
-        "DK-PEP", (495,),
-    ),
     "CC1=CCC(=O)CC(=O)[C@@]23C(=O)N[C@@H](CC(C)C)[C@@H]2[C@H](C)C(C)=C[C@@H]3C1": (
         "(3S,3aR,4S,6aS,13aS)-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,7,10-hexahydro-1H-cyclonona[d]isoindole-1,11,13(2H,12H)-trione",
         "DK-LARGERINGFUSED", (500,),
@@ -559,10 +547,6 @@ CANARY_KNOWN_DEFECTS = {
     "NC(=O)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O": (
         "histidylglutamylasparagine",
         "DK-PEP", (562,),
-    ),
-    "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "histidylglutamyltyrosine",
-        "DK-PEP", (565,),
     ),
     "C/C(=C\\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3=O)CO": (
         "(3S,5R,10S,13R,14R,17R,20R,24E)-3,26-dihydroxy-4,4,14-trimethylcholesta-8,24-dien-7-one",
@@ -651,10 +635,6 @@ CANARY_KNOWN_DEFECTS = {
     "CC(=O)OCC(=O)[C@@]1(O)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
         "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11,17-dihydroxy-16-methyl-3,20-dioxopregna-1,4-dien-21-yl acetate",
         "DK-P101CIP", (691,),
-    ),
-    "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
-        "glutamylalanyltryptophan",
-        "DK-PEP", (700,),
     ),
 }
 

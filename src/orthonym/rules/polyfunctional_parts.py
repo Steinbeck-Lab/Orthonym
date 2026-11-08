@@ -562,6 +562,23 @@ def _group_chain_end_acid_derivative(_amidine_excluded_n, all_prefixes, atom_to_
     return False
 
 
+def _acyl_side_has_carboxy(mol, acyl_c: int, n_idx: int) -> bool:
+    """True when the acyl side of -NH-CO-R (from ``acyl_c``, away from ``n_idx``) holds a -COOH: the walk spells such an acyl
+    '(3-carboxy-1-oxopropyl)amino', not the '3-carboxypropanamido' of method (1) (the Blue Book), so the
+    amide arm keeps the older route that spells it."""
+    from ..assembly.decorated_n_branch import _is_carboxy_carbon
+    seen, stack = {acyl_c, n_idx}, [nb.GetIdx() for nb in mol.GetAtomWithIdx(acyl_c).GetNeighbors() if nb.GetIdx() != n_idx]
+    while stack:
+        i = stack.pop()
+        if i in seen:
+            continue
+        seen.add(i)
+        if _is_carboxy_carbon(mol.GetAtomWithIdx(i)):
+            return True
+        stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors())
+    return False
+
+
 def _group_secondary_amide(_amidine_excluded_n, all_prefixes, atom_to_locant, chain_set, fg_name, matches, mol):
     """A secondary amide on the chain."""
     if fg_name == 'secondary_amide' and chain_set:
@@ -570,6 +587,9 @@ def _group_secondary_amide(_amidine_excluded_n, all_prefixes, atom_to_locant, ch
         _sa_units = {}  # amide C -> (amino-side prefix, N-side branch atoms)
         for _m in matches:
             _sac, _san = _m[0], _m[2]
+            if (_sac not in chain_set and any(nb.GetIdx() in chain_set for nb in mol.GetAtomWithIdx(_san).GetNeighbors())
+                    and not _acyl_side_has_carboxy(mol, _sac, _san)):
+                continue    # a reversed amide -NH-CO-R on the chain: the substituent walk names it ('2-aminopropanamido')
             if _sac not in chain_set:
                 _sa_ok = False
                 break

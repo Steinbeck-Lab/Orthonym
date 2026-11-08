@@ -1,6 +1,8 @@
 """A carboxamide at the end of a carbon chain, the substituent the PIN tier names by method (1) of."""
 from rdkit import Chem
 
+from .decorated_n_branch import acceptable_n_branch
+
 
 def is_chain_carboxamide(mol, sub_atoms, attach_idx) -> bool:
     """True for a substituent that is an acyclic carbon chain of two or more
@@ -33,8 +35,9 @@ def is_chain_carboxamide(mol, sub_atoms, attach_idx) -> bool:
                     if xi in sub_set and xi != n and xi not in comp:
                         comp.add(xi)
                         stack.append(xi)
-            if attach_idx not in comp and any(mol.GetAtomWithIdx(i).IsInRing() for i in comp):
-                branches |= comp
+            if attach_idx not in comp and (any(mol.GetAtomWithIdx(i).IsInRing() for i in comp)
+                                           or acceptable_n_branch(mol, comp, start, n)):
+                branches |= comp      # ring-bearing, decorated alkyl or a further carboxamide (``decorated_n_branch``)
         if branches and _chain_carboxamide_core(mol, sub_set - branches, attach_idx, frozenset(branches)):
             return True
     return False
@@ -117,8 +120,22 @@ def is_ring_amino(mol, sub_atoms, attach_idx) -> bool:
     acyl = len(outer) == 1 and outer[0].GetSymbol() == 'C' and not outer[0].IsInRing() and any(
         b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(outer[0]).GetSymbol() == 'O'
         for b in outer[0].GetBonds())
-    return acyl and bool(inner) and all(nb.IsInRing() or _saturated_alkyl_branch(mol, nb.GetIdx(), attach_idx, sub_set)
-                                         for nb in inner)
+    return acyl and bool(inner) and all(
+        nb.IsInRing() or _saturated_alkyl_branch(mol, nb.GetIdx(), attach_idx, sub_set)
+        or acceptable_n_branch(mol, _component(mol, nb.GetIdx(), attach_idx, sub_set), nb.GetIdx(), attach_idx)
+        for nb in inner)
+
+
+def _component(mol, start: int, n_idx: int, sub_set) -> set:
+    """The atoms of ``sub_set`` reached from ``start`` without crossing the nitrogen ``n_idx``."""
+    seen, stack = {start}, [start]
+    while stack:
+        for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+            j = nb.GetIdx()
+            if j in sub_set and j != n_idx and j not in seen:
+                seen.add(j)
+                stack.append(j)
+    return seen
 
 
 def _saturated_alkyl_branch(mol, start: int, n_idx: int, sub_set) -> bool:

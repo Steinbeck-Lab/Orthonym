@@ -256,7 +256,7 @@ _PASS_3_ROWS = [
      _SAME),
     (_DEPSIPEPTIDE[0], _DEPSIPEPTIDE[1], _DEPSIPEPTIDE[1]),
     ("COc1c(C(SCC(NC(=O)CCC(N)C(=O)O)C(=O)NCC(=O)O)C(O)C=O)cc2c(c1OC)OCO2",
-     "4-[1-({2-(4-amino-4-carboxybutanamido)-3-[(2-hydroxy-2-oxoethyl)amino]-3-oxopropyl}sulfanyl)-2-h"
+     "4-[1-({2-(4-amino-4-carboxybutanamido)-3-[(carboxymethyl)amino]-3-oxopropyl}sulfanyl)-2-h"
      "ydroxy-3-oxopropyl]-2,3-dimethoxy-7,9-dioxabicyclo[4.3.0]nona-1,3,5-triene",
      _SAME),
     ("CCCCCCCCCCCCCCCCCCN(C(CC(=O)O)C(=O)O)C(=O)C(CC(=O)N)S(=O)(=O)O",

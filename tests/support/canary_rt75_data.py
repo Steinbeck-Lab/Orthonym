@@ -1268,7 +1268,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)NCC(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",
-        "L-aspartylglycyl-L-tryptophan",
+        "(3S)-3-amino-4-[(2-{[(1S)-1-carboxy-2-(1H-indol-3-yl)ethyl]amino}-2-oxoethyl)amino]-4-oxobutanoic acid",
     ),
     (
         "C[C@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",
@@ -1336,7 +1336,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
-        "L-aspartyl-L-valyl-L-phenylalanine",
+        "(3S)-3-amino-4-{[(2S)-1-{[(1S)-1-carboxy-2-phenylethyl]amino}-3-methyl-1-oxobutan-2-yl]amino}-4-oxobutanoic acid",
     ),
     (
         "CC(C)(C)/C=C/C(=O)O",
@@ -1348,7 +1348,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
-        "L-glutamyl-L-valyl-L-phenylalanine",
+        "(4S)-4-amino-5-{[(2S)-1-{[(1S)-1-carboxy-2-phenylethyl]amino}-3-methyl-1-oxobutan-2-yl]amino}-5-oxopentanoic acid",
     ),
     (
         "CC(C)CCCCC/C=C\\CCCCCCC(=O)O",
@@ -2154,7 +2154,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-seryl-L-aspartyl-L-histidine",
+        "(3S)-3-[(2S)-2-amino-3-hydroxypropanamido]-4-{[(1S)-1-carboxy-2-(1H-imidazol-5-yl)ethyl]amino}-4-oxobutanoic acid",
     ),
     (
         "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
@@ -2436,7 +2436,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,large
-        "L-histidyl-L-glutamyl-L-tyrosine",
+        "(4S)-4-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-5-{[(1S)-1-carboxy-2-(4-hydroxyphenyl)ethyl]amino}-5-oxopentanoic acid",
     ),
     (
         "C/C(=C\\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3=O)CO",  # fused-ring,large,steroid
@@ -2991,7 +2991,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
-        "L-glutamyl-L-alanyl-L-tryptophan",
+        "(4S)-4-amino-5-{[(2S)-1-{[(1S)-1-carboxy-2-(1H-indol-3-yl)ethyl]amino}-1-oxopropan-2-yl]amino}-5-oxopentanoic acid",
     ),
     # --- a phase -a.3: HA=7 Tier A canaries ---
     # Cover the _MIN_RATIO_ACCEPT/1.5 coverage fallback at composer.py:1526

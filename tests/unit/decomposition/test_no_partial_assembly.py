@@ -397,9 +397,11 @@ class TestHonestAbstainWhenGenuinelyUnnameable:
         this session: `name_compound` returns the failure sentinel, never a
         malformed or partial name).
         """
+        # program 18 (2026-11-08): the systematic PIN is now built (carboxyalkyl amide N-branches,
+        # ``assembly.decorated_n_branch``); the contract is an abstention or an exact whole-molecule name
         result = name_compound(LIPOPEPTIDE, emit_tier="pin")
-        assert is_failure_name(result), (
-            f"expected an honest abstention for the lipopeptide, got: "
+        assert is_failure_name(result) or _full_rt(LIPOPEPTIDE, result), (
+            f"expected an honest abstention or an exact name for the lipopeptide, got: "
             f"{result!r}"
         )
 

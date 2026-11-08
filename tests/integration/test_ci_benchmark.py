@@ -337,7 +337,7 @@ CI_BENCHMARK = [
     pytest.param(
         "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)"
         "C(=O)O",
-        _declined_at_default("aspartylvalylphenylalanine"),
+        _ships("(3S)-3-amino-4-{[(2S)-1-{[(1S)-1-carboxy-2-phenylethyl]amino}-3-methyl-1-oxobutan-2-yl]amino}-4-oxobutanoic acid"),  # program 18: the substitutive PIN:2052)
         marks=_GATE,
     ),
     # L5 (TRIAGE default-tier-pin-or-decline): the old text is a different molecule (OPSIN
@@ -382,7 +382,7 @@ CI_BENCHMARK = [
     pytest.param(
         "N[C@@H](CC(=O)O)C(=O)NCC(=O)N[C@@H](Cc1c[nH]c2ccccc12)"
         "C(=O)O",
-        _declined_at_default("aspartylglycyltryptophan"),
+        _ships("(3S)-3-amino-4-[(2-{[(1S)-1-carboxy-2-(1H-indol-3-yl)ethyl]amino}-2-oxoethyl)amino]-4-oxobutanoic acid"),  # program 18: the substitutive PIN:2052)
         marks=_GATE,
     ),
     pytest.param(

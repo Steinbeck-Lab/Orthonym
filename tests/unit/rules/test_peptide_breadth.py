@@ -173,12 +173,11 @@ class TestFailClosedMidChainNonStandard:
         "N[C@@H](CC(C)C)C(=O)O)C(C)C)CC(C)C"
     )
 
-    def test_chebi371_abstains(self):
+    def test_chebi371_never_takes_a_peptide_name(self):
+        # program 18 (2026-11-08): the substitutive PIN is now built:2052 gives peptide names no PIN);
+        # the residue-name convention still cannot spell the mid-chain non-standard residue (a trace)
         result = _dt_name_compound(self.CHEBI_371)
-        assert is_failure_name(result), (
-            f"chebi 371 must abstain (mid-chain non-standard residue is not "
-            f"solvable via the peptide-chain convention -- SPY §2), got: {result}"
-        )
+        assert is_failure_name(result) or result.endswith("pentanoic acid"), result
 
     def test_chebi371_never_a_smaller_molecule(self):
         """Even if some future change makes this molecule emit a name, it
