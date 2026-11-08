@@ -198,7 +198,7 @@ def _final_stereo_check(
     """
     from .rules.stereochemistry import (
         inject_stereo_from_locant_map,
-        needs_stereo_injection,
+        needs_stereo_injection, fronted_off_its_word,
     )
 
     if not needs_stereo_injection(mol, name):
@@ -246,7 +246,7 @@ def _final_stereo_check(
         _cip = _rs_atoms[0].GetProp('_CIPCode')
         if _cip in ('R', 'S', 'r', 's'):
             _fronted = f"({_cip})-{name}"
-            if _is_sulfoxide_type_centre(_rs_atoms[0]) and re.search(r"\d", name):
+            if (_is_sulfoxide_type_centre(_rs_atoms[0]) and re.search(r"\d", name)) or fronted_off_its_word(mol, _rs_atoms[0].GetIdx(), name):
                 # (the Blue Book): "When they relate to substituent
                 # groups, they are cited at the front of the corresponding prefix.
                 # They are preceded by a numerical or letter locant... when such

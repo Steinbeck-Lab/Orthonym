@@ -1023,7 +1023,107 @@ def inject_stereo_from_locant_map(
         return name
 
     prefix = format_stereodescriptor_string(descriptors)
-    return f"{prefix}{name}"
+    return _place_parent_block(name, prefix, mol, atom_to_locant)
+
+
+#: an ester or a carboxylate group: C(=O)-O-C or C(=O)-O(-)
+_ACID_CARBONYL = None
+
+
+def _place_parent_block(name: str, prefix: str, mol, atom_to_locant) -> str:
+    """``prefix`` (the parent's descriptor block) placed before the word that names the parent: the whole name, except
+    for an ester or a salt whose parent is the acid ('ethyl (2Z)-anilino(hydroxyimino)acetate', 'sodium
+    (2S)-2-aminopropanoate'), where the block goes before the last word. "Naming of stereoisomers"
+    (the Blue Book): a descriptor is cited with the locant of its unit, so it stands before the word that numbers
+    that unit; '(2Z)-ethyl anilino(hydroxyimino)acetate' put it on 'ethyl', which has no C-2 (false PIN labels in the
+    SureChEMBL run). The block belongs to the acid word when no stereo atom of the molecule lies on the alcohol side of
+    an ester C(=O)O-C ('(1R,3S)-3-chloro-...-2-ethylbutyl acetate' keeps it in front); a carboxylate has no alcohol
+    side. A ring ester (lactone) or anything unread keeps the block in front."""
+    global _ACID_CARBONYL
+    words = _top_level_words(name)
+    if len(words) < 2 or not words[-1][1].rstrip(")]}").endswith("ate"):
+        return f"{prefix}{name}"
+    try:
+        from rdkit import Chem
+        if _ACID_CARBONYL is None:
+            _ACID_CARBONYL = Chem.MolFromSmarts("[CX3,PX4,SX4](=[OX1])[OX2H0,OX1-]")
+        matches = mol.GetSubstructMatches(_ACID_CARBONYL)
+        if not matches:
+            return f"{prefix}{name}"
+        stereo = {a.GetIdx() for a in mol.GetAtoms() if a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED}
+        for b in mol.GetBonds():
+            if b.GetStereo() != Chem.BondStereo.STEREONONE:
+                stereo |= {b.GetBeginAtomIdx(), b.GetEndAtomIdx()}
+        for carbon, _o, oxygen in matches:
+            ester = mol.GetAtomWithIdx(oxygen)
+            for nb in ester.GetNeighbors():
+                if nb.GetIdx() == carbon:
+                    continue
+                bond = mol.GetBondBetweenAtoms(oxygen, nb.GetIdx())
+                if bond.IsInRing():
+                    return f"{prefix}{name}"
+                alcohol = _side(mol, nb.GetIdx(), oxygen)
+                if alcohol & stereo:
+                    return f"{prefix}{name}"
+    except Exception:
+        return f"{prefix}{name}"
+    start = words[-1][0]
+    return f"{name[:start]}{prefix}{name[start:]}"
+
+
+def fronted_off_its_word(mol, centre: int, name: str) -> bool:
+    """A descriptor fronted to the whole of a multiword ``name`` belongs to another word than the first: the centre
+    lies on the acid side of an ester ('(R)-methyl (benzenesulfinyl)acetate', '(R)-methyl
+    N,N-dimethylphosphoramidochloridate'); a salt is not judged. (the Blue Book):
+    the descriptor stands at the front of the word, or the prefix, that holds its unit. False when it is not shown."""
+    if len(_top_level_words(name)) < 2:
+        return False
+    try:
+        from rdkit import Chem
+        global _ACID_CARBONYL
+        if len(Chem.GetMolFrags(mol)) > 1:
+            # a salt: its producer drops a name labelled below the PIN instead of shipping it at the wider tiers, and
+            # its fronted names were never labelled pin_verified (review 2026-11-08: 'sodium ethyl methylphosphonate'
+            # with a stereogenic P lost its best-effort name): not judged here
+            return False
+        if _ACID_CARBONYL is None:
+            _ACID_CARBONYL = Chem.MolFromSmarts("[CX3,PX4,SX4](=[OX1])[OX2H0,OX1-]")
+        for carbon, _o, oxygen in mol.GetSubstructMatches(_ACID_CARBONYL):
+            for nb in mol.GetAtomWithIdx(oxygen).GetNeighbors():
+                if nb.GetIdx() == carbon or mol.GetBondBetweenAtoms(oxygen, nb.GetIdx()).IsInRing():
+                    continue
+                if centre not in _side(mol, nb.GetIdx(), oxygen):
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+def _side(mol, start: int, cut: int) -> set:
+    """The atoms reached from ``start`` without passing through ``cut``."""
+    seen, todo = {start}, [start]
+    while todo:
+        for nb in mol.GetAtomWithIdx(todo.pop()).GetNeighbors():
+            k = nb.GetIdx()
+            if k != cut and k not in seen:
+                seen.add(k)
+                todo.append(k)
+    return seen
+
+
+def _top_level_words(name: str):
+    """``[(start, word)]`` of the words of ``name`` split at spaces outside every enclosing mark."""
+    words, depth, start = [], 0, 0
+    for i, ch in enumerate(name):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == " " and depth == 0:
+            words.append((start, name[start:i]))
+            start = i + 1
+    words.append((start, name[start:]))
+    return words
 
 
 def _block_repeats_a_locant(name: str) -> bool:
