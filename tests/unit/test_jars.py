@@ -17,12 +17,16 @@ PAYLOAD_SHA = hashlib.sha256(PAYLOAD).hexdigest()
 
 @pytest.fixture
 def server():
-    """Serve PAYLOAD at /good.jar and different bytes at /bad.jar on localhost."""
-    hits = {"n": 0}
+    """Serve PAYLOAD at /good.jar, HTTP 504 at /fail.jar and different bytes at any other path on localhost."""
+    hits = {"n": 0, "accept": []}
 
     class H(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             hits["n"] += 1
+            hits["accept"].append(self.headers.get("Accept"))
+            if self.path == "/fail.jar":
+                self.send_error(504, "Gateway Timeout")
+                return
             body = PAYLOAD if self.path == "/good.jar" else b"tampered"
             self.send_response(200)
             self.send_header("Content-Length", str(len(body)))
@@ -63,6 +67,47 @@ def test_pinned_specs_are_the_official_release_assets():
     assert jars.JARS["opsin"].sha256 == "c2e29326c281f87b59a05d934d8589adac6e9d17b95b984931b3e739111b360f"
     assert jars.JARS["centres"].url == "https://github.com/SiMolecule/centres/releases/download/1.2.1/centres.jar"
     assert jars.JARS["centres"].sha256 == "6c5d5cafa9393ed7b667a2340222348cd15a9bbdd0d1b92518229f26cc5e87fb"
+
+
+def test_pinned_specs_have_the_api_asset_route_as_second_link():
+    """The GitHub release-download links gave HTTP 504 for hours (2026-11-08); the API asset route of the same
+    release served the same bytes (checked against both pinned sums)."""
+    assert jars.JARS["opsin"].mirrors == ("https://api.github.com/repos/dan2097/opsin/releases/assets/374454262",)
+    assert jars.JARS["centres"].mirrors == (
+        "https://api.github.com/repos/SiMolecule/centres/releases/assets/136927111",)
+    assert jars._DOWNLOAD_HEADERS["Accept"] == "application/octet-stream"  # the API route needs it for the bytes
+
+
+def _with_links(monkeypatch, spec, url, *mirrors):
+    monkeypatch.setitem(jars.JARS, "opsin", jars.JarSpec(**{**spec.__dict__, "url": url, "mirrors": mirrors}))
+
+
+def test_failed_first_link_falls_back_to_the_second(fake_spec, monkeypatch, tmp_path, capsys):
+    spec, hits = fake_spec
+    _with_links(monkeypatch, spec, spec.url.replace("good", "fail"), spec.url)
+    p = jars.find_jar("opsin")
+    assert Path(p).read_bytes() == PAYLOAD and hits["n"] == 2
+    assert hits["accept"] == ["application/octet-stream"] * 2
+    assert capsys.readouterr().err.count("first start") == 1
+    assert not [f for f in (tmp_path / "jars").iterdir() if f.name.startswith(".fake-opsin")]  # no temp left
+
+
+def test_wrong_bytes_from_first_link_fall_back_to_the_second(fake_spec, monkeypatch):
+    spec, hits = fake_spec
+    _with_links(monkeypatch, spec, spec.url.replace("good", "bad"), spec.url)
+    assert Path(jars.find_jar("opsin")).read_bytes() == PAYLOAD and hits["n"] == 2
+
+
+def test_every_link_failing_names_each_link_and_keeps_nothing(fake_spec, monkeypatch, tmp_path):
+    spec, hits = fake_spec
+    fail, bad = spec.url.replace("good", "fail"), spec.url.replace("good", "bad")
+    _with_links(monkeypatch, spec, fail, bad)
+    with pytest.raises(jars.JarUnavailable) as err:
+        jars.find_jar("opsin")
+    msg = str(err.value)
+    assert "2 links" in msg and fail in msg and "HTTPError" in msg and bad in msg and "SHA-256" in msg
+    assert hits["n"] == 2 and not (tmp_path / "jars" / spec.filename).exists()
+    assert not [f for f in (tmp_path / "jars").iterdir() if f.name.startswith(".fake-opsin")]
 
 
 def test_download_then_cache_hit(fake_spec, tmp_path):

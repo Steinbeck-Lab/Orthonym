@@ -63,6 +63,10 @@ class JarSpec:
     url: str
     sha256: str
     env_var: str
+    #: further links to the same release asset, tried in order when ``url`` fails (the GitHub
+    #: release-download links gave HTTP 504 for hours on 2026-11-08 while the API asset route
+    #: served the same bytes). Every link must give the pinned ``sha256``.
+    mirrors: Tuple[str, ...] = ()
 
 
 JARS: Dict[str, JarSpec] = {
@@ -74,6 +78,7 @@ JARS: Dict[str, JarSpec] = {
             "opsin-cli-2.9.0-jar-with-dependencies.jar",
         sha256="c2e29326c281f87b59a05d934d8589adac6e9d17b95b984931b3e739111b360f",
         env_var="ORTHONYM_OPSIN_JAR",
+        mirrors=("https://api.github.com/repos/dan2097/opsin/releases/assets/374454262",),
     ),
     "centres": JarSpec(
         kind="centres",
@@ -82,11 +87,14 @@ JARS: Dict[str, JarSpec] = {
         url="https://github.com/SiMolecule/centres/releases/download/1.2.1/centres.jar",
         sha256="6c5d5cafa9393ed7b667a2340222348cd15a9bbdd0d1b92518229f26cc5e87fb",
         env_var="ORTHONYM_CENTRES_JAR",
+        mirrors=("https://api.github.com/repos/SiMolecule/centres/releases/assets/136927111",),
     ),
 }
 
 FETCH_HINT = "run `orthonym --fetch-jars` (or set ORTHONYM_OPSIN_JAR / ORTHONYM_CENTRES_JAR)"
 _DOWNLOAD_TIMEOUT_S = 120
+#: the GitHub API asset route sends the file only when asked for it; the release links ignore it
+_DOWNLOAD_HEADERS = {"Accept": "application/octet-stream", "User-Agent": "orthonym-jar-fetch"}
 
 
 class JarUnavailable(RuntimeError):
@@ -469,28 +477,47 @@ def _download(spec: JarSpec, target: Path, verbose: bool = False, first_start: b
             raise JarUnavailable(
                 f"{target} exists but its SHA-256 does not match the pinned {spec.kind} "
                 f"{spec.version} jar; remove it and {FETCH_HINT}")
-        if verbose:
-            print(f"[orthonym] downloading {spec.kind} {spec.version} from {spec.url}", file=sys.stderr)
-        fd, tmp = tempfile.mkstemp(prefix=f".{spec.filename}.", dir=str(checked))
-        try:
-            with os.fdopen(fd, "wb") as out, urllib.request.urlopen(spec.url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
-                if first_start:
-                    # once: later starts find the verified jar in the jar directory
-                    print(_first_start_message(spec, target, resp.headers.get("Content-Length")),
-                          file=sys.stderr, flush=True)
-                while True:
-                    block = resp.read(1 << 20)
-                    if not block:
-                        break
-                    out.write(block)
-            got = _sha256(Path(tmp))
-            if got != spec.sha256:
-                raise JarUnavailable(
-                    f"downloaded {spec.kind} jar has SHA-256 {got}, expected {spec.sha256}; not using it")
-            os.replace(tmp, target)
-        finally:
-            if os.path.exists(tmp):
-                os.unlink(tmp)
+        errors: List[str] = []
+        announced = [not first_start]  # shared with _fetch_one: a failed link may already have printed it
+        for url in (spec.url, *spec.mirrors):
+            if verbose:
+                print(f"[orthonym] downloading {spec.kind} {spec.version} from {url}", file=sys.stderr)
+            try:
+                _fetch_one(spec, url, target, checked, announced)
+                return
+            except (OSError, JarUnavailable) as exc:  # URLError, HTTPError and timeouts are OSErrors
+                errors.append(f"{url}: {type(exc).__name__}: {exc}")
+                if verbose:
+                    print(f"[orthonym] {url} failed: {exc}", file=sys.stderr)
+        raise JarUnavailable(f"could not download the {spec.kind} {spec.version} jar from any of its "
+                             f"{len(errors)} links ({'; '.join(errors)}); {FETCH_HINT}")
+
+
+def _fetch_one(spec: JarSpec, url: str, target: Path, jar_dir: Path, announced: List[bool]) -> None:
+    """Download ``url`` to a temp file in ``jar_dir``; put it at ``target`` only if its
+    is the pinned one. ``announced[0]`` says whether the first-start message was printed."""
+    fd, tmp = tempfile.mkstemp(prefix=f".{spec.filename}.", dir=str(jar_dir))
+    try:
+        request = urllib.request.Request(url, headers=_DOWNLOAD_HEADERS)
+        with os.fdopen(fd, "wb") as out, urllib.request.urlopen(request, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
+            if not announced[0]:
+                # once: later starts find the verified jar in the jar directory
+                print(_first_start_message(spec, target, resp.headers.get("Content-Length")),
+                      file=sys.stderr, flush=True)
+                announced[0] = True
+            while True:
+                block = resp.read(1 << 20)
+                if not block:
+                    break
+                out.write(block)
+        got = _sha256(Path(tmp))
+        if got != spec.sha256:
+            raise JarUnavailable(
+                f"downloaded {spec.kind} jar has SHA-256 {got}, expected {spec.sha256}; not using it")
+        os.replace(tmp, target)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
 
 
 def _first_start_message(spec: JarSpec, target: Path, length: Optional[str]) -> str:
