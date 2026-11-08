@@ -261,7 +261,7 @@ _INORGANIC_ACID_DERIVATIVES = {
 # acid locants (carbonothioic S-acid) are DEFERRED to a phase (no OPSIN RT).
 _CARBONIC_FRN = {
     "O=C(O)OO": build_frn_acid_name("carbon", "peroxo", 1),          # carbonoperoxoic acid
-    "O=C(S)S": build_frn_acid_name("carbon", "thio", 2),             # carbonodithioic acid (HS-CO-SH)
+    "O=C(S)S": build_frn_acid_name("carbon", "thio", 2),             # carbonodithioic acid (HS-CO-SH; S,S below)
     "S=C(S)S": build_frn_acid_name("carbon", "thio", 3),             # carbonotrithioic acid (HS-CS-SH)
     "N=C(O)O": build_frn_acid_name("carbon", "imido", 1),            # carbonimidic acid (HO-C(=NH)-OH)
     "N=C(N)O": build_frn_acid_name("carbam", "imido", 1),            # carbamimidic acid (H2N-C(=NH)-OH)
@@ -347,6 +347,18 @@ _ALL_INORGANIC = {
     **_CARBONIC_ACID_PSEUDOHALIDES,
     **_HYDROXYLAMINE_PRESELECTED,
 }
+
+
+def _with_acid_locant(mol, name: Optional[str]) -> Optional[str]:
+    """``name`` with the italic element locant of a mixed chalcocarbonic acid ('carbamothioic O-acid',
+    :30768; ``rules.chalcogen_acid_locant``), verified through its twin. A wider tier ships the word OPSIN reads (user
+    decision 2026-10-22, "Best-effort ships readable"), which the spelling check labels below the PIN."""
+    from .chalcogen_acid_locant import mol_acid_locant
+    from ..metrics.provenance import wider_tier_ctx
+    if not name or not name.endswith(" acid") or wider_tier_ctx.get():
+        return name
+    loc = mol_acid_locant(mol)
+    return f"{name[:-len(' acid')]} {loc}-acid" if loc else name
 
 
 def lookup_exact_acid_name(canonical_smiles: str) -> Optional[str]:
@@ -1820,7 +1832,7 @@ def name_carbonic_frn_family(mol):
         if not infixes:
             return None                   # plain carbonic/carbamic acid -> tabled
         from .functional_replacement import build_carbonic_mono_frn
-        return build_carbonic_mono_frn(stem, infixes)
+        return _with_acid_locant(mol, build_carbonic_mono_frn(stem, infixes))
 
     # ---- Poly (n >= 2): a linear alternating chain, cited with locants. ----
     if n > 4:
@@ -2480,7 +2492,7 @@ def name_inorganic_acid(mol) -> Optional[str]:
         return None
     tabled = _ALL_INORGANIC.get(canonical)
     if tabled is not None:
-        return tabled
+        return _with_acid_locant(mol, tabled)
     # PIN class program Task 13: cyanic-acid acyl halides, carbonic-acid nitriles and
     # the amides of di- and polycarbonic acids (functional classes; see the block
     # comment above name_carbonic_class_derivative).

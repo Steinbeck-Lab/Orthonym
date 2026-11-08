@@ -120,7 +120,9 @@ def test_acyl_prefix_table_p67_1_4_1_1():
     ("NS(=O)(=O)O", "sulfamic acid"),
     # carbonic-family FRN
     ("OOC(=O)O", "carbonoperoxoic acid"),
-    ("SC(=O)S", "carbonodithioic acid"),
+    # (the Blue Book): the italic locant of a mixed chalcocarbonic acid ('HSe-CO-SeH
+    # carbonodiselenoic Se,Se-acid (PIN)',:30780)
+    ("SC(=O)S", "carbonodithioic S,S-acid"),
     ("SC(=S)S", "carbonotrithioic acid"),
     ("N=C(O)O", "carbonimidic acid"),
     ("N=C(N)O", "carbamimidic acid"),

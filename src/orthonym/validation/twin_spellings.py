@@ -221,6 +221,16 @@ def _assembly_diyl_enclosed(name: str) -> str:
     return _ASSEMBLY_DIYL.sub(r"(\1)", name)
 
 
+#: the italic element locant of a mixed chalcocarbonic acid ('carbamothioic O-acid', 'carbonodiselenoic Se,Se-acid',
+#::30768), which OPSIN 2.9.0 does not read; the word without it reads to the same InChIKey (the two
+#: tautomers share it), and the locant itself is checked against the structure (spelling.checks_carbamothioic)
+_ACID_LOCANT = re.compile(r"(?<=ic) (?:O|S|Se|Te)(?:,(?:O|S|Se|Te))*-acid\b")
+
+
+def _acid_locant(name: str) -> str:
+    return _ACID_LOCANT.sub(" acid", name) if re.search(r"carb(?:am|on)\w*ic (?:O|S|Se|Te)", name) else name
+
+
 #: (rule id, rewrite) in the order the rules apply; each rewrite is pure and deterministic
 TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("bridge_sulfano", _bridge_rule("sulfano", "epithio", "(?!ne)")),
@@ -234,6 +244,7 @@ TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("polyester_acyloxy", polyester_twin),
     ("halido_o", halido_twin),
     ("preselected_cage", preselected_cage_twin),
+    ("chalcocarbonic_acid_locant", _acid_locant),
 )
 
 

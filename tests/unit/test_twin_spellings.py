@@ -7,6 +7,8 @@ from orthonym.validation.twin_spellings import TWIN_RULES, twin_of
 pytestmark = pytest.mark.unit
 
 PAIRS = [
+    # (the Blue Book): 'carbamothioic S-acid (PIN)' (:30826); OPSIN 2.9.0 reads the word without the locant
+    ("carbamothioic S-acid", "carbamothioic acid", "chalcocarbonic_acid_locant"),
     # (the Blue Book) preselected 'sulfano'; the PIN example '1,4-dihydro-1,4-
     # sulfanonaphthalene (PIN)' under CYCLIC ETHERS, SULFIDES, SELENIDES AND TELLURIDES (:28063)
     ("1,4-dihydro-1,4-sulfanonaphthalene", "1,4-dihydro-1,4-epithionaphthalene", "bridge_sulfano"),
@@ -102,7 +104,7 @@ def test_the_rules_apply_in_table_order():
     assert [rule for rule, _ in TWIN_RULES] == [
         "bridge_sulfano", "bridge_disulfano", "bridge_azano", "interior_phenalene", "isotope_letter_once",
         "isotope_count_one", "aminiumyl_azaniumyl", "assembly_diyl_enclosed", "polyester_acyloxy", "halido_o",
-        "preselected_cage"]
+        "preselected_cage", "chalcocarbonic_acid_locant"]
 
 
 def test_twin_of_is_pure_and_a_twin_is_not_rewritten_again():
