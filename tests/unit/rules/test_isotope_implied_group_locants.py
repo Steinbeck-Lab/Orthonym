@@ -170,9 +170,33 @@ def test_controls_keep_their_names(smiles, name):
 # tier declines it and best-effort labels it systematic_verified.
 @pytest.mark.parametrize("smiles,name", [
     ("[2H]C([2H])(N([2H])[2H])C(=O)O[2H]", "(2H5)glycine"),
-    ("[2H]C([2H])(N)C(=O)O", "(2,2-2H2)glycine"),
 ])
 def test_labelled_glycine_keeps_its_name_below_pin(smiles, name):
+    # completely labelled: no position is named,:44196), the retained name stays below the PIN
+    from tests.support.default_tier import declined_at_default
+    declined_at_default(smiles, name)
+
+
+def test_a_partly_labelled_glycine_takes_the_systematic_pin():
+    # (inserted 1 December 2021, IUPAC Blue Book corrections): "When the nuclide is located at a position in a
+    # retained name that is not numbered, a systematic name that identifies separately the relevant atom is used for the
+    # IUPAC preferred name"; 'glycine' has no PIN:50943), its systematic name is 'aminoacetic acid' (Table 10.4)
+    assert_pin_at_both_tiers("[2H]C([2H])(N)C(=O)O", "2-amino(2,2-2H2)acetic acid")
+
+
+def test_a_partly_labelled_chiral_amino_acid_takes_the_systematic_pin_with_its_descriptor():
+    # (2021 correction, as above): the label at C-3 of 'L-alanine' (not numbered in the retained name) needs
+    # the systematic name; the CIP descriptor of C-2 is cited on it; was '(3-13C)L-alanine' below the PIN
+    assert_pin_at_both_tiers("[13CH3][C@H](N)C(=O)O", "(2S)-2-amino(3-13C)propanoic acid")
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("[15NH2]CC(=O)O", "(15N)glycine"),
+    ("N[13CH2][13C](=O)O", "(13C2)glycine"),
+])
+def test_a_label_on_every_atom_of_one_element_keeps_the_retained_name_below_pin(smiles, name):
+    # every atom of the labelled element carries the nuclide, so no position is named,:44196) and the
+    # 2021 rule (a nuclide 'at a position... that is not numbered') does not apply: the retained name stays
     from tests.support.default_tier import declined_at_default
     declined_at_default(smiles, name)
 

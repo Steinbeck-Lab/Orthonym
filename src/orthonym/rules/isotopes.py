@@ -25,6 +25,8 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from .isotope_retained_skeleton import retained_skeleton_dropped
+
 from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from . import isotope_oxoacid as _oxoacid
@@ -4596,7 +4598,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # ``_place_on_skeleton``'s re-render restores ``1-methylbenzene``
     # (-> ``1-methyl(2-13C)benzene``). Isotope-path only (a label is always present
     # here); the non-isotope namer that emits plain ``toluene`` is never reached.
-    drop_retained = (pin_name in _ISOTOPE_NONSUBSTITUTABLE_RETAINED
+    drop_retained = (retained_skeleton_dropped(pin_name, style, original, _ISOTOPE_NONSUBSTITUTABLE_RETAINED)
                      and _usable(systematic_name) and pin_name != systematic_name)
 
     # Ordered ``(skeleton, is_pin_pass)`` list: retained/PIN spelling first, but ONLY

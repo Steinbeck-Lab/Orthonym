@@ -422,7 +422,7 @@ def test_rescue_memo_hit_keeps_the_producer_label():
 @pytest.mark.parametrize("smiles,expected", [
     # the descriptor in front of the D/L affix: 'L-(4-13C,35S)methionine'
     #,:44120-44128), which OPSIN 2.9.0 does not read
-    ("[13CH3][C@H](N)C(=O)O", "(3-13C)L-alanine"),
+    # '(3-13C)L-alanine' now takes the systematic PIN '(2S)-2-amino(3-13C)propanoic acid', 2021 correction)
     ("[14CH2]([14C@H]([14C](=O)O)N)S", "(14C3)D-cysteine"),
 ])
 def test_non_pin_spelling_is_labelled_below_the_pin(smiles, expected):
