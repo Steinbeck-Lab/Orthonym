@@ -3054,6 +3054,19 @@ def _is_hydroxy_substituent(mol, sub_atoms: List[int],
             and o.GetDegree() == 1 and o.GetTotalNumHs() == 1)
 
 
+def _is_sulfanyl_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is exactly a neutral -SH on the ring: the suffix -thiol, the chalcogen analogue of
+    -ol in class 17 (the Blue Book)."""
+    if len(sub_atoms) != 1 or sub_atoms[0] != attachment_atom:
+        return False
+    s = mol.GetAtomWithIdx(attachment_atom)
+    # a stereo ring carbon under it: the assembly name writes no ring cis/trans descriptor, the substitutive route does
+    if any(nb.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for nb in s.GetNeighbors()):
+        return False
+    return (s.GetSymbol() == 'S' and s.GetFormalCharge() == 0 and s.GetIsotope() == 0
+            and s.GetDegree() == 1 and s.GetTotalNumHs() == 1)
+
+
 def _ring_assembly_pcg_suffix(mol, sub_atoms: List[int],
                               attachment_atom: int) -> Optional[str]:
     """Classify a ring-assembly substituent as a PRINCIPAL characteristic group
@@ -3077,6 +3090,8 @@ def _ring_assembly_pcg_suffix(mol, sub_atoms: List[int],
         return 'amine'
     if _is_hydroxy_substituent(mol, sub_atoms, attachment_atom):
         return 'ol'
+    if _is_sulfanyl_substituent(mol, sub_atoms, attachment_atom):
+        return 'thiol'
     return None
 
 
@@ -3090,6 +3105,7 @@ _RING_ASSEMBLY_PCG_PREFIX = {
     'carbonitrile': 'cyano',
     'amine': 'amino',
     'ol': 'hydroxy',
+    'thiol': 'sulfanyl',
 }
 
 # Suffix-expressible ring-assembly PCG kind -> its rules.seniority key (so the
@@ -3099,6 +3115,7 @@ _RING_ASSEMBLY_PCG_SENIORITY_KEY = {
     'carbonitrile': 'nitrile',
     'carbaldehyde': 'aldehyde',
     'ol': 'alcohol',
+    'thiol': 'thiol',
     'amine': 'primary_amine',
 }
 

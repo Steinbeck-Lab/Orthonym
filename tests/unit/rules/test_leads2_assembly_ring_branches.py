@@ -134,7 +134,7 @@ def test_a_molecule_outside_the_class_is_not_named_on_the_assembly(smiles):
 
 PCG_AS_PREFIX = [
     ("NC(=O)c1ccc(cc1)-c1ccccc1", "4-carbamoyl-1,1'-biphenyl"),
-    ("Sc1ccc(cc1)-c1ccccc1", "4-sulfanyl-1,1'-biphenyl"),
+    # 'Sc1ccc(cc1)-c1ccccc1' now takes the suffix: '[1,1'-biphenyl]-4-thiol' (test_ring_ol_thiol_parents.py)
 ]
 
 

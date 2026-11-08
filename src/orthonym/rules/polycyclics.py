@@ -408,7 +408,7 @@ def _pah_numbering_anchors(mol, core_atoms: Set[int], principal_group: Optional[
             # suffix-word promotion runs later, ~:1266), so anchor it explicitly
             # -- mirrors the Fix 2 amine carve-out. Whole-class: any senior ring
             # `-ol` on a fused polycyclic bearing a junior prefix.
-            elif sub and ((sub.get('name') == 'hydroxy' and principal_group in _PAH_OL_PRINCIPAL_KEYS)
+            elif sub and ((sub.get('name') == 'hydroxy' and principal_group in _ALCOHOL_CLASS_KEYS - {'thiol'})
                           or (sub.get('name'), principal_group) == ('sulfanyl', 'thiol')):
                 is_pcg = True      # a ring -SH that is the principal group, the same way ('naphthalene-2-thiol')
         if is_attach:
@@ -1449,13 +1449,34 @@ def _identify_pah_functionalized_chain(
     return None
 
 
-def _promote_ring_suffix_words(principal_group, prefix_groups, suffix_groups) -> bool:
+def _ring_hydroxy_outnumbers_branches(mol, substituents, n_ring: int) -> bool:
+    """True when the ring carries ``n_ring`` >= 1 -OH and no side branch holds more alcohol -OH groups the most
+    principal groups, then a ring before a chain: '4-(hydroxymethyl)phenol', not a methanol parent); a branch
+    with a ring that bears an -OH is a ring-against-ring choice this writer does not make (False)."""
+    if not n_ring or mol is None or not substituents:
+        return False
+    for sub_list in substituents.values():
+        for sub in sub_list:
+            atoms = sub.get('atoms') or ()
+            if sub.get('name') == 'hydroxy' or sub.get('is_suffix'):
+                continue
+            ohs = [i for i in atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'O'
+                   and mol.GetAtomWithIdx(i).GetDegree() == 1 and mol.GetAtomWithIdx(i).GetTotalNumHs() == 1]
+            if len(ohs) > n_ring or any(nb.IsInRing() for i in ohs for nb in mol.GetAtomWithIdx(i).GetNeighbors()):
+                return False
+    return True
+
+
+def _promote_ring_suffix_words(principal_group, prefix_groups, suffix_groups, mol=None, substituents=None) -> bool:
     """A ring -OH, -SH or -NH2 that is the principal group becomes the '-ol', '-thiol' or '-amine' suffix when no senior
     suffix is present, in that order classes 17 and 19, the Blue Book,:18192; the chalcogen analogue after
     -OH): 'naphthalen-1-ol (PIN)' (:26819), 'naphthalene-2-thiol', 'naphthalen-2-amine'. False when a ring hydroxy or
     sulfanyl of the principal class is left a prefix with no suffix (an alcohol principal group this writer does not
     express, '9-hydroxy-9H-fluorene'): the caller declines."""
-    for prefix, suffix, principal in (('hydroxy', 'ol', principal_group in _PAH_OL_PRINCIPAL_KEYS),
+    ring_ol = principal_group in _PAH_OL_PRINCIPAL_KEYS or (
+        principal_group in _ALCOHOL_CLASS_KEYS and principal_group != 'thiol'
+        and _ring_hydroxy_outnumbers_branches(mol, substituents, len(prefix_groups.get('hydroxy', ()))))
+    for prefix, suffix, principal in (('hydroxy', 'ol', ring_ol),
                                       ('sulfanyl', 'thiol', principal_group == 'thiol'),
                                       ('amino', 'amine', principal_group in _PAH_AMINE_PRINCIPAL_KEYS)):
         if principal and prefix in prefix_groups and not suffix_groups:
@@ -1614,7 +1635,7 @@ def name_substituted_polycyclic(
     # and the amine promotion is guarded by `not suffix_groups`, so promoting the ol
     # first makes an amino+ol PAH correctly render as `x-aminonaphthalen-y-ol` instead
     # of the previous double-prefix fail-closed.
-    if not _promote_ring_suffix_words(principal_group, prefix_substituent_groups, suffix_groups):
+    if not _promote_ring_suffix_words(principal_group, prefix_substituent_groups, suffix_groups, mol, substituents):
         return None
 
     # Sort locants within each group
