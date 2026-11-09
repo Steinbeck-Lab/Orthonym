@@ -113,6 +113,11 @@ _NON_PIN_CONTROLS = [
 @pytest.mark.parametrize("tier", _TIERS)
 @pytest.mark.parametrize("smiles,name", _NON_PIN_CONTROLS)
 def test_non_pin_controls_name_the_ester(smiles, name, tier):
+    # change-asserted-value (2026-11-09): the strict path now builds these ('rules.esters.name_independent_esters' ->
+    # 'name_polyfunctional_ester_via_acid'), so the same names are certified PINs: (the Blue Book),
+    # the senior ester is the functional class name, the other ester its acyloxy prefix ('phenyl 3-(benzoyloxy)benzoate
+    # (PIN)',:31873); independent check = OPSIN read-back (assert_full_rt); mutation = dropping the via-acid call
+    # restores 'pin_unverified'.
     row = tier_row(smiles, tier)
-    assert (row["name"], row["tier"]) == (name, "pin_unverified"), row
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert_full_rt(row["name"], smiles)
