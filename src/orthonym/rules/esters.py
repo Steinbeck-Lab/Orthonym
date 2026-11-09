@@ -2868,7 +2868,9 @@ def classify_multi_ester(mol, ester_matches: list) -> str:
             ester_oxygens.add(match[2])  # ester oxygen (-O-)
 
         # BFS from c1 to c2, only following C-C bonds, excluding ester oxygens
-        if _carbons_connected(mol, c1, c2, ester_oxygens):
+        # or both carbonyls on one ring system: an ester on a ring nitrogen is a carboxylic acid of the ring too
+        # ('1H-indole-1,5-dicarboxylic acid',, reached through the N, not a C-C path
+        if _carbons_connected(mol, c1, c2, ester_oxygens) or _both_ester_carbonyls_on_ring(mol, ester_matches):
             return "dicarboxylic_diester"
 
     # Polyol polyester detection: multiple ester oxygens connect to a shared
