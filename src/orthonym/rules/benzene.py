@@ -44,7 +44,7 @@ from .hydroximic_acids import (
     name_imidic_on_benzene,
 )
 from ..assembly.straight_alkyl import straight_alkyl_name
-from ..assembly.strict_ring_prefix import acid_is_principal as _below_acid, ketone_or_book_acyl_group as _thioacyl  # -C(=S)-R, then any -C(=O)-R
+from ..assembly.strict_ring_prefix import acid_is_principal as _below_acid, chalcogen_rooted_acyl as _chalcogen_rooted, ketone_or_book_acyl_group as _thioacyl  # -C(=S)-R, then any -C(=O)-R
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
 from .ring_nitrogen_yl import large_substituent_in_scope, n_in_substituent_ring
@@ -2079,7 +2079,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 _acyl_c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 2.0
             for nb in _acyl_c.GetNeighbors()
         )
-        if _has_c_o:
+        if _has_c_o and not _chalcogen_rooted(mol, _acyl_c):   # -NH-CO-S-R: the carbamate prefix below
             sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
             from ..assembly.substituent_naming import (
                 acyl_amido_prefix_from_branch,

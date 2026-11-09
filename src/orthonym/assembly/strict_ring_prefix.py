@@ -648,6 +648,15 @@ class StrictRingPolicy:
         return winners[0]
 
 
+def chalcogen_rooted_acyl(mol, acyl_c) -> bool:
+    """True when the acyl carbon ``acyl_c`` (an Atom) also carries a single-bonded chalcogen: -NH-CO-O-R or -NH-CO-S-R is
+    the carbamate prefix ('[(methylsulfanyl)carbonyl]amino', the Blue Book;
+    ``n_acyl_amido.acylated_n_group``), never an amido prefix ('(methylsulfanyl)methanamido')."""
+    return any(nb.GetSymbol() in ('O', 'S', 'Se', 'Te')
+               and mol.GetBondBetweenAtoms(acyl_c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+               for nb in acyl_c.GetNeighbors())
+
+
 def acid_is_principal(mol) -> bool:
     """True when the principal characteristic group of ``mol`` ranks above the amides (an acid, anhydride, ester or
     acid halide,: an amide of the molecule is then a prefix."""
