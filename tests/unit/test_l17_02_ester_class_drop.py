@@ -338,11 +338,12 @@ def test_the_polyester_builder_cites_different_organyl_groups_in_alphanumerical_
             == "1,1-diethyl 3-methyl butane-1,1,3-tricarboxylate")
 
 
-# (M7) the triester of butane-1,1,3-tricarboxylic acid needs the locants of ('1,1-diethyl 3-methyl
-# butane-1,1,3-tricarboxylate (PIN)',:31783), which the builder does not cite; the name stays an ester-prefixed one
-def test_the_tricarboxylate_with_two_alcohols_keeps_its_valid_name():
+# (M7, closed 2026-11-09) the triester of butane-1,1,3-tricarboxylic acid takes the locants of:
+# '1,1-diethyl 3-methyl butane-1,1,3-tricarboxylate (PIN)' (:31783, verbatim); change-asserted-value: independent check =
+# assert_full_rt (OPSIN), the name is the book's; mutation = dropping rules.mixed_ester_locants restores the old name
+def test_the_tricarboxylate_with_two_alcohols_takes_the_book_pin():
     row = tier_row("CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC", "best-effort")
-    assert not row["is_pin"] and row["tier"] != "abstain", row
+    assert (row["name"], row["tier"]) == ("1,1-diethyl 3-methyl butane-1,1,3-tricarboxylate", "pin_verified"), row
     assert_full_rt(row["name"], "CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC")
 
 

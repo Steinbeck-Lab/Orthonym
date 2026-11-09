@@ -3212,6 +3212,15 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
             mol, principal, ester_data[1:], alkyl_name,
         )
 
+    # (the Blue Book): the senior ester is the functional class name and every other ester a
+    # prefix of its acid ('methyl 2-(acetyloxy)propanoate', as 'phenyl 3-(benzoyloxy)benzoate (PIN)':31873): the acid
+    # analog of the senior ester, named whole with its acyloxy prefixes, then '-ate'
+    carbonyls = [m[0] for m in ester_matches]
+    if all(ester_carbonyls_share_an_acid_parent(mol, carbonyls[0], c) for c in carbonyls[1:]):
+        return name_polyacid_polyester(mol)     # esters of ONE polyacid: 'trimethyl butane-1,1,3-tricarboxylate' (:31781)
+    via_acid = name_polyfunctional_ester_via_acid(mol, tuple(principal['match']), verified_acid=True)
+    if via_acid:
+        return via_acid
     acid_name = get_acid_fragment_name(mol, principal['acid_atoms'])
     if not acid_name:
         return None
