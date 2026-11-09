@@ -5,16 +5,17 @@ from typing import Optional
 
 
 def hydroxy_is_principal(principal_group: Optional[str]) -> bool:
-    """True when the molecule's principal group is a hydroxy or thiol group: a ketone or an
+    """True when the molecule's principal group is a hydroxy, thiol or amine group: a ketone or an
     ester of the ring cannot be the principal group of this naming, so it is a prefix
-    ('4-acetylphenol', '4-(methoxycarbonyl)phenol'). That is the case when the group is
-    the centre of an anion, which 'SENIORITY ORDER FOR CLASSES' (the Blue Book,
-    Table 4.1) ranks above acids and every class below them; in a neutral molecule the
-    ketone or ester would have been the principal group."""
+    ('4-acetylphenol', '4-(methoxycarbonyl)phenol', '4-(methoxycarbonyl)anilinium'). That is the
+    case when the group is the centre of an anion or a cation, which 'SENIORITY ORDER FOR
+    CLASSES' (the Blue Book, Table 4.1, '6 Cations':18169 before '7 Acids') ranks above
+    acids and every class below them; in a neutral molecule the ketone or ester would have been
+    the principal group (an amine ranks below both), so a neutral molecule never meets this."""
     if not principal_group:
         return False
     from .seniority import get_suffix
-    return get_suffix(principal_group, is_ring=True) in ('ol', 'thiol')
+    return get_suffix(principal_group, is_ring=True) in ('ol', 'thiol', 'amine')
 
 
 def pnictogen_oxoacid_prefix(mol, sub_atoms, start_idx: int) -> Optional[str]:

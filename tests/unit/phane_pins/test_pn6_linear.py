@@ -97,14 +97,9 @@ def test_the_default_tier_still_declines_the_silane_and_best_effort_keeps_its_na
     assert "P-44.1.2" in " ".join(f["detail"] for f in row["spelling_failures"])
 
 
-_SUBSTITUENT_SENTINEL = ("the substituent namer gives the 'substituent' sentinel for a chloro- or bromonaphthalenyl "
-                         "fragment, so the prefix block is not built")
-
-
-@pytest.mark.parametrize("line,name,smiles", [
-    pytest.param(*row, marks=pytest.mark.xfail(strict=False, reason=_SUBSTITUENT_SENTINEL)) if row[0] != "21631" else row
-    for row in substituted("compound_prefix")
-], ids=lambda v: str(v)[:30])
+# the xfail of the chloro-/bromonaphthalenyl rows (the substituent namer gave the 'substituent' sentinel) is lifted:
+# every row passes (re-probed 2026-11-09)
+@pytest.mark.parametrize("line,name,smiles", substituted("compound_prefix"), ids=lambda v: str(v)[:30])
 def test_book_compound_prefix_names(line, name, smiles):
     # (:21604) the parent has the maximum number of prefixes: the naphthalene with the chloro group is the
     # chain, the other naphthalene a substituent (:21631)

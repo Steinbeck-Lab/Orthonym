@@ -69,18 +69,6 @@ class TestRetainedNameMultiplierTransitions:
                 "P-14.2.1 + AUTONOM section 10 - acetoxy multiplier transition",
                 marks=[
                     pytest.mark.integration,
-                    pytest.mark.xfail(
-                        reason=(
-                            "Phase 154 IM-150-T1: prefixes.py emits 'bis(acetyloxy)' "
-                            "instead of 'diacetoxy' - retained acetoxy substituent "
-                            "form not wired through multiplicative.py. Per CONTEXT "
-                            "D-12 documents pre-existing assembly behavior; Phase "
-                            "154 closes multiplicative.py + ester-O-acyl substituent "
-                            "renderer. Source: 150-CONTEXT.md D-12 + 150-RESEARCH.md "
-                            "section 7.2."
-                        ),
-                        strict=False,
-                    ),
                 ],
             ),
             # T-2: bis(carbamoyl) -> dicarbamoyl (carbamoyl is a HC retained substituent)
@@ -149,17 +137,6 @@ class TestRetainedNameMultiplierTransitions:
                 "P-14.5.1 + P-14.5.2 - alphabetization first-letter (acetoxy < bromo)",
                 marks=[
                     pytest.mark.integration,
-                    pytest.mark.xfail(
-                        reason=(
-                            "Phase 154 IM-150-T1 (downstream): same root cause as "
-                            "T-1 ('bis(acetyloxy)' instead of 'diacetoxy'); the "
-                            "alphabetization check cannot run because the "
-                            "expected 'diacet' substring is not in the output. "
-                            "Source: 150-CONTEXT.md D-12 + 150-RESEARCH.md "
-                            "section 7.2."
-                        ),
-                        strict=False,
-                    ),
                 ],
             ),
             # T-5: Phase-150-imported retained name triggers di- form

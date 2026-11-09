@@ -292,8 +292,7 @@ class TestStereoFormatMultiCenter:
     limitation, not a format issue.
     """
 
-    @pytest.mark.xfail(reason="OPSIN limitation: multi-center stereo on VB parent")
-    def test_tricyclo_multi_stereo(self):
+    def test_tricyclo_multi_stereo(self):   # the xfail (OPSIN multi-centre stereo on a VB parent) is lifted: it passes
         """Compound #5: (2R,6R,13E)-4-methyl-9-aza-tricyclo[...]
         3-center stereo on polycyclic VB parent.
         """

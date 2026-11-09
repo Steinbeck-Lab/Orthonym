@@ -2117,7 +2117,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # Credit the previous iteration with its atoms when it emitted a prefix.
         if _fg_iter_mark is not None and len(all_prefixes) > _fg_iter_mark[0]:
             _fg_prefix_atoms.update(_fg_iter_mark[1])
-        _fg_iter_mark = (len(all_prefixes), {a for _m in matches for a in _m})
+        _fg_iter_mark = (len(all_prefixes), _credited_fg_atoms(mol, fg_name, matches, chain_set))
 
         # When chain is parent, separate FGs on ring from FGs on chain
         _cont, matches = _group_on_chain_parent(chain_set, features, fg_name, matches, mol, ring_fg_groups)
@@ -3401,6 +3401,58 @@ def _acid_linked_poly_branch(mol, sub_atoms, features, check_fg_link: bool,
         acyl_carbon=acyl_carbon)
 
 
+#: an ester written as an alkoxycarbonyl prefix: the carbonyl carbon, its =O and the alkoxy oxygen
+_ESTER_C_O_O = None
+
+
+def _credited_fg_atoms(mol, fg_name, matches, chain_set) -> set:
+    """The atoms a prefix of ``fg_name`` names when the FG loop emits one: the atoms of the matches, and for an ester the
+    whole alkoxy side when it lies off the principal chain (the 'ethoxycarbonyl' of '3-(ethoxycarbonyl)pentanedioic
+    acid' names the ethyl too; the match stops one atom into it, so the substituent walk named the branch again as a
+    phantom '(hydroxymethyl)' and the producer built another molecule). An acyloxy ester (the alkoxy side is the chain)
+    keeps its match atoms."""
+    global _ESTER_C_O_O
+    atoms = {a for m in matches for a in m}
+    if fg_name != 'ester':
+        return atoms
+    try:
+        from rdkit import Chem
+        if _ESTER_C_O_O is None:
+            _ESTER_C_O_O = Chem.MolFromSmarts("[CX3](=[OX1])[OX2][#6]")
+        for carbon, _o, oxygen, _alkyl in mol.GetSubstructMatches(_ESTER_C_O_O):
+            if not ({carbon, oxygen} <= atoms):
+                continue
+            side, todo = {oxygen}, [oxygen]
+            while todo:
+                for nb in mol.GetAtomWithIdx(todo.pop()).GetNeighbors():
+                    k = nb.GetIdx()
+                    if k != carbon and k not in side:
+                        side.add(k)
+                        todo.append(k)
+            if not side & set(chain_set):
+                atoms |= side
+    except Exception:  # noqa: BLE001 -- not read: the match atoms only, as before
+        return {a for m in matches for a in m}
+    return atoms
+
+
+def _alkoxycarbonyl_branch_named(mol, sub_atoms, chain_set, fg_proven) -> bool:
+    """True when the branch hangs on the chain by an ester carbonyl carbon (an 'alkoxycarbonyl' prefix) and the FG loop
+    named all of it (``_credited_fg_atoms``): the walk must not name it a second time ('3-(ethoxycarbonyl)-3-
+    (hydroxymethyl)...'). Other branches keep the walk (the credit is per loop iteration, not per prefix)."""
+    if fg_proven is None or not set(sub_atoms) <= fg_proven:
+        return False
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or not any(nb.GetIdx() in chain_set for nb in atom.GetNeighbors()):
+            continue
+        double_o = any(b.GetBondTypeAsDouble() == 2.0 and b.GetOtherAtom(atom).GetSymbol() == 'O' for b in atom.GetBonds())
+        ester_o = any(b.GetBondTypeAsDouble() == 1.0 and b.GetOtherAtom(atom).GetSymbol() == 'O'
+                      and b.GetOtherAtom(atom).GetDegree() == 2 for b in atom.GetBonds())
+        return double_o and ester_o
+    return False
+
+
 def _fg_loop_named_branch(sub_set, fg_set, fg_proven) -> bool:
     """True when the branch *sub_set* lies inside the functional-group match *fg_set* and the FG-prefix loop
     EMITTED a prefix for it (``fg_proven``: the atoms of the matches the loop named; None = no record kept).
@@ -3740,14 +3792,14 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 for idx in sub_atoms
             )
 
+            if has_heteroatom and _alkoxycarbonyl_branch_named(mol, sub_atoms, set(features.principal_chain or ()), _fg_proven): continue  # noqa: E701
             if has_heteroatom:
                 from ..assembly.composer import (
                     _check_for_acylamino,
                     _check_for_acyloxy,
                     _name_heteroatom_substituent,
                 )
-                # NOTE: Do NOT check alkoxy here - ethers are already handled
-                # by the FG prefix system in name_polyfunctional
+                # NOTE: no alkoxy check here: the FG prefix system of name_polyfunctional names the ethers
                 het_name = _check_for_acylamino(mol, sub_atoms, features.principal_chain)
                 if not het_name and not skip_acyloxy:
                     het_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
