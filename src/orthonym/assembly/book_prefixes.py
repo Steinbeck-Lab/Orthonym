@@ -472,6 +472,54 @@ def acyl_group_prefix(mol, carbonyl_c: int, parent_idx: int, acyl_atoms,
     return out
 
 
+def _hydrazine_second_nitrogen(mol, parts) -> bool:
+    """True when the one N-rooted part of the amide N is the second nitrogen of a hydrazine: acyclic, neutral, not
+    labelled, its bonds single but for at most one C=N (a hydrazone). An N=O (nitroso,:36415, named on
+    'amino': '(nitrosocarbamoyl)'), an N=N (diazenyl) or a ring N is no hydrazine of this acid and keeps the carbamoyl
+    form."""
+    from rdkit import Chem
+    second = [p[0] for p in parts if mol.GetAtomWithIdx(p[0]).GetSymbol() == "N"]
+    if len(second) != 1:
+        return False
+    a2 = mol.GetAtomWithIdx(second[0])
+    if a2.IsInRing() or a2.GetFormalCharge() or a2.GetIsotope() or a2.GetNumRadicalElectrons():
+        return False
+    multiple = [b for b in a2.GetBonds() if b.GetBondType() != Chem.BondType.SINGLE]
+    return not multiple or (len(multiple) == 1 and multiple[0].GetBondType() == Chem.BondType.DOUBLE
+                            and multiple[0].GetOtherAtom(a2).GetSymbol() == "C")
+
+
+def _hydrazinecarbonyl_prefix(mol, n1: int, parts, name_part) -> Optional[str]:
+    """The acyl prefix of -CO-N(R)-N(R')R'' (the amide N ``n1`` bonded to a second acyclic N), or ``None``.
+
+     Substituent groups derived from hydrazides (the Blue Book-33990): -CO-NH-NH2 is named "(1) as an
+    acyl group derived from the corresponding acid, which gives the preferred prefix": 'hydrazinecarbonyl (preferred
+    prefix)', not '(aminocarbamoyl)'. The acid of a substituted group is numbered 1 and 2 from the carbonyl
+     :38507, 'not N and N''), so its acyl group is '(2-methylhydrazine-1-carbonyl)', and a hydrazone
+    carbon on the second N is its ylidene prefix, '2-(propan-2-ylidene)hydrazine-1-carboxamide (PIN)' (:5096). A third
+    N (a triazane) is declined. ``parts`` holds the one second nitrogen of:func:`_hydrazine_second_nitrogen`."""
+    from ..rules.inorganic_acids import _hzc_assemble_prefix, _hzc_branch_atoms
+    from .prefix_derivation import built
+    n2, n2_atoms = next(p for p in parts if mol.GetAtomWithIdx(p[0]).GetSymbol() == "N")
+    a2 = mol.GetAtomWithIdx(n2)
+    subs = []
+    for root, atoms in [p for p in parts if p[0] != n2]:
+        subs.append(('1', name_part(atoms, root)))
+    for nb in a2.GetNeighbors():
+        j = nb.GetIdx()
+        if j == n1 or nb.GetAtomicNum() <= 1:
+            continue
+        branch = _hzc_branch_atoms(mol, j, {n2})
+        if nb.GetSymbol() == "N" or not branch <= set(n2_atoms):
+            return None
+        subs.append(('2', name_part(branch, j)))
+    if any(not nm for _, nm in subs):
+        return None
+    if not subs:   # a compound prefix, cited in marks: '[(hydrazinecarbonyl)oxy]formohydrazide' (:34111)
+        return built("hydrazinecarbonyl", substituted=False, enclosed=True)
+    return built(f"{_hzc_assemble_prefix(subs)}hydrazine-1-carbonyl", substituted=True, enclosed=True)
+
+
 def _acyl_group_prefix(mol, carbonyl_c: int, parent_idx: int, acyl_atoms,
                        name_part) -> Optional[str]:
     """The book's prefix of the acyl group whose carbonyl carbon ``carbonyl_c`` (one
@@ -606,6 +654,8 @@ def _acyl_group_prefix(mol, carbonyl_c: int, parent_idx: int, acyl_atoms,
         if not parts:
             return (built("carbamoyl", substituted=False, enclosed=False)
                     if rest == {yi} else None)
+        if _hydrazine_second_nitrogen(mol, parts):
+            return _hydrazinecarbonyl_prefix(mol, yi, parts, name_part)
         names = []
         for p_attach, p_atoms in parts:
             nm = name_part(p_atoms, p_attach)

@@ -77,13 +77,16 @@ _FREE_ACID = Chem.MolFromSmarts("[$(*=[O,S])][OX2H1,OX1-]")
 def _hydrazine_unit_ok(mol, n1: int, n2: int, c_idx: int) -> bool:
     """The hydrazine of a hydrazinecarboxylate: each nitrogen bound by single bonds to carbon (or hydrogen) only, apart
     from the N-N bond and the carbonyl. An N=O ('nitrous amide', the Blue Book), an N=N or a third nitrogen (a
-    triazane is the longer parent, 'tetraazane-1-carboxylic acid (PIN)',:24910) is no unit of this name."""
+    triazane is the longer parent, 'tetraazane-1-carboxylic acid (PIN)',:24910) is no unit of this name. The second
+    nitrogen may carry a C=N double bond (a hydrazone), cited as a ylidene prefix as on the carboxamide of the same acid,
+    '2-(propan-2-ylidene)hydrazine-1-carboxamide (PIN)' (:5096)."""
     for idx, other in ((n1, n2), (n2, n1)):
         for b in mol.GetAtomWithIdx(idx).GetBonds():
             nb = b.GetOtherAtom(mol.GetAtomWithIdx(idx))
             if nb.GetIdx() in (other, c_idx):
                 continue
-            if nb.GetSymbol() != 'C' or b.GetBondType() != Chem.BondType.SINGLE:
+            ylidene = idx == n2 and b.GetBondType() == Chem.BondType.DOUBLE
+            if nb.GetSymbol() != 'C' or (b.GetBondType() != Chem.BondType.SINGLE and not ylidene):
                 return False
     return True
 

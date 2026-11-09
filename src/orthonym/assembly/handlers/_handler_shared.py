@@ -272,7 +272,7 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
             _terms.append(
                 f"{render_locants(_locs)}-{_mult}{_REPL[_sym]}"
             )
-        stem = ''.join(_terms) + stem
+        stem = '-'.join(_terms) + stem   # '3,12-dioxa-6-thia-9-azatetradecane' (the Blue Book)
 
     # Get bond locants if we have atom_to_locant mapping
     double_locants = []

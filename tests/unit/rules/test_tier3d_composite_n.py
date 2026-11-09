@@ -52,7 +52,10 @@ class TestHydrazideNNPrefixes:
         ("CNNC(=S)C", "N'-methylethanethiohydrazide"),
         # hydrazinecarboxylic acid — carbamic_acid SMARTS tightened
         ("NNC(=O)O", "hydrazinecarboxylic acid"),
-        ("CNNC(=O)O", "N'-methylhydrazinecarboxylic acid"),
+        # Hydrazine and derivatives (the Blue Book): 'As a parent hydride, hydrazine is numbered by
+        # numerical locants, 1 and 2, not N and N''. change-asserted-value: independent check = OPSIN read-back
+        # (pin_verified); mutation = the old N/N' branch of composer._assemble_hydrazide_name fails this row.
+        ("CNNC(=O)O", "2-methylhydrazine-1-carboxylic acid"),
     ])
     def test_hydrazide_nn(self, smiles, expected):
         assert name_compound(smiles) == expected

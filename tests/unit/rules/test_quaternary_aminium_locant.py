@@ -144,6 +144,10 @@ def test_quaternary_aminium_regressions_unchanged(smiles, expected):
     ("CC[N+](C)(C)c1ccccc1", "N-ethyl-N,N-dimethylanilinium"),  # mixed N-substituents
     ("C[N+](C)(C)c1ccc2ccccc2c1", "N,N,N-trimethylnaphthalen-2-aminium"),
     ("C[N+](C)(C)c1ccncc1", "N,N,N-trimethylpyridin-4-aminium"),  # heteroaromatic ring
+    # a parent that begins with a locant is joined by a hyphen:3477, 'a name-part is separated from a
+    # following locant'); it was 'N,N,N-trimethyl2,1,3-benzothiadiazol-5-aminium', and the PIN tier declined it
+    ("C[N+](C)(C)C1=CC2=NSN=C2C=C1", "N,N,N-trimethyl-2,1,3-benzothiadiazol-5-aminium"),
+    ("C[N+](C)(C)c1ccc2[nH]ccc2c1", "N,N,N-trimethyl-1H-indol-5-aminium"),
 ])
 def test_aryl_quaternary_aminium_now_built(smiles, expected):
     """Task 8B RC2, the Blue Book): aryl-quaternary-N ->...anilinium."""

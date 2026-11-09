@@ -102,9 +102,14 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     from ..carbazate_names import hydrazine_second_nitrogen
     ring_carboxylic = bool(matches) and (mol.GetAtomWithIdx(n_idx).IsInRing()
                                          or hydrazine_second_nitrogen(mol, n_idx, c_idx) is not None)
+    # a lactone is a heterocyclic pseudoketone, not an ester "Lactones", the Blue Book, method (1)
+    # "as heterocyclic pseudoketones by adding the suffix 'one'"): 'tert-butyl 1-oxo-2-oxa-8-azaspiro[4.5]decane-8-
+    # carboxylate', as its thiolactone twin already is
+    if pg == 'ester' and fgs.get('ester') and all(_is_lactone(mol, m[0]) for m in fgs['ester']):
+        pg = 'ketone'
     try:
         if seniority_index(pg, mol, getattr(features, 'principal_group_atoms', None)) <= SENIORITY_ORDER.index('ester') \
-                and not (ring_carboxylic and _junior_to_ring_n_carboxylic(pg)):
+                and not (ring_carboxylic and (_junior_to_ring_n_carboxylic(pg) or _senior_ring_n_ester(mol, pg, c_idx))):
             return False
     except ValueError:
         return False
@@ -118,10 +123,11 @@ def _carbamate_ranks_above_principal(features: Any, pg: str) -> bool:
     carbamate_rank = ester_acid_rank('carbamate')
     for name, found in fgs.items():
         rank = ester_acid_rank(name)
-        if ring_carboxylic and _junior_to_ring_n_carboxylic(name):
+        if ring_carboxylic and (_junior_to_ring_n_carboxylic(name) or _senior_ring_n_ester(mol, name, c_idx)):
             continue
         if rank is not None and rank < carbamate_rank and any(
-                m[0] != c_idx and not _is_carbamoyl_carbon(mol, m[0]) for m in found or ()):
+                m[0] != c_idx and not _is_carbamoyl_carbon(mol, m[0]) and not _is_lactone(mol, m[0])
+                for m in found or ()):
             return False
     c_atom = mol.GetAtomWithIdx(c_idx)
     ester_x = [nb.GetIdx() for nb in c_atom.GetNeighbors()
@@ -147,6 +153,28 @@ def _junior_to_ring_n_carboxylic(fg_name: str) -> bool:
     piperidin-4-yl methanesulfonate')."""
     from ...rules.seniority import ester_acid_rank
     return ester_acid_rank(fg_name) == 0 and fg_name not in _CARBOXYLIC_OXYGEN_ESTERS
+
+
+def _senior_ring_n_ester(mol, fg_name: str, c_idx: int) -> bool:
+    """True when ``fg_name`` is a carboxylic oxygen ester and the ring-nitrogen ester at ``c_idx`` outranks every such
+    ester of the molecule by the seniority of its parent, 'phenyl 3-(benzoyloxy)benzoate (PIN)',
+    the Blue Book; the ring is senior to the chain,: 'tert-butyl 4-(acetyloxy)piperidine-1-
+    carboxylate', not '1-(tert-butoxycarbonyl)piperidin-4-yl acetate'."""
+    if fg_name not in _CARBOXYLIC_OXYGEN_ESTERS:
+        return False
+    from ...decomposition.ester_in_alcohol import ring_n_ester_is_senior
+    return ring_n_ester_is_senior(mol, c_idx)
+
+
+def _is_lactone(mol, idx: int) -> bool:
+    """True when the carbonyl carbon ``idx`` and its single-bonded oxygen share a ring: an intramolecular ester (a
+    lactone), named as a heterocyclic pseudoketone, the Blue Book), not as an ester."""
+    atom = mol.GetAtomWithIdx(idx)
+    if not atom.IsInRing():
+        return False
+    rings = [set(r) for r in mol.GetRingInfo().AtomRings() if idx in r]
+    return any(nb.GetSymbol() == 'O' and mol.GetBondBetweenAtoms(idx, nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+               and any(nb.GetIdx() in r for r in rings) for nb in atom.GetNeighbors())
 
 
 def _is_carbamoyl_carbon(mol, idx: int) -> bool:

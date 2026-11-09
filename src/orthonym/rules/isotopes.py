@@ -1642,6 +1642,7 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
     # A bare letter only where ``rules.isotope_letters`` allows it,,: the
     # atoms it could denote are one symmetry class (a possibility of isomers otherwise); else the numbered form.
     from .isotope_letters import acid_hydroxyl_takes_letter, bare_letter_allowed, geminal_nitrogen_letters
+    from .isotope_letters import nitrogen_letter_offer
     bare_n = bare_letter_allowed(original, "N")
     bare_o = bare_letter_allowed(original, "O")
     out: List[str] = []
@@ -1653,17 +1654,7 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
         nbrs = atom.GetNeighbors()
         if (nbrs and nbrs[0].GetSymbol() == "N" and not nbrs[0].GetIsAromatic()
                 and not nbrs[0].IsInRing()):
-            if numbered or not bare_n:
-                #: several nitrogens, or one the bare letter may not cite -> the numbered
-                # locant. Offer every numeral the parent could assign (1..n_pos), ascending, so the
-                # lowest round-tripping one wins.
-                for i in range(1, n_pos + 1):
-                    tag = f"N{i}"
-                    if tag not in out:
-                        out.append(tag)
-            if bare_n and "N" not in out:
-                #: a single nitrogen keeps the bare italic ``N`` (last where numbered).
-                out.append("N")
+            out.extend(nitrogen_letter_offer(skeleton, numbered, bare_n, n_pos, out))
     out.extend(geminal_nitrogen_letters(skeleton, out))     # N, N' of a geminal parent,
     # italic ``O`` locant: a labelled O on the HYDROXYL oxygen of a
     # carboxyl group (the single-bonded, degree-1 ``-OH``, NOT the ``=O``). It is

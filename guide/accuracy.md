@@ -22,7 +22,7 @@ The table gives both for the same molecules. It is Orthonym 1.0.9 with the chang
 |:--|--:|--:|--:|--:|--:|--:|--:|
 | Held-out ChEBI 2,000 | 2,000 | 1,994 (99.70 %) | 1,254 (62.70 %) | 5 | 732 | 1 | 14 |
 | ChEBI development 2,000 | 2,000 | 1,993 (99.65 %) | 1,250 (62.50 %) | 4 | 733 | 3 | 17 |
-| Drug-like PubChem 2,000 | 2,000 | 1,961 (98.05 %) | 1,039 (51.95 %) | 39 | 946 (+1 timeout) | 0 | 14 |
+| Drug-like PubChem 2,000 | 2,000 | 1,961 (98.05 %) | 1,040 (52.00 %) | 39 | 945 (+1 timeout) | 0 | 14 |
 
 Each tier's columns add up to Molecules. Named: the name read back to the input's full InChIKey; the percentage is of Molecules. Declined: no name, with a reason. A timeout (naming one molecule did not finish within the 60 seconds the harness allows) is also no name and counts as a miss. Unreadable: the engine emitted a name that OPSIN 2.9.0 cannot read, so it does not count as named. These are the documented exceptions of [Output tiers](tiers.md): at the PIN-only tier, for example, a PIN spelling that OPSIN's grammar lacks or a PIN with stereodescriptors OPSIN cannot read; at the default, a name with stereodescriptors OPSIN cannot read for a molecule that has no other name. Wrong structures, a name that reads back to a different molecule: none in any cell.
 

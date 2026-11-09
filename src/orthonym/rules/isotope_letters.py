@@ -55,6 +55,46 @@ _GEMINAL_NITROGENS_RE = re.compile(
     r"(?:methane|(?<![\d,])(\d+),\1-)(?:di|tri)(?:amine|imine|amide|carboxamide)")
 
 
+_HYDRAZIDE_PARENT_RE = re.compile(r"hydrazide$")
+_HYDRAZINE_PARENT_RE = re.compile(r"hydrazine(?:-1-)?carboxylic acid$|hydrazine(?:-1-)?carboxylate$")
+
+
+def hydrazine_nitrogen_letters(skeleton: Optional[str]) -> Optional[List[str]]:
+    """The letter locants of the nitrogens of a hydrazide or hydrazine parent, or None for any other skeleton.
+
+    A hydrazide cites its nitrogens N (bonded to the acyl carbon) and N', 'N'-methylacetohydrazide'); never
+    the numbers N1, N2 of the di- and polyamides, the Blue Book). The parent hydride hydrazine "is
+    numbered by numerical locants, 1 and 2, not N and N'",:38507), so a hydrazinecarboxylic acid takes
+    no letter at all (): the numerals of the integer sweep place its labels ('2-methyl(1-2H)hydrazine-1-carboxylic
+    acid')."""
+    if skeleton is None:
+        return None
+    if _HYDRAZIDE_PARENT_RE.search(skeleton):
+        return ["N", "N'"]
+    if _HYDRAZINE_PARENT_RE.search(skeleton):
+        return []
+    return None
+
+
+def nitrogen_letter_offer(skeleton: Optional[str], numbered: bool, bare_n: bool, n_pos: int,
+                          offered: List[str]) -> List[str]:
+    """The letter locants offered for a labelled hydrogen on a non-ring nitrogen, those not in ``offered`` yet.
+
+    A hydrazide or hydrazine parent takes its own locants (:func:`hydrazine_nitrogen_letters`). Otherwise:
+    several nitrogens, or one the bare letter may not cite, take the numbered locant, every numeral the parent could
+    assign (1..n_pos) ascending so the lowest round-tripping one wins;: a single nitrogen keeps the bare
+    italic ``N`` (last where numbered)."""
+    tags = hydrazine_nitrogen_letters(skeleton)
+    if tags is None:
+        tags = [f"N{i}" for i in range(1, n_pos + 1)] if numbered or not bare_n else []
+        tags += ["N"] if bare_n else []
+    out: List[str] = []
+    for tag in tags:
+        if tag not in offered and tag not in out:
+            out.append(tag)
+    return out
+
+
 def geminal_nitrogen_letters(skeleton: Optional[str], offered: List[str]) -> List[str]:
     """The letter locants ``N``, ``N'``, ``N''`` a skeleton with a geminal nitrogen suffix cites its nitrogens
     by, for a caller that offers letters already (``offered``): those of them it does not offer yet. Offered

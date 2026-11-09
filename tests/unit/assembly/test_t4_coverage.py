@@ -108,7 +108,8 @@ def test_universal_floor_names_former_unroutable_carbamate():
     and the floor rung is locked with a molecule only the floor converts: the carbazate
     ``CC(O)COC(=O)NN`` (cid 3017679) -- rungs 0-2 decline, and the candidate is the floor's
     (``final_floor``), coverage-complete and carrying no ``result_obj`` (verified downstream by
-    ). Its name '1-[(aminocarbamoyl)oxy]-2-hydroxypropane' is OPSIN 2.9.0 round-trip exact.
+    ). Its name '1-[(hydrazinecarbonyl)oxy]-2-hydroxypropane' is OPSIN 2.9.0 round-trip exact
+    ('hydrazinecarbonyl (preferred prefix)',:33990).
     """
     mol, feats = _classified("C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl")
     name = t4_coverage.name_t4_complete(mol, feats)
@@ -117,7 +118,7 @@ def test_universal_floor_names_former_unroutable_carbamate():
     mol, feats = _classified("CC(O)COC(=O)NN")
     assert t4_coverage._run_general_e1(mol, feats) is None, "rung 0 must decline: not floor-only"
     name = t4_coverage.name_t4_complete(mol, feats)
-    assert name == "1-[(aminocarbamoyl)oxy]-2-hydroxypropane", name
+    assert name == "1-[(hydrazinecarbonyl)oxy]-2-hydroxypropane", name
     cand = t4_coverage._best_effort_candidate(mol, feats)
     assert cand is not None and cand.result_obj is None and cand.final_floor, (
         "the universal floor rung carries no result_obj (like polyol-polyester)")
