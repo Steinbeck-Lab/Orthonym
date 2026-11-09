@@ -33,9 +33,9 @@ ROWS = [
     # a heteroatom or hydrazine-like substituent of the engine's own spelling
     # the hydrazinyl unit cites its locants, the Blue Book; '3-[2-(hydrazinecarbonyl)hydrazin-1-yl]
     # propanoic acid',:38712, is the book's second spelling of this group, the PIN prefix is
-    # 'hydrazinecarbohydrazido'): a non-PIN name, '(aminocarbamoyl)' is the fragment namer's spelling of
-    # H2N-NH-CO- (UNVERIFIED: not the book's 'hydrazinecarbonyl'); was '(hydrazinecarboxamidoamino)'
-    ("NNC(=O)NNCC(=O)O", "[2-(aminocarbamoyl)hydrazin-1-yl]acetic acid"),
+    # 'hydrazinecarbohydrazido'): a non-PIN name; H2N-NH-CO- is 'hydrazinecarbonyl (preferred prefix)'
+    #:33990; was '(aminocarbamoyl)', before that '(hydrazinecarboxamidoamino)')
+    ("NNC(=O)NNCC(=O)O", "[2-(hydrazinecarbonyl)hydrazin-1-yl]acetic acid"),
     ("NNC=NNCC(=O)O", "({[(aminoamino)methylidene]amino}amino)acetic acid"),
     ("COS(=O)OS(=O)OS(=O)OCC(=O)O", "{[({[(methoxysulfinyl)oxy]sulfinyl}oxy)sulfinyl]oxy}acetic acid"),
     # dev2000 / rows

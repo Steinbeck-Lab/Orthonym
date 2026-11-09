@@ -630,8 +630,8 @@ _UNLOCANTED_RING_SUFFIX = re.compile(
 # hydride ('...propyl)benzene', '...-2-oxopyrrolidine', '...-4,5-dihydro-1,3-
 # thiazole') -- has no principal characteristic group, so none of its prefixes may
 # denote a group that a suffix expresses (hydroxy -> -ol, oxo -> -one, amino /
-# anilino -> -amine, imino -> -imine, amido / carbamoyl -> -amide, cyano ->
-# -nitrile, formyl -> -al, carboxy -> -oic acid): '(2-acetamidopropyl)benzene' is not
+# anilino -> -amine, imino -> -imine, amido / carbamoyl -> -amide, hydrazinecarbonyl ->
+# -carbohydrazide (:17472 "carbohydrazide (preferred suffix)"), cyano -> -nitrile, formyl -> -al, carboxy -> -oic acid): '(2-acetamidopropyl)benzene' is not
 # the PIN of N-(1-phenylpropan-2-yl)acetamide. 'isocyano' (a prefix-only class) and
 # ring names that merely contain 'oxo' ('1,3-dioxolane', '1,5-dioxocane') are not
 # matched; names with a functional-class word (a space) are not read.
@@ -641,7 +641,7 @@ _NOT_PARENT_HYDRIDE_END = re.compile(
     r"|ylidene|ylidyne|ylene)$")
 _SUFFIX_GROUP_PREFIX = re.compile(
     r"hydroxy|(?<![a-z])(?:\d+(?:,\d+)*-)?(?:di|tri|tetra|penta|hexa)?oxo(?!l|c|n[ai]n)"
-    r"|amino|anilino|imino|amido|carbamoyl|(?<!iso)cyano|formyl|carboxy")
+    r"|amino|anilino|imino|amido|carbamoyl|hydrazine(?:-1-)?carbonyl|(?<!iso)cyano|formyl|carboxy")
 
 
 def _suffix_group_on_parent_hydride(name: str) -> Optional[str]:

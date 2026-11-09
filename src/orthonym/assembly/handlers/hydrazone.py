@@ -24,9 +24,15 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_hydrazone(features: Any) -> bool:
     """Mirrors composer.py:785 (``features.principal_group == 'hydrazone'``).
 
-    Pure read-only per internal notes / -26.
+    Pure read-only per internal notes / -26. A carbamate ester outranks the hydrazone, class 9
+    "Esters", the Blue Book, before the hydrazine derivatives): the carbazate hydrazone R-O-CO-NH-N=CR2 is the
+    ester 'tert-butyl 2-(propan-2-ylidene)hydrazine-1-carboxylate', named by the carbamate handler, as the amide of the
+    same acid is '2-(propan-2-ylidene)hydrazine-1-carboxamide (PIN)' (:5096).
     """
-    return getattr(features, 'principal_group', None) == 'hydrazone'
+    if getattr(features, 'principal_group', None) != 'hydrazone':
+        return False
+    from .carbamate import _is_carbamate
+    return not _is_carbamate(features)
 
 
 def name_hydrazone(

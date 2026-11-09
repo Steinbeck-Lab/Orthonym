@@ -13,7 +13,8 @@ pytestmark = pytest.mark.opsin_gate
 
 @pytest.mark.parametrize("smiles,expected", [
     ("OC(=O)c1cc2ccccc2cc1CC(=O)O", "3-(carboxymethyl)naphthalene-2-carboxylic acid"),
-    ("OC(=O)c1cc2ccccc2cc1C(=O)NN", "3-(aminocarbamoyl)naphthalene-2-carboxylic acid"),
+    # (the Blue Book): 'hydrazinecarbonyl (preferred prefix)', not 'aminocarbamoyl'
+    ("OC(=O)c1cc2ccccc2cc1C(=O)NN", "3-(hydrazinecarbonyl)naphthalene-2-carboxylic acid"),
 ])
 def test_best_effort_spells_the_fusion_parent(smiles, expected):
     row = tier_row(smiles, "best-effort")

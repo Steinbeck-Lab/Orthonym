@@ -6227,15 +6227,15 @@ def _assemble_hydrazide_name(features: Any, style: str):
 
     # --- hydrazinecarboxylic acid (no R carbon; C = OH-bearing acid) ---
     if r_carbon is None and dbl_o == 1 and oh_o == 1 and dbl_s == 0:
-        # N = the N bonded to the C (inner); N' = the terminal N.
+        # (the Blue Book): 'As a parent hydride, hydrazine is numbered by numerical locants, 1 and
+        # 2, not N and N''; 1 = the N bonded to the acid C, as in 'N,1-dimethylhydrazine-1-carboxamide (PIN)' (:38637).
         inner_subs, _ = _hydrazide_n_sub_names(mol, n_inner, core)
         term_subs, _ = _hydrazide_n_sub_names(mol, n_term, core)
+        from ..rules.inorganic_acids import _hzc_assemble_prefix
         if inner_subs is None or term_subs is None:
             return None
-        prefix = _format_hydrazide_nn_prefix(inner_subs, term_subs)
-        if prefix is None:
-            return None
-        return f"{prefix}hydrazinecarboxylic acid"
+        subs = [('1', nm) for nm in inner_subs] + [('2', nm) for nm in term_subs]
+        return f"{_hzc_assemble_prefix(subs)}hydrazine-1-carboxylic acid" if subs else "hydrazinecarboxylic acid"
 
     # --- (thio)hydrazide: needs an R carbon (the acyl/thioacyl parent) ---
     if r_carbon is None:

@@ -3651,7 +3651,11 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple,
     # Reject garbled stems (empty / bare-suffix artefacts).
     if len(ate) < 4 or ate.startswith("ano"):
         return None
-    return f"{alkyl_name} {ate}"
+    #: a ring-nitrogen ester of the alcohol part outranks the ester the name is built on ('tert-butyl
+    # 4-(acetyloxy)piperidine-1-carboxylate', not '1-(tert-butoxycarbonyl)piperidin-4-yl acetate'): label below the PIN
+    from ..decomposition.ester_in_alcohol import label_ester_with_acid_ester_alcohol
+    return label_ester_with_acid_ester_alcohol(f"{alkyl_name} {ate}", alkyl_name, {"acid": acid_smiles},
+                                               Chem.MolToSmiles(mol))
 
 
 def name_polyfunctional_diester_free_hydroxy(

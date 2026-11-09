@@ -291,7 +291,13 @@ _CLASS_SMARTS = [
     (9, 'acid_halide', '[CX3](=O)[F,Cl,Br,I]'),
     (10, 'amide', '[CX3](=O)-!@[NX3;!R;!$(N-N)]'),
     (10, 'amide', '[SX4](=O)(=O)-!@[NX3;!R;!$(N-N)]'),
-    (10, 'guanidine', '[NX3;!R][CX3;!R](=[NX2;!R])[NX3;!R]'),
+    # (a hydrazine nitrogen on the carbon makes it a carbonic hydrazide, 'hydrazinecarboximidohydrazide', class 12)
+    (10, 'guanidine', '[NX3;!R;!$(N-N)][CX3;!R](=[NX2;!R])[NX3;!R;!$(N-N)]'),
+    # (the Blue Book) "12 Hydrazides", after the amides: R-CO-NH-N< with R a carbon (the ester and
+    # the amide of hydrazinecarboxylic acid have their own classes)
+    (11, 'hydrazide', '[#6][CX3](=[O,S])-!@[NX3;!R]-[N;!R;!$(N=[O,N])]'),
+    # an N-nitroso or N-diazenyl amide is an amide (the N=O / N=N is a prefix on its nitrogen,
+    (10, 'amide', '[CX3](=O)-!@[NX3;!R]-[N;!R]=[O,N]'),
     (13, 'nitrile', '[#6][CX2]#[NX1]'),
     (14, 'aldehyde', '[CX3H1](=O)[#6]'),
     (15, 'ketone', '[#6][CX3](=O)[#6]'),
@@ -304,9 +310,11 @@ _CLASS_SMARTS = [
     (19, 'imine', '[CX3;!R]=[NX2;!R][H,#6]'),
 ]
 _CLASS_PAT = [(r, c, Chem.MolFromSmarts(s)) for r, c, s in _CLASS_SMARTS]
+_NITRO = Chem.MolFromSmarts('[N+](=O)[O-]')
 _NAME_CLASS = [
     (re.compile(r"(?:oic|carboxylic|sulfonic|sulfinic|phosphonic|carbothioic|carbodithioic|ic) acid$"), 6, 'acid'),
-    (re.compile(r"(?:amide|carboxamide|sulfonamide|carbohydrazide|hydrazide)$"), 10, 'amide'),
+    (re.compile(r"(?:amide|carboxamide|sulfonamide)$"), 10, 'amide'),
+    (re.compile(r"(?:carbohydrazide|hydrazide)$"), 11, 'hydrazide'),
     (re.compile(r"(?:nitrile|carbonitrile)$"), 13, 'nitrile'),
     (re.compile(r"(?:carbaldehyde|[a-z]al)$"), 14, 'aldehyde'),
     (re.compile(r"(?:one)$"), 15, 'ketone'),
@@ -323,7 +331,9 @@ def principal_class_check(mol, name):
     species and radicals are not read here."""
     if P10.search(name) or '.' in Chem.MolToSmiles(mol):
         return None
-    if any(a.GetFormalCharge() or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+    # a nitro group drawn charge-separated, [N+](=O)[O-], is the neutral prefix 'nitro', no ion
+    nitro = {i for m in mol.GetSubstructMatches(_NITRO) for i in (m[0], m[2])}
+    if any((a.GetFormalCharge() and a.GetIdx() not in nitro) or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
         return None
     n = re.sub(r"\s*\(\d+/\d+\)$", '', normalise(name).strip())
     if len(n.split(' ')) > 1 and not n.endswith(' acid'):

@@ -6956,7 +6956,7 @@ def _name_arylamine_quaternary_aminium(mol, cation_site: Dict) -> str:
         return ''
     if not parent_name or is_failure_name(parent_name):
         return ''
-    aminium = name_aminium_cation(n_prefix + parent_name)
+    aminium = name_aminium_cation(_join_prefix_stem(n_prefix, parent_name))
     if not aminium or not aminium.endswith('ium'):
         return ''
     return aminium

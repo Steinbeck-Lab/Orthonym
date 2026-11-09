@@ -48,6 +48,27 @@ def senior_ring_n_ester_outranks(parent_smiles: Optional[str], acid_smiles: Opti
     return any(_key(mol, m, True) < best_named for m in ring_n)
 
 
+def ring_n_ester_is_senior(mol, c_idx: int) -> bool:
+    """True when the ester of the ring-nitrogen carboxylic acid whose carbonyl carbon is ``c_idx`` outranks every other
+    carboxylic ester of ``mol``, by:func:`_key`): its ester is then the parent of the PIN ('tert-butyl
+    4-(acetyloxy)piperidine-1-carboxylate')."""
+    ring_n = [m for m in mol.GetSubstructMatches(_RING_N_ESTER) if m[1] == c_idx]
+    others = [m for m in mol.GetSubstructMatches(_CARBOXYLIC_ESTER) if m[1] != c_idx]
+    if len(ring_n) != 1 or not others:
+        return False
+    # an acid carbon on the ring system of the ring nitrogen makes one polyacid of the two: its mixed diester is
+    # named on that acid, 'ethyl methyl benzene-1,3-dicarboxylate (PIN)' (the Blue Book), no claim here
+    from ..perception.rings import get_containing_ring_system
+    system = set(get_containing_ring_system(mol, [ring_n[0][0]]))
+    if any(m[0] in system for m in others):
+        return False
+    try:
+        mine = _key(mol, ring_n[0], True)
+        return all(mine < _key(mol, m, False) for m in others)
+    except Exception:  # noqa: BLE001 - not decidable: no claim
+        return False
+
+
 def label_ester_with_acid_ester_alcohol(name: str, alkyl_prefix: str, fragment_smiles, parent_smiles) -> str:
     """``name``, recorded below the PIN (by its alcohol word ``alkyl_prefix``) when a ring-nitrogen ester outranks the ester
     the name is built on (:func:`senior_ring_n_ester_outranks`)."""

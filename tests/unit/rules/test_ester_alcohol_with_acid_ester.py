@@ -15,17 +15,20 @@ from tests.support.pin_tiers import tier_row
 pytestmark = pytest.mark.opsin_gate
 
 
-@pytest.mark.parametrize("smiles", [
-    "CC(C)(C)OC(=O)N1CCC(CC1)OC(=O)c1ccccc1",
-    "CC(C)(C)OC(=O)N1CCC(CC1)OC(=O)C1CCCCC1",
-    "CC(C)(C)OC(=O)N1CCC(COC(=O)c2ccccc2)CC1",
-    "CC(C)(C)OC(=O)N1CCC(CC1)OC(=O)c1ccc2ccccc2c1",   # piperidine is a heterocycle: senior to naphthalene
+# change-asserted-value (2026-11-09): the carbamate handler now makes the ring-nitrogen ester the parent when it
+# outranks the other ester (handlers.carbamate._senior_ring_n_ester), so the PIN tier names the PIN this file's
+# docstring derives instead of declining; independent check = OPSIN read-back (pin_verified); mutation = dropping
+# _senior_ring_n_ester restores the decline and fails these rows.
+@pytest.mark.parametrize("smiles, expected", [
+    ("CC(C)(C)OC(=O)N1CCC(CC1)OC(=O)c1ccccc1", "tert-butyl 4-(benzoyloxy)piperidine-1-carboxylate"),
+    ("CC(C)(C)OC(=O)N1CCC(CC1)OC(=O)C1CCCCC1", "tert-butyl 4-[(cyclohexanecarbonyl)oxy]piperidine-1-carboxylate"),
+    ("CC(C)(C)OC(=O)N1CCC(COC(=O)c2ccccc2)CC1", "tert-butyl 4-[(benzoyloxy)methyl]piperidine-1-carboxylate"),
+    # piperidine is a heterocycle: senior to naphthalene
+    ("CC(C)(C)OC(=O)N1CCC(CC1)OC(=O)c1ccc2ccccc2c1", "tert-butyl 4-[(naphthalene-2-carbonyl)oxy]piperidine-1-carboxylate"),
 ])
-def test_not_a_pin(smiles):
+def test_the_ring_nitrogen_ester_is_the_pin_parent(smiles, expected):
     pin = tier_row(smiles, "pin")
-    assert pin["tier"] != "pin_verified", pin
-    best = tier_row(smiles, "best-effort")
-    assert best["tier"] in ("systematic_verified", "pin_unverified", "best_effort"), best
+    assert (pin["name"], pin["tier"]) == (expected, "pin_verified"), pin
 
 
 @pytest.mark.parametrize("smiles,expected", [

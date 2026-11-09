@@ -128,7 +128,7 @@ def test_chain_hydrazide_merged_nn_multiplier(smiles, expected):
         # dropping the 'hydrazide' entry of composition_primitives.RETAINED_C2_ACYL_BY_SUFFIX fails both.
         ("CNNC(C)=O", "N'-methylacetohydrazide"),
         ("CN(N)C(C)=O", "N-methylacetohydrazide"),
-        ("CNNC(=O)O", "N'-methylhydrazinecarboxylic acid"),
+        ("CNNC(=O)O", "2-methylhydrazine-1-carboxylic acid"),  #:38507, hydrazine takes 1 and 2
         ("CNNC(=S)C", "N'-methylethanethiohydrazide"),
         # dihydrazide via the decomposition quality gate (C1)
         ("NNC(=O)CCC(=O)NN", "butanedihydrazide"),
