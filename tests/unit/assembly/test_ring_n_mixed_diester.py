@@ -39,8 +39,16 @@ def test_a_compound_organyl_behind_its_locant_is_enclosed(smiles, name):
     assert (row["name"], row["tier"]) == (name, "pin_verified")
 
 
-@pytest.mark.parametrize("smiles", ["CC(C)(C)OC(=O)n1ccc2cc(C(=O)OC)ccc21", "CC(C)(C)OC(=O)n1cc(C(=O)OC)cn1"])
-def test_an_aromatic_ring_n_ester_beside_a_ring_ester_claims_no_pin(smiles):
-    """The aromatic ring nitrogen carries a carboxylic acid too ('1H-indole-1,5-dicarboxylic acid'): the name built on the
-    C ester ('methyl 1-(tert-butoxycarbonyl)-1H-indole-5-carboxylate') is not the PIN; the diester is not built yet."""
-    assert Orthonym().name_tiered(smiles)["tier"] != "pin_verified"
+@pytest.mark.parametrize("smiles, name", [
+    # an aromatic ring nitrogen carries a carboxylic acid too ('1H-indole-1,5-dicarboxylic acid'); the two esters reach
+    # each other through the N, not a C-C path (rules.esters.classify_multi_ester)
+    ("CC(C)(C)OC(=O)n1ccc2cc(C(=O)OC)ccc21", "1-tert-butyl 5-methyl 1H-indole-1,5-dicarboxylate"),
+    ("CC(C)(C)OC(=O)n1cc(C(=O)OC)cn1", "1-tert-butyl 4-methyl 1H-pyrazole-1,4-dicarboxylate"),
+    ("CCOC(=O)n1ccc(C(=O)OCC)c1", "diethyl 1H-pyrrole-1,3-dicarboxylate"),
+    # two ring-nitrogen esters of one ring
+    ("CC(C)(C)OC(=O)N1CCN(CC1)C(=O)OCC", "tert-butyl ethyl piperazine-1,4-dicarboxylate"),
+    ("CC(C)(C)OC(=O)N1CCN(C(C)C1)C(=O)OCc1ccccc1", "1-benzyl 4-tert-butyl 2-methylpiperazine-1,4-dicarboxylate"),
+])
+def test_ring_nitrogen_diesters_of_aromatic_and_two_nitrogen_rings(smiles, name):
+    row = Orthonym().name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (name, "pin_verified")

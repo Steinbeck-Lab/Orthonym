@@ -82,12 +82,12 @@ def ring_n_diester_matches(mol) -> Optional[list]:
     matches = [m for m in mol.GetSubstructMatches(_ANY_ESTER)
                if not any(m[0] in r and m[2] in r for r in ri.AtomRings())]
     ring_n = [m for m in mol.GetSubstructMatches(_RING_N_ESTER)]
-    if len(matches) != 2 or len(ring_n) != 1 or mol.HasSubstructMatch(_ACID):
+    if len(matches) != 2 or len(ring_n) not in (1, 2) or mol.HasSubstructMatch(_ACID):
         return None
     from ..perception.rings import get_containing_ring_system
     system = set(get_containing_ring_system(mol, [ring_n[0][0]]))
-    other = [m for m in matches if m[0] != ring_n[0][1]]
-    if len(other) != 1 or not any(nb.GetIdx() in system for nb in mol.GetAtomWithIdx(other[0][0]).GetNeighbors()):
+    # the other ester: a C ester on that ring system, or a second ring-nitrogen ester of it ('piperazine-1,4-...')
+    if not all(any(nb.GetIdx() in system for nb in mol.GetAtomWithIdx(m[0]).GetNeighbors()) for m in matches):
         return None
     return matches
 
