@@ -3486,7 +3486,10 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
             return None
         alkyl_names.append(alkyl_name)
 
-    diacid = _build_diacid_from_diester(mol, ester_matches)
+    tagged = Chem.Mol(mol)
+    for m in ester_matches:
+        tagged.GetAtomWithIdx(m[0]).SetIntProp("_diester_c", 1)
+    diacid = _build_diacid_from_diester(tagged, ester_matches)
     if diacid is None:
         return None
 
@@ -3512,6 +3515,10 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     # alphanumerical order (see " -- 'butyl 2-ethylhexyl', never the plain
     # string order that put the locant first ('2-ethylhexyl butyl').
     from ..assembly.naming_utils import alpha_sort_key_total
+    from .mixed_ester_locants import located_organyl_words, positions_equivalent
+    if not positions_equivalent(diacid, [a.GetIdx() for a in diacid.GetAtoms() if a.HasProp("_diester_c")]):
+        from ..namer import _validity_gate_name_to_smiles     # the two acid positions differ: locants (:31783)
+        return located_organyl_words(mol, alkyl_names, ate, alpha_sort_key_total, _validity_gate_name_to_smiles)
     first, second = sorted(alkyl_names, key=alpha_sort_key_total)
     return f"{first} {second} {ate}"
 
@@ -4153,8 +4160,7 @@ def name_polyacid_polyester(mol) -> Optional[str]:
         acid = _build_diacid_from_diester(mol, matches)
         if acid is None:
             return None
-        if len(set(alkyl_names)) > 1 and not _organyl_assignment_is_unambiguous(mol, matches, alkyl_names):
-            return None     # the organyl groups would need locants, which are not built
+        located = len(set(alkyl_names)) > 1 and not _organyl_assignment_is_unambiguous(mol, matches, alkyl_names)
         from ..assembly.composer import assemble_name
         from ..namer import compute_features
         feats = compute_features(acid, Chem.MolToSmiles(acid))
@@ -4187,6 +4193,13 @@ def name_polyacid_polyester(mol) -> Optional[str]:
         words = {a: (_multiplied_organyl(counts[a], a) if counts[a] > 1 else a) for a in counts}
         organyls = " ".join(words[a] for a in sorted(counts, key=alpha_sort_key_total))
         name = f"{organyls} {ate}"
+        if located:     # "When necessary, locants are cited at the front of the organyl groups" (:31783)
+            from ..namer import _validity_gate_name_to_smiles
+            from .mixed_ester_locants import located_organyl_words
+            name = located_organyl_words(mol, alkyl_names, ate, alpha_sort_key_total, _validity_gate_name_to_smiles,
+                                         chain_length=len(_chain))
+            if not name:
+                return None
         # The acid component is named by a gate-free intermediate namer, whose raw
         # composer output can describe another molecule ('2-(1-aminoethyl)butane-
         # dioic acid' for the 1-aminoethylidene acid). Ship the polyester name only

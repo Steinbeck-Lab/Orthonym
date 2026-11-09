@@ -14,7 +14,7 @@ from typing import Optional
 from rdkit import Chem
 
 _CARBOXYLIC_ESTER = Chem.MolFromSmarts('[#6][CX3](=O)!@[OX2]!@[#6]')
-_RING_N_ESTER = Chem.MolFromSmarts('[N;R;X3]!@[CX3](=O)!@[OX2]!@[#6]')
+_RING_N_ESTER = Chem.MolFromSmarts('[#7;R;X3]!@[CX3](=O)!@[OX2]!@[#6]')
 _ACID = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
 _RULE = "P-65.6.3.3.4.2"
 _DETAIL = "a ring-nitrogen ester of the molecule is senior to the ester the name is built on"
@@ -67,6 +67,29 @@ def ring_n_ester_is_senior(mol, c_idx: int) -> bool:
         return all(mine < _key(mol, m, False) for m in others)
     except Exception:  # noqa: BLE001 - not decidable: no claim
         return False
+
+
+_ANY_ESTER = Chem.MolFromSmarts('[CX3](=O)[OX2][#6]')
+
+
+def ring_n_diester_matches(mol) -> Optional[list]:
+    """The two ester matches (carbonyl C, =O, O, organyl C) of a molecule whose carboxylic esters are one ester of a
+    ring-nitrogen carboxylic acid and one ester of a carboxylic acid on the same ring system, or None. The two acids are
+    one diacid, 'pyrrolidine-1,2-dicarboxylic acid' 'pyrrolidine-1-carboxylic acid (PIN)'), and the
+    molecule is its mixed diester, '1-tert-butyl 2-methyl pyrrolidine-1,2-dicarboxylate',
+    the Blue Book, organyl locants as in '1,1-diethyl 3-methyl butane-1,1,3-tricarboxylate (PIN)':31783)."""
+    ri = mol.GetRingInfo()
+    matches = [m for m in mol.GetSubstructMatches(_ANY_ESTER)
+               if not any(m[0] in r and m[2] in r for r in ri.AtomRings())]
+    ring_n = [m for m in mol.GetSubstructMatches(_RING_N_ESTER)]
+    if len(matches) != 2 or len(ring_n) != 1 or mol.HasSubstructMatch(_ACID):
+        return None
+    from ..perception.rings import get_containing_ring_system
+    system = set(get_containing_ring_system(mol, [ring_n[0][0]]))
+    other = [m for m in matches if m[0] != ring_n[0][1]]
+    if len(other) != 1 or not any(nb.GetIdx() in system for nb in mol.GetAtomWithIdx(other[0][0]).GetNeighbors()):
+        return None
+    return matches
 
 
 def label_ester_with_acid_ester_alcohol(name: str, alkyl_prefix: str, fragment_smiles, parent_smiles) -> str:

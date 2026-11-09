@@ -4,7 +4,7 @@
  to; 'phenyl 3-(benzoyloxy)benzoate (PIN)', the Blue Book); a ring-nitrogen acid is a carboxylic
 acid ranked by its ring (``decomposition.ester_in_alcohol``). The ester route named the acetate and labelled
 '1-(tert-butoxycarbonyl)piperidin-4-yl acetate' a PIN. Two acids on one ring system are one diacid, whose mixed
-diester is not built here ('ethyl methyl benzene-1,3-dicarboxylate (PIN)',:5068): the PIN tier declines it.
+diester is named on that diacid ('ethyl methyl benzene-1,3-dicarboxylate (PIN)',:5068).
 A lactone is a heterocyclic pseudoketone, not an ester "Lactones",:32084).
 """
 import pytest
@@ -26,6 +26,12 @@ def test_the_ring_nitrogen_ester_is_the_parent(smiles, name):
     assert (row["name"], row["tier"]) == (name, "pin_verified")
 
 
-@pytest.mark.parametrize("smiles", ["CC(C)(C)OC(=O)N1CCC(CC1)C(=O)OC", "CC(C)(C)OC(=O)N1CCCC1C(=O)OC"])
-def test_two_acids_on_one_ring_claim_no_pin(smiles):
-    assert Orthonym().name_tiered(smiles)["tier"] != "pin_verified"
+@pytest.mark.parametrize("smiles, name", [
+    ("CC(C)(C)OC(=O)N1CCC(CC1)C(=O)OC", "1-tert-butyl 4-methyl piperidine-1,4-dicarboxylate"),
+    ("CC(C)(C)OC(=O)N1CCCC1C(=O)OC", "1-tert-butyl 2-methyl pyrrolidine-1,2-dicarboxylate"),
+])
+def test_two_acids_on_one_ring_are_one_diacid(smiles, name):
+    """never 'tert-butyl 4-(methoxycarbonyl)piperidine-1-carboxylate': the mixed diester of the one diacid
+    (test_ring_n_mixed_diester.py)."""
+    row = Orthonym().name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (name, "pin_verified")

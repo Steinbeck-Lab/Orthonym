@@ -331,7 +331,11 @@ def test_the_polyester_builder_cites_different_organyl_groups_in_alphanumerical_
     assert name_polyacid_polyester(Chem.MolFromSmiles("CCOC(=O)CCC(=O)OC1CCCCC1")) == "cyclohexyl ethyl butanedioate"
     assert name_polyacid_polyester(Chem.MolFromSmiles("COC(=O)CCC(=O)OCC(O)CO")) == "2,3-dihydroxypropyl methyl butanedioate"
     assert name_polyacid_polyester(Chem.MolFromSmiles("CCOC(=O)C(C)CC(=O)OC")) is None                 # locants needed
-    assert name_polyacid_polyester(Chem.MolFromSmiles("CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC")) is None      # (M7: open)
+    # (M7 closed 2026-11-09) the organyl locants are built: '1,1-diethyl 3-methyl butane-1,1,3-tricarboxylate (PIN)'
+    # (the Blue Book, verbatim); change-asserted-value: independent check = OPSIN read-back inside the builder,
+    # mutation = dropping rules.mixed_ester_locants restores None
+    assert (name_polyacid_polyester(Chem.MolFromSmiles("CCOC(=O)C(CC(C)C(=O)OC)C(=O)OCC"))
+            == "1,1-diethyl 3-methyl butane-1,1,3-tricarboxylate")
 
 
 # (M7) the triester of butane-1,1,3-tricarboxylic acid needs the locants of ('1,1-diethyl 3-methyl

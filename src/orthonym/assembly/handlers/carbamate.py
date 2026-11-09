@@ -162,8 +162,8 @@ def _senior_ring_n_ester(mol, fg_name: str, c_idx: int) -> bool:
     carboxylate', not '1-(tert-butoxycarbonyl)piperidin-4-yl acetate'."""
     if fg_name not in _CARBOXYLIC_OXYGEN_ESTERS:
         return False
-    from ...decomposition.ester_in_alcohol import ring_n_ester_is_senior
-    return ring_n_ester_is_senior(mol, c_idx)
+    from ...decomposition.ester_in_alcohol import ring_n_diester_matches, ring_n_ester_is_senior
+    return ring_n_ester_is_senior(mol, c_idx) or ring_n_diester_matches(mol) is not None
 
 
 def _is_lactone(mol, idx: int) -> bool:
@@ -223,8 +223,14 @@ def name_carbamate(
             carb_name = _name_carbamate(features)
     if not carb_name:
         # the ester of a carboxylic acid on a ring nitrogen ('ethyl piperidine-1-carboxylate',
+        from ...decomposition.ester_in_alcohol import ring_n_diester_matches
         from ..ring_n_carboxylate import ring_n_carboxylate_ester_name
-        ring_name = ring_n_carboxylate_ester_name(features.mol, style)
+        pair = ring_n_diester_matches(features.mol)
+        if pair is not None:    # one diacid on the ring: its mixed diester ('1-tert-butyl 2-methyl pyrrolidine-...')
+            from ...rules.esters import _name_ring_dicarboxylic_diester
+            ring_name = _name_ring_dicarboxylic_diester(features.mol, pair)
+        else:
+            ring_name = ring_n_carboxylate_ester_name(features.mol, style)
         if not ring_name or get_current_pool().add(ring_name, "carbamate", features) is None:
             return None
         return NamingResult(name=ring_name, tree=NameTreeNode(
