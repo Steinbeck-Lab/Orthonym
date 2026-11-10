@@ -323,8 +323,11 @@ def unspecified_carbohydrate(mol) -> bool:
     Blue Book names carbohydrates by their configuration ff.) and no rule read for this
     producer makes the systematic oxane name of a sugar of unknown configuration the PIN, so no prefix of
     such a molecule is promoted (the molecule stays with the first run)."""
+    rings = list(_sugar_rings(mol))
+    if not rings:
+        return False        # no sugar ring: the CIP pass below (minutes on a large molecule) cannot change the answer
     centres = dict(Chem.FindMolChiralCenters(Chem.Mol(mol), includeUnassigned=True, useLegacyImplementation=False))  # a copy: it relabels
-    return any(centres.get(a) == '?' for ring in _sugar_rings(mol) for a in ring)
+    return any(centres.get(a) == '?' for ring in rings for a in ring)
 
 
 def principal_group(mol):

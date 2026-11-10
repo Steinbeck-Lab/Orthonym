@@ -4117,6 +4117,7 @@ class AlphaKey(str):
         obj._lam = _NO_LAMBDA if lam is None else lam
         obj._raw = raw
         obj._locs = None
+        obj._ord = None
         return obj
 
     def _own_locs(self) -> tuple:
@@ -4135,13 +4136,17 @@ class AlphaKey(str):
         return (_key_letters(self), _italic_prefixes(self._original), self._own_locs(), str(self), self._lam)
 
     def _order(self):
-        orig = self._original
-        # The own locants, in order of appearance, come before the key text: that text has
-        # dropped a leading locant, so it compares the LAST locants only ('methylpentan-2-yl' before
-        # 'methylpentan-3-yl') and would decide before the set compares, in which
-        # '2-methylpentan-3-yl' (2,3) precedes '3-methylpentan-2-yl' (3,2) (the Blue Book).
-        return (_key_letters(self), _italic_prefixes(orig), self._own_locs(), str(self), self._lam,
-                _P146Text(orig))
+        """The tuple the comparisons order by, built at the first comparison and kept (a key is never changed
+        after it is made)."""
+        if self._ord is None:
+            orig = self._original
+            # The own locants, in order of appearance, come before the key text: that text has
+            # dropped a leading locant, so it compares the LAST locants only ('methylpentan-2-yl' before
+            # 'methylpentan-3-yl') and would decide before the set compares, in which
+            # '2-methylpentan-3-yl' (2,3) precedes '3-methylpentan-2-yl' (3,2) (the Blue Book).
+            self._ord = (_key_letters(self), _italic_prefixes(orig), self._own_locs(), str(self), self._lam,
+                         _P146Text(orig))
+        return self._ord
 
     @staticmethod
     def _other_order(other):

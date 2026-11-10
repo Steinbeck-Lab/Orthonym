@@ -60,8 +60,12 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
     fail-open: any error leaves the primary labels unchanged.
     """
     try:
+        # rdCIPLabeler labels a double bond only when it carries a configuration (STEREOZ/E/CIS/TRANS; not
+        # STEREONONE or STEREOANY), so a molecule with no such bond left unlabelled is not passed to it: on a large
+        # molecule with many centres the pass costs minutes and could copy nothing (program 22 step 4)
         needs = [b.GetIdx() for b in bonds_of(mol)
                  if b.GetBondType() == Chem.BondType.DOUBLE
+                 and b.GetStereo() not in (Chem.BondStereo.STEREONONE, Chem.BondStereo.STEREOANY)
                  and not (b.HasProp('_CIPCode') and b.GetProp('_CIPCode') in ('E', 'Z'))]
         if not needs:
             return

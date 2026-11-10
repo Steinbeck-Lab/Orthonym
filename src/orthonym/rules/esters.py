@@ -2358,17 +2358,9 @@ def _severed_acid_smiles(mol, group: list, cuts: list) -> Optional[str]:
 
 
 def _free_acid_name(acid_smi: str) -> Optional[str]:
-    """The name of the free acid of ``acid_smi`` through the general pipeline, None when it has none."""
-    from orthonym import name_compound  # lazy: re-entrant on the free-acid fragment
-    try:
-        acid_name = name_compound(acid_smi)
-    except Exception:
-        return None
-    if (not acid_name
-            or "unknown" in acid_name.lower()
-            or "not supported" in acid_name.lower()):
-        return None
-    return acid_name
+    """The name of the free acid of ``acid_smi``, None when it has none (``rules.free_acid_names``)."""
+    from .free_acid_names import free_acid_name
+    return free_acid_name(acid_smi)
 
 
 def has_identical_acyloxy_groups(mol) -> bool:
