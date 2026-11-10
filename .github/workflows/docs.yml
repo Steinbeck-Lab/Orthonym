@@ -51,7 +51,9 @@ jobs:
       - name: Build (warnings are errors)
         env:
           ORTHONYM_DOCS_BASEURL: ${{ steps.pages.outputs.base_url }}
-        run: sphinx-build -W -b html guide _build/html
+        # -d keeps the doctree cache out of the site folder: inside it, the Pages upload carried about 950 MB of
+        # .doctrees with every deploy, and the deploy ran into its 10-minute limit
+        run: sphinx-build -W -b html -d _build/doctrees guide _build/html
 
       - name: Upload the site
         if: github.repository == 'Steinbeck-Lab/Orthonym'
