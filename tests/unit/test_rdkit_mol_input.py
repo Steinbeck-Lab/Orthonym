@@ -734,14 +734,47 @@ def test_chi_other_tag_is_declined_without_a_crash(case):
     "C[C@H](N)C(=O)O |&1:1|",           # AND: racemic
     "C[C@H](N)C(=O)O |o1:1|",           # OR: one enantiomer, unknown which
     "C[C@H](O)[C@@H](C)Cl |&1:1,3|",
+    "C[C@H](O)[C@@H](C)C[C@H](N)C |&1:1,o2:3|",   # two groups, the atoms in another order in RDKit's SMILES
 ])
-def test_and_or_stereo_group_is_declined(cxsmiles):
-    """A SMILES holds no stereo group, so RDKit's SMILES of such a Mol states one
-    enantiomer; the Mol is declined instead of named as that enantiomer."""
+def test_and_or_stereo_group_is_named_as_its_cxsmiles(cxsmiles):
+    """A plain SMILES holds no stereo group, so a Mol with an AND or OR group is named through the CXSMILES
+    ``input_mol.smiles_for`` writes for it (the proven SMILES and the group extension in its atom order), and every
+    public call gives the result of that string: 'rac-(2R)-2-aminopropanoic acid', not one enantiomer."""
     mol = Chem.MolFromSmiles(cxsmiles)
     assert any(g.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE
                for g in mol.GetStereoGroups())
-    _assert_declined(mol, "stereo group")
+    written = input_mol.smiles_for(mol)
+    assert " |" in written and Chem.MolToCXSmiles(Chem.MolFromSmiles(written)) == Chem.MolToCXSmiles(mol)
+    for label, call in CALLS.items():
+        assert call(mol) == call(written), (label, written)
+
+
+def test_stereo_group_mol_in_another_atom_order_gets_the_same_string():
+    """The group test compares structures, not RDKit's CXSMILES, whose canonical order depends on the atom order
+    of the Mol: a renumbered copy of one Mol is named as the Mol is (core principle 4)."""
+    mol = Chem.MolFromSmiles("C[C@@H]([C@H](C)Cl)[C@@H](C)Cl |&1:2,5|")
+    renumbered = Chem.RenumberAtoms(mol, [0, 1, 5, 7, 4, 6, 3, 2])
+    assert input_mol.smiles_for(renumbered) == input_mol.smiles_for(mol)
+
+
+def test_the_group_test_sees_a_group_on_another_atom():
+    one = Chem.MolFromSmiles("C[C@H](O)[C@@H](C)Cl |&1:1|")
+    other = Chem.MolFromSmiles("C[C@H](O)[C@@H](C)Cl |&1:3|")
+    same = Chem.MolFromSmiles("Cl[C@H](C)[C@@H](O)C |&1:3|")
+    assert input_mol._group_meaning(one) != input_mol._group_meaning(other)
+    assert input_mol._group_meaning(one) == input_mol._group_meaning(same)
+
+
+def test_racemic_mol_states_its_group():
+    assert name_compound(Chem.MolFromSmiles("C[C@H](N)C(=O)O |&1:1|")) == "rac-(2R)-2-aminopropanoic acid"
+
+
+def test_stereo_group_on_an_atom_without_a_configuration_is_declined():
+    """An AND group that holds an atom with no tetrahedral tag states nothing a name can carry."""
+    mol = Chem.RWMol(Chem.MolFromSmiles("C[C@H](O)CC(C)O |&1:1|"))
+    group = Chem.CreateStereoGroup(Chem.StereoGroupType.STEREO_AND, mol, [1, 5])
+    mol.SetStereoGroups([group])
+    _assert_declined(mol.GetMol(), "stereo group")
 
 
 def test_absolute_stereo_group_is_named_as_its_smiles():

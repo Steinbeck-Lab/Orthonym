@@ -36,6 +36,21 @@ not-a-smiles	ERROR: Invalid SMILES: not-a-smiles
 CC(=O)O	acetic acid
 ```
 
+## MOL and SDF files
+
+`--sdf FILE` names every record of a MOL or SDF file, as `--batch` names the lines of a text file: one output line per record, in the order of the file. The first column is the SMILES that was named (a CXSMILES for a record with an AND or OR stereo group), then a tab and the name:
+
+```console
+$ orthonym --sdf molecules.sdf
+C[C@@H](N)C(=O)O	(2R)-2-aminopropanoic acid
+C/C=C\C	(2Z)-but-2-ene
+CC[C@H](C)O |&1:2|	rac-(2R)-butan-2-ol
+```
+
+The stereo is the file's own. RDKit reads the tetrahedral centres from the wedge bonds (or from the coordinates of a 3D record) and the double bonds from the coordinates. A double bond marked 'either', or drawn crossed, stays open. A V3000 record keeps its AND and OR stereo collections, and the name states them (`rac-`, `rel-`). The chiral flag of a V2000 record is not read: as in the standard InChI, the configurations are absolute. Many writers, RDKit among them, set the flag to 0 also for a structure of known configuration; state a racemate with a V3000 AND collection. Orthonym then drops the coordinates, so nothing is perceived from them again while the structure is named.
+
+A record that RDKit cannot read, or whose SMILES does not hold it, gets the line `<record N>`, which is reported as an unreadable line of `--batch` is (`ERROR:` and exit status `1`), and its number and the reason go to the error stream. A record with no atoms gets an empty line and a message. `--sdf` takes the options of `--batch` (`--output`, `--emit-tier`, `--provenance`, `--on-failure`, `--jobs`, `--time-limit`).
+
 ## A time limit for each structure
 
 A few structures take a long time (a large molecule, a cage ring system: some need half a minute or more), and in a long file they hold up everything behind them. `--time-limit SECONDS` gives each line at most that long. A line that is not named in time is a line with no name, in its own place, and the run goes on with the next one:

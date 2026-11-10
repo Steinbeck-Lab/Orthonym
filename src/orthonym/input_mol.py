@@ -33,8 +33,14 @@ molecule or another stereoisomer:
     RDKit's reading as in the standard reading of SMILES, which the naming of a
     string follows (:func:`_lone_pair_centres_read_alike`).
 
+A Mol with an AND or OR stereo group (racemic, or one enantiomer of unknown configuration) is named
+through a CXSMILES string: the proven SMILES of the Mol without its groups, and the enhanced-stereo
+extension written for those atoms in the order of that SMILES ('CC[C@H](C)O |&1:2|'), checked by
+reading it back (:func:`_with_stereo_groups`). The naming of such a string states the group ('rac-',
+'rel-',, so the Mol is not named as one enantiomer.
+
 A Mol with stereo this check cannot compare is declined before the SMILES is
-written: an AND or OR stereo group (a SMILES holds no stereo group), an atropisomer tag (a SMILES holds no axis configuration) or a ``CHI_OTHER``
+written: an atropisomer tag (a SMILES holds no axis configuration) or a ``CHI_OTHER``
 chiral tag (RDKit's SMILES writer can crash the process on one). Square-planar,
 trigonal-bipyramidal and octahedral tags pass: a SMILES holds them and no name states
 them, so the Mol gets the result of its SMILES.
@@ -89,6 +95,8 @@ def smiles_for(arg) -> str:
     given.RemoveAllConformers()
     _decline_stereo_it_cannot_compare(given)
     try:
+        if _relative_groups(given):
+            return _with_stereo_groups(given)
         return _proven_smiles(given)
     except InvalidInputError:
         raise
@@ -158,14 +166,89 @@ _COMPARABLE_OR_UNNAMED = (Chem.ChiralType.CHI_UNSPECIFIED, *_TETRAHEDRAL,
                           Chem.ChiralType.CHI_OCTAHEDRAL)
 
 
+def _relative_groups(mol: Chem.Mol) -> list:
+    """The AND and OR stereo groups of ``mol`` (an ABSOLUTE group states what the tags state alone)."""
+    return [g for g in mol.GetStereoGroups() if g.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE]
+
+
+#: the CXSMILES mark of a stereo group type ('&1:2' AND, 'o1:2' OR)
+_GROUP_MARK = {Chem.StereoGroupType.STEREO_AND: "&", Chem.StereoGroupType.STEREO_OR: "o"}
+
+
+def _with_stereo_groups(given: Chem.Mol) -> str:
+    """The CXSMILES:func:`smiles_for` names for ``given``, a Mol with an AND or OR stereo group: the
+    proven SMILES of ``given`` without its stereo groups and the extension of those groups, the atoms
+    numbered by their place in that SMILES. RDKit's canonical CXSMILES is not used: its canonical order
+    takes the groups into account and can differ from the order the proof matched. The string is read
+    back and must hold the same groups, of the same type, on the same atoms (InvalidInputError if not)."""
+    plain = Chem.RWMol(given)
+    plain.SetStereoGroups([])
+    key, order = _proven_smiles_and_order(plain.GetMol())
+    position = {index: k for k, index in enumerate(order)}
+    marks, counters, wanted = [], {}, set()
+    for group in _relative_groups(given):
+        atoms = sorted(position[a.GetIdx()] for a in group.GetAtoms())
+        if not atoms or any(given.GetAtomWithIdx(order[k]).GetChiralTag() not in _TETRAHEDRAL for k in atoms):
+            raise InvalidInputError("Invalid molecule: a stereo group holds an atom without a tetrahedral "
+                                    "configuration, which no name can state.")
+        kind = group.GetGroupType()
+        counters[kind] = counters.get(kind, 0) + 1
+        marks.append(f"{_GROUP_MARK[kind]}{counters[kind]}:" + ",".join(map(str, atoms)))
+        wanted.add((kind, tuple(atoms)))
+    text = f"{key} |{','.join(marks)}|"
+    params = Chem.SmilesParserParams()
+    params.removeHs = False                   # the atoms the SMILES writes, one for one, as in the proof
+    back = Chem.MolFromSmiles(text, params)
+    got = {(g.GetGroupType(), tuple(sorted(a.GetIdx() for a in g.GetAtoms())))
+           for g in (back.GetStereoGroups() if back is not None else ())
+           if g.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE}
+    meaning = _group_meaning(given)
+    if back is None or got != wanted or meaning is None or meaning != _group_meaning(back):
+        # the second test: each group stands for the same stereoisomers in the Mol and in the string (the
+        # proof can match the atoms through a symmetric equivalent, which the group positions above follow
+        # only where the equivalent maps each group onto itself); a test of the structures, so the order of
+        # the atoms of the Mol does not matter
+        raise InvalidInputError(f"Invalid molecule: its CXSMILES ({text}) does not read back with the "
+                                "stereo groups of the Mol.")
+    return text
+
+
+#: more AND and OR groups than this are not compared (each doubles the stereoisomers to compare)
+_MAX_GROUPS = 6
+
+
+def _group_meaning(mol) -> Optional[tuple]:
+    """What the AND and OR groups of ``mol`` state, as structures: for each group, its type and the canonical
+    isomeric SMILES of the molecule with that group's atoms inverted, sorted; and the set of the SMILES of every
+    inversion of a set of groups. The same for two Mols whatever the order of their atoms; None for more than
+    :data:`_MAX_GROUPS` groups or when RDKit cannot write one of them."""
+    import itertools
+    groups = [(g.GetGroupType(), [a.GetIdx() for a in g.GetAtoms()]) for g in _relative_groups(mol)]
+    if len(groups) > _MAX_GROUPS:
+        return None
+    base = Chem.RWMol(mol)
+    base.SetStereoGroups([])
+    flip = {Chem.ChiralType.CHI_TETRAHEDRAL_CW: Chem.ChiralType.CHI_TETRAHEDRAL_CCW,
+            Chem.ChiralType.CHI_TETRAHEDRAL_CCW: Chem.ChiralType.CHI_TETRAHEDRAL_CW}
+
+    def written(inverted) -> str:
+        copy = Chem.RWMol(base)
+        for _kind, atoms in inverted:
+            for index in atoms:
+                atom = copy.GetAtomWithIdx(index)
+                atom.SetChiralTag(flip.get(atom.GetChiralTag(), atom.GetChiralTag()))
+        return Chem.MolToSmiles(Chem.RemoveHs(copy.GetMol()))
+
+    try:
+        each = tuple(sorted((int(kind), written([(kind, atoms)])) for kind, atoms in groups))
+        every = frozenset(written(chosen) for r in range(len(groups) + 1)
+                          for chosen in itertools.combinations(groups, r))
+    except Exception:  # RDKit cannot sanitize or write an inverted copy
+        return None
+    return each, every
+
+
 def _decline_stereo_it_cannot_compare(mol: Chem.Mol) -> None:
-    for group in mol.GetStereoGroups():
-        if group.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE:
-            raise InvalidInputError(
-                "Invalid molecule: it has an AND (racemic) or OR (unknown enantiomer) "
-                "stereo group, which the plain SMILES written for a Mol does not hold; it would be "
-                "named as one enantiomer. Pass it as a CXSMILES string (Chem.MolToCXSmiles), or "
-                "clear the configuration of the group's atoms to name the molecule without it.")
     for atom in mol.GetAtoms():
         tag = atom.GetChiralTag()
         if tag not in _COMPARABLE_OR_UNNAMED:

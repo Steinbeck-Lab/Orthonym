@@ -455,6 +455,14 @@ def stereo_group_scope(fn):
     @functools.wraps(fn)
     def _wrapper(self, *args, **kwargs):
         given = args[0] if args else kwargs.get("smiles")
+        if given is not None and not isinstance(given, str):
+            # an RDKit Mol with an AND or OR stereo group: named through its checked CXSMILES
+            # (``input_mol.smiles_for``), so the group reaches this layer as it does for the string
+            from rdkit import Chem
+            from .. import input_mol
+            if isinstance(given, Chem.Mol) and input_mol._relative_groups(given):
+                given = input_mol.smiles_for(given)
+                args, kwargs = ((given,) + tuple(args[1:]), kwargs) if args else (args, {**kwargs, "smiles": given})
         if not isinstance(given, str) or "|" not in given:
             return fn(self, *args, **kwargs)
         from ..errors import is_failure_name

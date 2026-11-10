@@ -404,6 +404,37 @@ _ONE_SMILES_ONLY = (("validation_stats", "--validation-stats"), ("dispatch_stats
                     ("engine_only", "--engine-only"), ("dump_tree", "--dump-tree"), ("format", "--format"))
 
 
+def _add_file_options(parser: argparse.ArgumentParser) -> None:
+    """``--output`` and ``--sdf``, the file options of ``--batch``."""
+    parser.add_argument(
+        "--output", "-o",
+        type=str,
+        help="With --batch or --sdf: write the lines to this file instead of the screen."
+    )
+    parser.add_argument(
+        "--sdf",
+        type=str,
+        help=("Name every record of this MOL or SDF file, as --batch names the lines of a file: one "
+              "'SMILES<tab>name' line per record, in file order (the SMILES is the one named; a CXSMILES "
+              "for a record with an AND or OR stereo group). The stereo is the file's own: wedges, the "
+              "coordinates of double bonds and 3D records, 'either' bonds open, V3000 AND/OR collections; a "
+              "V2000 chiral flag is not read); the coordinates are then dropped and never read again. A "
+              "record that cannot be read gets the line '<record N>' (ERROR:, as an unreadable --batch "
+              "line) and a message on the error stream. Takes the options of --batch.")
+    )
+
+
+def _prepare_inputs(parser: argparse.ArgumentParser, parsed: argparse.Namespace) -> None:
+    """``--sdf``: its records become the lines of ``--batch`` (``cli_sdf.batch_file``); then the usage checks
+    of:func:`_check_flag_combinations`."""
+    if parsed.sdf:
+        if parsed.batch or parsed.smiles:
+            parser.error("--sdf names the records of a file; it cannot be combined with --batch or a SMILES")
+        from .cli_sdf import batch_file
+        parsed.batch = batch_file(parsed.sdf) or parsed.sdf
+    _check_flag_combinations(parser, parsed)
+
+
 def _check_flag_combinations(parser: argparse.ArgumentParser, parsed: argparse.Namespace) -> None:
     """Usage error (status 2) for flags that cannot be asked for together, before anything is read
     or any jar is checked."""
@@ -500,11 +531,7 @@ def main(args: List[str] = None) -> int:
               "look inside one SMILES and stop with a usage error here.")
     )
 
-    parser.add_argument(
-        "--output", "-o",
-        type=str,
-        help="With --batch: write the lines to this file instead of the screen."
-    )
+    _add_file_options(parser)
 
     _add_jobs_option(parser)
 
@@ -712,7 +739,7 @@ def main(args: List[str] = None) -> int:
     if _opsin_option_applied(parsed):
         return 0
 
-    _check_flag_combinations(parser, parsed)
+    _prepare_inputs(parser, parsed)
 
     # Nothing to name: the help needs no jars, so print it before the jar check (which
     # downloads a missing jar and makes a first call without arguments slow).

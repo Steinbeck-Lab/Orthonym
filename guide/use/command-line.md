@@ -55,8 +55,11 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 `--batch FILE`, `-b FILE`
 : Name every SMILES in the file, one per line. `--emit-tier`, `--provenance`, `--trivial`, `--enable-triviality-controller` and `--binding-proof` work as they do for one SMILES. `--validation-stats`, `--dispatch-stats`, `--engine-only`, `--dump-tree` and `--format` look inside the naming of one structure, so with `--batch` they stop with a usage error. See [Batch files](batch.md).
 
+`--sdf FILE`
+: Name every record of a MOL or SDF file, one output line per record in file order, as `--batch` names the lines of a file; it takes the same options. The stereo is the file's own (wedges, the coordinates of double bonds, 'either' bonds left open, V3000 AND and OR collections; a V2000 chiral flag is not read), and the coordinates are dropped before naming. See [MOL and SDF files](batch.md#mol-and-sdf-files).
+
 `--output FILE`, `-o FILE`
-: With `--batch`, write the lines to this file instead of the screen.
+: With `--batch` or `--sdf`, write the lines to this file instead of the screen.
 
 `--jobs N`, `-j N`
 : With `--batch`, name the lines in N processes at once (default 1). The output and the error stream are the same, line for line and in the same order (with `--time-limit`, a line that needs about as long as the limit can run out of time in one run and not in another); each process starts its own Java machine. See [Many processes at once](batch.md#many-processes-at-once).
