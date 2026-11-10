@@ -203,7 +203,9 @@ def _reads_back(name: str, drawing: HalogenDrawing) -> bool:
 
 def halogen_drawing_scope(fn):
     """The decorator of ``Orthonym.name``, ``name_tiered`` and ``name_with_confidence`` that names a caller's input
-    through:func:`iodine_drawing_row`; any other input, and a nested call, runs ``fn`` as before. ``name_tiered``
+    through:func:`iodine_drawing_row` (or a substituted metallocene through its cyclopentyl drawing, or a charge-separated
+    drawing that gets no name as drawn through a fallback of ``decline_fallback``); any other input, and a nested
+    call, runs ``fn`` as before. ``name_tiered``
     returns the row, ``name_with_confidence`` its record, ``name`` its name; a decline gives the label (``name``
     raises the limit with ``raise_on_limit``)."""
     kind = fn.__name__
@@ -220,6 +222,14 @@ def halogen_drawing_scope(fn):
             except Exception:  # noqa: BLE001 -- a drawing that fails to build is no name: the caller names the input
                 logging.getLogger(__name__).debug("ocene drawing failed for %s", smiles, exc_info=True)
                 row = None
+        if row is None and top:
+            from .decline_fallback import has_fallback, named_or_fallback
+            if has_fallback(smiles):
+                # named as drawn first; only a decline takes a fallback (``decline_fallback``)
+                done, out = named_or_fallback(self, kind, fn, smiles, args, kwargs)
+                if done:
+                    return out
+                row = out
         if row is None:
             return fn(self, smiles, *args, **kwargs)
         if kind == 'name_tiered':
@@ -228,7 +238,7 @@ def halogen_drawing_scope(fn):
         limit = None if row['tier'] != 'abstain' else _make(row['limit_code'], row['name'], smiles)
         if kind == 'name_with_confidence':
             from .coverage_scoring import unmeasured_confidence
-            record = unmeasured_confidence(name=row['name'], handler='iodine_drawing')
+            record = unmeasured_confidence(name=row['name'], handler=row.get('source') or 'iodine_drawing')
             return {**record, 'tier': row['tier'] if limit is None else None,
                     'limit': None if limit is None else limit.as_dict(), 'spelling_failures': []}
         if limit is not None:

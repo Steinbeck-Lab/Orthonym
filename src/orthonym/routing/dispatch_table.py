@@ -502,8 +502,11 @@ def _is_multiplicative(mol, smiles, canonical_smiles, features=None, **kwargs) -
     in effect (once via the truthy check, once via assigning the return). The
     cost is paid by Tier-2 perception amortization per internal notes.
     """
+    from orthonym.rules.isotope_alternative import alternative_skeleton_active
     from orthonym.rules.multiplicative import name_multiplicative
-    return name_multiplicative(mol) is not None
+    # no offer in the second skeleton of the isotope decorator, where labels make the units unlike
+    # (``rules.isotope_alternative``)
+    return not alternative_skeleton_active() and name_multiplicative(mol) is not None
 
 
 def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:

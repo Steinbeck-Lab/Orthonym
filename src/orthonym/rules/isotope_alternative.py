@@ -13,6 +13,10 @@ skeleton names that no candidate can pass, although another producer names the s
   ('1,2-phenylenebis(methylene) diacetate', ``rules.multiplicative_general.name_ester_organyl_group``), whose arms the
   labels make unlike ('{2-[(acetyloxy)(13C)methyl]phenyl}methyl acetate': names a polyester of unlike
   arms by substitutive nomenclature);
+- a multiplicative name, '4,4'-(propane-2,2-diyl)diphenol', ``rules.multiplicative.name_multiplicative``) whose
+  identical units the labels make unlike: "Isotopically modified atoms or groups that are not identically modified in
+  equivalent positions are expressed separately", the Blue Book), so the units are named apart by the
+  next producer ('4-[2-(4-hydroxyphenyl)propan-2-yl](2-2H)phenol');
 - an ester of one multivalent group and several identical acids ('dibutylstannanediyl diacetate', 'ethane-1,2-diyl
   diacetate',: one labelled anion among the others makes them unlike, and the Blue Book then cites the
   anions apart (method (1) of, 'ethane-1,2-diyl 1-acetate 2-propanoate'), a form OPSIN 2.9.0 does not
@@ -31,7 +35,8 @@ _ACTIVE: "contextvars.ContextVar[bool]" = contextvars.ContextVar("orthonym_isoto
 
 @contextlib.contextmanager
 def alternative_skeleton():
-    """Name the skeleton without the series, senior-hub and multiplied-anion ester producers while this block runs."""
+    """Name the skeleton without the series, senior-hub, multiplicative and multiplied-anion ester producers while this
+    block runs."""
     token = _ACTIVE.set(True)
     try:
         yield
@@ -41,15 +46,17 @@ def alternative_skeleton():
 
 def has_alternative(mol) -> bool:
     """True when ``mol`` (the label-free skeleton) has a producer this scope withholds: a series member, a senior
-    mononuclear hub, a polyester of identical arms or two identical acyloxy groups. Otherwise the second pass would give
-    the skeleton the name it had."""
+    mononuclear hub, a polyester of identical arms, two identical acyloxy groups or a multiplicative name. Otherwise the
+    second pass would give the skeleton the name it had."""
     from .esters import has_identical_acyloxy_groups
     from .hydrocarbon_series import identify_series
     from .mononuclear_hydrides import _BELOW_HUB, _scan_senior_hubs
+    from .multiplicative import name_multiplicative
     from .multiplicative_general import polyester_organyl_group_named
     try:
         return (identify_series(mol) is not None or bool(_scan_senior_hubs(mol, _BELOW_HUB))
-                or polyester_organyl_group_named(mol) or has_identical_acyloxy_groups(mol))
+                or polyester_organyl_group_named(mol) or has_identical_acyloxy_groups(mol)
+                or name_multiplicative(mol) is not None)
     except Exception:  # noqa: BLE001 -- a skeleton these readers refuse has no alternative here
         return False
 
@@ -65,14 +72,17 @@ def decorate_alternative(stripped, decorate):
     on its second skeleton by substitutive nomenclature, because the labels make its arms unlike,
     the Blue Book), and "One or more isotopically modified atoms" (:21473) makes the principal chain that
     has the modified atoms the senior parent, which the descriptor spliced into the skeleton name does not decide: the
-    name is recorded as no PIN."""
+    name is recorded as no PIN. The same holds for the units of a multiplicative name named apart: "The senior parent
+    structure contains the greater number of isotopically modified atoms or groups",:21477)."""
+    from .multiplicative import name_multiplicative
     from .multiplicative_general import polyester_organyl_group_named
     with alternative_skeleton():
         name = decorate()
-    if name and polyester_organyl_group_named(stripped):
+    if name and (polyester_organyl_group_named(stripped) or name_multiplicative(stripped) is not None):
         from ..metrics.provenance import record_non_pin_label
         record_non_pin_label(
             name, rule="P-44.4.1.11",
-            detail="the labels make the arms of the polyester unlike: the senior parent chain is the one with the "
-                   "modified atoms, which the descriptor spliced into the skeleton name does not decide")
+            detail="the labels make the arms of the polyester or the units of the multiplicative name unlike: the "
+                   "senior parent is the one with the modified atoms, which the descriptor spliced into the skeleton "
+                   "name does not decide")
     return name
