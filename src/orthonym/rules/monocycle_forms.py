@@ -222,6 +222,16 @@ def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
     n = len(order)
     ranks = _canonical_ranks(mol)
     senior = min((_RANK[mol.GetAtomWithIdx(a).GetSymbol()] for a in hetero), default=None)
+    # the branch atoms of each prefix name, the names in alphanumerical order: the same for every
+    # numbering tried, since every numbering covers every ring atom
+    by_name: Dict[str, list] = {}
+    if branch_names:
+        from ..assembly.naming_utils import alpha_sort_key
+        on_ring = set(order)
+        for a, nm in zip(branch_atoms, branch_names):
+            if a in on_ring:
+                by_name.setdefault(nm, []).append(a)
+        by_name = {nm: by_name[nm] for nm in sorted(by_name, key=alpha_sort_key)}
     best_key, best = None, None
     for start in range(n):
         for direction in (1, -1):
@@ -248,15 +258,7 @@ def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
             # (g) (the Blue Book, section:3219 " NUMBERING"): "lowest locants for
             # the substituent cited first as a prefix in the name", the prefixes in alphanumerical
             # order. ``branch_names`` is parallel to ``branch_atoms``.
-            g = ()
-            if branch_names:
-                from ..assembly.naming_utils import alpha_sort_key
-                by_name: Dict[str, list] = {}
-                for a, nm in zip(branch_atoms, branch_names):
-                    if a in a2p:
-                        by_name.setdefault(nm, []).append(a2p[a])
-                g = tuple(tuple(sorted(by_name[nm]))
-                          for nm in sorted(by_name, key=alpha_sort_key))
+            g = tuple(tuple(sorted(a2p[a] for a in atoms)) for atoms in by_name.values())
             # (a) heteroatoms, (b) indicated hydrogen, (c) free valence,
             # (e) hydro prefixes, (f) detachable prefixes, (g) the prefix cited first
             key = (first_ok, het_set, sen, ih, fv, fvs, chg, hydro, br, g, tie)
