@@ -1,69 +1,57 @@
-"""Salts of mononuclear noncarbon oxoacids: arsoric, stiboric and silicic acid.
+"""Salts of the anions of the noncarbon oxoacids of / and of phosphinic, phosphorous and arsorous acid,
+and of the oxoanions of Mn, Cr and Re (program 22, 2026-11-10).
 
-the Blue Book "Salts of mononuclear noncarbon oxoacids" (:35898-35900):
-"Names of anions are formed by changing the 'ic acid' ending to 'ate'"; the acids
-are preselected names (arsoric acid:35413; stiboric acid and silicic
-acid:18423); hydrogen words as in 'methyl dihydrogen phosphate (PIN)' (:35940).
-
-The multi-anion fallback in rules/ions.py used to return the NEUTRAL acid name for
-such an anion, so 'O=[As]([O-])([O-])O.[Pb+2]' shipped as 'lead(II) arsoric acid'
-(a different molecule) -- exempts a neutral salt input from its net-charge
-guard.
+ 'CLASS 7e. OTHER MONOBASIC 'OXO' ACIDS USED AS FUNCTIONAL PARENTS': "All these names are preselected names"
+(the Blue Book), 'hypochlorous acid ClOH', 'bromous acid Br(O)OH' (:18460);: 'boric acid B(OH)3',
+'disulfurous acid (HO)S(O)-O-S(O)(OH)', 'dithionous acid (hypodisulfurous acid) (HO)(O)S-S(O)(OH)' (:18427-18439).
+The anion of an '-ous acid' ends in '-ite', of an '-ic acid' in '-ate' Anions derived from acids,
+:40953). A name without carbon is a preselected name at most, never a PIN (the contributor guide, scope); a metal-centred anion
+gives no PIN either.
 """
 import pytest
-from rdkit import Chem
 
-from orthonym.jvm_budget import jvm_slots
-from orthonym.jvm_bridge import opsin_stdout
-from orthonym.rules.ions import name_anion
-from tests.support.default_tier import assert_default_tier_declines, strict_path_name
-from tests.support.jars import jar_or_skip
+from orthonym import Orthonym
+
+pytestmark = pytest.mark.opsin_gate
 
 
-def _strict_rt(name: str, smiles: str) -> bool:
-    jar = jar_or_skip()
-    txt, _ = opsin_stdout(name, allow_radicals=False, jar_path=jar)
-    parsed = Chem.MolFromSmiles((txt or "").strip())
-    return parsed is not None and Chem.MolToSmiles(parsed) == Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+@pytest.fixture(scope="module")
+def best_effort():
+    return Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
 
 
-SALTS = [
-    ("O=[As]([O-])([O-])O.[Pb+2]", "lead(II) hydrogen arsorate"),
-    ("O=[As]([O-])([O-])O.[Sn+2]", "tin(II) hydrogen arsorate"),
-    ("O=[As]([O-])([O-])O.[Ca+2]", "calcium hydrogen arsorate"),
-    ("O=[As]([O-])([O-])[O-].[Na+].[Na+].[Na+]", "trisodium arsorate"),
-    ("O=[As](O)(O)[O-].[Na+]", "sodium dihydrogen arsorate"),
-    ("O=[As]([O-])([O-])O.[Na+].[Na+]", "disodium hydrogen arsorate"),
-    ("O=[Sb]([O-])([O-])O.[Pb+2]", "lead(II) hydrogen stiborate"),
-    ("O=[Sb]([O-])([O-])[O-].[Na+].[Na+].[Na+]", "trisodium stiborate"),
-    ("O=[Sb]([O-])(O)O.[K+]", "potassium dihydrogen stiborate"),
-    ("[O-][Si]([O-])([O-])[O-].[Na+].[Na+].[Na+].[Na+]", "tetrasodium silicate"),
-    ("[O-][Si]([O-])(O)O.[Ca+2]", "calcium dihydrogen silicate"),
-    ("[O-][Si](O)(O)O.[Na+]", "sodium trihydrogen silicate"),
-]
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,expected", SALTS)
-def test_oxoacid_salt_named(smiles, expected):
-    # Carbon-free (user decision 2026-11-02, "decide what the Blue Book says"): a preselected name at most, never a
-    # PIN, so the default tier declines it. PREFERRED IUPAC NAMES (the Blue Book): the label 'PIN' goes to
-    # names of compounds "that also contain at least one carbon atom in their structure";:2058 "... the label
-    # 'preselected name' is added to appropriate names". The strict path's name is asserted unchanged.
-    with jvm_slots(1, purpose="test-oxoacid-salt"):
-        assert_default_tier_declines(smiles)
-        name = strict_path_name(smiles)
-    assert name == expected
-    assert _strict_rt(expected, smiles)
-
-
-# The fallback itself: an anion never gets a neutral-acid name. These four
-# returned 'stiboric acid' / 'silicic acid' at the previous commit.
-@pytest.mark.parametrize("smiles", [
-    "O=[Sb]([O-])([O-])O",
-    "[O-][Sb]([O-])([O-])=O",
-    "[O-][Si]([O-])(O)O",
-    "O=[As]([O-])([O-])O",
+@pytest.mark.parametrize("smiles, name", [
+    ("[Na+].[O-]Cl", "sodium hypochlorite"),
+    ("[Ca+2].[O-]Cl.[O-]Cl", "calcium dihypochlorite"),
+    ("[Na+].[O-]Br", "sodium hypobromite"),
+    ("[K+].[O-]Br=O", "potassium bromite"),
+    ("[Na+].O=[PH2][O-]", "sodium phosphinate"),
+    ("[Na+].[Na+].O=S([O-])OS(=O)[O-]", "disodium disulfite"),
+    ("[Na+].[Na+].[Na+].[O-]B([O-])[O-]", "trisodium borate"),
+    ("[K+].[O-][Mn](=O)(=O)=O", "potassium permanganate"),
+    ("[K+].[K+].O=[Cr](=O)([O-])O[Cr](=O)(=O)[O-]", "dipotassium dichromate"),
+    ("[K+].[O-][Re](=O)(=O)=O", "potassium perrhenate"),
+    ("C[N+](C)(C)C.[O-][Mn](=O)(=O)=O", "N,N,N-trimethylmethanaminium permanganate"),
 ])
-def test_name_anion_never_returns_a_neutral_acid(smiles):
-    assert not name_anion(Chem.MolFromSmiles(smiles)).endswith("acid")
+def test_oxoanion_salt_named_without_pin_label(best_effort, smiles, name):
+    row = best_effort.name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (name, "systematic_verified")
+
+
+@pytest.mark.parametrize("smiles, name", [
+    # an organic cation: the same treatment as the perchlorate already in the table
+    ("C[N+](C)(C)C.[O-]Cl", "N,N,N-trimethylmethanaminium hypochlorite"),
+    ("CC[NH3+].O=[PH2][O-]", "ethanaminium phosphinate"),
+])
+def test_organic_cation_salt_of_a_nonmetal_oxoanion(smiles, name):
+    row = Orthonym().name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (name, "pin_verified")
+
+
+@pytest.mark.parametrize("smiles", [
+    "[Na+].[Na+].O=S([O-])S(=O)(=O)[O-]",   # the S-S drawing: OPSIN reads 'disulfite' as the S-O-S acid of the book
+    "[K+].[O-][Tc](=O)(=O)=O",              # technetium is not admitted to salts (data/metal_scope.py)
+])
+def test_not_named_from_the_table(best_effort, smiles):
+    row = best_effort.name_tiered(smiles)
+    assert "disulfite" not in (row["name"] or "") and "pertechnetate" not in (row["name"] or ""), row

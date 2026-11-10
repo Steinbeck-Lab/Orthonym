@@ -386,6 +386,41 @@ INORGANIC_ANIONS = {
     # exact for both, alone and in the onium salts.
     '[B-](F)(F)(F)F': 'tetrafluoroboranuide',        # BF4-
     'F[P-](F)(F)(F)(F)F': 'hexafluoro-λ5-phosphanuide',  # PF6-
+    'F[Sb-](F)(F)(F)(F)F': 'hexafluoro-λ5-stibanuide',   # SbF6-, the same method (1)
+    # program 22 (2026-11-10): the anions of the oxoacids of / ("All these names are preselected
+    # names", the Blue Book; the acids at:18435-18460: hypochlorous, bromous, boric, disulfurous
+    # '(HO)S(O)-O-S(O)(OH)', dithionous '(HO)(O)S-S(O)(OH)', dithionic) and of phosphinic, phosphorous and arsorous
+    # acids, '-ous acid' -> '-ite', '-ic acid' -> '-ate'; the oxoanions of Mn, Cr and Re, which
+    # data/metal_scope.py admits to ION_SALTS (Tc is not: no pertechnetate). Each read back by OPSIN 2.9.0 to the
+    # full key, alone and in a sodium or potassium salt. Not added: the S-S drawing O3S-SO2(2-) (OPSIN reads
+    # 'disulfite' as the S-O-S acid of the book), molybdate and tungstate (OPSIN reads neither), 'peroxide'.
+    '[O-]Cl': 'hypochlorite',                        # ClO-
+    '[O-]Br': 'hypobromite',                         # BrO-
+    '[O-]I': 'hypoiodite',                           # IO-
+    '[O-]Br=O': 'bromite',                           # BrO2-
+    '[O-]I=O': 'iodite',                             # IO2-
+    'O=[PH2][O-]': 'phosphinate',                    # H2PO2-
+    '[O-]P([O-])[O-]': 'phosphite',                  # PO3(3-), of phosphorous acid P(OH)3
+    '[O-]P([O-])O': 'hydrogen phosphite',
+    '[O-]P(O)O': 'dihydrogen phosphite',
+    'O=[PH]([O-])O': 'hydrogen phosphonate',         # beside 'phosphonate' above
+    '[O-]P([O-])OP([O-])[O-]': 'diphosphite',
+    '[O-][As]([O-])[O-]': 'arsorite',                # of arsorous acid, beside 'arsorate'
+    '[O-]B([O-])[O-]': 'borate',
+    'O=S([O-])OS(=O)[O-]': 'disulfite',              # disulfurous acid (HO)S(O)-O-S(O)(OH),:18435
+    'O=S([O-])S(=O)[O-]': 'dithionite',
+    'O=S(=O)([O-])S(=O)(=O)[O-]': 'dithionate',
+    '[O-]S[O-]': 'sulfanediolate',
+    '[S-][S-]': 'disulfanediide',
+    '[O-][O-]': 'dioxidanediide',                    # O2(2-); OPSIN does not read 'peroxide' alone
+    '[NH-]N': 'hydrazinide',
+    '[O-][Mn](=O)(=O)=O': 'permanganate',            # MnO4-
+    'O=[Mn](=O)([O-])[O-]': 'manganate',             # MnO4(2-)
+    'O=[Cr](=O)([O-])[O-]': 'chromate',              # CrO4(2-)
+    'O=[Cr](=O)([O-])O[Cr](=O)(=O)[O-]': 'dichromate',
+    'O=[Cr](=O)([O-])Cl': 'chlorochromate',
+    '[O-][Re](=O)(=O)=O': 'perrhenate',              # ReO4-
+    'O=[Re](=O)([O-])[O-]': 'rhenate',               # ReO4(2-)
 }
 
 
