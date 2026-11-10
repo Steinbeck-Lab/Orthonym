@@ -141,6 +141,7 @@ from .substituent_enumerator import (
 )
 from .n_substituent_stereo import cite_n_substituent_stereo
 from .straight_alkyl import straight_alkyl_name
+from .ring_branch import ring_branch_atoms as _ring_branch
 from .fused_het_inner_subs import detect_fused_het_inner_subs
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment, retained_benzyl
 from ..perception.smarts_cache import compiled as _compiled_smarts
@@ -9493,11 +9494,11 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # a porphyrin as "cyclononacosyl").
         if len(ring_atom_set) > len(ring_atoms):
             _full_ring = tuple(sorted(ring_atom_set))
-            _full_name = get_ring_substituent_name(
-                features.mol, _full_ring, _ring_attach_atom)
+            _full_name = get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom)
             if _full_name is None and _tier_general:
                 _full_name = _general_ring_prefix(features.mol, _full_ring, _ring_attach_atom, lambda: (
-                    get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom, allow_mancude=True)))
+                    get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom, allow_mancude=True,
+                                              substituent_atoms=_ring_branch(features.mol, ring_atom_set, chain_set))))
             # Accept the full-system name only if it produced a retained / routed
             # name (not a generic cyclo-name). a phase SUBST-01: get_ring_substituent_name
             # may now return None (fail-closed for an unnameable polycyclic) — fall
@@ -9506,16 +9507,15 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 base_name = _full_name
             else:
                 # Full system produced generic cyclo-name / None; use SSSR ring
-                base_name = get_ring_substituent_name(
-                    features.mol, ring_atoms, _ring_attach_atom)
+                base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
         else:
-            base_name = get_ring_substituent_name(
-                features.mol, ring_atoms, _ring_attach_atom)
+            base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
         # ADDITIVE-ONLY general-tier retry, same contract as the decorated-ring
         # branch above: only where the PIN route named nothing.
         if base_name is None and _tier_general:
             base_name = _general_ring_prefix(features.mol, ring_atoms, _ring_attach_atom, lambda: (
-                get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom, allow_mancude=True)))
+                get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom, allow_mancude=True,
+                                          substituent_atoms=_ring_branch(features.mol, ring_atom_set, chain_set))))
         # a phase SUBST-01: a None base_name (unnameable ring) must not reach the
         # string assembly below, and must not drop the ring either.
         #
@@ -9630,18 +9630,8 @@ def _with_ring_yl_descriptor(mol, ring_atoms, chain_set: set, attach_atom, ring_
     descriptor from it, or declines."""
     if attach_atom is None or not ring_name or ring_name.startswith('('):
         return ring_name
-    branch = set(ring_atoms)
-    stack = list(ring_atoms)
-    while stack:
-        cur = stack.pop()
-        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
-            ni = nb.GetIdx()
-            if ni in branch or ni in chain_set or nb.GetAtomicNum() <= 1:
-                continue
-            branch.add(ni)
-            stack.append(ni)
     from .substituent_naming import ring_yl_attachment_descriptor
-    descriptor = ring_yl_attachment_descriptor(mol, branch, attach_atom, ring_name=ring_name)
+    descriptor = ring_yl_attachment_descriptor(mol, _ring_branch(mol, ring_atoms, chain_set), attach_atom, ring_name=ring_name)
     return f'{descriptor}-{ring_name}' if descriptor else ring_name
 
 

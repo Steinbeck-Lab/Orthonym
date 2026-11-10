@@ -2398,7 +2398,7 @@ def _name_ring_system_substituent(
     if frag_ring_atoms == frag_set and ring_info.NumAtomRings(attach_idx) > 0:
         try:
             name = get_ring_substituent_name(mol, tuple(frag_atoms), attach_idx,
-                                             allow_mancude=allow_mancude)
+                                             allow_mancude=allow_mancude, substituent_atoms=frag_set)
         except Exception:
             name = None
         if name is not None and not name.startswith('('):
@@ -3392,6 +3392,7 @@ def get_ring_substituent_name(
     ring_atoms: Tuple[int, ...],
     attachment_point: Optional[int] = None,
     allow_mancude: bool = False,
+    substituent_atoms=None,
 ) -> Optional[str]:
     """
     Get the substituent name for a ring when it becomes a substituent on a chain.
@@ -3409,6 +3410,7 @@ def get_ring_substituent_name(
                        fused-aromatic systems) is named via the universal
                        von-Baeyer cage engine as a ``...-<loc>-yl`` polyene.
                        Default False keeps every existing caller byte-identical.
+        substituent_atoms: the group being named, parent excluded (``terminal_ring_yl_name``; ``allow_mancude`` only).
 
     Returns:
         Substituent name string (e.g., 'phenyl', 'cyclohexyl', '2-pyridyl'), or
@@ -3572,10 +3574,10 @@ def get_ring_substituent_name(
         # Gated on ``allow_mancude`` so the PIN default keeps the fail-closed
         # refusal below, byte-identical.
         if allow_mancude and attachment_point is not None:
-            from .terminal_ring import terminal_ring_name
-            _t = terminal_ring_name(mol, sorted(ring_atoms), attachment_point)
+            from .terminal_ring import terminal_ring_yl_name
+            _t = terminal_ring_yl_name(mol, ring_atoms, attachment_point, substituent_atoms)
             if _t is not None:
-                return _t.name
+                return _t
 
         # Fail-closed: an unidentifiable ring system (the old generic
         # ``cyclo{N}yl`` size-guess named a DIFFERENT molecule — norbornane as
@@ -3614,11 +3616,10 @@ def get_ring_substituent_name(
                 if _j in _ring_set_c and _i < _j and \
                         mol.GetBondBetweenAtoms(_i, _j).GetBondTypeAsDouble() >= 2.0:
                     if allow_mancude and attachment_point is not None:
-                        from .terminal_ring import terminal_ring_name
-                        _tc = terminal_ring_name(
-                            mol, sorted(ring_atoms), attachment_point)
+                        from .terminal_ring import terminal_ring_yl_name
+                        _tc = terminal_ring_yl_name(mol, ring_atoms, attachment_point, substituent_atoms)
                         if _tc is not None:
-                            return _tc.name
+                            return _tc
                     return None
 
     # Wave2: heteromonocyclic analog — mancude parent + hydro
@@ -3656,11 +3657,10 @@ def get_ring_substituent_name(
                         # answer here instead of abstaining. The PIN default keeps
                         # the refusal, byte-identical.
                         if allow_mancude and attachment_point is not None:
-                            from .terminal_ring import terminal_ring_name
-                            _t6 = terminal_ring_name(
-                                mol, sorted(ring_atoms), attachment_point)
+                            from .terminal_ring import terminal_ring_yl_name
+                            _t6 = terminal_ring_yl_name(mol, ring_atoms, attachment_point, substituent_atoms)
                             if _t6 is not None:
-                                return _t6.name
+                                return _t6
                         return None
 
     # IUPAC: a monocyclic heteroaryl substituent takes

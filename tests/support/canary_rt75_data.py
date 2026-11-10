@@ -1946,7 +1946,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCC(=O)OCC(=O)[C@@]1(O)CC[C@H]2[C@@H]3CCC4=CC(=O)CC[C@]4(C)[C@H]3[C@@H](O)C[C@@]21C",  # fused-ring,polyfunctional,large,steroid
-        "(8S,9S,10R,11S,13S,14S,17R)-11,17-dihydroxy-3,20-dioxopregn-4-en-21-yl octanoate",
+        "2-[(8S,9S,10R,11S,13S,14S,17R)-11,17-dihydroxy-10,13-dimethyl-3-oxo-2,3,6,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-2-oxoethyl octanoate",  # cage-loop: the steroid has its fusion name (user decision 2026-10-31;:50943 gives no PIN to the stereoparent); OPSIN 2.9.0 full InChIKey exact; was '(8S,9S,10R,11S,13S,14S,17R)-11,17-dihydroxy-3,20-dioxopregn-4-en-21-yl octanoate'
     ),
     (
         "COc1cc(O)cc(O)c1",  # aromatic,small
@@ -2954,7 +2954,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OCC(=O)[C@@]1(O)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C",  # fused-ring,polyfunctional,large,steroid
-        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11,17-dihydroxy-16-methyl-3,20-dioxopregn-1,4-dien-21-yl acetate",
+        "2-[(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11,17-dihydroxy-10,13,16-trimethyl-3-oxo-6,7,8,9,10,11,12,13,14,15,16,17-dodecahydro-3H-cyclopenta[a]phenanthren-17-yl]-2-oxoethyl acetate",  # cage-loop: the fusion name, as the row above; OPSIN 2.9.0 full InChIKey exact; was the DK-P101CIP stereoparent name '...-3,20-dioxopregna-1,4-dien-21-yl acetate' (canary call 691)
     ),
     (
         "CC(O)CCCCCCCCCC(=O)[O-]",  # acyclic,charged,small

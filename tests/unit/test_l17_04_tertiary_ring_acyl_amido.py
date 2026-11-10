@@ -251,13 +251,19 @@ _PASS_3_ROWS = [
      "1-amino-4-(2-amino-1,3-diazaprop-1-en-1-ium-1-yl)-1-oxobutane",
      _SAME),
     ("C[C@]12CC[C@@H]3[C@@H]([C@@H]1CC[C@@]2(C)O)CCC4=CC(=CC[C@@]34C)NOCC(=O)NCC(=O)O",
-     "N-[({[(1R,2S,10S,11S,14R,15S)-14-hydroxy-2,14,15-trimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptade"
-     "ca-4,6-dien-5-yl]amino}oxy)acetyl]glycine",
-     _SAME),
+     # cage-loop: the steroid ring takes its fusion name:23710, "Fusion nomenclature gives preferred IUPAC
+     # names only to compounds having at least two rings of at least five or more members"); at complete the N-acyl
+     # glycine takes its acetic acid name names are not PINs;:2648 '2,2',2''-nitrilotriacetic acid (PIN)'
+     # over 'N,N-bis(carboxymethyl)glycine'). Both read back to the full InChIKey on OPSIN 2.9.0.
+     "N-[({[(8S,9R,10S,13S,14S,17R)-17-hydroxy-10,13,17-trimethyl-6,7,8,9,10,11,12,13,14,15,16,17-dodecahydro-1H-cyclope"
+     "nta[a]phenanthren-3-yl]amino}oxy)acetyl]glycine",
+     "[2-({[(8S,9R,10S,13S,14S,17R)-17-hydroxy-10,13,17-trimethyl-6,7,8,9,10,11,12,13,14,15,16,17-dodecahydro-1H-cyclop"
+     "enta[a]phenanthren-3-yl]amino}oxy)acetamido]acetic acid"),
     (_DEPSIPEPTIDE[0], _DEPSIPEPTIDE[1], _DEPSIPEPTIDE[1]),
     ("COc1c(C(SCC(NC(=O)CCC(N)C(=O)O)C(=O)NCC(=O)O)C(O)C=O)cc2c(c1OC)OCO2",
-     "4-[1-({2-(4-amino-4-carboxybutanamido)-3-[(carboxymethyl)amino]-3-oxopropyl}sulfanyl)-2-h"
-     "ydroxy-3-oxopropyl]-2,3-dimethoxy-7,9-dioxabicyclo[4.3.0]nona-1,3,5-triene",
+     # cage-loop: the fusion name '2H-1,3-benzodioxole':23710); OPSIN 2.9.0 full InChIKey exact
+     "6-[1-({2-(4-amino-4-carboxybutanamido)-3-[(carboxymethyl)amino]-3-oxopropyl}sulfanyl)-2-h"
+     "ydroxy-3-oxopropyl]-4,5-dimethoxy-2H-1,3-benzodioxole",
      _SAME),
     ("CCCCCCCCCCCCCCCCCCN(C(CC(=O)O)C(=O)O)C(=O)C(CC(=O)N)S(=O)(=O)O",
      "N-(4-amino-4-oxo-2-sulfobutanoyl)-2-(octadecylamino)butanedioic acid",

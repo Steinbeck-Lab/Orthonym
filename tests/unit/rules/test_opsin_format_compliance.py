@@ -632,10 +632,8 @@ CANARY_KNOWN_DEFECTS = {
         "2-hydroxy-5,5-dimethyl-11,13-dioxatetracyclo[7.5.1.0^1,6.0^12,15]pentadec-8-ene-4,14-dione",
         "DK-VBFUSED", (688,),
     ),
-    "CC(=O)OCC(=O)[C@@]1(O)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
-        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11,17-dihydroxy-16-methyl-3,20-dioxopregna-1,4-dien-21-yl acetate",
-        "DK-P101CIP", (691,),
-    ),
+    # 691 left (cage-loop): the steroid ester has its fusion name now, '2-[...-3H-cyclopenta[a]phenanthren-17-yl]-2-oxoethyl
+    # acetate' (user decision 2026-10-31;:50943 gives no PIN to the stereoparent); OPSIN 2.9.0 full InChIKey exact.
 }
 
 
