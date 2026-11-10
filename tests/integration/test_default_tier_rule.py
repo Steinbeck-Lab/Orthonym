@@ -311,11 +311,19 @@ def test_a_declined_metal_compound_does_not_say_its_element_is_unsupported(capsy
 
 
 def test_a_true_unsupported_element_decline_keeps_its_own_text():
-    # the covalent drawing [Na]Cl: no name is built, the reason is UNSUPPORTED_ELEMENT
-    row = Orthonym().name_tiered("[Na]Cl")
+    # the covalent drawing Cl[Ca]Cl (Group 2 is not admitted to DISCONNECT): no name is built, the reason is
+    # UNSUPPORTED_ELEMENT
+    row = Orthonym().name_tiered("Cl[Ca]Cl")
     assert row["limit_code"] == "UNSUPPORTED_ELEMENT", row
-    assert row["name"] == "sodium compound (not supported)", row
-    assert name_compound("[Na]Cl", on_failure="label") == "sodium compound (not supported)"
+    assert row["name"] == "calcium compound (not supported)", row
+    assert name_compound("Cl[Ca]Cl", on_failure="label") == "calcium compound (not supported)"
+
+
+def test_a_bonded_group1_drawing_is_named_on_its_ionic_drawing():
+    # program 22 (2026-11-09): sodium is admitted to DISCONNECT, so [Na]Cl is named through [Na+].[Cl-]; a
+    # carbon-free name is no PIN (the contributor guide, scope), so the PIN tier declines and the default cascade names it
+    assert Orthonym().name_tiered("[Na]Cl")["limit_code"] == "NO_VERIFIED_PIN"
+    assert name_compound("[Na]Cl", on_failure="label") == "sodium chloride"
 
 
 # --- review fixes (delta review of the default-tier rule) -------------------------

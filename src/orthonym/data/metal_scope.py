@@ -159,7 +159,7 @@ producer names fails for want of a name and not for want of support of the eleme
 label of such an input is ``UNNAMEABLE`` and not ``UNSUPPORTED_ELEMENT``
 (``errors.classify_failure_limit``, through ``has_complete_scope``). The elements of Groups 1 and 2
 are admitted to ``ION_SALTS``, ``CARBANION_SALTS`` and ``ZERO_VALENT`` (magnesium also to ``MACROCYCLE`` and
-``DISCONNECT``) and are not complete: their failures keep their label.
+``DISCONNECT``, lithium to caesium also to ``DISCONNECT``) and are not complete: their failures keep their label.
 
 The valences are the charges of the cation that a rewrite of the structure may give the metal
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
@@ -198,6 +198,8 @@ class MetalScope:
 #: the elements of Groups 1 and 2: the Blue Book's INTRODUCTION counts them with the
 #: transition elements for the status of the names of organometallic compounds
 GROUP_1 = ("Li", "Na", "K", "Rb", "Cs", "Fr")
+#: the Group 1 metals admitted to ``DISCONNECT`` (program 22, 2026-11-09)
+GROUP_1_DISCONNECT = ("Li", "Na", "K", "Rb", "Cs")
 GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 
 #: the metals admitted to ``ZERO_VALENT`` alone: the 28 of the 30 most frequent metals of PubChem's
@@ -244,7 +246,12 @@ ELEMENT_ONLY_METALS = ("Tc", "Pm", "Th", "Pa", "Np", "Pu", "Am", "Cm", "Bk", "Cf
 METAL_SCOPE: Dict[str, MetalScope] = {
     # the hydride of a Group 1 or 2 salt (``[Na+].[H-]``), its carbanions and the neutral atom beside ions
     # ('potassium(0)'): the lane of 2026-10-30; the atom and the ion alone ('sodium(1+)'): lane LONE
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}), frozenset({1}))
+    # and (program 22, 2026-11-09) the bonded drawing of a salt, 'C(=O)O[Li]' named on its ionic drawing ('lithium
+    #...carboxylate', ``DISCONNECT``, systematic_verified): Li, Na, K, Rb and Cs, each measured on the SureChEMBL
+    # rows with that metal bonded (+211, +233, +59, +2, +6 named, none lost or changed); francium had no row
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL})
+                          | (frozenset({DISCONNECT}) if symbol in GROUP_1_DISCONNECT else frozenset()),
+                          frozenset({1}))
        for symbol in GROUP_1},
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}), frozenset({2}))
        for symbol in GROUP_2},
