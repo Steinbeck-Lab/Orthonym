@@ -80,9 +80,14 @@ TELLURANE_NAME = "(3R)-3-methyl-1-oxo-1λ4-tellurolane"
 def test_a_name_that_leaves_out_a_configuration_inchi_sees_is_not_shipped(tier):
     # the N of the N-aryl aziridine: RDKit drops its tag, the standard InChI keeps it (the key of
     # '(1R,2S)-2-methyl-1-phenylaziridine' is the input's, that of '(2S)-...' is not), so the name that leaves it
-    # out is not the input: declined at every tier
+    # out is not the input: never shipped. The PIN tier declines; best-effort cites the nitrogen
+    # (``assembly/aziridine_nitrogen.py``, 2026-11-10): from the CH2, the lone pair, C-2 and the phenyl run
+    # anticlockwise ('@'), Ph > C-2 > C-3 > lone pair, so N-1 is R, the Blue Book)
     res = _row(ARYL_AZIRIDINE, tier)
-    assert res.get("tier") == "abstain", res
+    if tier == "pin":
+        assert res.get("tier") == "abstain", res
+    else:
+        assert (res.get("name"), res.get("source")) == ("(1R,2S)-2-methyl-1-phenylaziridine", "aziridine_nitrogen")
     assert not lpr.dropped_centres_invisible_to_inchi(ARYL_AZIRIDINE)
 
 

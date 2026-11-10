@@ -30,6 +30,7 @@ from .isotope_retained_skeleton import retained_skeleton_dropped
 from ..data.locant_text import render_locants
 from ..data.multipliers import multiplier_table
 from . import isotope_oxoacid as _oxoacid
+from . import isotope_slots as _slots
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_licence import apply_unit_licences, unit_has_no_free_position
@@ -918,7 +919,8 @@ def _insertion_offsets(skel: str) -> List[int]:
     # ('[9,24-dioxahexacyclo...') or the heteroatom locants of a benzo-fused ring
     # ('(1,2-benzoxazol-3-yl)'): the slot right after the mark
     # (``_BRACKET_SKELETAL_LOCANT_RE``, ``_BRACKET_BENZO_LOCANT_RE``). RT-gated.
-    from .isotope_slots import BRACKET_HW_LOCANT_RE
+    from .isotope_slots import BRACKET_HW_LOCANT_RE, COMPONENT_LOCANT_START_RE
+    offsets.extend(m.start() for m in COMPONENT_LOCANT_START_RE.finditer(skel))
     offsets.extend(m.start() + 1
                    for regex in (_BRACKET_SKELETAL_LOCANT_RE, _BRACKET_BENZO_LOCANT_RE, BRACKET_HW_LOCANT_RE)
                    for m in regex.finditer(skel))
@@ -4205,6 +4207,8 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     if name is None:
         from .isotope_hydro_locants import decorate_with_hydro_locants
         name = decorate_with_hydro_locants(stripped, _passes)
+    if name and "—" in name:    # the components without a label keep their unmodified names
+        name = _slots.unlabelled_components_kept(name, _name_skeleton(namer, Chem.MolToSmiles(stripped)), original)
     return name
 
 
