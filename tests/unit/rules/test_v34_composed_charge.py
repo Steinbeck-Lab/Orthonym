@@ -710,8 +710,17 @@ def test_ws_noabstain_isoflavone_phenolate_mancude_cage_names_full_rt():
     # only to compounds having at least two rings of at least five or more members";
     #:24221 hydro prefixes;:24864 a ring C=O cited as 'oxo').
     # OPSIN 2.9.0 reads this name back to the input's full InChIKey.
-    assert name == ("6-methoxy-3-(4-methoxy-7,9-dioxabicyclo[4.3.0]nona-1,3,5-"
-                    "trien-3-yl)-7-oxido-4-oxo-4H-1-benzopyran")
+    # change-asserted-value, was '6-methoxy-3-(4-methoxy-7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-3-yl)-7-oxido-4-oxo-4H-1-
+    # benzopyran': the benzodioxole is a fusable ring system the catalogue has no entry for, and the writers of the floor
+    # now take its parent from the tables of the PIN fusion lane (``fused_forms._printed_parents``). (1)
+    # "Five-membered ring requirement" (the Blue Book): "Fusion nomenclature gives preferred IUPAC names only to
+    # compounds having at least two rings of at least five or more members" (6 + 5 here); "Citation of indicated hydrogen" (:14603,:14624) "Omission of
+    # indicated hydrogen is also permitted in general nomenclature... for example 1,3-benzodioxole, rather than
+    # 2H-1,3-benzodioxole": the PIN cites the 2H. (2) OPSIN 2.9.0 reads the name to the input's full InChIKey (the
+    # assertion below), and the PIN tier already names the ring '2H-1,3-benzodioxol-5-yl'. (3) mutation: with
+    # ``_printed_parents`` returning  the von Baeyer name comes back and this assertion fails.
+    assert name == ("6-methoxy-3-(6-methoxy-2H-1,3-benzodioxol-5-yl)-7-oxido-4-oxo-4H-1-"
+                    "benzopyran")
     assert verified == name  # full-InChIKey CONFIRMED
 
 

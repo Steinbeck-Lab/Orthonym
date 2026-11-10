@@ -3416,7 +3416,8 @@ def _book_fused_spine(ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSe
     ring = sorted(ring_atoms)
     try:
         form = fused_system_form(view, ring, attach_hint,
-                                 branch_carriers(view, ring, attach_hint, within=component))
+                                 branch_carriers(view, ring, attach_hint, within=component),
+                                 printed_parents=True)
     except Exception:  # noqa: BLE001 - a producer that raises is a decline
         return None
     if form is None:

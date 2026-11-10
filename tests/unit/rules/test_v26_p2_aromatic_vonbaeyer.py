@@ -69,17 +69,35 @@ AROMATIC_FUSED_CASES = [
     # predates the compound-locant-count/cited-set tiers in
     # ``VonBaeyerAnalyzer._unsaturation_locant_key`` (polycyclic.py) and was
     # an arbitrary atom-index backstop pick.
-    # (the engine's own string; the full namer names this cage with its fusion name at
-    # both tiers, FUSION_NAMED_CAGES below)
+    # The engine's own string is the fusion name since the best-effort writers take the parent
+    # tables of the PIN fusion lane (``fused_forms._printed_parents``), as the full namer does at
+    # both tiers (FUSION_NAMED_CAGES below). change-asserted-value, was
+    # 'tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene' (kept as VB_SPELLINGS below):
+    # (1) "Five-membered ring requirement" (the Blue Book): "Fusion nomenclature gives
+    # preferred IUPAC names only to compounds having at least two rings of at least five or more
+    # members" (5 + 6 + 6 here), and the book prints the parent: '1H-cyclopenta[b]naphthalene-1,5,8-trione
+    # (PIN)' (:24748); (2) the engine now agrees with the full namer's own producer (FUSION_NAMED_CAGES),
+    # and OPSIN 2.9.0 reads the name to the input's full InChIKey (test_fusion_named_cages_round_trip);
+    # (3) mutation: with ``_printed_parents`` returning  this assertion fails.
     ("C1=Cc2cc3ccccc3cc2C1",            # 1H-cyclopenta[b]naphthalene
-     "tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene"),
+     "1H-cyclopenta[b]naphthalene"),
     # 1-benzoxonine and 1-benzothionine used to be here: see
     # BENZO_HETERO_FUSION_CASES (their benzo names are the PINs).
     # benzocycloheptene and benzosuberane used to be here: see
     # BENZO7_FUSION_CASES (their fusion names are the PINs).
-    ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclooctene
-     "bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
+    # change-asserted-value, was 'bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene' (VB_SPELLINGS below):
+    # (:23710) as above (6 + 9 members), and the book prints the parent: "The δ-convention"
+    # (:14657), '8δ2-benzo[9]annulene (PIN)' (:14661); the full namer names the cage so too (FUSION_NAMED_CAGES); OPSIN 2.9.0 round trip exact.
+    ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclononene
+     "5H-benzo[9]annulene"),
 ]
+
+# The von Baeyer spelling of the two cages the engine now names by fusion: the analysis (numbering, the
+# compound locants of the double bonds) is unchanged and still the spelling when no fusion name is allowed.
+VB_SPELLINGS = {
+    "C1=Cc2cc3ccccc3cc2C1": "tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene",
+    "C1=CC=CC=Cc2ccccc2C1": "bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene",
+}
 
 # Cages of AROMATIC_FUSED_CASES that the full namer names with the fusion name at BOTH
 # tiers (the engine alone still returns the von Baeyer polyene above). N5b: a carbon-only
@@ -271,6 +289,14 @@ def test_engine_exact_string_and_e1(smiles, expected):
     assert res.name == expected, f"{smiles}: {res.name!r} != {expected!r}"
     verdict = verify_certificate(mol, res)
     assert verdict.ok, f"E1 failed for {smiles}: {verdict.reason}"
+
+
+@pytest.mark.parametrize("smiles,expected", sorted(VB_SPELLINGS.items()))
+def test_the_von_baeyer_analysis_of_a_fusion_named_cage_keeps_its_spelling(smiles, expected):
+    from orthonym.rules.polycyclic import _build_parent_with_unsaturation
+    cage = analyze_cage_universal(Chem.MolFromSmiles(smiles), allow_mancude=True)
+    assert cage.hetero_prefix + cage.descriptor + _build_parent_with_unsaturation(
+        cage.total_atoms, cage.unsaturation) == expected
 
 
 # --------------------------------------------------------------------------

@@ -119,7 +119,16 @@ def test_symmetric_halves_keep_their_stereodescriptors_and_the_z_takes_the_lower
     stereo and could swap the halves, so the name followed the spelling."""
     smiles = "CC(=O)N/N=C/1\\CC2=C/C(=N\\NC(=O)C)/CC2=C1"
     names = {be(s)["name"] for s in spellings(smiles, SPELLINGS)}
-    assert names == {"(3Z,7E)-3,7-bis(acetylhydrazinylidene)bicyclo[3.3.0]octa-1(8),4-diene"}, names
+    # change-asserted-value, was '(3Z,7E)-3,7-bis(acetylhydrazinylidene)bicyclo[3.3.0]octa-1(8),4-diene': the cage is a
+    # fusable ring system (two five-membered rings), and the best-effort writers now take its parent from the tables of
+    # the PIN fusion lane (``fused_forms._printed_parents``). (1) "Five-membered ring requirement"
+    # (the Blue Book): "Fusion nomenclature gives preferred IUPAC names only to compounds having at least two
+    # rings of at least five or more members"; the book prints 'pentalene (PIN)' (:11459). (2) OPSIN 2.9.0 reads the name
+    # to the input's full InChIKey, and the property of this test still holds for it: one name for every spelling, the
+    # Z descriptor at the lower locant (2Z, 5E). (3) mutation: with ``_printed_parents`` returning  the von Baeyer name
+    # returns and this assertion fails. Open: the numbering of a fused parent ranks (c), (e), (f) and then the canonical
+    # atom order, not (j); that the Z takes the lower locant here is measured over these spellings, not derived.
+    assert names == {"(2Z,5E)-2,5-bis(acetylhydrazinylidene)-1,2,4,5-tetrahydropentalene"}, names
 
 
 @pytest.mark.unit

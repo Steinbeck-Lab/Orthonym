@@ -3368,7 +3368,7 @@ def _terminal_bare_ring_substituent(mol, frag_atoms, attach_idx):
     if seen != frag:
         return None
     from ..rules.terminal_ring import terminal_ring_name
-    result = terminal_ring_name(mol, sorted(frag), attach_idx)
+    result = terminal_ring_name(mol, sorted(frag), attach_idx, substituent_atoms=frag)
     return result.name if result is not None else None
 
 

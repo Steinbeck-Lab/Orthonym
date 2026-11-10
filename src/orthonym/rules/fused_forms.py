@@ -175,14 +175,48 @@ def _halogen_benzo_parents(mol, ring):
 _ITALIC_STEM = re.compile(r'^(?:as|s)-')
 
 
+def _printed_parents(mol, ring):
+    """The parents of ``ring`` that the parent tables of the PIN fusion lane hold, in the shape of the catalogue's
+    candidates (``_resolve_oxo_parent``): ``(name, [(atom -> locant, {})], no intrinsic indicated hydrogen)``, or ````.
+
+    The catalogue (``data.fused_heterocycles``, ``data.polycyclic_data``) has no entry for a skeleton such as 1,3-benzodioxole,
+    whose name "Heteromonocyclic components fused to a benzene ring" (the Blue Book) forms and the book prints ('1,3-benzodioxole', ``parent_table.BB_PARENTS``),
+    so the writers spelled its von Baeyer name ('7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-3-yl') although
+    "Five-membered ring requirement" (:23710) gives it a fusion name: "Fusion nomenclature gives preferred IUPAC names only to
+    compounds having at least two rings of at least five or more members". The tables name the skeleton and number it;
+    the indicated hydrogen and the hydro prefixes come from the structure, as for a catalogue parent ('2H-1,3-benzodioxole':
+    the CH2 between the two oxygens). A name assembled from components and numbered by OPSIN's reading of it is not taken
+    (``tables_only``): that needs a JVM, and it is the part of the class this does not build."""
+    from .bridged_fused_pin.parents import fused_parent
+    try:
+        found = fused_parent(mol, ring, tables_only=True)
+    except Exception:  # noqa: BLE001 - a producer that raises is a decline
+        return []
+    if found is None:
+        return []
+    return [(found.name, [(dict(numbering), {}) for numbering in found.numberings], frozenset())]
+
+
 def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
-                      branch_atoms: Sequence[int] = (), suffix_atoms: Sequence[int] = ()) -> Optional[FusedForm]:
+                      branch_atoms: Sequence[int] = (), suffix_atoms: Sequence[int] = (),
+                      printed_parents: bool = False) -> Optional[FusedForm]:
     """The fusion name and numbering of the ring system ``ring_atoms``, or ``None``.
 
     ``branch_atoms`` lists the ring atoms that carry a substituent prefix, once per prefix
      (f)); ``free_valence_atom`` is the ring atom of the free valence of a
     substituent prefix, ``None`` for a parent. Every atom of either kind must take a
-    numbered (not lettered) locant."""
+    numbered (not lettered) locant.
+
+    ``printed_parents``: a skeleton the catalogue has no entry for takes the parent the PIN fusion lane's tables hold
+    (``_printed_parents``). Off by default, so ``ring_substituents``, ``strict_ring_prefix`` and the other writers
+    that call this without it keep the catalogue alone. On for ``terminal_ring._book_fused``, which runs at every
+    tier: a fusable system the catalogue lacks (the steroid skeleton, 'cyclopenta[a]phenanthrene') can therefore
+    reach the PIN tier through that writer, with the fusion name and the hydro prefixes of (:24221) in
+    place of a von Baeyer or stereoparent spelling. That is intended: steroids take the systematic fusion name at the
+    PIN tier (user decision 2026-10-31), and "Numbering fused ring systems" (the Blue Book,:12493):
+    "Anthracene, phenanthrene, acridine, carbazole, xanthene and its chalcogen analogues, purine, and
+    cyclopenta[a]phenanthrene are exceptions; traditional numberings are retained", which the parent table carries.
+    The floor's fused spine and the general engine, best-effort writers, pass it too."""
     from ..assembly.book_prefixes import book_forms_enabled
     if not book_forms_enabled():
         return None
@@ -201,6 +235,8 @@ def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optiona
         except Exception:  # noqa: BLE001 - a resolver that raises is a decline
             logger.info("fused_forms: the parent resolver raised; decline")
             return None
+        if not candidates and printed_parents:
+            candidates = _printed_parents(mol, ring)
     from . import ring_hydrogen as rh_rule
     from .bridged_fused_pin import hydro
     from .monocycle_forms import free_valence_carries_indicated_hydrogen
@@ -324,7 +360,7 @@ _KETONE_MULTIPLIERS = multiplier_table(6)
 
 
 def fused_system_ketone_form(mol, ring_atoms: Iterable[int], suffix_atoms: Iterable[int],
-                             branch_atoms: Sequence[int] = ()) -> Optional[FusedKetoneForm]:
+                             branch_atoms: Sequence[int] = (), printed_parents: bool = False) -> Optional[FusedKetoneForm]:
     """The fusion name and numbering of the ring system ``ring_atoms`` with the ring C=O
     groups on ``suffix_atoms`` cited as the '-one' suffix, or ``None``.
 
@@ -339,7 +375,8 @@ def fused_system_ketone_form(mol, ring_atoms: Iterable[int], suffix_atoms: Itera
     ,,:25036-:25044) (c) indicated hydrogen, (d) the suffix, (e) added
     hydrogen, (f) hydro prefixes, (g) the prefixes (``branch_atoms``: the ring atoms that carry
     a substituent prefix, once per prefix; the suffix atoms are not among them), then a
-    canonical-rank tie-break so the input atom order never decides.
+    canonical-rank tie-break so the input atom order never decides. ``printed_parents``: as for
+    ``fused_system_form``.
 
     Out of scope (``None``; the caller keeps its prefix spelling): what ``fused_system_form``
     declines, a suffix atom that is not a ring atom, a numbering with a lettered locant on a
@@ -359,6 +396,8 @@ def fused_system_ketone_form(mol, ring_atoms: Iterable[int], suffix_atoms: Itera
     except Exception:  # noqa: BLE001 - a resolver that raises is a decline
         logger.info("fused_forms: the parent resolver raised; decline")
         return None
+    if not candidates and printed_parents:
+        candidates = _printed_parents(mol, ring)
     from . import ring_hydrogen as rh_rule
     needed = list(branch_atoms) + sorted(suffix)
     ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))

@@ -601,12 +601,21 @@ def _kekulized_copy(mol, ring_atoms):
 
 def terminal_ring_name(
     mol, ring_atoms: Sequence[int], free_valence_atom: Optional[int] = None,
+    substituent_atoms=None,
 ) -> Optional[TerminalRingName]:
     """The audited terminal name for one connected ring system.
 
     ``ring_atoms`` must be the skeletal atoms of a single connected ring system
     (the caller owns the partition). ``free_valence_atom`` makes it a ``-yl``
     substituent token numbered per; ``None`` yields the parent hydride.
+
+    ``substituent_atoms`` (``mol`` indices; default ``None``: the ring system is the parent of
+    ``mol``) is the atom set of the group being named, the ring system with its own decorations,
+    when the ring system is a SUBSTITUENT of the rest of ``mol``. A cage's neighbour outside it is
+    then the parent its free valence is bonded to: a free valence for (c) "principal
+    characteristic groups and free valences (suffixes)" (the Blue Book), not a detachable
+    prefix for (f) and (g). Without it the bond back to the parent was named as a prefix of the cage,
+    and that prefix holds the parent's own cages, which did the same in turn.
 
     Returns ``None`` only when the ring system is out of the module's stated
     scope (see the module docstring) or when the emitted name FAILS its
@@ -685,7 +694,14 @@ def terminal_ring_name(
     # rank >= 2: the audited universal analyzers, unchanged. They run their own
     # reconstruction audits internally (audit_von_baeyer_descriptor /
     # audit_spiro_descriptor) and return None on any mismatch.
-    return _polycyclic_terminal_name(mol, ring, free_valence_atom)
+    return _polycyclic_terminal_name(mol, ring, free_valence_atom, substituent_atoms)
+
+
+def terminal_ring_yl_name(mol, ring_atoms, attach: int, substituent_atoms=None) -> Optional[str]:
+    """The ``-yl`` name of ``terminal_ring_name`` as a string, or ``None``: the systematic ring namer of the
+    substituent producers, which hold a group (``substituent_atoms``: see ``terminal_ring_name``) or none."""
+    result = terminal_ring_name(mol, sorted(ring_atoms), attach, substituent_atoms)
+    return result.name if result is not None else None
 
 
 def _hantzsch_widman_names_halogen_ring(mol, ring, attach: Optional[int] = None) -> bool:
@@ -760,7 +776,8 @@ def _book_fused(mol, ring, free_valence_atom) -> Optional[TerminalRingName]:
     ring_atoms = sorted(ring)
     try:
         form = fused_system_form(mol, ring_atoms, free_valence_atom,
-                                 branch_carriers(mol, ring_atoms, free_valence_atom))
+                                 branch_carriers(mol, ring_atoms, free_valence_atom),
+                                 printed_parents=True)
     except Exception:  # noqa: BLE001 - a producer that raises is a decline
         return None
     if form is None:
@@ -775,9 +792,14 @@ def _book_fused(mol, ring, free_valence_atom) -> Optional[TerminalRingName]:
                             basis='fused_book', cites_locant=form.cites_locant(fv_loc))
 
 
-def _polycyclic_terminal_name(mol, ring, free_valence_atom):
+def _polycyclic_terminal_name(mol, ring, free_valence_atom, substituent_atoms=None):
     """Delegate to the existing audited cage / spiro analyzers -- after the fusion
-    name of a fusable system (roadmap N5b, ``_book_fused``)."""
+    name of a fusable system (roadmap N5b, ``_book_fused``).
+
+    ``substituent_atoms``: see ``terminal_ring_name``. The von Baeyer analyzer reads it (the
+    parent is no prefix of the cage). The spiro analyzer needs none: it numbers a ring-only
+    submolecule (``vonbaeyer_universal._extract_spiro_submol``) with the free valence as its suffix
+    atom, so the parent is never in view of its numbering."""
     book = _book_fused(mol, ring, free_valence_atom)
     if book is not None:
         return book
@@ -798,7 +820,8 @@ def _polycyclic_terminal_name(mol, ring, free_valence_atom):
                              {free_valence_atom} if free_valence_atom is not None
                              else None))
             else:
-                res = fn(mol, cage_atoms=ring, allow_mancude=True)
+                res = fn(mol, cage_atoms=ring, allow_mancude=True,
+                         substituent_atoms=substituent_atoms)
         except Exception as e:  # noqa: BLE001 - a declining analyzer must degrade
             logger.info("terminal_ring: %s analyzer raised %s; continue",
                         basis, type(e).__name__)

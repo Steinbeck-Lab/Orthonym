@@ -302,8 +302,11 @@ def _same_orbit(key_mol, first: Dict[int, Locant], other: Dict[int, Locant]) -> 
 
 
 @lru_cache(maxsize=1024)
-def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], ...], str]]:
-    """(name, fixed numbering on the atoms of ``Chem.MolFromSmiles(key)``, source)."""
+def _parent_for_key(key: str, tables_only: bool = False) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], ...], str]]:
+    """(name, fixed numbering on the atoms of ``Chem.MolFromSmiles(key)``, source).
+
+    ``tables_only``: the parents the tables hold (and the retained names of the mancude skeleton), never a name
+    assembled from components and numbered by OPSIN's reading of it."""
     from ...data import get_retained_name
     from ..fusion_numbering import compute_fused_numbering
     key_mol = Chem.MolFromSmiles(key)
@@ -327,6 +330,8 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
                 candidates.append((_IH.sub("", retained),
                                    {a: normalize_locant(l) for a, l in cfn.items()},
                                    "retained+fusion_numbering"))
+    if not candidates and tables_only:
+        return None
     if not candidates:
         # (:11903): no retained or Blue Book name -- a two-component carbocyclic
         # fusion name (``fusion_names``), numbered by OPSIN's reading of it
@@ -384,8 +389,9 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
     return name, tuple(sorted(fixed.items())), source
 
 
-def fused_parent(mol, residual) -> Optional[FusedParent]:
-    """The name and every numbering of the fused parent on ``residual``, or None."""
+def fused_parent(mol, residual, tables_only: bool = False) -> Optional[FusedParent]:
+    """The name and every numbering of the fused parent on ``residual``, or None. ``tables_only``: see
+    ``_parent_for_key`` (no OPSIN reading, so no JVM)."""
     if len(residual) >= 60:
         from .fullerene import fused_parent as c60_parent        # a C60 skeleton with its addend
         cage = c60_parent(mol, residual)
@@ -396,7 +402,7 @@ def fused_parent(mol, residual) -> Optional[FusedParent]:
     order = list(sk.GetPropsAsDict(True, True).get("_smilesAtomOutputOrder", ()))
     from ...validation.opsin_roundtrip import OpsinUnavailable
     try:
-        got = _parent_for_key(key)
+        got = _parent_for_key(key, tables_only)
     except OpsinUnavailable:
         # OPSIN could not number a produced name just now (``fusion_names.opsin_structure``):
         # no parent this time, and neither cache keeps the failure, so a later call asks again

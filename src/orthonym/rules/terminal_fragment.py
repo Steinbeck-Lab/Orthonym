@@ -571,7 +571,7 @@ def _composite_fragment_name(
         return None
 
     core = _ring_system_of(mol, frag, attach_idx)
-    tr = terminal_ring_name(mol, sorted(core), attach_idx)
+    tr = terminal_ring_name(mol, sorted(core), attach_idx, substituent_atoms=set(frag))
     if tr is None:
         logger.info("terminal_fragment: terminal_ring declined the %d-atom ring "
                     "system; refuse", len(core))

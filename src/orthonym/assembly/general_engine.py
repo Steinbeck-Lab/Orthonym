@@ -2135,11 +2135,11 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
         from ..rules.fused_forms import fused_system_ketone_form
         ketone_form = fused_system_ketone_form(
             mol, sorted(ring_set), suffix_atoms,
-            [a for a in carriers if a not in suffix_atoms])
+            [a for a in carriers if a not in suffix_atoms], printed_parents=True)
     form = None
     if ketone_form is None:
         form = fused_system_form(ion_view or mol, sorted(ring_set), None, carriers,
-                                 suffix_atoms=plan[1] if plan else ())
+                                 suffix_atoms=plan[1] if plan else (), printed_parents=True)
         if form is None:
             return None
     a2l = dict((ketone_form or form).numbering)
