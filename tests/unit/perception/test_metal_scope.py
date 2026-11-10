@@ -183,7 +183,10 @@ def test_zinc_has_its_mechanisms():
     assert has_mechanism("Mg", CONNECT_ANION) is True  # program 6: '[Br-].[Mg+]c1ccccc1' -> 'phenylmagnesium bromide'
     assert has_mechanism("Zn", ION_SALTS) is True
     assert has_mechanism("Zn", CARBANION_SALTS) is True
-    assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_1 + GROUP_2 if s != "Mg")
+    # program 22 (2026-11-09): Group 1 bonded drawings of salts are named on their ionic drawing ('C(=O)O[Li]')
+    assert all(has_mechanism(s, DISCONNECT) is True for s in GROUP_1 if s != "Fr")
+    assert has_mechanism("Fr", DISCONNECT) is False      # no measured row
+    assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_2 if s != "Mg")
     assert has_mechanism("Mg", DISCONNECT) is True     # a bonded Mg-N / Mg-X drawing is named through its ionic drawing
     assert all(has_mechanism(s, DISCONNECT) is False for s in NOT_ADMITTED)
 
@@ -207,7 +210,7 @@ def test_mechanism_lookup():
         # magnesium: porphyrins, its bonded drawings and, since program 6 (2026-11-06), the organomagnesium cation
         # beside its anion ('cyclopropylmagnesium bromide') and its bonded names
         extra = (frozenset({MACROCYCLE, DISCONNECT, CONNECT_ANION, BONDED_NAMES}) if symbol == "Mg"
-                 else frozenset())
+                 else frozenset({DISCONNECT}) if symbol in GROUP_1 and symbol != "Fr" else frozenset())   # Group 1: program 22
         # ELEMENT since lane LONE (2026-11-01): the atom and the ion alone ('sodium(1+)'); RECONNECT_RADICAL since
         # program 6 (2026-11-06): '[Li].CCC[CH2]' is named through 'CCCC[Li]'
         assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT,
