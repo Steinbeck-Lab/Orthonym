@@ -160,3 +160,20 @@ def test_a_failing_ocene_drawing_does_not_abort_the_naming(monkeypatch):
     row = name_best_effort("CC(C)(C)C[C-]1C=CC=C1.CC(C)(C)C(=O)[C-]1C=CC=C1.[Fe+2]")
     assert row.get("source") != "ocene_drawing", row
     assert row.get("name"), row
+
+
+def test_the_default_tier_engine_does_not_open_the_drawing_again(monkeypatch):
+    """With the default tier's rule off (the raw-output switch ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE), each engine used
+    to ask its own default-tier engine for the name of the ocene, which asked its own again: 190 engines deep, until a
+    RecursionError broke the outermost name exit and left its request tier behind. One drawing run per call now."""
+    from orthonym import name_compound, namer
+    from orthonym.assembly import ocene_drawing
+    from orthonym.wallclock import leaked_naming_state
+    monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", True)
+    runs = []
+    real = ocene_drawing._ocene_row
+    monkeypatch.setattr(ocene_drawing, "_ocene_row", lambda n, s: runs.append(s) or real(n, s))
+    smiles = "[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C"
+    assert name_compound(smiles, style="pin") == "decamethylferrocene"
+    assert runs == [smiles]
+    assert leaked_naming_state() == {}

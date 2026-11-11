@@ -20,6 +20,7 @@ Scope (fail closed, None otherwise): three fragments, a metal of the ocene table
 cyclopentadienide and a cyclopentadienide with its groups on ring carbons (no fused ring), no other charge; a wider tier
 only (the default tier keeps its own answer). The label is systematic_verified: an ocene has no PIN here.
 """
+import contextvars
 import re
 from typing import Optional
 
@@ -257,10 +258,26 @@ def _raise_enclosing_marks(name: str, start: int) -> Optional[str]:
     return ''.join(chars)
 
 
+#: True while ``ocene_drawing_row`` runs: a naming it starts (the default tier's engine below, the surrogate) names
+#: its string as drawn. The default tier's engine stops at its own policy check, except where that rule is off
+#: (ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE): there each engine asked its own default-tier engine again, without end.
+#: It holds for any input: every naming a row starts other than that one is of a one-fragment cyclopentyl surrogate,
+#: which is no ocene (``_surrogate`` asks for three fragments).
+_ROW_OPEN = contextvars.ContextVar("orthonym_ocene_row_open", default=False)
+
+
 def ocene_drawing_row(namer, smiles: str) -> Optional[dict]:
     """The ``name_tiered`` row of a substituted ocene in scope at a wider tier, or None (the caller names it)."""
-    if not isinstance(smiles, str) or namer._default_tier_policy_applies():
+    if not isinstance(smiles, str) or _ROW_OPEN.get() or namer._default_tier_policy_applies():
         return None                     # an RDKit Mol input is named through its own SMILES by the caller
+    token = _ROW_OPEN.set(True)
+    try:
+        return _ocene_row(namer, smiles)
+    finally:
+        _ROW_OPEN.reset(token)
+
+
+def _ocene_row(namer, smiles: str) -> Optional[dict]:
     found = _surrogate(smiles)
     if found is None:
         return None

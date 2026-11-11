@@ -515,3 +515,20 @@ def test_persistent_opsin_does_not_hand_a_late_answer_to_the_next_name(monkeypat
         assert srv.invoke("third") == ("third", True)
     finally:
         srv.close()
+
+
+def test_ocene_row_flag_is_in_the_idle_list():
+    """The re-entry flag of ``ocene_drawing.ocene_drawing_row`` is idle outside a naming call: a flag left set would
+    give every later ocene of the thread no ocenyl name."""
+    from orthonym.assembly import ocene_drawing as od
+    from orthonym.wallclock import _IDLE_CONTEXTVARS, clear_leaked_naming_state, leaked_naming_state
+
+    assert ("orthonym.assembly.ocene_drawing", "_ROW_OPEN", False) in _IDLE_CONTEXTVARS
+    assert leaked_naming_state() == {}
+    token = od._ROW_OPEN.set(True)
+    try:
+        assert leaked_naming_state() == {"_ROW_OPEN": True}
+        assert clear_leaked_naming_state() == {"_ROW_OPEN": True}
+        assert leaked_naming_state() == {}
+    finally:
+        od._ROW_OPEN.reset(token)
