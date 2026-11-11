@@ -9374,7 +9374,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                         break
 
                 if attach_ring_idx is not None:
-                    # Detect inner substituents on the fused het core
+                    from ..rules.fused_free_valence import renumber_core_for_free_valence as _free_valence_first
+                    atom_mapping = _free_valence_first(features.mol, het_name, core_smiles, atom_mapping, attach_ring_idx)  # (c) before (f); then the inner substituents
                     inner_prefix = detect_fused_het_inner_subs(
                         features.mol, core_atom_set, atom_mapping,
                         ring_atom_set, chain_set, attach_ring_idx
@@ -9392,8 +9393,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                             core_smiles, attach_ring_idx, atom_mapping
                         )
                         if prefix is not None:
-                            # Fused het prefixes always need parentheses
-                            # (they contain locants and hyphens per IUPAC
+                            # Fused het prefixes always need parentheses (they contain locants and hyphens,
                             ring_sub_groups[f'({prefix})'].append(locant)
                             continue
         # --- End a phase fused het detection ---
@@ -11525,6 +11525,9 @@ def _name_n_attached_substituent_fallback(
                         if attach_ring_idx is not None:
                             break
                 if attach_ring_idx is not None:
+                    from ..rules.fused_free_valence import renumber_core_for_free_valence  # (c) before (f)
+                    atom_mapping = renumber_core_for_free_valence(
+                        mol, het_name, core_smiles, atom_mapping, attach_ring_idx)
                     prefix = _get_fused_het_prefix(core_smiles, attach_ring_idx, atom_mapping)
                     if prefix is not None:
                         # Check if ring accounts for all sub atoms (pure fused het, no linker)
