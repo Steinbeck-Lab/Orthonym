@@ -438,7 +438,8 @@ def test_the_named_rows_of_a_zinc_failure_carry_the_label_at_every_tier(smiles, 
     ("[Zn]=[Zn]", "UNNAMEABLE", "zinc compound (not supported)"),
     ("[Zn-].[Zn-].[Na+]", "UNNAMEABLE", "sodium compound (not supported)"),  # [Zn-].[Na+] is named since lane LONE
     ("Cl[Zn]Cl", "NO_VERIFIED_PIN", "unknown organic compound"),     # a name was built and is no PIN
-    ("Cl[Cu]Cl", "UNSUPPORTED_ELEMENT", "copper compound (not supported)"),
+    ("Cl[Cu]Cl", "NO_VERIFIED_PIN", "unknown organic compound"),     # copper(II) chloride, a preselected name
+    ("Cl[Tc]Cl", "UNSUPPORTED_ELEMENT", "inorganic compound (not supported)"),  # a metal the table does not admit
 ])
 def test_the_unnamed_zinc_call_logs_the_zinc_code(caplog, smiles, code, label):
     """The caller's own call with no name (GitHub issue 45) returns '' and logs one warning on the logger

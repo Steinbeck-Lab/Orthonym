@@ -88,10 +88,15 @@ GATE_OUTCOME_ACID_SPLIT_PREFIX = "acid_split_verified:"
 #: (``validation.long_count_read_back``). OPSIN never reads the name, or a spelling of it, and the key of the
 #: input is not used: the compare is the full canonical SMILES, with no stereo.
 GATE_OUTCOME_RECONSTRUCTED_PREFIX = "reconstructed:"
+#: prefix of ``cip_dialect_verified:<units>``: OPSIN reads the name as another stereoisomer, only at stereo units whose
+#: ranking mancude averaging decides (OPSIN lacks that rule, dan2097/opsin#349), and it reads the same
+#: descriptor placement with the letters of those units swapped to the input's FULL InChIKey
+#: (``validation.cip_dialect``). Best-effort tier only; never a PIN label.
+GATE_OUTCOME_CIP_DIALECT_PREFIX = "cip_dialect_verified:"
 #: the outcome prefixes of the names read back some other way than by OPSIN reading the name itself: through a
 #: twin spelling, through the acids a name cites, or by the reconstructor
 NAME_READ_BACK_PREFIXES = (GATE_OUTCOME_TWIN_PREFIX, GATE_OUTCOME_ACID_SPLIT_PREFIX,
-                           GATE_OUTCOME_RECONSTRUCTED_PREFIX)
+                           GATE_OUTCOME_RECONSTRUCTED_PREFIX, GATE_OUTCOME_CIP_DIALECT_PREFIX)
 
 #: The ONLY outcomes that may report anything other than "unverified".
 #: An allowlist, never a blocklist — an outcome string this code has never
@@ -122,11 +127,13 @@ _TWIN_LABEL, _TWIN_TOKEN = "verified_twin", "twin_round_trip"
 _ACID_SPLIT_LABEL, _ACID_SPLIT_TOKEN = "verified_acid_split", "acid_split_round_trip"
 #: the same of the reconstructed outcome
 _RECONSTRUCTED_LABEL, _RECONSTRUCTED_TOKEN = "verified_reconstructor", "name_reconstruction"
+#: the same of the CIP dialect outcome
+_CIP_DIALECT_LABEL, _CIP_DIALECT_TOKEN = "verified_cip_dialect", "cip_dialect_round_trip"
 
 #: the ``opsin`` labels of a name that was read back to the input's full structure: the name
 #: itself, its twin spelling, the acids of a poly-anhydride name, or the structure the reconstructor
 #: builds from the text of the name
-VERIFIED_OPSIN_LABELS = ("verified", _TWIN_LABEL, _ACID_SPLIT_LABEL, _RECONSTRUCTED_LABEL)
+VERIFIED_OPSIN_LABELS = ("verified", _TWIN_LABEL, _ACID_SPLIT_LABEL, _RECONSTRUCTED_LABEL, _CIP_DIALECT_LABEL)
 
 #: the ``verified`` field of a row by the ``opsin`` label of its gate outcome
 VERIFIED_FIELD_BY_OPSIN_LABEL = {
@@ -135,6 +142,7 @@ VERIFIED_FIELD_BY_OPSIN_LABEL = {
     _TWIN_LABEL: "opsin_twin",
     _ACID_SPLIT_LABEL: "opsin_acids",
     _RECONSTRUCTED_LABEL: "reconstructor",
+    _CIP_DIALECT_LABEL: "opsin_cip_dialect",
 }
 
 #: the values of ``verified`` that earn the tier pin_verified: a read-back of the name, or of
@@ -142,7 +150,7 @@ VERIFIED_FIELD_BY_OPSIN_LABEL = {
 VERIFIED_FIELD_FOR_PIN_TIER = ("opsin", "opsin_twin", "opsin_acids", "identity")
 #: the values of ``verified`` that earn a tier named "verified": those of the PIN tier, and the
 #: reconstructor's read-back of the text of the name, which does not certify a preferred name
-VERIFIED_FIELD_FOR_TIER = VERIFIED_FIELD_FOR_PIN_TIER + ("reconstructor",)
+VERIFIED_FIELD_FOR_TIER = VERIFIED_FIELD_FOR_PIN_TIER + ("reconstructor", "opsin_cip_dialect")
 
 
 def pin_path_tier(opsin_label: str) -> tuple:
@@ -150,7 +158,7 @@ def pin_path_tier(opsin_label: str) -> tuple:
     a PIN, except for a name only the reconstructor read back (``validation.long_count_read_back``), which proves
     the constitution of the name and never its spelling and so is systematic_verified, not a PIN."""
     from ..assembly.offer_pool import PIN_VERIFIED, SYSTEMATIC_VERIFIED
-    if opsin_label == _RECONSTRUCTED_LABEL:
+    if opsin_label in (_RECONSTRUCTED_LABEL, _CIP_DIALECT_LABEL):
         return SYSTEMATIC_VERIFIED, False
     return PIN_VERIFIED, True
 
@@ -622,6 +630,11 @@ def reconstructed_outcome(rule: str) -> str:
     return GATE_OUTCOME_RECONSTRUCTED_PREFIX + rule
 
 
+def cip_dialect_outcome(units: str) -> str:
+    """``cip_dialect_verified:<units>`` — see :data:`GATE_OUTCOME_CIP_DIALECT_PREFIX`."""
+    return GATE_OUTCOME_CIP_DIALECT_PREFIX + units
+
+
 def resolve_gate_outcome(outcome: Optional[str], outcome_name: Optional[str],
                          shipped_name: Optional[str]) -> str:
     """The outcome that applies to ``shipped_name`` — deny-by-default.
@@ -652,6 +665,8 @@ def opsin_label_for_gate_outcome(outcome: Optional[str]) -> str:
         return _ACID_SPLIT_LABEL
     if outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX):
         return _RECONSTRUCTED_LABEL
+    if outcome and outcome.startswith(GATE_OUTCOME_CIP_DIALECT_PREFIX):
+        return _CIP_DIALECT_LABEL
     return _VERIFIED_GATE_OUTCOMES.get(outcome, "unverified")
 
 
@@ -663,6 +678,8 @@ def gate_token_for_gate_outcome(outcome: Optional[str]) -> Optional[str]:
         return _ACID_SPLIT_TOKEN
     if outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX):
         return _RECONSTRUCTED_TOKEN
+    if outcome and outcome.startswith(GATE_OUTCOME_CIP_DIALECT_PREFIX):
+        return _CIP_DIALECT_TOKEN
     return _GATE_TOKENS.get(outcome)
 
 

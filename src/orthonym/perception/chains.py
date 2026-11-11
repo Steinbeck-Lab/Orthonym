@@ -529,10 +529,84 @@ def _memo_by_oriented_chain(key_of, reverse_needed):
     return keyed
 
 
-def _min_noting_tie(mol, top, key):
-    """``min(top, key=key)``, noting the tie (:func:`_tied`) when ``top`` holds chains that differ in
-    structure: the molecule has no ring, so the selector counts every prefix and its last key decides."""
-    best = min(top, key=key)
+#: ``ORTHONYM_P2_VERIFY=1``: the molecules whose staged choice differed from the plain ``min`` (process-global)
+P45_VERIFY_MISMATCHES: List[tuple] = []
+
+
+def _p45_sub_locants(mol, oriented, fg_atoms, combined_exclude) -> List[int]:
+    """The first term of:func:`_p45_alpha_key_of` (the sorted locants of the prefixes), read without naming a
+    prefix: the same branches in the same chain orientation. Not for ``ring_prefixes``."""
+    cset = set(oriented)
+    found = []
+    for position, chain_atom in enumerate(oriented, 1):
+        for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in cset or ni in fg_atoms or ni in combined_exclude or nbr.GetSymbol() == 'H':
+                continue
+            found.append(position)
+    return sorted(found)
+
+def _p45_symmetry_class(mol, oriented, fg_atoms, combined_exclude) -> str:
+    """The canonical isomeric SMILES of the molecule with each atom of the oriented chain marked by its
+    locant, and the atoms of the principal groups and of the enumeration boundary marked by two more marks: two
+    chains share it only when an automorphism of the molecule, stereo included, maps one onto the other locant
+    by locant and keeps both atom sets, so:func:`_p45_alpha_key_of` (which reads the chain, those sets and
+    the branches they bound) is one key for them (Topic 1 of the still-unnamed PubChem plan, 2026-11-11)."""
+    marked = Chem.Mol(mol)
+    for atom in marked.GetAtoms():
+        atom.SetAtomMapNum(0)
+    for position, atom_idx in enumerate(oriented, 1):
+        marked.GetAtomWithIdx(atom_idx).SetAtomMapNum(position)
+    chain_set = set(oriented)
+    for atom_idx in fg_atoms:
+        if atom_idx not in chain_set:
+            marked.GetAtomWithIdx(atom_idx).SetAtomMapNum(9001)
+    for atom_idx in combined_exclude:
+        if atom_idx not in chain_set and atom_idx not in fg_atoms:
+            marked.GetAtomWithIdx(atom_idx).SetAtomMapNum(9002)
+    return Chem.MolToSmiles(marked)
+
+def _p45_staged_min(mol, top, alpha_key, reverse_needed, fg_atoms, combined_exclude):
+    """``min(top, key=alpha_key)`` (``alpha_key``::func:`find_principal_chain`'s ``_p45_alpha_key``), computing the key once per symmetry class of the tied chains
+    (:func:`_p45_symmetry_class`) and only for the classes with the least first term (the prefix locants,
+    which need no prefix name): the first chain of ``top`` with the least key, as the plain ``min``. With
+    ``ORTHONYM_P2_VERIFY=1`` the plain ``min`` runs too and must give the same chain."""
+    classes = []
+    first_of: Dict[str, int] = {}
+    for i, chain in enumerate(top):
+        oriented = _oriented_chain(chain, reverse_needed)
+        cls = _p45_symmetry_class(mol, oriented, fg_atoms, combined_exclude)
+        classes.append(cls)
+        first_of.setdefault(cls, i)
+    locants = {cls: _p45_sub_locants(mol, _oriented_chain(top[i], reverse_needed), fg_atoms, combined_exclude)
+               for cls, i in first_of.items()}
+    least = min(locants.values())
+    keys = {cls: alpha_key(top[i]) for cls, i in first_of.items() if locants[cls] == least}
+    best = min((i for i in range(len(top)) if classes[i] in keys), key=lambda i: keys[classes[i]])
+    if _os.environ.get("ORTHONYM_P2_VERIFY") == "1":
+        plain = min(top, key=alpha_key)
+        if plain != top[best]:
+            # recorded before the raise: the naming cascade catches broad exceptions, so a run counts
+            # the mismatches from this list (as ``assembly.memo`` does for its verify mode)
+            P45_VERIFY_MISMATCHES.append((Chem.MolToSmiles(mol), tuple(top[best]), tuple(plain)))
+            raise AssertionError((top[best], plain))
+    return top[best]
+
+
+def _p45_tie_break(mol, top, alpha_key, reverse_needed, fg_atoms, combined_exclude):
+    """The one chain of ``top``, or the chain:func:`_p45_staged_min` chooses among them, noting the tie
+    (:func:`_min_noting_tie`)."""
+    if len(top) == 1:
+        return top[0]
+    return _min_noting_tie(mol, top, None, lambda tied: _p45_staged_min(
+        mol, tied, alpha_key, reverse_needed, fg_atoms, combined_exclude))
+
+
+def _min_noting_tie(mol, top, key, chooser=None):
+    """``min(top, key=key)`` (or ``chooser(top)``, a function that returns that chain), noting the tie
+    (:func:`_tied`) when ``top`` holds chains that differ in structure: the molecule has no ring, so the
+    selector counts every prefix and its last key decides."""
+    best = chooser(top) if chooser is not None else min(top, key=key)
     if len({chain_symmetry_key(mol, c) for c in top}) > 1:
         _tied(best)
     return best
@@ -1205,7 +1279,7 @@ def find_principal_chain(
         best_lambda = max(_lambda_direct_key(c) for c in top)
         top = [c for c in top if _lambda_direct_key(c) == best_lambda]
         if not ring_prefixes:
-            best_chain = top[0] if len(top) == 1 else _min_noting_tie(mol, top, _p45_alpha_key)
+            best_chain = _p45_tie_break(mol, top, _p45_alpha_key, _cascade_reverse, fg_atoms, combined_exclude)
         elif len(top) == 1 or len({chain_symmetry_key(mol, c) for c in top}) == 1:
             # one chain, or chains that a symmetry of the molecule maps onto each other
             # (a chain and its reverse, the two methyl ends of an isopropyl group): the

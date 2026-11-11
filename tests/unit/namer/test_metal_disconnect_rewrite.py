@@ -95,7 +95,8 @@ def test_rewrite_needs_equal_key_and_an_admitted_metal():
     rewrite = metal_offer.metal_disconnected_spelling_and_order
     assert rewrite("[Zn]=O") is None                      # the key changes
     assert rewrite("CC[Zn]CC") is None                    # a Zn-C bond
-    assert rewrite("CC(=O)O[Cu]OC(C)=O") is None          # copper is not admitted
+    assert rewrite("CC(=O)O[Tc]OC(C)=O") is None          # technetium is not admitted to DISCONNECT
+    assert rewrite("CC(=O)O[Cu]OC(C)=O") is not None      # copper is (Cu2+: the radical RDKit gives the bare ion is bookkeeping)
     assert rewrite("N->[Zn](Cl)Cl<-N") is None            # no key (ZN10)
     assert rewrite("[Cl-].[Cl-].[Zn+2]") is None          # no bond to break
     assert rewrite("CCO") is None and rewrite("") is None and rewrite(None) is None

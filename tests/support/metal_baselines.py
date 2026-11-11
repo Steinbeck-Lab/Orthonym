@@ -74,7 +74,10 @@ def identity_diff(base_rows: Iterable[dict], new_rows: Iterable[dict]) -> List[T
 
 #: the two files of declared moves: lane B1 (Al, Hg, Pd, Pt, Ru, Ti, V, W) and lane B2 (38 more metals, tin and lead,
 #: ligands joined by a multiple bond)
-DECLARED_BONDED_MOVE_FILES = ("declared_moves_bonded_b1.tsv", "declared_moves_bonded_b2.tsv")
+# declared_moves_bonded_still.tsv: lane still (2026-11-11), the bare ion of a broken bond keeps the radical RDKit
+# gives it ([Cu+2], [Fe+3]), which the ledger counts as bookkeeping, so the admitted Cu, Fe rows below are named
+DECLARED_BONDED_MOVE_FILES = ("declared_moves_bonded_b1.tsv", "declared_moves_bonded_b2.tsv",
+                              "declared_moves_bonded_still.tsv")
 
 
 def declared_bonded_metal_moves() -> Dict[Key, Tuple]:

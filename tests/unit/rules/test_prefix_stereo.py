@@ -32,11 +32,13 @@ def test_a_substituent_double_bond_is_cited_at_the_front_of_its_prefix(best_effo
 @pytest.mark.opsin_gate
 def test_a_bare_descriptor_beside_locanted_ones_is_not_offered(best_effort):
     # CID10929611: '(R,S,1R,24S)-...' reads back only by the order in which OPSIN gives the bare descriptors to the
-    # centres, so the molecule keeps its abstention
+    # centres, so it is not offered. Since 2026-11-11 the CIP dialect judge names the molecule with every descriptor
+    # locanted (two of its units are decided by, which OPSIN lacks; test_cip_dialect.py)
     row = best_effort.name_tiered(
         "C1C[C@H]2C3=NC4=CC5=C(C=C4N=C3[C@@H]1C6=NC(=C(N=C26)C#N)C#N)N=C7[C@@H]8CC[C@H](C7=N5)"
         "C9=NC(=C(N=C89)C#N)C#N")
-    assert row["tier"] == "abstain"
+    assert row["name"].startswith("(1S,9R,16S,24R)-") and "(R," not in row["name"] and "(S," not in row["name"]
+    assert row["gate_outcome"] == "cip_dialect_verified:2_units"
 
 
 def test_a_block_inside_a_part_raises_the_marks_around_it():

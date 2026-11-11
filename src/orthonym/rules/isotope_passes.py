@@ -40,6 +40,32 @@ def lone_atom_isotope_name(original: Chem.Mol) -> Optional[str]:
         _iso._RADICAL_READING.reset(token)
 
 
+def labelled_ion_salt_name(original: Chem.Mol, style: str) -> Optional[str]:
+    """The name of a salt whose every label sits on a one-atom anion ('potassium (18F)fluoranide',
+    'sodium deuteride', 'N,N,N-trimethylmethanaminium (36Cl)chloranide') that reads back, or None.
+
+    The anion takes the name of the lone ion (:func:`lone_atom_isotope_name`;, Table 8.1 of:
+    the skeleton name of the stripped salt gives the class word ('fluoride'), which OPSIN does not read with
+    a nuclide in front. The same read-back as every candidate of the decorator decides."""
+    frags = Chem.GetMolFrags(original, asMols=False, sanitizeFrags=False)
+    if len(frags) < 2:
+        return None
+    labelled = [a.GetIdx() for a in original.GetAtoms() if a.GetIsotope()]
+    one_atom = {f[0] for f in frags if len(f) == 1}
+    if not labelled or any(i not in one_atom or original.GetAtomWithIdx(i).GetFormalCharge() >= 0
+                           for i in labelled):
+        return None
+    from .salts import name_salt
+    try:
+        name = name_salt(original, style=style)
+    except Exception:  # noqa: BLE001 - a salt the producer cannot take is declined here
+        return None
+    if not name or not any(original.GetAtomWithIdx(i).GetSymbol() == 'H'
+                           or f"({original.GetAtomWithIdx(i).GetIsotope()}" in name for i in labelled):
+        return None
+    return name if _iso._isotope_round_trips(name, original) else None
+
+
 def decorate_passes(smiles: str, style: str, namer, original: Chem.Mol, stripped: Chem.Mol,
                     label_map) -> Optional[str]:
     """The name of ``original`` (``stripped`` and ``label_map`` as ``rules.isotopes.strip_isotopes``

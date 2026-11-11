@@ -183,11 +183,17 @@ def _composed_row(namer, smiles: str, flat: str) -> Optional[Dict]:
         if not flat_name or is_failure_name(flat_name) or flat_row.get("tier") == "abstain":
             return None
         composed = _verified_composed_name(smiles, flat_name)
+        outcome = pv.GATE_OUTCOME_STEREO_RECOMPOSED
         if composed is None:
-            return None
+            # OPSIN reads the composed name as another stereoisomer only where it ranks a mancude ring without the
+            # averaging of (``validation.cip_dialect``): the best-effort tier ships it, labelled below the PIN
+            judged = _cip_dialect_composed_name(smiles, flat_name)
+            if judged is None:
+                return None
+            composed, outcome = judged
         pv.clear_provenance()
         pv.record_source("general_engine")
-        pv.record_gate_outcome(pv.GATE_OUTCOME_STEREO_RECOMPOSED, composed)
+        pv.record_gate_outcome(outcome, composed)
         if carried(composed, engine._exit_round_trip_check(composed, smiles)) != composed:
             return None                     # the exit check every other name passes (ambiguity, lone pair)
         row = engine._tier_row_and_pin_form(smiles, composed, pv.get_provenance())[0]
@@ -205,6 +211,23 @@ def _composed_row(namer, smiles: str, flat: str) -> Optional[Dict]:
         restore_abstention(kept_abstention)
         if row is None:
             pv.restore_provenance(kept_provenance)
+
+
+def _cip_dialect_composed_name(smiles: str, flat_name: str):
+    """``(name, gate outcome)`` of the CIP dialect judge (``validation.cip_dialect.cip_dialect_name``) for the
+    composed name of ``smiles`` on ``flat_name``, or None. Declined for an input with a lone-pair stereocentre (the
+    judge is about the ranking of a mancude ring, not the lone-pair convention) and for a name whose descriptor block
+    cites a locant twice (the reading would rest on the order of the descriptors)."""
+    from ..errors import is_failure_name
+    from ..metrics import provenance as pv
+    from ..namer import _has_lone_pair_stereocentre, _lone_pair_as_written
+    from ..validation.cip_dialect import cip_dialect_name, stereo_locants_once
+    if _has_lone_pair_stereocentre(_lone_pair_as_written(smiles)):
+        return None
+    found = cip_dialect_name(flat_name, smiles)
+    if found is None or is_failure_name(found[0]) or not stereo_locants_once(found[0]):
+        return None
+    return found[0], pv.cip_dialect_outcome(found[1])
 
 
 def _verified_composed_name(smiles: str, flat_name: str) -> Optional[str]:

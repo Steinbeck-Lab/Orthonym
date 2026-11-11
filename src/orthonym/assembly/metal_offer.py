@@ -386,6 +386,13 @@ def _metal_spelling_checked(mol, sites, kind) -> Optional[Tuple[str, Tuple[int, 
     try:
         from ..namer import _smiles_output_order_of
         from ..perception.metals import atom_and_charge_ledger_ok
+        if not kind.moved_radical:
+            # a chemical radical elsewhere in the molecule (a silylene, an aminyl) makes every read-back compare the
+            # whole graph (``validation.radical_identity``), and the graph of the rewritten drawing is not the
+            # input's: no check could confirm the name against the drawing as written, so it is not rewritten
+            from ..validation.radical_identity import _is_radical_centre
+            if any(_is_radical_centre(atom) for atom in mol.GetAtoms()):
+                return None
 
         def ledger_ok(rewritten):
             if kind.bonds_are_formed:

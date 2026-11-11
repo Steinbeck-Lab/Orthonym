@@ -1,0 +1,10 @@
+smiles	tier_req	name	tier	is_pin	limit_code
+Cl[Fe](Cl)Cl	best-effort	iron(III) chloride	systematic_verified	false	
+CC(=CC(C)=O)O[Fe](OC(C)=CC(C)=O)OC(C)=CC(C)=O	best-effort	iron tris(4-oxopent-2-en-2-olate)	systematic_verified	false	
+Cl[Cu]Cl	best-effort	copper(II) chloride	systematic_verified	false	
+CC(=O)O[Cu]OC(C)=O	best-effort	copper diacetate	systematic_verified	false	
+O=S1(=O)O[Cu]O1	best-effort	copper(II) sulfate	systematic_verified	false	
+[NH3+][Cu-2]([NH3+])([NH3+])[NH3+].[O-]S([O-])(=O)=O	best-effort	sulfate—ammonia—copper(2+) (1/4/1)	systematic_verified	false	
+CC(=CC(C)=O)O[Cu]OC(C)=CC(C)=O	best-effort	copper bis(4-oxopent-2-en-2-olate)	systematic_verified	false	
+C1=CC2=NC1=Cc1ccc3[n]1[Cu][n]1c(ccc1=CC1=NC(=C3)C=C1)=C2	best-effort	copper porphyrin-21,23-diide	systematic_verified	false	
+[NH2+]1CC(=O)O[Cu-2]12OC(=O)C[NH2+]2	best-effort	copper diglycinate	systematic_verified	false	

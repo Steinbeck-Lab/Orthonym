@@ -217,20 +217,24 @@ ALL_MECHANISMS = frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AM
 
 #: the metals of PubChem's bonded drawings admitted to every mechanism, with the charges of their cations: the
 #: lane of 2026-10-30 measured them on a panel of their bonded, dative and ionic drawings (`internal notes
-#: metal-bonded/``) with no wrong name. They are not ``complete``: their eta and multiply bonded ligands have no
+#: metal-bonded/``) with no wrong name. The still-unnamed PubChem study of 2026-11-11 added the common oxidation
+#: states its sane bonded drawings carry (Ru 4 and 6, Ti 2, V 2, W 5, Pd 4, Pt 6 here; Ni 3 and 4, Cr 4, Ir 4,
+#: Ag 2, Rh 2, Re 4, Zr 2 and 3, Os 6, Sm 2, Nb 3, Tm 2 below), measured on the panel
+#: `internal notes`; charges a metal hardly takes (Ti 6, Ru 1, Pd 1,
+#: Fe 1) stay out, because a standard InChIKey does not bound the charge of a metal. They are not ``complete``: their eta and multiply bonded ligands have no
 #: producer yet, so their failures keep their label.
-BONDED_METAL_VALENCES = {"Al": (3,), "Hg": (1, 2), "Pd": (2,), "Pt": (2, 4), "Ru": (2, 3), "Ti": (3, 4),
-                         "V": (3, 4, 5), "W": (4, 6)}
+BONDED_METAL_VALENCES = {"Al": (3,), "Hg": (1, 2), "Pd": (2, 4), "Pt": (2, 4, 6), "Ru": (2, 3, 4, 6),
+                         "Ti": (2, 3, 4), "V": (2, 3, 4, 5), "W": (4, 5, 6)}
 
 #: the metals of the second panel of the lane (2026-10-30, 38 metals of PubChem's unnamed metal drawings, no wrong
 #: name), and uranium (2026-10-31): every mechanism zinc has, with the charges of their cations. Not complete.
-MORE_BONDED_METAL_VALENCES = {"Zr": (4,), "Hf": (4,), "Fe": (2, 3), "Co": (2, 3), "Ni": (2,), "Cu": (1, 2),
-                              "Mo": (2, 3, 4, 5, 6), "Cr": (2, 3, 6), "Rh": (1, 3), "Re": (1, 3, 5, 7),
-                              "Mn": (2, 3), "Ir": (1, 3), "Y": (3,), "Os": (2, 3, 4), "Ag": (1,),
-                              "Au": (1, 3), "Cd": (2,), "Ga": (3,), "In": (3,), "Tl": (1, 3), "Nb": (5,),
-                              "Ta": (5,), "Sc": (3,), "La": (3,), "Ce": (3, 4), "Sm": (3,), "Eu": (2, 3),
-                              "Gd": (3,), "Nd": (3,), "Yb": (2, 3), "Lu": (3,), "Er": (3,), "Dy": (3,), "Tb": (3,),
-                              "Pr": (3,), "Ho": (3,), "Tm": (3,), "U": (3, 4, 5, 6)}
+MORE_BONDED_METAL_VALENCES = {"Zr": (2, 3, 4), "Hf": (4,), "Fe": (2, 3), "Co": (2, 3), "Ni": (2, 3, 4),
+                              "Cu": (1, 2), "Mo": (2, 3, 4, 5, 6), "Cr": (2, 3, 4, 6), "Rh": (1, 2, 3),
+                              "Re": (1, 3, 4, 5, 7), "Mn": (2, 3), "Ir": (1, 3, 4), "Y": (3,), "Os": (2, 3, 4, 6),
+                              "Ag": (1, 2), "Au": (1, 3), "Cd": (2,), "Ga": (3,), "In": (3,), "Tl": (1, 3),
+                              "Nb": (3, 5), "Ta": (5,), "Sc": (3,), "La": (3,), "Ce": (3, 4), "Sm": (2, 3),
+                              "Eu": (2, 3), "Gd": (3,), "Nd": (3,), "Yb": (2, 3), "Lu": (3,), "Er": (3,), "Dy": (3,),
+                              "Tb": (3,), "Pr": (3,), "Ho": (3,), "Tm": (2, 3), "U": (3, 4, 5, 6)}
 
 #: metals whose ions have a retained name of their own ('copper(II)', 'iron(III)': ``data.ion_retained_names``,
 #: INORGANIC_CATIONS). They are admitted to ``ELEMENT`` for the atom and for the ions without such a name

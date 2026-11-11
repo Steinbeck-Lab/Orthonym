@@ -798,6 +798,13 @@ def holds_carbanion_salt_of_group_3_12_metal(mol: "Chem.Mol") -> bool:
     return False
 
 
+#: the metalloids whose anions a Group 1 or 2 metal salt carries ('sodium tellanide', 'lithium difluoroarsanide'):
+#: a bond from such a metal to one of them is a DISCONNECT site like a bond to a nonmetal; the count of atoms and
+#: charges still compares the partner's radical electrons, hydrogens and charge
+_SALT_METALLOID_ANION_ELEMENTS: FrozenSet[str] = frozenset({'As', 'Sb', 'Te'})
+_GROUP_1_2_SYMBOLS: FrozenSet[str] = frozenset(GROUP_1) | frozenset(GROUP_2)
+
+
 def single_bond_metal_heteroatom_sites(mol: "Chem.Mol") -> Optional[List[Tuple[int, int]]]:
     """The bonds of ``mol`` that a charge-conserving heterolytic disconnection may break, as
     ``(metal atom index, other atom index)`` pairs; ``None`` when ``mol`` is not a drawing that
@@ -810,7 +817,8 @@ def single_bond_metal_heteroatom_sites(mol: "Chem.Mol") -> Optional[List[Tuple[i
     * there is no such bond;
     * a true metal is bonded to carbon INTRODUCTION, "Organometallic compounds are
       compounds having at least one bond between one metal atom and one carbon atom": the key of
-      such a drawing is not the key of its ionic drawing), to another metal or a metalloid;
+      such a drawing is not the key of its ionic drawing), to another metal or a metalloid (a Group 1
+      or 2 metal may bond to arsenic, antimony or tellurium: ``[Na][TeH]`` is ``sodium tellanide``);
     * a bond from a true metal is not a single bond (a double bond, a dative bond);
     * a bonded metal is not admitted to ``DISCONNECT``, or the charge it would carry after the
       disconnection (its formal charge plus the number of its bonds broken) is not one of its
@@ -837,7 +845,9 @@ def single_bond_metal_heteroatom_sites(mol: "Chem.Mol") -> Optional[List[Tuple[i
             return None
         metal, other = (a1, a2) if m1 else (a2, a1)
         symbol = other.GetSymbol()
-        if symbol == 'C' or is_metal_element(symbol):
+        if symbol == 'C' or (is_metal_element(symbol)
+                             and not (symbol in _SALT_METALLOID_ANION_ELEMENTS
+                                      and metal.GetSymbol() in _GROUP_1_2_SYMBOLS)):
             return None
         if b.GetBondType() != Chem.BondType.SINGLE or b.GetBondDir() != Chem.BondDir.NONE:
             return None
@@ -1068,6 +1078,31 @@ def _charge_stays_on_the_donor(mol: "Chem.Mol", fragment, donor_idx: int) -> boo
         return False
 
 
+def _bare_ion_bookkeeping_radicals(old: "Chem.Atom", new: "Chem.Atom") -> bool:
+    """True when the metal atom ``new`` of a broken site ends as a bare ion (no bond, no hydrogen)
+    whose radical electrons are only the ones RDKit infers for that bare ion from its default
+    valence, and the bonded atom ``old`` had none: ``Cl[Fe](Cl)Cl`` split into ``[Fe+3]`` (RDKit
+    gives the bare ``[Fe+3]`` one radical electron, ``[Ti+3]``, ``[Cu+2]`` and ``[Cr+3]`` too;
+    ``[Zn+2]`` and ``[Ti+4]`` none). A monoatomic ion's name carries no radical, and
+    ``validation/radical_identity.py`` treats these counts as valence bookkeeping, so the ledger does
+    not compare them; a radical written on the metal, or one the metal keeps with a bond, is
+    compared as before. ``new`` is the atom without the bonds (``after`` of the ledger)."""
+    if new.GetDegree() != 0 or new.GetTotalNumHs() != 0 or old.GetNumRadicalElectrons() != 0:
+        return False
+    if new.GetNumRadicalElectrons() == 0:
+        return False
+    bare = Chem.RWMol()
+    probe = Chem.Atom(new.GetAtomicNum())
+    probe.SetFormalCharge(new.GetFormalCharge())
+    probe.SetNoImplicit(True)
+    bare.AddAtom(probe)
+    try:
+        Chem.SanitizeMol(bare)
+    except Exception:  # noqa: BLE001 - an ion RDKit refuses is compared as before
+        return False
+    return bare.GetAtomWithIdx(0).GetNumRadicalElectrons() == new.GetNumRadicalElectrons()
+
+
 def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
                               changed_bonds: List[Tuple[int, int]], moved_charge: int = 1,
                               moved_radical: bool = False) -> bool:
@@ -1088,6 +1123,8 @@ def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
     With ``moved_radical`` each broken bond is a homolytic one (``RECONNECT_RADICAL``): the other atom
     gains one radical electron for each, and the metal's radical electrons are not compared (RDKit gives
     a bare metal atom the radical electrons of its default valence: ``[Li]`` 1, ``[Sn]`` 4).
+    The metal of a site that ends as a bare ion is not compared on the radical electrons RDKit infers
+    for that bare ion (``[Fe+3]`` 1,:func:`_bare_ion_bookkeeping_radicals`).
     A bond listed twice, a bond that ``before`` does not have, or any RDKit error is False.
     PURE: read-only inspection of both molecules."""
     if before is None or after is None:
@@ -1110,10 +1147,12 @@ def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",
             if moved_radical:
                 radicals[other_idx] += 1
                 metals.add(metal_idx)
+        site_metals = {metal_idx for metal_idx, _ in changed_bonds}
         for idx in range(count):
             old, new = before.GetAtomWithIdx(idx), after.GetAtomWithIdx(idx)
             if (old.GetAtomicNum() != new.GetAtomicNum() or old.GetIsotope() != new.GetIsotope()
                     or (idx not in metals
+                        and not (idx in site_metals and _bare_ion_bookkeeping_radicals(old, new))
                         and new.GetNumRadicalElectrons() != old.GetNumRadicalElectrons() + radicals[idx])
                     or old.GetTotalNumHs() != new.GetTotalNumHs()
                     or new.GetFormalCharge() != old.GetFormalCharge() + delta[idx]):

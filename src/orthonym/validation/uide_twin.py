@@ -72,13 +72,16 @@ def uide_twin_outcome(outcome: Optional[str]) -> bool:
       tier the gate withdraws a phane name);
     * a fullerene name whose structure ``validation.fullerene_read_back`` builds from the name and finds to be the
       input's (``carveout:fullerene``, recorded by the validity gate for a best-effort request: OPSIN reads no
-      fullerene name)."""
-    from ..metrics.provenance import GATE_OUTCOME_RECONSTRUCTED_PREFIX, carveout_outcome, twin_outcome
+      fullerene name);
+    * a stereo name whose OPSIN reading differs only where OPSIN ranks a mancude ring without the averaging
+      (``cip_dialect_verified:<count>_units``, ``validation.cip_dialect``): the best-effort tier ships it."""
+    from ..metrics.provenance import (GATE_OUTCOME_CIP_DIALECT_PREFIX, GATE_OUTCOME_RECONSTRUCTED_PREFIX, carveout_outcome,
+                                      twin_outcome)
     from .thioperoxol_twin import thioperoxol_twin_outcome
     return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), twin_outcome("preselected_cage"),
                         carveout_outcome("phane"), carveout_outcome("fullerene"))
             or thioperoxol_twin_outcome(outcome)
-            or bool(outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX)))
+            or bool(outcome and outcome.startswith((GATE_OUTCOME_RECONSTRUCTED_PREFIX, GATE_OUTCOME_CIP_DIALECT_PREFIX))))
 
 
 def uide_twin(name: str) -> Optional[str]:

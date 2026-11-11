@@ -214,6 +214,9 @@ def test_guard_is_deterministic():
     """The budgets are fixed operation/call counts reset at the outermost
     name, so the abstain decision is deterministic: naming the same explosive
     witness twice yields byte-identical output."""
+    from tests.support.rt_assert import name_is_rt_exact
     a = _name_best_effort(_COBYRINATE)
     b = _name_best_effort(_COBYRINATE)
-    assert a == b == "(no name — UNSUPPORTED_ELEMENT)", (a, b)
+    # named since lane still (2026-11-11) on the ionic drawing ([Co+2], the ligand an -ide), which reads back
+    assert a == b and a.endswith("-20-ide—cobalt(2+) (1/1)"), (a, b)
+    assert name_is_rt_exact(a, _COBYRINATE)
