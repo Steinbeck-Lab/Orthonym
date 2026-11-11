@@ -111,7 +111,18 @@ def place_stereo_by_scope(flat_name: str, smiles: str) -> Optional[str]:
     return name
 
 
-def _placed(flat_name: str, smiles: str) -> Optional[str]:
+def place_pair_by_scope(flat_name: str, smiles: str, labelled, swapped: frozenset) -> Optional[Tuple[str, str]]:
+    """``(name, twin)`` for the CIP dialect judge (``validation.cip_dialect``): ``labelled`` is the input labelled
+    with the letters OPSIN reads right (the record's, with the letter of each unit of ``swapped`` -- ``('a', atom)``
+    or ``('b', bond)`` -- changed to the other one). The places are found exactly as:func:`place_stereo_by_scope`
+    finds them, with those letters, and the name with them (the twin) must read back to the input; the name returned
+    first cites the same places and locants with the record's letter at the units of ``swapped``. None when a unit
+    has no place or the twin does not read back."""
+    found = _placed(flat_name, smiles, labelled=labelled, swapped=swapped)
+    return found if isinstance(found, tuple) else None
+
+
+def _placed(flat_name: str, smiles: str, labelled=None, swapped: frozenset = frozenset()):
     from ..namer import (Orthonym, _has_lone_pair_stereocentre, _lone_pair_as_written, _self_consistency_full_key,
                          _validity_gate_name_to_opsin_smiles)
     from ..perception.stereo import assign_stereochemistry
@@ -121,10 +132,11 @@ def _placed(flat_name: str, smiles: str) -> Optional[str]:
         # the full key does not settle a lone-pair centre (namer._lone_pair_configuration_verified, which this
         # path does not run): such a molecule keeps the caller's decline
         return None
-    mol = Chem.MolFromSmiles(smiles)
+    mol = Chem.MolFromSmiles(smiles) if labelled is None else Chem.Mol(labelled)
     if mol is None or not flat_name or _STEREO_EMBEDDED_RE.search(flat_name):
         return None                         # a name that already cites stereo is not placed again
-    assign_stereochemistry(mol)
+    if labelled is None:
+        assign_stereochemistry(mol)
     units = _units(mol)
     places = _places(flat_name)
     if not units or len(units) > _MAX_UNITS or len(places) > _MAX_PLACES:
@@ -133,6 +145,7 @@ def _placed(flat_name: str, smiles: str) -> Optional[str]:
     if not locants:
         return None                         # without OPSIN's numbering no locant is known
     chosen: Dict[int, List[str]] = {}
+    record: Dict[int, List[str]] = {}       # the same places with the record's letters (``swapped``)
     readings = 0
     for unit in units:
         target = _self_consistency_full_key(_single_unit_smiles(mol, unit))
@@ -153,6 +166,11 @@ def _placed(flat_name: str, smiles: str) -> Optional[str]:
         if hit is None:
             return None
         chosen.setdefault(hit[0], []).append(hit[1])
+        if (unit[0], unit[1]) in swapped:
+            other = {"R": "S", "S": "R", "r": "s", "s": "r", "E": "Z", "Z": "E"}[hit[1][-1]]
+            record.setdefault(hit[0], []).append(hit[1][:-1] + other)
+        else:
+            record.setdefault(hit[0], []).append(hit[1])
     for texts in chosen.values():
         # a bare descriptor only alone in its block, and no locant twice in one block: OPSIN gives the
         # descriptors of such a block to the centres in the order it reads them, so the name would rest on
@@ -169,7 +187,12 @@ def _placed(flat_name: str, smiles: str) -> Optional[str]:
             or enclosing_marks_check(mol, name) is not None):
         # the exact isomeric comparison sees the E/Z of a C=N the key cannot (amidines, amidoximes)
         return None
-    return name
+    if labelled is None:
+        return name
+    first = flat_name
+    for place in sorted(record, reverse=True):
+        first = _with_block(first, place, ",".join(sorted(record[place], key=_descriptor_key)))
+    return first, name
 
 
 def _descriptor_key(text: str):

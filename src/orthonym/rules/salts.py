@@ -795,6 +795,40 @@ def _ion_fragment_roundtrips(frag_mol, name: str) -> bool:
         return False
 
 
+def _labelled_monoatomic_anion_word(frag_mol) -> str:
+    """The anion word of a one-atom anion that carries a nuclide label (``[18F-]`` ->
+    '(18F)fluoranide', ``[2H-]`` -> 'deuteride'), else ''."""
+    if frag_mol is None or frag_mol.GetNumAtoms() != 1:
+        return ''
+    atom = frag_mol.GetAtomWithIdx(0)
+    if not atom.GetIsotope() or atom.GetFormalCharge() >= 0 or atom.GetNumRadicalElectrons():
+        return ''
+    from .metal_atoms import lone_atom_name_and_basis
+    return lone_atom_name_and_basis(frag_mol)[0] or ''
+
+
+def _labelled_or_table_anion_word(frag_mol, smiles: str, cation_list, systematic_anion_words: dict) -> str:
+    """The anion word of a labelled monoatomic anion or of the inorganic anion table, else ''.
+
+    A labelled monoatomic anion ('[18F-]', '[2H-]', '[36Cl-]') takes the name of the lone ion ('(18F)fluoranide',
+    'deuteride', '(36Cl)chloranide': and Table 8.1 of, ``metal_atoms.lone_atom_name_and_basis``);
+    OPSIN reads no nuclide on the class word ('(18F)fluoride'), and the salt's read-back checks the whole name.
+
+    The table word of a one-atom anion of a mononuclear parent hydride ('nitride', 'phosphide', 'carbide') has the
+    systematic '-ide' name as its alternative, the Blue Book-40902: 'azanetriide',
+    'phosphanetriide', ``ions._name_mononuclear_hydride_anion``), stored in ``systematic_anion_words`` and used by
+    :func:`name_salt` when OPSIN reads the table-word salt name back as nothing."""
+    if (labelled_word := _labelled_monoatomic_anion_word(frag_mol)):
+        return labelled_word
+    inorganic_word = inorganic_anion_word(smiles, cation_list)
+    if inorganic_word:
+        from .ions import _name_mononuclear_hydride_anion
+        sys_word = _name_mononuclear_hydride_anion(frag_mol)
+        if sys_word:
+            systematic_anion_words[inorganic_word] = sys_word
+    return inorganic_word or ''
+
+
 def name_salt(mol, style: str = 'pin', *,
               general_fallback: bool = False,
               general_fallback_unverified: bool = False,
@@ -1061,17 +1095,8 @@ def name_salt(mol, style: str = 'pin', *,
         frag_mol = anion_frag['mol']
         smiles = anion_frag['smiles']
 
-        if (inorganic_word := inorganic_anion_word(smiles, cation_list)):
-            anion_names.append(inorganic_word)
-            # The table word of a one-atom anion of a mononuclear parent hydride
-            # ('nitride', 'phosphide', 'carbide') has the systematic '-ide' name as
-            # its alternative, the Blue Book-40902: 'azanetriide',
-            # 'phosphanetriide', ``ions._name_mononuclear_hydride_anion``); used
-            # below when OPSIN reads the table-word salt name back as nothing.
-            from .ions import _name_mononuclear_hydride_anion
-            _sys_word = _name_mononuclear_hydride_anion(frag_mol)
-            if _sys_word:
-                systematic_anion_words[inorganic_word] = _sys_word
+        if (table_word := _labelled_or_table_anion_word(frag_mol, smiles, cation_list, systematic_anion_words)):
+            anion_names.append(table_word)
             continue
         # W3-P10: di-/polynuclear oxoacid anion word ('diphosphate')
         # BEFORE the generic name_anion, which would otherwise emit the neutral acid

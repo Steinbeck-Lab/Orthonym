@@ -214,9 +214,9 @@ BUCKET_C = [
          "TRIAGE g7 C09 (j7): the emitted best-effort name is RT exact but built from "
          "replacement chains ending on N/O/S (P-15.4.3.1, BlueBookV2.md:6465); see the "
          "j7 section of TRIAGE.md"))),
-    # 169166535 — fusion-carbon R vs S conflict.
-    ("169166535",
-     "CC(C)(C)C1=NC=C(O1)C(=O)N2CCC3=C([C@@H]2C4=CC5=CC=CC=C5C=N4)N=CN3"),
+    # 169166535 (fusion-carbon R vs S) left this bucket on 2026-11-11: the conflict is OPSIN's missing
+    # averaging, and the best-effort tier ships the name of record through the CIP dialect judge
+    # (tests/unit/rules/test_cip_dialect.py::test_a_mancude_conflict_ships_the_name_of_record).
 ]
 
 

@@ -155,15 +155,50 @@ def is_macrocycle_complex_name_without_pin(smiles: str, name: Optional[str]) -> 
         return False
 
 
+def is_labelled_ion_salt_name_without_pin(smiles: str, name: Optional[str]) -> bool:
+    """True iff ``smiles`` is a salt whose every nuclide label sits on a one-atom anion and ``name`` cites that anion
+    by the name of the lone ion ('N,N,N-triethylethanaminium (18F)fluoranide', ``rules.isotope_passes.
+    labelled_ion_salt_name``).
+
+     NAMES, (the Blue Book): "The name of an isotopically substituted compound is formed by adding
+    or inserting the nuclide symbol(s) enclosed in parentheses... before the part of the compound that is isotopically
+    substituted": the PIN of the labelled salt is the PIN of the unlabelled salt with the nuclide before its anion word
+    ('... (18F)fluoride'), which OPSIN 2.9.0 does not read; the '-anide' word of the lone ion names the same compound
+    and is a verified systematic name at most. Label only: the name is unchanged."""
+    if not smiles or not name:
+        return False
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return False
+        frags = Chem.GetMolFrags(mol, asMols=False, sanitizeFrags=False)
+        one_atom = {f[0] for f in frags if len(f) == 1}
+        labelled = [a for a in mol.GetAtoms() if a.GetIsotope()]
+        if len(frags) < 2 or not labelled or any(a.GetIdx() not in one_atom or a.GetFormalCharge() >= 0
+                                                 for a in labelled):
+            return False
+        from .metal_atoms import lone_atom_name_and_basis
+        for atom in labelled:
+            word = lone_atom_name_and_basis(Chem.MolFromSmiles(f"[{atom.GetIsotope()}{atom.GetSymbol()}"
+                                                               f"{'-' if atom.GetFormalCharge() == -1 else atom.GetFormalCharge()}]"))[0]
+            if word and word in name:
+                return True
+        return False
+    except Exception:
+        return False
+
+
 def is_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
     """True iff ``name`` is a name of a compound of a Group 3-12 metal that the Blue Book gives no
     PIN: the compositional name of a salt of a carbanion (``is_carbanion_salt_of_group_3_12_metal``),
     a name of a bonded drawing that lists its ligands (``is_bonded_metal_name_without_pin``), the
     name of an atom, an ion or an isotope (``is_lone_atom_name_without_pin``) or the name of
-    a salt of a metal with a macrocyclic ligand (``is_macrocycle_complex_name_without_pin``).
+    a salt of a metal with a macrocyclic ligand (``is_macrocycle_complex_name_without_pin``), and the name of
+    a salt whose labelled anion is cited by its lone-ion name (``is_labelled_ion_salt_name_without_pin``, any cation).
     The tier row of ``Orthonym._tier_row_and_pin_form`` reads this one predicate. Label only."""
     return (is_carbanion_salt_of_group_3_12_metal(smiles, name)
             or is_beta_diketonate_salt_of_group_3_12_metal(smiles, name)
             or is_bonded_metal_name_without_pin(smiles, name)
             or is_lone_atom_name_without_pin(smiles, name)
-            or is_macrocycle_complex_name_without_pin(smiles, name))
+            or is_macrocycle_complex_name_without_pin(smiles, name)
+            or is_labelled_ion_salt_name_without_pin(smiles, name))

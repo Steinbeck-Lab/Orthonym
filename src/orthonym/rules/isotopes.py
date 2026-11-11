@@ -34,6 +34,8 @@ from . import isotope_slots as _slots
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_licence import apply_unit_licences, unit_has_no_free_position
+#:func:`_isotope_round_trips_once` once per top-level naming for one candidate, structure and reading state
+from .isotope_memos import round_trips_memoised as _isotope_round_trips, skeleton_naming_memoised
 from .isotope_offsets import restrict_offsets, search_space
 from .isotope_phane_locants import composite_sort_key, composite_tokens as _phane_tokens
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
@@ -548,8 +550,8 @@ def _bond_order_free_key(mol: Chem.Mol) -> Optional[str]:
         return None
 
 
-def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
-                         stereo_blind: bool = False) -> bool:
+def _isotope_round_trips_once(candidate_name: str, original_mol: Chem.Mol,
+                              stereo_blind: bool = False) -> bool:
     """True iff OPSIN parses ``candidate_name`` to a structure that is rdkit-
     canonical-identical (isotopes retained) to ``original_mol``. Fail-closed
     on parse failure / no JAR.
@@ -4183,9 +4185,10 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         return None
     from ..opsin_capabilities import phane_names_withheld
     from .isotope_alternative import alternative_skeleton_active, decorate_alternative, has_alternative
-    from .isotope_passes import decorate_passes, lone_atom_isotope_name
+    from .isotope_passes import decorate_passes, labelled_ion_salt_name, lone_atom_isotope_name
     def _passes():
-        found = lone_atom_isotope_name(original) or decorate_passes(smiles, style, namer, original, stripped, label_map)
+        found = (lone_atom_isotope_name(original) or labelled_ion_salt_name(original, style)
+                 or decorate_passes(smiles, style, namer, original, stripped, label_map))
         if found is None and not alternative_skeleton_active() and has_alternative(stripped):
             found = decorate_alternative(stripped, lambda: decorate_passes(smiles, style, namer, original, stripped,
                                                                            label_map))
@@ -4424,7 +4427,7 @@ def _name_skeleton(naming, smiles: str) -> str:
     from ..assembly.fragment_naming import PerfBudgetExceeded, rearm_hang_budgets
     while True:
         try:
-            return naming.name(smiles)
+            return skeleton_naming_memoised(naming, smiles)
         except PerfBudgetExceeded:
             count = _SKELETON_NAMINGS.get()
             if count is None or count[0] >= _SKELETON_NAMING_CAP:

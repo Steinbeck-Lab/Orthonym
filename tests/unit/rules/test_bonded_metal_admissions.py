@@ -152,16 +152,17 @@ def test_the_atoms_and_ions_decline_at_the_default_tier(smiles):
 
 
 def test_every_declared_move_holds():
-    """Each row of ``declared_moves_bonded_b1.tsv`` and ``declared_moves_bonded_b2.tsv`` (the other-metals baseline rows
-    that lanes B1 and B2 move) is named as declared, and a name reads back to the full key: the guards that read the
+    """Each row of ``declared_moves_bonded_b1.tsv``, ``declared_moves_bonded_b2.tsv`` and
+    ``declared_moves_bonded_still.tsv`` (the other-metals baseline rows that lanes B1, B2 and still move) is named as declared, and a name reads back to the full key: the guards that read the
     files see only some of their rows."""
     from orthonym import Orthonym
     from orthonym.cli import _emit_tier_flags
     from tests.support.metal_baselines import (DECLARED_BONDED_MOVE_FILES, declared_bonded_metal_moves, identity_view)
     namers = {tier: Orthonym(style="pin", **_emit_tier_flags(tier)) for tier in ("pin", "best-effort")}
     moves = declared_bonded_metal_moves()
-    assert len(DECLARED_BONDED_MOVE_FILES) == 2
-    assert len(moves) == 16 + 24                      # the rows of lane B1 and of lane B2 (three of the acetylacetonates' PIN rows: olate)
+    assert len(DECLARED_BONDED_MOVE_FILES) == 3
+    # the rows of lane B1 and of lane B2 (three of the acetylacetonates' PIN rows: olate), and the Cu, Fe rows of lane still
+    assert len(moves) == 16 + 24 + 9
     for (smiles, tier_req), view in sorted(moves.items()):
         now = namers[tier_req].name_tiered(smiles)
         assert identity_view(now) == view, (smiles, tier_req)
