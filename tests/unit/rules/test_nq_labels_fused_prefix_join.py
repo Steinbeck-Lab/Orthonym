@@ -32,7 +32,9 @@ NO_HYPHEN = [
 KEEPS_HYPHEN = [
     ("Cc1ccc2c(c1)ccn2CC(=O)O", "(5-methyl-1H-indol-1-yl)acetic acid"),
     ("Cc1cc2c(s1)ccc(CC(=O)O)c2", "(2-methyl-1-benzothiophen-5-yl)acetic acid"),
-    ("Cc1ccc2c(c1)[nH]c1ccc(CC(=O)O)cc12", "(2-methyl-9H-carbazol-6-yl)acetic acid"),
+    # the free valence takes the low locant before the methyl "NUMBERING" (c) before (f),
+    # the Blue Book,:3301; '(7-ethyl-8-propylnaphthalen-2-yl)oxy' (PIN),:22098)
+    ("Cc1ccc2c(c1)[nH]c1ccc(CC(=O)O)cc12", "(7-methyl-9H-carbazol-3-yl)acetic acid"),
 ]
 
 
