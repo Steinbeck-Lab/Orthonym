@@ -1296,8 +1296,8 @@ def _try_azanediyl_methylene_phosphonic(mol) -> Optional[str]:
     return None
 
 
-#: A neutral phosphonic acid group -P(=O)(OH)2 on a carbon.
-_PHOSPHONIC_ACID_SMARTS = Chem.MolFromSmarts('[#6][PX4;+0](=[OX1])([OX2H1])[OX2H1]')
+#: A neutral phosphonic acid group -P(=O)(OH)2 on a carbon or a ring nitrogen (see the imported pattern).
+from .linked_phosphonic_surrogate import PHOSPHONIC_ACID_SMARTS as _PHOSPHONIC_ACID_SMARTS  # noqa: E402
 _LINKED_PHOSPHONIC_CACHE: Dict[str, Optional[str]] = {}
 
 

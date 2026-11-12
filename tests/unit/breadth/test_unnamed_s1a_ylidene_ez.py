@@ -88,10 +88,13 @@ SENIOR_PARENT_ROWS = [
      "(2Z)-4-benzyl-2-(3-benzyl-2-{[5-cyano-2-(ethylamino)phenyl]imino}-4-oxo-1,3-thiazolidin-5-ylidene)"
      "-3,5-dimethyl-2,3-dihydro-1,3-thiazole"),
     ("XCHEBIb3", "CC(C)C1O/C(=C2\\C(=O)NC(CC(N)=O)C2=O)C=CC1C",
-     "(2Z)-2-{4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]-3,5-dioxopyrrolidin-2-yl}"
+     # the C=C joins C-4 of the pyrrolidinyl prefix to the pyranylidene group: its descriptor stands at the front of
+     # that prefix with the attachment locant, the Blue Book; (1)(a):48276); was
+     # '(2Z)-2-{4-[...]...}acetamide', where C-2 of acetamide has no double bond
+     "2-{(4Z)-4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]-3,5-dioxopyrrolidin-2-yl}"
      "acetamide"),
     ("XCHEBIb9", "CC(C)C1O/C(=C2/C(=O)NC(CC(N)=O)C2=O)C=CC1C",
-     "(2E)-2-{4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]-3,5-dioxopyrrolidin-2-yl}"
+     "2-{(4E)-4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]-3,5-dioxopyrrolidin-2-yl}"
      "acetamide"),
 ]
 

@@ -60,8 +60,12 @@ CASES = [
     ("C1CCC(CC1)NOP[O-]", "{[(cyclohexylamino)oxy]phosphanyl}oxidanide", "P-72.2.2.2.4"),
     # -- the anion of a group that is an oxoacid group, when no producer named it (the producers of the acid anions come first)
     ("CCN1CC[C@H](C1)CC2=CC=CC=C2N(C3=C(C4=C(C=C3)[C@H]5C[C@H]5CO4)C(=O)O)S(=O)[O-]",
-     "(2S,3R,4R)-[1-(1-[8-carboxy-6-oxatricyclo[5.4.0.0^2,4]undeca-1(7),8,10-trien-9-yl]-1-{2-[1-(1-ethylpyrrolidin-3-yl)methan-1-yl]phenyl}"
-     "-1-azamethan-1-yl)-2-oxa-1-thiaeth-1-en-1-yl]oxidanide", "P-72.2.2.2.4"),
+     # the centres stand at the front of their own prefixes, the Blue Book, "When they relate to
+     # substituent groups, they are cited at the front of the corresponding prefix"); was '(2S,3R,4R)-[1-(...)]oxidanide',
+     # where the parent oxidanide has no locant 2, 3 or 4 (change-asserted-value: the old block is impossible on the
+     # parent; OPSIN reads the new name back to the full key in this test)
+     "{1-[1-[(2S,4R)-8-carboxy-6-oxatricyclo[5.4.0.0^2,4]undeca-1(7),8,10-trien-9-yl]-1-(2-{1-[(3R)-1-ethylpyrrolidin-3-yl]"
+     "methan-1-yl}phenyl)-1-azamethan-1-yl]-2-oxa-1-thiaeth-1-en-1-yl}oxidanide", "P-72.2.2.2.4"),
     # -- the centre of two or three charges,:40900;,:41559;,:41656)
     ("CC(C)[P-2]", "(propan-2-yl)phosphanediide", "P-72.2.2.1"),
     ("CC1=C(C(=CC=C1)C)[P-2]", "(2,6-dimethylphenyl)phosphanediide", "P-72.2.2.1"),

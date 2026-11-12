@@ -38,7 +38,7 @@ from .ring_cation_hydron import (  # noqa: F401 (also patched by tests as ions.<
 from ..perception.ions import get_ion_sites
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.molcache import inchikey_of
-from .ion_locants import cites_a_locant, name_neutral_ring_for_ion
+from .ion_locants import bare_fused_ring_locants, cites_a_locant, name_neutral_ring_for_ion
 from .ring_cation_hydro import (hydro_ring_cation_name, hydro_ring_zwitterion_name, neutralized_cation,
                                 ring_cation_locants, ring_numbering_tie_key, ring_stereo_prefix)
 from .uide_lambda import (UIDE_STD_VALENCE, double_bonded_ligand, doubled_ligand_not_pin, lambda_uide_name, uide_bonding_number, uide_lambda)
@@ -4439,7 +4439,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
             return ''
         ring_frag = frag_mols[ring_k[0]]
         ring_orig = frag_idxs[ring_k[0]]
-        frag_locants = _ring_iupac_locants(ring_frag)
+        frag_locants = bare_fused_ring_locants(ring_frag, mol, ring_system) or _ring_iupac_locants(ring_frag)
         if not frag_locants:
             return ''
         # Re-choose, among the automorphism-equivalent numberings of the bare ring,
@@ -4892,7 +4892,7 @@ def _p74_ring_substituent_prefix(mol, ring_system, locants, skip_atoms):
     parts = []
     # order; tokens of one alphanumerical key ('(1R)-1-hydroxyethyl', '(1S)-...') are cited R first
     for token in sorted(groups, key=lambda t: (nu.alpha_sort_key(t), nu.prefix_citation_sort_key(t))):
-        locs = sorted(groups[token])
+        locs = sorted(groups[token], key=_ring_locant_order_key)   # '4a' beside 4: a fused numbering
         parts.append(nu.format_substituent_prefix(token, locs, len(locs)))
     return '-'.join(parts)
 

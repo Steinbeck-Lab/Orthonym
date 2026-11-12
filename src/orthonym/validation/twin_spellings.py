@@ -61,7 +61,7 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   '([1,1'-biphenyl]-4,4'-diyl)bis(methylene) diacetate'. The twin encloses a bracketed ring assembly group, its locants
   and its 'diyl' (or 'triyl') that stands in front of a multiplying prefix.
 * ``polyester_acyloxy`` (``validation.polyester_twin``): method (1), the functional-class
-  polyol polyester name 'propane-1,2,3-triyl 1,3-diacetate 2-propanoate (PIN)' (the Blue Book)
+  polyol polyester name 'propane-1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)' (the Blue Book)
   and its acyloxy spelling '1,3-bis[acetyloxy]-2-[propanoyloxy]propane', substitutive nomenclature of
   the same ester,:31968). OPSIN reads the second and not the first. A half ester of a
   polybasic acid has no acyloxy spelling OPSIN reads, and its name does not ship.

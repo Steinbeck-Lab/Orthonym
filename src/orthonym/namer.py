@@ -2005,10 +2005,10 @@ def _try_compose_input_stereo(
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return None
-        from .rules.prefix_stereo import composed_reads_back, place_stereo_by_scope
+        from .rules.prefix_stereo import composed_reads_back, place_stereo_by_scope, scoped_over_front
         from .rules.stereochemistry import inject_stereo_reanchored_rt_gated
-        composed = inject_stereo_reanchored_rt_gated(
-            flat_name, mol, None, input_smiles=smiles)
+        composed = scoped_over_front(inject_stereo_reanchored_rt_gated(    # a substituent's descriptor: its prefix
+            flat_name, mol, None, input_smiles=smiles), flat_name, smiles, in_key)
         if not composed or composed == flat_name or not composed_reads_back(composed, smiles, in_key):
             # every descriptor at the front did not read back: for the last offer only (``place_by_scope``,
             # assembly/stereo_composed_offer.py), each one at the front of the part it relates to

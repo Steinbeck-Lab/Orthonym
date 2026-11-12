@@ -48,8 +48,10 @@ WORSE = [
      "1-{3-[6-(cyclohexa-1,2,3,5-tetraen-1-yl)-4-phenyl-1,3,5-triazin-1-ium-2-yl]phenyl}-2-[(2,2,3,3,4,4,5,5,5-nonafluoro-1-oxidaniumylidene-1-oxo-1-thiapentan-1-yl)oxy]naphthalene",
      "fewer non-PIN parts: naphthalene and 1,3,5-triazin-1-ium, not bicyclo[4.4.0]deca-pentaene and 2,4,6-triazacyclohexatriene (P-52.2.4.1, P-52.2.2.2)"),
     ("4", "C1=CC=C2C(=C1)C=CC=C2C3=[N+](C(=N3)N4C5=CC=CC=C5C6=C4C7=CC=CC=C7C8=C6C9=CC=CC=C9C=C8)C1=CC=CC2=CC=CC=C21",
-     "9-[1,4-di(naphthalen-1-yl)-1,2-dihydro-1,3-diazet-2-ylidene]-9-azahexacyclo[15.8.0.0^2,10.0^3,8.0^11,16.0^20,25]pentacosa-1(25),2(10),3,5,7,11,13,15,17,19,21,23-dodecaen-9-ium",
-     "P-73.7 (a): the parent holds the cation (azahexacyclo...-9-ium)"),
+     # the bare fused ring cation is numbered by its fused name (rules/ring_ion_numbering.py), so the fusion name
+     # stands where the von Baeyer name '9-azahexacyclo[15.8.0...]pentacosa...-9-ium' stood
+     "11-[1,4-di(naphthalen-1-yl)-1,2-dihydro-1,3-diazet-2-ylidene]-11H-benzo[a]naphtho[2,1-c]carbazol-11-ium",
+     "P-73.7 (a): the parent holds the cation (benzo[a]naphtho[2,1-c]carbazol-11-ium)"),
     ("13", "CC1=C(C2=C(N1C3=CC=CC(=C3)C(F)(F)F)C=C=C=C2)C4=C(/C(=C\\5/C(=[N+](C6=CC=CC=C65)C7=CC=CC(=C7)C(F)(F)F)C)/C4=O)OC",
      "9-(2-methoxy-3-{2-methyl-1-[3-(trifluoromethyl)phenyl]-1H-indol-3-yl}-4-oxocyclobut-2-en-1-ylidene)-8-methyl-7-[3-(trifluoromethyl)phenyl]-7-azabicyclo[4.3.0]nona-1,5,7-trien-3-yn-7-ium",
      "the form set is no longer over the work bound (2 places of the +1, 4 forms); the name has no (1,1,1-trifluoromethyl)"),
@@ -105,7 +107,9 @@ STEREO = [
      "disodium (2Z)-2-{(2E,4Z,6E)-4-chloro-7-[4-chloro-7,7-dimethyl-2-(4-sulfonatobutyl)-2,9-diazabicyclo[4.3.0]nona-1(6),2,4,8-tetraen-2-ium-8-yl]hepta-2,4,6-trien-1-ylidene}-3,3-dimethyl-5-sulfonato-1-(4-sulfonatobutyl)-2,3-dihydro-1H-indole",
      "4 E/Z bonds of the heptatriene bridge between two indolenine-type ends"),
     ("r2090", "CC1(C2=C(N=C1/C=C/C=C/C=C/3\\C(C4=C(N3CCCS(=O)(=O)O)C=CC(=C4)S(=O)(=O)O)(C)C)[N+](=CC(=C2)C(=O)NOCCCCCC(=O)ON5C(=O)CCC5=O)CCCS(=O)(=O)C)C",
-     "(2E)-2-[(2E,4E)-5-{4-[({6-[(2,5-dioxopyrrolidin-1-yl)oxy]-6-oxohexyl}oxy)carbamoyl]-2-(4,4-dioxo-4-thiapentan-1-yl)-7,7-dimethyl-2,9-diazabicyclo[4.3.0]nona-1(6),2,4,8-tetraen-2-ium-8-yl}penta-2,4-dien-1-ylidene]-3,3-dimethyl-5-sulfo-1-(3-sulfopropyl)-2,3-dihydro-1H-indole",
+     # the cation's fused ring is named now ('3H-pyrrolo[2,3-b]pyridin-7-ium', was the von Baeyer
+     # '2,9-diazabicyclo[4.3.0]nona...-2-ium-8-yl' prefix on an indole), and it is the parent (a))
+     "2-{(1E,3E,5E)-5-[3,3-dimethyl-5-sulfo-1-(3-sulfopropyl)-2,3-dihydro-1H-indol-2-ylidene]penta-1,3-dien-1-yl}-5-[({6-[(2,5-dioxopyrrolidin-1-yl)oxy]-6-oxohexyl}oxy)carbamoyl]-7-[3-(methanesulfonyl)propyl]-3,3-dimethyl-3H-pyrrolo[2,3-b]pyridin-7-ium",
      "3 E/Z bonds of the pentadiene bridge"),
 ]
 
@@ -182,16 +186,21 @@ def _forms_named(monkeypatch):
 def test_the_choice_gives_the_name_the_blue_book_order_ranks_first(monkeypatch, row, smiles, name, why):
     counts = _forms_named(monkeypatch)
     result = _engine().name_tiered(smiles)
-    assert (result["name"], result["tier"]) == (name, "systematic_verified"), (row, why)
+    assert (result["name"], result["tier"]) == (name, _TIER.get(row, "systematic_verified")), (row, why)
     assert counts and counts[0] >= 2, "the choice must run over two forms or more: %r" % counts
     assert opsin_key(name) == rdkit_key(smiles), name
+
+
+#: rows whose fused ring cation is named by its fused name (rules/ring_ion_numbering.py): a name in PIN form that no
+#: strict path certifies, one label above the von Baeyer form they had
+_TIER = {"4": "pin_unverified", "r2090": "pin_unverified"}
 
 
 @pytest.mark.parametrize("row, smiles, name, why", STEREO)
 def test_the_form_that_keeps_the_configuration_of_the_input_is_named(monkeypatch, row, smiles, name, why):
     counts = _forms_named(monkeypatch)
     result = _engine().name_tiered(smiles)
-    assert (result["name"], result["tier"]) == (name, "systematic_verified"), (row, why)
+    assert (result["name"], result["tier"]) == (name, _TIER.get(row, "systematic_verified")), (row, why)
     assert counts and counts[0] == 2, counts
     # every double bond the input configures is a descriptor of the name
     configured = sum(1 for kind, _atoms in stereo_elements(Chem.MolFromSmiles(smiles)) if kind == "=")

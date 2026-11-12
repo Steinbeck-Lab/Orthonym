@@ -54,7 +54,13 @@ RECLAIM_CASES = [
      #:16286, 'ethyldi(methyl)phosphane (PIN)':7290; independent check: the test reads the name back with
      # OPSIN (below), which the cited rule does not affect; mutation: HEAD spells 'triphenyl', so the new
      # value fails at HEAD.
-     "(1Z,3Z,6Z)-(cycloocta-1,3,6-trien-1-yl)tri(phenyl)boranuide"),
+     # was '(1Z,3Z,6Z)-(cycloocta-...)...boranuide': the parent boranuide has no locant 1, 3 or 6, so the front
+     # block could only be read on the substituent (OPSIN tries every group). change-asserted-value: NAMING OF
+     # STEREOISOMERS (the Blue Book): "When they relate to substituent groups, they are cited at the front of the
+     # corresponding prefix"; independent check: the old value is impossible as a
+     # parent block (no such parent locant) and OPSIN reads the new one back to the full key (below); mutation: HEAD
+     # gives the old value.
+     "[(1Z,3Z,6Z)-cycloocta-1,3,6-trien-1-yl]tri(phenyl)boranuide"),
     # D3: the plain C1 methyl is spelled 'methyl' (not 'methan-1-yl');
     # with its inner parens gone the enclosure de-escalates one level ({} ->
     # ), and 'methyl' vs 'methan' flips the alphanumerical order
@@ -64,7 +70,10 @@ RECLAIM_CASES = [
     #, the Blue Book) and the ring is 'piperidin-4-yl',
     #:8482). The oxime is '(hydroxyimino)' Oximes, the Blue Book; item 12a).
     ("CC1=NC(=C(C=C1)/C(=N/O)/N(C)C2CCN(CC2)C)OC3=CC=CC(=C3)C(C)C",
-     "(1Z)-3-{(hydroxyimino)[methyl(1-methylpiperidin-4-yl)amino]methyl}-6-methyl-"
+     # was '(1Z)-3-{(hydroxyimino)...methyl}...pyridine': N-1 of the parent pyridine has no stereo double bond; the C=N
+     # belongs to the methyl prefix, the Blue Book; (1)(a):48276 within that prefix).
+     # Independent check: the old block is impossible on the parent; OPSIN reads the new name back exactly (below).
+     "3-{(1Z)-(hydroxyimino)[methyl(1-methylpiperidin-4-yl)amino]methyl}-6-methyl-"
      "2-[3-(propan-2-yl)phenoxy]pyridine"),
 ]
 
