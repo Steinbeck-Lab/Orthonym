@@ -116,6 +116,13 @@ def _is_complete_name(name: str) -> bool:
     """
     name_lower = name.lower().rstrip()
 
+    # A name with a bracketed descriptor (fusion 'cyclopenta[a]phenanthrene', von Baeyer, spiro) is
+    # formed by rule,,, never retained; this one is OPSIN's fusion component,
+    # without the indicated hydrogen its mancude ring system needs, the Blue Book).
+    # The ring builders name such a molecule themselves.
+    if "[" in name_lower:
+        return False
+
     # Names containing spaces are typically complete (e.g., "acetic acid")
     if " " in name_lower:
         return True
