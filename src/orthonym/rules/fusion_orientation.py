@@ -590,7 +590,8 @@ def score_orientation(
         if best_sub is None or sub < best_sub:
             best_sub = sub
 
-    assert best_sub is not None
+    if best_sub is None:
+        raise AssertionError('no orientation scored')
     ur4, ll4, neg_above2 = best_sub[0], best_sub[1], best_sub[2]
     # Reassemble into the full ascending-better score tuple.
     return (-max_row, ur4, ll4, neg_above2)
@@ -788,7 +789,8 @@ def score_orientation_general(
         sub = (-ur4, ll4, -above2)
         if best is None or sub < best:
             best = sub
-    assert best is not None
+    if best is None:
+        raise AssertionError('no orientation scored')
     return (-max_row, best[0], best[1], best[2])
 
 
@@ -1027,7 +1029,8 @@ def score_orientation_grid(graph, centres, coords) -> Tuple[int, ...]:
         sub = (-ur, ll, -above)
         if best is None or sub < best:
             best = sub
-    assert best is not None
+    if best is None:
+        raise AssertionError('no orientation scored')
     return (-max_row,) + best
 
 

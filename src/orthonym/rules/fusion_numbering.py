@@ -315,7 +315,8 @@ def _start_ring_key(
         if best_metric is None or metric < best_metric:
             best_metric = metric
             best_key = key
-    assert best_key is not None
+    if best_key is None:
+        raise AssertionError('no orientation scored')
     return best_key
 
 

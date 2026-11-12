@@ -612,6 +612,53 @@ def _min_noting_tie(mol, top, key, chooser=None):
     return best
 
 
+#: ORTHONYM_P2_VERIFY=1 only: the molecules whose staged cascade differed from the full one (a check reads it)
+P2_STAGED_MISMATCHES: List[str] = []
+
+
+def _p44_count_terms(chain, fg_atoms, fg_bearing_carbons, count_bonds_in_chain) -> tuple:
+    """Terms 0-4 of ``chain_score`` (find_principal_chain): principal group on the chain, its instances, length,
+    multiple bonds, double bonds."""
+    chain_set = set(chain)
+    double_bonds, triple_bonds = count_bonds_in_chain(chain)
+    return (1 if (fg_atoms & chain_set) else 0, sum(1 for bearing in fg_bearing_carbons if bearing & chain_set),
+            len(chain), double_bonds + triple_bonds, double_bonds)
+
+
+def _staged_p44_top(chains, stages) -> list:
+    """The chains whose score (terms 0-9 of ``chain_score``, a tuple compared lexicographically) is the best, in
+    enumeration order (PURE SPEEDUP). The chains with the best whole tuple are exactly those left after keeping, stage
+    by stage, the chains with the best part of it: terms 0-4 first, then the locant terms 5-7, then 8, then 9. Every
+    term is the same for a chain and its reverse (``find_maximal_carbon_chains`` gives both), so a stage runs once per
+    pair. Measured: a C428 branched hydrocarbon has 20,592 maximal chains and 6 of the longest length; scoring every
+    chain in full took 205 of its 240 s."""
+    memo: Dict[tuple, tuple] = {}
+    cands = list(chains)
+    for i, stage in enumerate(stages):
+        if len(cands) <= 1:
+            break
+        keyed = []
+        for c in cands:
+            t = tuple(c)
+            key = (i, min(t, t[::-1]))
+            if key not in memo:
+                memo[key] = stage(c)
+            keyed.append((memo[key], c))
+        best = max(k for k, _ in keyed)
+        cands = [c for k, c in keyed if k == best]
+    return cands
+
+
+def _verify_staged_top(mol, chains, top, chain_score) -> None:
+    """ORTHONYM_P2_VERIFY=1: ``top`` must be the chains of the best full score, in order; records and raises otherwise
+    (a broad except may swallow the raise, the record stays)."""
+    scored = [(chain_score(c), c) for c in chains]
+    best = max(k for k, _ in scored)
+    if top != [c for k, c in scored if k == best]:
+        P2_STAGED_MISMATCHES.append(Chem.MolToSmiles(mol))
+        raise AssertionError("staged P-44 cascade differs")
+
+
 def find_principal_chain(
     mol,
     functional_groups: Dict[str, List[tuple]],
@@ -1234,43 +1281,15 @@ def find_principal_chain(
                     lams.append(lam)
         return tuple(sorted(lams, reverse=True))
 
-    # reverse-pair memo (PURE SPEEDUP — provably output-identical).
-    # `chain_score` is orientation-invariant: criteria 1-2 read set membership,
-    # 3-5 count length/bonds (both orientation-free), 6-8 take a fwd/rev `max`,
-    # and criterion 9 (`_compute_sub_locant_score`) returns the same tuple for a
-    # chain and its reverse — it only differs between the two orientations when
-    # they do NOT tie the cascade, and in that case both orientations pick
-    # the SAME canonical orientation; when they DO tie, the substituent-position
-    # pattern is palindromic so `sorted(positions)` is identical either way.
-    # `find_all_carbon_chains` emits every chain in BOTH orientations (~47% of
-    # the list are exact reverses — measured 210/441, 462/981), so scoring the
-    # reverse-canonical form once and reusing it for the mirror chain returns the
-    # IDENTICAL tuple with ~half the work. The cache is LOCAL to this
-    # find_principal_chain call (a new call = a new closure = a new dict), so it
-    # can never serve a stale score for a different molecule / PCG / exclude set.
-    _score_cache: Dict[tuple, tuple] = {}
-    _P2_VERIFY = _os.environ.get("ORTHONYM_P2_VERIFY") == "1"
-
-    def _chain_score_cached(chain: List[int]) -> tuple:
-        t = tuple(chain)
-        rt = t[::-1]
-        key = t if t <= rt else rt
-        cached = _score_cache.get(key)
-        if cached is None:
-            cached = chain_score(chain)
-            _score_cache[key] = cached
-        elif _P2_VERIFY:
-            # Debug self-check: the memo must return exactly what the un-memoized
-            # code would. Off by default (zero cost); flip ORTHONYM_P2_VERIFY=1
-            # to assert orientation-invariance on real data across a whole run.
-            fresh = chain_score(chain)
-            assert fresh == cached, (chain, fresh, cached)
-        return cached
-
-    # Find chain with highest score; break exact ties deterministically.
-    scored = [(_chain_score_cached(c), c) for c in chains]
-    best_score = max(s for s, _ in scored)
-    top = [c for s, c in scored if s == best_score]
+    # Find chain with highest score; break exact ties deterministically. The cascade runs
+    # staged (``_staged_p44_top``): the same `top`, in the same order, as the max of `chain_score`.
+    top = _staged_p44_top(chains, (
+        lambda c: _p44_count_terms(c, fg_atoms, fg_bearing_carbons, count_bonds_in_chain),
+        lambda c: (_compute_fg_locant_score(c), _compute_bond_locant_score(c), _compute_double_bond_locant_score(c)),
+        lambda c: (_count_substituents(c),),
+        lambda c: (_compute_sub_locant_score(c),)))
+    if _os.environ.get("ORTHONYM_P2_VERIFY") == "1":
+        _verify_staged_top(mol, chains, top, chain_score)
     if len(top) == 1:
         best_chain = top[0]
     else:

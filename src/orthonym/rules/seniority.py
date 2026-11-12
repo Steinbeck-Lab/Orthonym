@@ -1195,6 +1195,8 @@ _PNICTOGEN_INATE_ATOM = {"phosphinate_ester": "P", "arsinate_ester": "As", "stib
 #: same molecule again; that nested question gets the head answer (:func:`offered_principal_group` is the hypothesis, for
 #: the one reader that needs it).
 _OXOACID_OFFER_ACTIVE: dict = {}
+#: The canonical SMILES of the molecules whose offer is being built (the re-entry guard; see the offer)
+_OXOACID_OFFER_CONTENT: set = set()
 
 
 def offered_principal_group(mol):
@@ -1290,16 +1292,24 @@ def _promoted_oxoacid_ester(mol, functional_groups, head_name, head_matches=()):
             return None
     except ValueError:
         return None
-    if id(mol) in _OXOACID_OFFER_ACTIVE:
+    # Re-entry is keyed on the structure, not on the Mol object: the offer names the owners through the
+    # substituent and ring namers, which ask again on a fresh copy of the same molecule; an id key never
+    # matched it, and the loop ran until Python's recursion limit (a steroid phosphate: 2.9-4.7 s, ending in a
+    # swallowed RecursionError).
+    from rdkit import Chem
+    content = Chem.MolToSmiles(mol)
+    if id(mol) in _OXOACID_OFFER_ACTIVE or content in _OXOACID_OFFER_CONTENT:
         return None
     for fg_name in candidates:
         matches = functional_groups.get(fg_name)
         _OXOACID_OFFER_ACTIVE[id(mol)] = (fg_name, matches)
+        _OXOACID_OFFER_CONTENT.add(content)
         try:
             if _oxoacid_ester_offered(mol, fg_name, matches):
                 return fg_name, matches
         finally:
             _OXOACID_OFFER_ACTIVE.pop(id(mol), None)
+            _OXOACID_OFFER_CONTENT.discard(content)
     return None
 
 

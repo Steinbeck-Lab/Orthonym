@@ -31,7 +31,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
 )
 from ..perception.molcache import atoms_of, canon_smiles
 from .bridge_arms import arm_sizes_differ
-from .linked_phosphonic_surrogate import name_sulfonic_surrogate
+from .linked_phosphonic_surrogate import linked_phosphonic_acids_name as _linked_phosphonic_acids_name
 from .multiplicative_general import name_general_multiplicative
 from .multiplied_class_word_units import ACYL_UNIT_SUFFIXES, multiply_class_word_unit
 from .multiplicative_arms import find_arm_pcg
@@ -1299,9 +1299,6 @@ def _try_azanediyl_methylene_phosphonic(mol) -> Optional[str]:
 #: A neutral phosphonic acid group -P(=O)(OH)2 on a carbon.
 _PHOSPHONIC_ACID_SMARTS = Chem.MolFromSmarts('[#6][PX4;+0](=[OX1])([OX2H1])[OX2H1]')
 _LINKED_PHOSPHONIC_CACHE: Dict[str, Optional[str]] = {}
-#: The surrogate's sulfonic-acid suffix: '<parent>[-<locants>]-<n>sulfonic acid'.
-_SULFONIC_SUFFIX_RE = __import__('re').compile(
-    r'^(?P<head>.+?)(?:-(?P<locs>\d+(?:,\d+)+))?-?(?P<mult>di|tri|tetra)sulfonic acid$')
 
 
 def _try_linked_phosphonic_acids(mol) -> Optional[str]:
@@ -1337,8 +1334,15 @@ def _try_linked_phosphonic_acids(mol) -> Optional[str]:
     if key in _LINKED_PHOSPHONIC_CACHE:
         result = _LINKED_PHOSPHONIC_CACHE[key]
     else:
-        _LINKED_PHOSPHONIC_CACHE[key] = None
-        result = _linked_phosphonic_acids_name(mol, matches)
+        _LINKED_PHOSPHONIC_CACHE[key] = None   # re-entry for the same molecule declines
+        try:
+            result = _linked_phosphonic_acids_name(mol, matches)
+        except BaseException:
+            # A time-out (WallClockTimeout is a BaseException) or an error leaves no result: the
+            # placeholder must not stay, or the molecule is named without its multiplicative name for
+            # the rest of the process ('(2-phosphonoethyl)phosphonic acid', pin_verified).
+            _LINKED_PHOSPHONIC_CACHE.pop(key, None)
+            raise
         _LINKED_PHOSPHONIC_CACHE[key] = result
     if result is None:
         # No verified multiplicative name: a name another producer builds with
@@ -1350,57 +1354,6 @@ def _try_linked_phosphonic_acids(mol) -> Optional[str]:
             record_non_pin_fragment(f"{word}phosphonic acid")
             record_non_pin_fragment(f"{word}phosphonate")
     return result
-
-
-def _linked_phosphonic_acids_name(mol, matches) -> Optional[str]:
-    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
-    rw = RWMol(mol)
-    for m in matches:
-        rw.GetAtomWithIdx(m[1]).SetAtomicNum(16)
-        # S(=O)(=O)O: the second hydroxy oxygen becomes the second oxo
-        rw.GetBondBetweenAtoms(m[1], m[4]).SetBondType(Chem.BondType.DOUBLE)
-        o = rw.GetAtomWithIdx(m[4])
-        o.SetNoImplicit(True)
-        o.SetNumExplicitHs(0)
-    surrogate = rw.GetMol()
-    try:
-        Chem.SanitizeMol(surrogate)
-        acid = name_sulfonic_surrogate(surrogate)
-    except Exception:
-        return None
-    mm = _SULFONIC_SUFFIX_RE.match(acid or '')
-    if not mm:
-        return None
-    n = {'di': 2, 'tri': 3, 'tetra': 4}[mm.group('mult')]
-    if n != len(matches):
-        return None
-    head, locs = mm.group('head'), mm.group('locs')
-    if locs is None and head.endswith('methane'):
-        linker, enclose = head[:-len('methane')] + 'methylene', head != 'methane'
-    elif locs and head.endswith('benzene'):
-        linker, enclose = f"{head[:-len('benzene')]}{locs}-phenylene", True
-    elif locs:
-        linker, enclose = f"{head}-{locs}-{mm.group('mult')}yl", True
-    else:
-        return None
-    mult = COMPLEX_MULTIPLIERS.get(n)
-    if not mult:
-        return None
-    name = f"({linker}){mult}(phosphonic acid)" if enclose else f"{linker}{mult}(phosphonic acid)"
-    return name if _linked_name_rt_ok(name, mol) else None
-
-
-def _linked_name_rt_ok(name: str, mol) -> bool:
-    """OPSIN reads ``name`` back to ``mol``'s full InChIKey; False when it cannot
-    be checked."""
-    try:
-        from ..validation.opsin_roundtrip import opsin_parse
-        from ..perception.molcache import inchikey_of
-        parsed = opsin_parse(name)
-        pm = Chem.MolFromSmiles(parsed) if parsed else None
-        return pm is not None and Chem.MolToInchiKey(pm) == inchikey_of(mol)
-    except Exception:
-        return False
 
 
 def _try_phosphanetriyl_methylene_oxoacid(mol) -> Optional[str]:

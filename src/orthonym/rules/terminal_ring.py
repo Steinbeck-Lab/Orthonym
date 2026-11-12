@@ -154,12 +154,14 @@ def _size_from_stem(stem: str) -> Optional[int]:
     what is emitted at the tier running)."""
     if not _STEM_SIZES:
         from ..data.chain_names import get_chain_prefix
+        sizes: Dict[str, int] = {}
         for n in range(3, max(_vbu.BEST_EFFORT_MAX_CAGE_ATOMS,
                               _vbu.MAX_CAGE_ATOMS) + 1):
             try:
-                _STEM_SIZES.setdefault(get_chain_prefix(n), n)
+                sizes.setdefault(get_chain_prefix(n), n)
             except (ValueError, KeyError):
                 continue
+        _STEM_SIZES.update(sizes)   # whole or not at all: a time-out mid-loop leaves it empty
     return _STEM_SIZES.get(stem)
 
 

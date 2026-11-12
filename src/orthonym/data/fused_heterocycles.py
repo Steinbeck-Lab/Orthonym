@@ -2430,10 +2430,17 @@ def _build_pattern_index() -> None:
 
     Iterates FUSED_HETEROCYCLE_DATA in INSERTION ORDER and records each pattern's
     catalog index so the bucket scan can reproduce the old loop's tie-break.
+
+    The index is built in local dicts and published at the end, the guard dict last: a wall-clock
+    time-out during the build (the first fused naming of a process, ~0.15 s) leaves the guard empty, so
+    the next call builds it again. Filled in place, a cut build stayed partial for the process and
+    named 'C1CCN2CCCC2C1' 'indolizidine' (pin_verified) instead of 'octahydroindolizine'.
     """
-    global _PATTERN_BUCKETS, _REC_BY_SMILES, _REC_BY_SKELETON
     if _PATTERN_BUCKETS:
         return
+    buckets: Dict[Tuple[int, frozenset], List['_PatternRec']] = {}
+    by_smiles: Dict[str, '_PatternRec'] = {}
+    by_skeleton: Dict[str, '_PatternRec'] = {}
     for idx, (smiles, data) in enumerate(FUSED_HETEROCYCLE_DATA.items()):
         pattern = Chem.MolFromSmiles(smiles)
         if pattern is None:
@@ -2457,15 +2464,18 @@ def _build_pattern_index() -> None:
             hetset=hetset,
             has_exocyclic=has_exocyclic,
         )
-        _PATTERN_BUCKETS.setdefault((rank, hetset), []).append(rec)
-        _REC_BY_SMILES[smiles] = rec
+        buckets.setdefault((rank, hetset), []).append(rec)
+        by_smiles[smiles] = rec
         # Index all-ring entries by their skeleton key for the O(1) fast path.
         # First-writer-wins keeps the lowest catalog index on a key collision,
         # mirroring the bucket scan's first-at-max tie-break.
         if not has_exocyclic:
             skel = ring_skeleton_key(pattern)
-            if skel is not None and skel not in _REC_BY_SKELETON:
-                _REC_BY_SKELETON[skel] = rec
+            if skel is not None and skel not in by_skeleton:
+                by_skeleton[skel] = rec
+    _REC_BY_SMILES.update(by_smiles)
+    _REC_BY_SKELETON.update(by_skeleton)
+    _PATTERN_BUCKETS.update(buckets)
 
 
 def _gather_candidates(q_rank: int, q_hetset: frozenset) -> List['_PatternRec']:
