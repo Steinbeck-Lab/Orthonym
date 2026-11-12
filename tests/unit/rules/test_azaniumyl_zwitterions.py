@@ -114,10 +114,21 @@ def test_the_phosphoserine_zwitterion_is_named_below_the_pin_until_the_book_deci
 
 #: ruling R6 (RULINGS-ANION.md): a zwitterionic amino acid takes the name at every tier, the retained table name
 #: staying only where no such name is built: the partial zwitterions of glutamic and aspartic acid (a free carboxy group
-#: beside the carboxylate,:54554 gives no name for them) and carnitine, whose composed name breaks the
-#: hyphen rule. "Zwitterionic amino acids are named in two ways" (the Blue Book, example
-#::54561);:50943 gives the retained names no PIN.
-_RETAINED_STAYS = {"L-glutamic acid", "L-aspartic acid", "L-carnitine", "carnitine"}
+#: beside the carboxylate,:54554 gives no name for them). "Zwitterionic amino acids are named
+#: in two ways" (the Blue Book, example:54561);:50943 gives the retained names no PIN.
+_RETAINED_STAYS = {"L-glutamic acid", "L-aspartic acid"}
+
+#: carnitine is a quaternary betaine: like '(N,N-dimethylmethanaminiumyl)acetate (PIN)',:42473) its PIN spells
+#: the cation 'N,N-dimethylmethanaminiumyl', verified through its 'trimethylazaniumyl' twin, and the best-effort tier
+#: names it with the twin (ruling a lever). The cation prefix is cited among the parent's prefixes in the order of
+#: (:3477) with the hyphen of (b) (:6936); the Blue Book has no 'carnitine' (0 hits). The PIN tier verifies
+#: no name for the L zwitterion (None: it abstains).
+_COMPOSED = {
+    "carnitine": {"pin": ("4-(N,N-dimethylmethanaminiumyl)-3-hydroxybutanoate", "pin_verified"),
+                  "best-effort": ("3-hydroxy-4-(trimethylazaniumyl)butanoate", "systematic_verified")},
+    "L-carnitine": {"pin": None,
+                    "best-effort": ("(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate", "systematic_verified")},
+}
 
 
 def _retained_zwitterion_rows():
@@ -129,6 +140,13 @@ def _retained_zwitterion_rows():
 def test_a_retained_zwitterion_takes_the_azaniumyl_name_unless_none_is_built(smiles, retained):
     for tier in TIERS:
         row = _row(smiles, tier)
+        if retained in _COMPOSED:
+            if _COMPOSED[retained][tier] is None:
+                assert row["tier"] == "abstain", (tier, row)
+                continue
+            assert (row["name"], row["tier"]) == _COMPOSED[retained][tier], (tier, row)
+            assert name_is_rt_exact(_COMPOSED[retained]["best-effort"][0], smiles), (tier, row)
+            continue
         if retained not in _RETAINED_STAYS:
             assert row["name"] != retained and ("azaniumyl" in row["name"] or "-ium-" in row["name"]), (tier, row)
             assert row["tier"] == "pin_verified", (tier, row)

@@ -177,15 +177,13 @@ CHARGE_FIXES = [
     pytest.param(
         "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
         # The inner salt is named as the '-ate' zwitterion and the acyl is
-        # 3-hydroxyhexadecanoyl, so the old substring was wrong for this SMILES.
-        # Expected spelling: substituent prefixes in alphanumerical order,
-        # (the Blue Book); OPSIN 2.9.0 full-InChIKey EXACT (TRIAGE g4
-        # C7). The shipped name is RT-exact and labelled below pin_verified
-        # (test_carnitine_ester_zwitterion_tier_contract).
-        "3-[(3-hydroxyhexadecanoyl)oxy]-4-(trimethylazaniumyl)butanoate",
+        # 3-hydroxyhexadecanoyl. The PIN spells the cation as in
+        # '(N,N-dimethylmethanaminiumyl)acetate (PIN)' (the Blue Book) and cites
+        # it among the parent's prefixes in alphanumerical order, (:3477),
+        # with the hyphen of (b) (:6936)
+        # (tests/integration/test_medium_parent_fixes.py::test_carnitine_ester_zwitterion_tier_contract).
+        "4-(N,N-dimethylmethanaminiumyl)-3-[(3-hydroxyhexadecanoyl)oxy]butanoate",
         id="zwitterion-palmitoyloxy",
-        marks=pytest.mark.xfail(strict=True, reason=(
-            "the inner-salt name is general nomenclature (its P-74.1.3 PIN cites '(N,N-dimethylmethanaminiumyl)', which OPSIN 2.9.0 cannot verify; decision A part 2) and _route_zwitterion glues the cation prefix in front of the anion parent's own prefixes: '4-(trimethylazaniumyl)3-[(3-hydroxyhexadecanoyl)oxy]butanoate' (no hyphen, P-14.5.2 order broken; charged_router needs a structured composition) -- TODO in TRIAGE.md 'Suite fix -- j5-pin-labels-b'")),
     ),
     pytest.param(
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",

@@ -173,11 +173,24 @@ def shared_prefix_entries(ring_groups: Dict[str, List[int]], n_names: Sequence[s
 # A prefix block written in front of the name of a parent that cites prefixes of its own
 # ----------------------------------------------------------------------------------------------
 
+_CHAIN_STEMS = (r"(?:meth|eth|prop|but|pent|hex|hept|oct|non|dec|undec|dodec|tridec"
+                r"|tetradec|pentadec|hexadec|heptadec|octadec|nonadec|icos)")
+
 #: a chain amide parent, with what is glued to its front: 'dimethylbutanamide' is the prefix
 #: 'dimethyl' and the parent 'butanamide'
-_CHAIN_AMIDE = re.compile(
-    r"^(?P<head>.*?)(?P<parent>(?:meth|eth|prop|but|pent|hex|hept|oct|non|dec|undec|dodec|tridec"
-    r"|tetradec|pentadec|hexadec|heptadec|octadec|nonadec|icos)anamide)$")
+_CHAIN_AMIDE = re.compile(rf"^(?P<head>.*?)(?P<parent>{_CHAIN_STEMS}anamide)$")
+
+#: a chain carboxylate parent at the end of a name: saturated ('butanoate') or with its double and
+#: triple bonds ('pent-2-enoate', 'hexa-2,4-dienoate', 'pent-2-en-4-ynoate'); its carboxylate carbon
+#: is C1 whatever the prefixes are, so a prefix cited with them moves no locant
+_UNSAT_LOCS = r"[0-9]+(?:,[0-9]+)*"
+_UNSAT_MULT = r"(?:di|tri|tetra|penta|hexa)?"
+_CHAIN_CARBOXYLATE = re.compile(
+    rf"{_CHAIN_STEMS}(?:an|a?-{_UNSAT_LOCS}-{_UNSAT_MULT}en(?:-{_UNSAT_LOCS}-{_UNSAT_MULT}yn)?"
+    rf"|a?-{_UNSAT_LOCS}-{_UNSAT_MULT}yn)oate$")
+
+#: an isotopic descriptor ('(1-13C)', '(2H3)'), not the added hydrogen of '1(2H)' that a locant precedes
+_ISOTOPIC = re.compile(r"(?<![0-9])\((?:[0-9,]+-)?[0-9]+[A-Z][a-z]?[0-9]*\)")
 _LOCANT_SET = re.compile(rf"^{_LOC}(?:,{_LOC})*$")
 
 
@@ -267,5 +280,36 @@ def merge_n_block_into_name(n_block: str, name: str) -> Optional[str]:
         return None
     grouped = group_identical_prefixes(n_units + units)
     if len(grouped) == len(n_units) + len(units) or _pairs(grouped) != before:
+        return None
+    return _join_prefix_to_name(_join_prefixes(grouped), parent)
+
+
+def merge_prefix_into_chain_carboxylate(prefix: str, name: str) -> Optional[str]:
+    """``name``, a saturated chain carboxylate that cites prefixes of its own
+    ('3-(acetyloxy)butanoate'), with the locanted ``prefix`` ('4-(trimethylazaniumyl)') cited
+    among them: '3-(acetyloxy)-4-(trimethylazaniumyl)butanoate'. (the Blue Book)
+    and (:3477, a prefix begins with the first letter of its complete name) set the
+    order; (b) (:6936) puts a hyphen after a closing parenthesis that a locant
+    follows, so the prefix is never written in front of a locant of the parent. The carboxylate
+    carbon is C1 whatever the prefixes are, so no locant moves. ``None`` when either text is not
+    read with certainty or carries an isotopic descriptor.
+
+    The result is audited: the (locant, substituent) pairs of the two texts are exactly those of
+    the result."""
+    from .composition_primitives import _join_prefix_to_name, _join_prefixes
+    from .naming_utils import top_level_tokens
+    tail = _CHAIN_CARBOXYLATE.search(name)
+    if tail is None or _ISOTOPIC.search(name) or _ISOTOPIC.search(prefix):
+        return None
+    units = _units_of(top_level_tokens(name[:tail.start()], "-", "([{"))
+    added = _units_of(top_level_tokens(prefix, "-", "([{"))
+    if not units or added is None:
+        return None
+    parent = tail.group(0)
+    before = _pairs(added + units)
+    if before is None:
+        return None
+    grouped = group_identical_prefixes(added + units)
+    if _pairs(grouped) != before:
         return None
     return _join_prefix_to_name(_join_prefixes(grouped), parent)

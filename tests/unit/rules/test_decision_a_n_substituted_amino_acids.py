@@ -78,13 +78,14 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "CCCCC/C=C\\C[C@@H](/C=C/C=C\\C/C=C\\CCCC(=O)NCCS(=O)(=O)[O-])OO",
     "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
-    "C[N+](C)(C)CC(O)CC(=O)[O-]",
     "C[N+](C)(C)C[C@@H](O)CC(=O)[O-]",
     "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
     "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
+    "C[N+](C)(C)C[C@@H](O)CC(=O)[O-]",
+    "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
 })
 
 
@@ -244,27 +245,21 @@ def test_gate_refuses_in_scope_and_demotes_outside():
 # --- 3. carnitine: kept, never a PIN-tier name --------------------------------------
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,expected", [
-    ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", "L-carnitine"),
-    ("C[N+](C)(C)CC(O)CC(=O)[O-]", "carnitine"),
+@pytest.mark.parametrize("smiles,best_effort", [
+    ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", "(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate"),
+    ("C[N+](C)(C)C[C@@H](O)CC(=O)[O-]", "(3S)-3-hydroxy-4-(trimethylazaniumyl)butanoate"),
 ])
-def test_carnitine_is_labelled_below_the_pin_tier(namer, smiles, expected):
-    """0 Blue Book hits; the PIN tier builds no RT-exact systematic name yet (the L
-    zwitterion abstains without the retained name, the stereo-free one gives the
-    malformed '4-(trimethylazaniumyl)3-hydroxybutanoate'), so the name is kept and
-    labelled non-PIN rather than withdrawn."""
-    res = _dt_obj_row(namer, smiles)
-    assert res["name"] == expected
-    assert res["is_pin"] is False and res["tier"] != "pin_verified"
-    assert_full_rt(res["name"], smiles)
-
-
-@pytest.mark.opsin_gate
-def test_d_carnitine_from_the_amino_acid_table_is_labelled_below_the_pin_tier(namer):
-    smiles = "C[N+](C)(C)C[C@@H](O)CC(=O)[O-]"
+def test_carnitine_is_labelled_below_the_pin_tier(namer, smiles, best_effort):
+    """0 Blue Book hits; the PIN tier verifies no name for the L and D zwitterions (the strict
+    path keeps the amino-acid table's name, labelled non-PIN), and the best-effort tier gives
+    the name, the cation prefix cited among the parent's prefixes
+    the Blue Book, (b):6936) and the descriptor of the whole molecule. The
+    stereo-free one takes the PIN (tests/unit/rules/test_azaniumyl_zwitterions.py)."""
+    from tests.support.pin_tiers import tier_row
     res = _dt_obj_row(namer, smiles)
     assert res["is_pin"] is False and res["tier"] != "pin_verified", res
     assert_full_rt(res["name"], smiles)
+    assert tier_row(smiles, "best-effort")["name"] == best_effort
 
 
 # --- 4. part 2 (2026-09-27): the systematic names part 1 could only demote ----------

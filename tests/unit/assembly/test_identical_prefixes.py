@@ -169,3 +169,37 @@ def test_an_n_block_and_the_prefixes_of_the_amide_name_are_cited_together(block,
 ])
 def test_no_merge_when_nothing_is_shared_or_the_name_is_not_read(block, name):
     assert ip.merge_n_block_into_name(block, name) is None
+
+
+# (the Blue Book), (:3477: a prefix begins with the first letter of its
+# complete name) and (b) (:6936: a hyphen after a closing parenthesis that a locant
+# follows): a locanted prefix is cited among the prefixes of a chain carboxylate, not in front.
+@pytest.mark.parametrize("prefix,name,merged", [
+    ("4-(trimethylazaniumyl)", "3-(acetyloxy)butanoate", "3-(acetyloxy)-4-(trimethylazaniumyl)butanoate"),
+    ("4-(trimethylazaniumyl)", "3-chlorobutanoate", "3-chloro-4-(trimethylazaniumyl)butanoate"),
+    ("2-(trimethylazaniumyl)", "3-(1H-indol-3-yl)propanoate", "3-(1H-indol-3-yl)-2-(trimethylazaniumyl)propanoate"),
+    ("3-(trimethylazaniumyl)", "3-methylbutanoate", "3-methyl-3-(trimethylazaniumyl)butanoate"),
+    ("2-(trimethylazaniumyl)", "4-[2,3-bis(butanoyloxy)propoxy]butanoate",
+     "4-[2,3-bis(butanoyloxy)propoxy]-2-(trimethylazaniumyl)butanoate"),
+    ("5-(trimethylazaniumyl)", "4-hydroxypent-2-enoate", "4-hydroxy-5-(trimethylazaniumyl)pent-2-enoate"),
+    ("6-(trimethylazaniumyl)", "3-methylhexa-2,4-dienoate", "3-methyl-6-(trimethylazaniumyl)hexa-2,4-dienoate"),
+    ("5-(trimethylazaniumyl)", "4-methylpent-2-ynoate", "4-methyl-5-(trimethylazaniumyl)pent-2-ynoate"),
+    ("2-(trimethylazaniumyl)", "3-methyldodecanoate", "3-methyl-2-(trimethylazaniumyl)dodecanoate"),
+    ("2-(trimethylazaniumyl)", "4-(2-oxopyridin-1(2H)-yl)butanoate",
+     "4-(2-oxopyridin-1(2H)-yl)-2-(trimethylazaniumyl)butanoate"),     # added hydrogen, not an isotope
+])
+def test_a_prefix_is_cited_among_the_prefixes_of_a_chain_carboxylate(prefix, name, merged):
+    assert ip.merge_prefix_into_chain_carboxylate(prefix, name) == merged
+
+
+@pytest.mark.parametrize("prefix,name", [
+    ("2-(trimethylazaniumyl)", "4-hydroxycyclohexane-1-carboxylate"),   # a ring: its numbering may move
+    ("2-(trimethylazaniumyl)", "3-hydroxypentanedioate"),               # two ends: its numbering may move
+    ("2-(trimethylazaniumyl)", "3-hydroxybutanamide"),                  # not a carboxylate
+    ("(trimethylazaniumyl)", "3-hydroxybutanoate"),                     # a prefix without its locant
+    ("4-(trimethylazaniumyl)", "(3R)-3-hydroxybutanoate"),              # a stereodescriptor block is not read
+    ("4-(trimethylazaniumyl)", "3-hydroxy(1-13C)butanoate"),            # an isotopic descriptor is not moved
+    ("2-(trimethylazaniumyl)", "butanoate"),                            # no prefixes to cite it among
+])
+def test_no_merge_when_the_numbering_may_move_or_the_text_is_not_read(prefix, name):
+    assert ip.merge_prefix_into_chain_carboxylate(prefix, name) is None
