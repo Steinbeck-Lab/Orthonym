@@ -2656,9 +2656,11 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                     and _self_consistency_verdict(smiles, opsin_smiles, name=name) == "ok"):
                 _record_gate_outcome(_pv.GATE_OUTCOME_SELF01, name)
                 return name
-            _record_gate_outcome(
-                _pv.carveout_outcome("polyacid_prefix_derivative"), name)
-            return name
+            from .validation.carveout_binding import polyacid_carveout_bound
+            if polyacid_carveout_bound(name, smiles, opsin_smiles):
+                _record_gate_outcome(
+                    _pv.carveout_outcome("polyacid_prefix_derivative"), name)
+                return name
         # _self_consistency_decision records its own outcome (one per verdict).
         return reject_ambiguous(name, smiles, _self_consistency_decision(name, smiles, opsin_smiles, stats), stats)
     # opsin_smiles is None -> either OPSIN was UNAVAILABLE (transient: timeout /
@@ -2739,11 +2741,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # (the eta-hapto names ship at no tier,:39735). The stereo-layer
         # carve-out is withheld here too and offered after every other path
         # (``assembly/default_tier_offer.py``, which says why and how).
-        try:
-            from .data.natural_products import NAME_EXACT_NP_PARENTS as _NP_EXACT
-            _np_exact_hit = name in _NP_EXACT
-        except Exception:
-            _np_exact_hit = False
+        # the list name of exactly this input, not any list name (a name alone proves no structure)
+        _np_exact_hit = name is not None and _np_exact_list_name(smiles) == name
         # A halogen -uide name (no OPSIN grammar at any tier) ships on its twin read-back (validation.uide_twin).
         # The inositol of the very structure (exact InChIKey of a meso stereoisomer) ships the same way.
         # A fullerene name (OPSIN reads none) ships on the engine's own reader.
@@ -3204,16 +3203,12 @@ def _coordination_list_name(smiles: Optional[str], name: Optional[str]) -> bool:
 def _is_exact_match_list_name(smiles: Optional[str], name: Optional[str]) -> bool:
     """True iff ``name`` is one of the exact-match list names the general tiers
     may ship without an OPSIN round trip: a NAME_EXACT natural-product parent
-    ('germacrane', matched on the whole structure) or the coordination retained
+    ('germacrane', the table entry of this input's structure) or the coordination retained
     name of exactly this input."""
     if not name:
         return False
-    try:
-        from .data.natural_products import NAME_EXACT_NP_PARENTS
-        if name in NAME_EXACT_NP_PARENTS:
-            return True
-    except Exception:
-        pass
+    if _np_exact_list_name(smiles) == name:
+        return True
     try:
         return bool(smiles) and _coordination_retained_name(smiles) == name
     except Exception:

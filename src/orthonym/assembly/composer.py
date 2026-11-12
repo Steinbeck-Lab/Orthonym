@@ -12482,7 +12482,9 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
     # closing ")- " to avoid false matches with parenthesized substituent names
     # like "(oxan-2-yl)oxy". The pattern matches the full stereo descriptor block:
     # one or more comma-separated [digits][stereo-letter] groups inside parentheses.
-    if re.match(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-', name):
+    # A locant may carry a fusion letter and primes ('(4aS,8aR)-', "(1'R)-"): a block of such
+    # descriptors was missed and a second block from another atom-to-locant map was put in front.
+    if re.match(r"\(\d*[a-z]?['′]*[RSrsEZez](,\d*[a-z]?['′]*[RSrsEZez])*\)-", name):
         return name
 
     # This function does NOT choose the parent -- it decorates a name some OTHER

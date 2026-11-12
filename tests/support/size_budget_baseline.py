@@ -67,8 +67,8 @@ FUNCTIONS = {
     "src/orthonym/namer.py::Orthonym._try_general_engine_recovery_impl#1": 367,
     "src/orthonym/namer.py::Orthonym.name#1": 677,
     "src/orthonym/namer.py::_build_ring_info_for_parent_selection#1": 279,
-    "src/orthonym/namer.py::_final_opsin_validity_gate#1": 420,
-    "src/orthonym/perception/chains.py::find_principal_chain#1": 698,
+    "src/orthonym/namer.py::_final_opsin_validity_gate#1": 419,
+    "src/orthonym/perception/chains.py::find_principal_chain#1": 670,
     "src/orthonym/perception/functional_groups.py::_detect_functional_groups_impl#1": 234,
     "src/orthonym/perception/functional_groups.py::_resolve_fg_collisions#1": 366,
     "src/orthonym/rules/acid_halides.py::name_acid_halide#1": 216,
@@ -144,18 +144,18 @@ FUNCTIONS = {
 
 FILES = {
     "src/orthonym/assembly/composer.py": 12676,
-    "src/orthonym/assembly/substituent_enumerator.py": 6533,
+    "src/orthonym/assembly/substituent_enumerator.py": 6531,
     "src/orthonym/assembly/substituent_naming.py": 9450,
     "src/orthonym/data/opsin_imports/aryl_groups.py": 7782,
     "src/orthonym/data/opsin_imports/carboxylic_acids_opsin.py": 5346,
     "src/orthonym/data/opsin_imports/simple_groups.py": 8895,
     "src/orthonym/data/opsin_imports/substituent_names_opsin.py": 8496,
     # ION3: +2 lines, the import and the call of the last charged rescue (rules/charged_fallback.py).
-    "src/orthonym/namer.py": 10831,
+    "src/orthonym/namer.py": 10826,
     "src/orthonym/rules/benzene.py": 6060,
     "src/orthonym/rules/fused_rings.py": 5628,
     "src/orthonym/rules/heterocycles.py": 5770,
     "src/orthonym/rules/ions.py": 7676,
-    "src/orthonym/rules/multiplicative.py": 5249,
+    "src/orthonym/rules/multiplicative.py": 5202,
     "src/orthonym/rules/spiro.py": 7001,
 }

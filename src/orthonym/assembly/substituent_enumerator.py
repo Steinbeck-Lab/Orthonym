@@ -316,9 +316,7 @@ def _verify_completeness(mol, parent_atoms, substituents,
         if overlap:
             if general_fallback:
                 return False
-            assert not overlap, (
-                f"Double-assigned atoms: {overlap}"
-            )
+            raise AssertionError(f"Double-assigned atoms: {overlap}")   # not an assert: python -O keeps it
         all_sub_atoms.update(sub.frag_atoms)
 
     expected = set()
@@ -330,12 +328,12 @@ def _verify_completeness(mol, parent_atoms, substituents,
     if missed:
         if general_fallback:
             return False
-        assert not missed, f"Unassigned atoms: {missed}"
+        raise AssertionError(f"Unassigned atoms: {missed}")
     extra = all_sub_atoms - expected
     if extra:
         if general_fallback:
             return False
-        assert not extra, f"Extra atoms not in molecule: {extra}"
+        raise AssertionError(f"Extra atoms not in molecule: {extra}")
     return True
 
 

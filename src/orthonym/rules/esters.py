@@ -294,7 +294,6 @@ def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
     # and append "-carboxylic"
     # Build a sub-molecule from just the ring atoms to identify
     from ..data import ALL_RETAINED_NAMES as RETAINED_NAMES
-    from ..rules.polycyclics import identify_polycyclic
 
     # Try identifying as a polycyclic aromatic
     # Create sub-mol from acid fragment
@@ -321,24 +320,9 @@ def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
             if "carboxylic acid" in ring_name:
                 return ring_name.replace(" acid", "").strip()
 
-        # Try polycyclic identification on the sub-mol
-        pah_name = identify_polycyclic(sub_mol)
-        if pah_name:
-            return f"{pah_name}carboxylic"
-
-        # For heterocyclic rings, try heterocycle naming
-        from ..rules.heterocycles import classify_heterocycle
-        for ring in ring_info.AtomRings():
-            ring_set = set(ring)
-            if ring_set.issubset(acid_set):
-                has_heteroatom = any(
-                    mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
-                    for idx in ring
-                )
-                if has_heteroatom:
-                    het_info = classify_heterocycle(mol, tuple(ring))
-                    if het_info and het_info.get('name'):
-                        return f"{het_info['name']}-carboxylic"
+        # (A polycyclic and a heterocycle lookup on ``sub_mol`` stood here. ``sub_mol`` is never sanitised, so
+        # ``identify_polycyclic`` always raised 'RingInfo not initialized' and neither ran; had they run, they gave a
+        # stem without the acid locant ('{name}carboxylic'). Removed, so they cannot come alive by accident.)
     except Exception:
         pass
 
