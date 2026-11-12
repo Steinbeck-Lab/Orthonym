@@ -594,6 +594,29 @@ def _record_ring_suffix_without_locant(composed: str, parent_anion_name: str, ac
         record_non_pin_fragment(composed)
 
 
+def _cite_cation_prefix(cat_unit: str, parent_anion_name: str) -> str:
+    """The name of the anion parent with ``cat_unit``, the locanted cation prefix ('4-(trimethylazaniumyl)'),
+    cited in it, the Blue Book). A parent without prefixes of its own takes it in front of its
+    name ('3-(trimethylazaniumyl)propanoate'). A parent that cites prefixes takes it among them in the order of
+    , with a hyphen after its closing mark (b),:6936): '3-(acetyloxy)-4-(trimethylazaniumyl)
+    butanoate', never '4-(trimethylazaniumyl)3-(acetyloxy)butanoate'. '' when that cannot be written with certainty
+    (a prefix without its locant, a parent whose numbering a new prefix may move); the neutral-form path then names
+    the molecule. The parent's stereodescriptors describe the parent without the cation: a block of R/S descriptors is
+    left out (the CIP ranks differ: '(3S)' in the parent of L-carnitine, which is (3R)) and the molecule's are cited
+    afterwards; a block with an E/Z descriptor stays in front,:44643), because the descriptors cited
+    afterwards give an exocyclic '-ylidene' bond the substituent's own locant ('(1Z)-2-ethylidene...', not '(2Z)',
+     :48276). A descriptor the cation would change does not read back and the name is not used."""
+    from ..assembly.identical_prefixes import merge_prefix_into_chain_carboxylate
+    from .stereochemistry import _STEREO_PREFIX_RE
+    m = _STEREO_PREFIX_RE.match(parent_anion_name)
+    stereo = m.group(0) if m is not None and _re.search(r'[EZ]', m.group(0)) else ''
+    parent_anion_name = parent_anion_name[m.end():] if m is not None else parent_anion_name
+    if not parent_anion_name[:1].isdigit():
+        return f'{stereo}{cat_unit}{parent_anion_name}'
+    merged = merge_prefix_into_chain_carboxylate(cat_unit, parent_anion_name)
+    return f'{stereo}{merged}' if merged else ''
+
+
 def _parent_has_chain_locants(parent_anion_name: str) -> bool:
     """True if the anion-parent name is a systematic chain name that admits a
     substituent locant (``…anoate``, ``…enoate``, ``…ynoate``, ``…dioate``).
@@ -1510,21 +1533,9 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     # prefix), in the nesting order when the prefix carries its own
     # marks: '[ethyldi(methyl)azaniumyl]acetate' (the Blue Book).
     from ..assembly.naming_utils import apply_enclosing_marks
-    composed = f'{locant_prefix}{apply_enclosing_marks(cat_prefix, -1)}{parent_anion_name}'
-    _record_ring_suffix_without_locant(composed, parent_anion_name, acls, ring_attach_locant)
-
-    # Defensive: never ship a malformed composition where the prefix glues
-    # directly onto a parent locant with no separator ('(...)2-hydroxy...'). If
-    # the parent name carries its own leading locant but we computed no
-    # cation-locant prefix, the join is ambiguous -> decline (honest-fail, the
-    # neutral-form path names it). A clean name has the parent starting with a
-    # letter right after the ')'. Strip leading stereodescriptors (e.g. '(2E)')
-    # before checking for a digit, so a future un-handled stereo parent with no
-    # computed locant also fails closed.
-    from ..assembly.naming_utils import _STEREO_PAREN_RE
-    _after = _STEREO_PAREN_RE.sub('', parent_anion_name, count=1).lstrip('-')
-    if not locant_prefix and _after[:1].isdigit():
-        return ''
+    composed = _cite_cation_prefix(f'{locant_prefix}{apply_enclosing_marks(cat_prefix, -1)}', parent_anion_name)
+    if composed:
+        _record_ring_suffix_without_locant(composed, parent_anion_name, acls, ring_attach_locant)
     return composed
 
 

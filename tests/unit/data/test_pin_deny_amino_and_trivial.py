@@ -237,8 +237,8 @@ class TestNotOverGated:
         # systematic names are now built and verified, so they are gated above)
         "selenocystine",      # 'unknown organic compound'
         "tellurocystine",     # 'tellurium compound (not supported)'
-        "carnitine",          # L/D abstain, stereo-free malformed; kept, labelled
-                              # non-PIN instead (amino_acids.NON_PIN_AMINO_ACID_NAMES)
+        "carnitine",          # L/D: no PIN verified (the stereo-free one takes the
+                              # PIN); kept, labelled non-PIN (amino_acids.NON_PIN_AMINO_ACID_NAMES)
         # (saccharin left this list in PS lane 1:, the Blue Book, makes the sultam PIN a
         # heterone ('1λ6,2-thiazinane-1,1-dione (PIN)', the Blue Book), so 'saccharin' is no PIN and the
         # default tier declines it rather than label a non-PIN; see test_retained_trivial_names_not_pins.py)

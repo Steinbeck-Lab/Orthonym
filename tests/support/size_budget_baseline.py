@@ -80,7 +80,7 @@ FUNCTIONS = {
     "src/orthonym/rules/benzene.py::_identify_suffix_fg_on_benzene#1": 393,
     "src/orthonym/rules/benzene.py::_name_substituted_benzene#1": 314,
     "src/orthonym/rules/bicyclo.py::get_bicyclo_numbering#1": 245,
-    "src/orthonym/rules/charged_router.py::_route_zwitterion#1": 226,
+    "src/orthonym/rules/charged_router.py::_route_zwitterion#1": 214,
     "src/orthonym/rules/charged_router.py::route_charged#1": 940,
     "src/orthonym/rules/esters.py::_build_ester_acid_word#1": 289,
     "src/orthonym/rules/esters.py::name_polyfunctional_diester_free_hydroxy#1": 217,

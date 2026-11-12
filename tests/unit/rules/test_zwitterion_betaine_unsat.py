@@ -11,15 +11,11 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "C[N+](C)(C)C/C=C/C(=O)[O-]",
-    "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
-})
+# The unsaturated betaine and L-carnitine left the list when the cation prefix stopped being glued in front of the
+# parent's descriptor and prefixes: their best-effort names are pinned below and in test_azaniumyl_zwitterions.py.
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    # the strict path spells the '-aminiumyl' PIN (glued to the descriptor, so declined), the best-effort tier 'azaniumyl'
-    "C[N+](C)(C)C/C=C/C(=O)[O-]",
-})
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
 
 def _declined_pin_row(smiles):
@@ -72,8 +68,6 @@ def test_parent_has_chain_locants_retained_2_naphthoate():
 # Integration tests with Orthonym.name — require OPSIN gate ON
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    # the unsaturated betaine (the fix)
-    ("C[N+](C)(C)C/C=C/C(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)(2E)-but-2-enoate"),
     # saturated betaine (regression check)
     ("C[N+](C)(C)CCC(=O)[O-]", "3-(N,N-dimethylmethanaminiumyl)propanoate"),
 ])
@@ -83,12 +77,27 @@ def test_unsaturated_betaine_integration(namer, smi, expected):
 
 
 @pytest.mark.opsin_gate
+def test_the_unsaturated_betaine_cites_its_descriptor_in_front():
+    """ "NAMING OF STEREOISOMERS" (the Blue Book),:44643: stereodescriptors "are placed at the
+    front of the complete name when related to the parent structure". The route names the parent without the
+    cation and used to glue the prefix in front of the parent's descriptor ('4-(trimethylazaniumyl)(2E)-but-2-
+    enoate'); the parent's E/Z block is now cited in front of the whole name."""
+    from tests.support.pin_tiers import tier_row
+    from tests.support.rt_assert import assert_full_rt
+    smi = "C[N+](C)(C)C/C=C/C(=O)[O-]"
+    row = tier_row(smi, "best-effort")
+    assert (row["name"], row["tier"]) == ("(2E)-4-(trimethylazaniumyl)but-2-enoate", "systematic_verified"), row
+    assert_full_rt(row["name"], smi)
+    # the PIN spells the cation as '(N,N-dimethylmethanaminiumyl)acetate (PIN)' does (:42473)
+    row = tier_row(smi, "pin")
+    assert (row["name"], row["tier"]) == ("(2E)-4-(N,N-dimethylmethanaminiumyl)but-2-enoate", "pin_verified"), row
+
+
+@pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     # longer saturated betaine (regression)
     ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate"),
-    # carnitine (regression). Name unchanged; labelled below pin_verified since
-    # decision A part 1 (test_decision_a_n_substituted_amino_acids.py).
-    ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", "L-carnitine"),
+    # L-carnitine: tests/unit/rules/test_azaniumyl_zwitterions.py (_COMPOSED)
 ])
 def test_betaine_regressions(namer, smi, expected):
     """Ensure saturated cases still work correctly."""

@@ -709,10 +709,11 @@ if GENERAL_ONLY_AMINO_ACIDS:
 # the Blue Book-:54245); (heading:54247),:54251: "When not
 # denoted by a retained name, amino acids receive systematic substitutive names".
 # Unlike the pin:false rows (GENERAL_ONLY_AMINO_ACIDS), these names are KEPT: the
-# PIN tier builds no RT-exact systematic name for them yet (measured 2026-09-26: the
-# L and D zwitterions abstain, the stereo-free one gives the malformed
-# '4-(trimethylazaniumyl)3-hydroxybutanoate'), so withdrawing them would trade a
-# valid name for an abstention. They ship labelled below pin_verified instead
+# PIN tier verifies no systematic name for the L and D zwitterions (the stereo-free one
+# takes the PIN '4-(N,N-dimethylmethanaminiumyl)-3-hydroxybutanoate' since
+# 2026-11-12, and the wider tiers give the composed '(3R)-3-hydroxy-4-(trimethyl-
+# azaniumyl)butanoate'), so withdrawing them would trade a valid name for an
+# abstention. They ship labelled below pin_verified instead
 # (name-scoped non-PIN record, metrics.provenance.record_non_pin_fragment).
 # Consumers: get_amino_acid_name above and rules/salts.name_zwitterion's
 # RETAINED_AMINO_ACID_ZWITTERIONS lookup ('L-carnitine', 'carnitine').

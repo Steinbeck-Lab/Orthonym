@@ -47,7 +47,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     # the Blue Book '(N,N-dimethylmethanaminiumyl)acetate (PIN)')
     "C[NH+](C)CC(CC(=O)[O-])C(=O)[O-]",
     "NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]",
-    "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 # Leads item 29: 'NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]' and '[NH2+]=C(N)NCC(CC(=O)[O-])C(=O)[O-]' are
@@ -110,13 +109,14 @@ def test_carboxylate_betaine_unchanged(namer):
 
 
 @pytest.mark.opsin_gate
-def test_l_carnitine_unchanged(namer):
-    # The name is unchanged, but since decision A part 1 (2026-09-26) it ships
-    # labelled below pin_verified: 'carnitine' has 0 Blue Book hits and the PIN tier
-    # builds no RT-exact systematic name for it yet
-    # (tests/unit/rules/test_decision_a_n_substituted_amino_acids.py).
-    assert _dt_obj_name(namer, "C[N+](C)(C)C[C@H](O)CC(=O)[O-]") == "L-carnitine"
-    assert _dt_obj_row(namer, "C[N+](C)(C)C[C@H](O)CC(=O)[O-]")["is_pin"] is False
+def test_l_carnitine_is_no_pin_and_takes_the_composed_name(namer):
+    # 'carnitine' has 0 Blue Book hits and the PIN tier verifies no name for the L zwitterion
+    # (tests/unit/rules/test_decision_a_n_substituted_amino_acids.py); the best-effort tier gives the
+    # name with the cation prefix among the parent's prefixes the Blue Book).
+    from tests.support.pin_tiers import tier_row
+    smiles = "C[N+](C)(C)C[C@H](O)CC(=O)[O-]"
+    assert _dt_obj_row(namer, smiles)["is_pin"] is False
+    assert tier_row(smiles, "best-effort")["name"] == "(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate"
 
 
 @pytest.mark.opsin_gate

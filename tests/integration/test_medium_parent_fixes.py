@@ -36,16 +36,11 @@ pytestmark = pytest.mark.usefixtures("np_producer_only")
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
-})
-#... whose best-effort name is another one (it reads back exactly). The carnitine ester is one since ruling a lever
-# (RULINGS-ANION.md): the strict path spells the cation '(N,N-dimethylmethanaminiumyl)':42296,
-#:42473), which OPSIN 2.9.0 cannot read, and the best-effort tier spells the same atoms '(trimethylazaniumyl)',
-# its twin (validation/twin_spellings.py); both read back to the input's full InChIKey.
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
-})
+# The carnitine ester left the list when its cation prefix was cited among the parent's prefixes:3477,
+# (b):6936): the PIN tier now builds its PIN (test_carnitine_ester_zwitterion_tier_contract).
+DEFAULT_TIER_DECLINES = frozenset()
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
 
 def _declined_pin_row(smiles):
@@ -322,15 +317,13 @@ CHARGED_SPECIES_FIXES = [
         "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])"
         "C[N+](C)(C)C",
         # The inner salt is named as the '-ate' zwitterion and the acyl is
-        # 3-hydroxyhexadecanoyl, so the old substring was wrong for this SMILES.
-        # Expected spelling: substituent prefixes in alphanumerical order,
-        # (the Blue Book); OPSIN 2.9.0 full-InChIKey EXACT (TRIAGE g4
-        # C7). The shipped name is RT-exact and labelled below pin_verified
+        # 3-hydroxyhexadecanoyl. The PIN spells the cation as in
+        # '(N,N-dimethylmethanaminiumyl)acetate (PIN)' (the Blue Book) and cites
+        # it among the parent's prefixes in alphanumerical order, (:3477),
+        # with the hyphen of (b) (:6936)
         # (test_carnitine_ester_zwitterion_tier_contract).
-        "3-[(3-hydroxyhexadecanoyl)oxy]-4-(trimethylazaniumyl)butanoate",
+        "4-(N,N-dimethylmethanaminiumyl)-3-[(3-hydroxyhexadecanoyl)oxy]butanoate",
         id="carnitine-palmitoyl-acid",
-        marks=pytest.mark.xfail(strict=True, reason=(
-            "the inner-salt name is general nomenclature (its P-74.1.3 PIN cites '(N,N-dimethylmethanaminiumyl)', which OPSIN 2.9.0 cannot verify; decision A part 2) and _route_zwitterion glues the cation prefix in front of the anion parent's own prefixes: '4-(trimethylazaniumyl)3-[(3-hydroxyhexadecanoyl)oxy]butanoate' (no hyphen, P-14.5.2 order broken; charged_router needs a structured composition) -- TODO in TRIAGE.md 'Suite fix -- j5-pin-labels-b'")),
     ),
     pytest.param(
         "CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])"
@@ -364,13 +357,18 @@ def test_charged_species_naming(smiles, expected_substr):
 @pytest.mark.integration
 @pytest.mark.opsin_gate
 def test_carnitine_ester_zwitterion_tier_contract():
-    """The strict-xfail carnitine row above, in production (gate on): a name ships,
-    RT-exact, and below pin_verified PIN not verifiable; the composed
-    spelling is not the order yet -- TRIAGE g4 C7)."""
+    """The carnitine row above, in production (gate on): the PIN tier ships the
+    PIN, whose 'N,N-dimethylmethanaminiumyl' OPSIN 2.9.0 reads through its
+    'trimethylazaniumyl' twin, and the best-effort tier ships that twin, read back to
+    the input's full InChIKey."""
+    from tests.support.pin_tiers import tier_row
     from tests.support.rt_assert import name_is_rt_exact
     smi = "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C"
     r = _dt_row(smi)
-    assert r["tier"] != "pin_verified", r
+    assert (r["name"], r["tier"]) == (
+        "4-(N,N-dimethylmethanaminiumyl)-3-[(3-hydroxyhexadecanoyl)oxy]butanoate", "pin_verified"), r
+    r = tier_row(smi, "best-effort")
+    assert r["name"] == "3-[(3-hydroxyhexadecanoyl)oxy]-4-(trimethylazaniumyl)butanoate", r
     assert name_is_rt_exact(r["name"], smi), r
 
 
