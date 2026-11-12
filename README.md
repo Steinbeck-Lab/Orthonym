@@ -26,7 +26,7 @@
 
 <a href="https://github.com/Steinbeck-Lab/Orthonym/discussions/49"><picture>
   <source media="(max-width: 700px)" srcset="assets/readme-pubchem-narrow.svg">
-  <img src="assets/readme-pubchem.svg" alt="Orthonym names 124,145,767 of the 124,717,116 compounds in PubChem (99.54 %); 571,349 (0.46 %) are not named yet; 0 wrong structures. A bar of all PubChem compounds, drawn to scale, is green to its far end, where a sliver marks the 571,349. All of PubChem, no filtering, November 2026." width="100%">
+  <img src="assets/readme-pubchem.svg" alt="Orthonym names 99.6 % of PubChem: 124,224,676 of the 124,717,116 compounds, each name read back to its structure by OPSIN; 0 wrong structures. A bar of all PubChem compounds, drawn to scale, is green to its far end; a lens draws that end 24 times wider to show the 492,440 compounds not named yet. All of PubChem, no filtering, November 2026." width="100%">
 </picture></a>
 
 ## What it names
