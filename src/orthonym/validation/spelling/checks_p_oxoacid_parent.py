@@ -14,8 +14,9 @@ name that writes either acid as the prefix 'phosphono' ('2,7-diphosphonobicyclo[
 '(6-phosphonodecahydronaphthalen-2-yl)phosphonic acid') is a valid name and not the PIN.
 
 Scope, where the acid is certainly the principal characteristic group and the parents are identical: every heavy
-atom other than the acid groups is a neutral carbon, every P (As) atom is the centre of a neutral -P(=O)(OH)2
-(-As(=O)(OH)2) on a carbon, and only one of the two elements occurs. One acid: the name must carry the acid word.
+atom other than the acid groups is a neutral carbon or the ring nitrogen that carries a phosphonic acid, every P (As)
+atom is the centre of a neutral -P(=O)(OH)2 (-As(=O)(OH)2) on a carbon (a P also on a ring nitrogen:,
+:35702, '(piperidin-1-yl)phosphonochloridic acid'), and only one of the two elements occurs. One acid: the name must carry the acid word.
 Two acids on one multiplying group (``_one_linking_group``): the name must carry 'bis(<acid>)'. Three or more acids: only the acid word is checked decides
 between multiplied and substituted forms there). Outside the scope the rule is not about the molecule and the check
 returns None (not ABSTAIN, which would keep every other name from a PIN certificate). No naming code, no OPSIN.
@@ -28,7 +29,8 @@ from ..pin_spelling import PASS, SpellingFailure, register
 
 #: element -> (acid word, SMARTS of the neutral acid group on a carbon)
 _ACIDS = {
-    'P': ('phosphonic acid', Chem.MolFromSmarts('[#6][PX4;+0](=[OX1])([OX2H1])[OX2H1]')),
+    # on a carbon or a ring nitrogen,:35702: '(piperidin-1-yl)phosphonochloridic acid')
+    'P': ('phosphonic acid', Chem.MolFromSmarts('[#6,$([#7;R;+0;D3])][PX4;+0](=[OX1])([OX2H1])[OX2H1]')),
     'As': ('arsonic acid', Chem.MolFromSmarts('[#6][AsX4;+0](=[OX1])([OX2H1])[OX2H1]')),
 }
 
@@ -44,8 +46,9 @@ def _acid_in_scope(mol):
     if not matches or sum(1 for a in mol.GetAtoms() if a.GetSymbol() == elem) != len(matches):
         return None
     acid_atoms = {i for m in matches for i in m[1:]}
+    ring_n = {m[0] for m in matches if mol.GetAtomWithIdx(m[0]).GetSymbol() == 'N'}   # an acid's ring N
     for atom in mol.GetAtoms():
-        if atom.GetAtomicNum() == 1 or atom.GetIdx() in acid_atoms:
+        if atom.GetAtomicNum() == 1 or atom.GetIdx() in acid_atoms or atom.GetIdx() in ring_n:
             continue
         if atom.GetSymbol() != 'C' or atom.GetFormalCharge() or atom.GetNumRadicalElectrons():
             return None

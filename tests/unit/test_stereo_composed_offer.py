@@ -46,7 +46,11 @@ _SULFOOXY_NAME = (
     "1,4-bis{bis[4,5,6-tris(sulfooxy)cyclohex-2-en-1-yl]amino}benzene")
 # PubChem CID140605103: two stereo units, two locants, no repeat
 _AZANIDE = "C1CC[C@H]([C@@H](C1)NC2=NC3=C(S2)C=C(C=C3)CN4C5=CC=CC=C5N=C4[NH-])O"
-_AZANIDE_NAME = ("(1R,2R)-[1-({2-[(2-hydroxycyclohexyl)amino]-1,3-benzothiazol-6-yl}methyl)-1H-1,3-benzimidazol-2-yl]"
+# the two centres are in the cyclohexyl prefix: their block stands at its front, the Blue Book, "When
+# they relate to substituent groups, they are cited at the front of the corresponding prefix"); was
+# '(1R,2R)-[1-(...)...]azanide', where the parent azanide has no locant 1 or 2 (independent check: the old block is
+# impossible on the parent; OPSIN reads the new name back to the full key)
+_AZANIDE_NAME = ("{1-[(2-{[(1R,2R)-2-hydroxycyclohexyl]amino}-1,3-benzothiazol-6-yl)methyl]-1H-1,3-benzimidazol-2-yl}"
                  "azanide")
 # PubChem CID102144947: eight oxazoline stereocentres; the composed name has one descriptor at each repeated locant
 _OXAZOLINES = (

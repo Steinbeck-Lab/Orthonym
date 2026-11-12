@@ -387,7 +387,9 @@ def test_the_amidoxime_keeps_the_ring_cascades_pyridine_parent_at_best_effort():
     trip) and the ring cascade's parent was lost to it; the assembler now declines a branch joined by a double bond that
     it has no ylidene prefix for."""
     row = tier_row(_AMIDOXIME, "best-effort")
-    assert row["name"] == ("(1Z)-3-{(hydroxyimino)[methyl(1-methylpiperidin-4-yl)amino]methyl}-6-methyl-"
+    # the (1Z) of the C=N stands at the front of its methyl prefix, the Blue Book; was at the front
+    # of the name, where pyridine N-1 has no such bond)
+    assert row["name"] == ("3-{(1Z)-(hydroxyimino)[methyl(1-methylpiperidin-4-yl)amino]methyl}-6-methyl-"
                            "2-[3-(propan-2-yl)phenoxy]pyridine"), row
     assert_full_rt(row["name"], _AMIDOXIME)
 

@@ -25,14 +25,21 @@ FAILS = [  # (smiles, name, rule)
     ("OP(=O)(O)C1CCC2CC(P(=O)(O)O)CCC2C1", "(6-phosphonodecahydronaphthalen-2-yl)phosphonic acid", "P-51.3.1"),
     ("O[As](=O)(O)C1CC2CCC1C2[As](=O)(O)O", "2,7-diarsonobicyclo[2.2.1]heptane", "P-67.1.1.1"),
     ("OP(=O)(O)CCP(=O)(O)O", "(2-phosphonoethyl)phosphonic acid", "P-51.3.1"),
-    ("OP(=O)(O)c1ccc(cc1)-c1ccc(cc1)P(=O)(O)O", "(4'-phosphono[1,1'-biphenyl]-4-yl)phosphonic acid", "P-51.3.1"),
+    ("OP(=O)(O)c1ccc(cc1)-c1ccc(cc1)P(=O)(O)O", "(4'-phosphono[1,1'-biphenyl]-4-yl)phosphonic acid", "P-51.3.1"),    # was a NO_FAILURE row ("ring N: abstain"). change-asserted-value: "Name construction guidelines for
+    # functional replacement nomenclature" (the Blue Book): "phosphonic... acid... can only be used when P... is
+    # attached to atoms of hydrogen, carbon or another atom of a parent hydride such as N"... "(C5H10N)-P(O)Cl(OH) is
+    # (piperidin-1-yl)phosphonochloridic acid", so the N-bound group is a phosphonic acid too and (:23180)
+    # multiplies the two; independent check: OPSIN reads '(piperidine-1,4-diyl)bis(phosphonic acid)' to the same full
+    # InChIKey; mutation: at HEAD the check abstains on this molecule
+    ("OP(=O)(O)C1CCN(CC1)P(=O)(O)O", "(1-phosphonopiperidin-4-yl)phosphonic acid", "P-51.3.1"),
 ]
 NO_FAILURE = [  # (smiles, name): passes, or the check abstains
     ("OP(=O)(O)C1CCC(P(=O)(O)O)CC1", "(cyclohexane-1,4-diyl)bis(phosphonic acid)"),
     ("CCP(=O)(O)O", "ethylphosphonic acid"),
     ("OP(=O)(O)CP(=O)(O)O", "methylenebis(phosphonic acid)"),
     ("OC(=O)CP(=O)(O)O", "phosphonoacetic acid"),                       # a senior acid: abstain
-    ("OP(=O)(O)C1CCN(CC1)P(=O)(O)O", "(1-phosphonopiperidin-4-yl)phosphonic acid"),  # ring N: abstain
+    ("OP(=O)(O)C1CCN(CC1)P(=O)(O)O", "(piperidine-1,4-diyl)bis(phosphonic acid)"),
+    ("CN(C)P(=O)(O)O", "N,N-dimethylphosphoramidic acid"),               # an acyclic amine N: out of scope
     ("OP(=O)(O)C1CC(P(=O)(O)O)CC(P(=O)(O)O)C1", "(cyclohexane-1,3,5-triyl)tris(phosphonic acid)"),
     # a ring and a chain are no single multiplying group, the Blue Book): substitutive PIN
     ("OP(=O)(O)Cc1ccc(cc1)P(=O)(O)O", "[(4-phosphonophenyl)methyl]phosphonic acid"),
@@ -64,6 +71,10 @@ def test_interface():
     ("OP(=O)(O)C1CCC2CC(P(=O)(O)O)CCC2C1", "(decahydronaphthalene-2,6-diyl)bis(phosphonic acid)"),
     ("OP(=O)(O)c1ccc(cc1)-c1ccc(cc1)P(=O)(O)O", "([1,1'-biphenyl]-4,4'-diyl)bis(phosphonic acid)"),
     ("OP(=O)(O)c1cccc2c(P(=O)(O)O)cccc12", "(naphthalene-1,5-diyl)bis(phosphonic acid)"),
+    # an acid on a ring N is a phosphonic acid, the Blue Book); was '(1-phosphonopiperidin-4-yl)phosphonic
+    # acid' pin_verified, and the piperazine had no PIN
+    ("OP(=O)(O)C1CCN(CC1)P(=O)(O)O", "(piperidine-1,4-diyl)bis(phosphonic acid)"),
+    ("OP(=O)(O)N1CCN(CC1)P(=O)(O)O", "(piperazine-1,4-diyl)bis(phosphonic acid)"),
     #: a linker holding a stereo block is enclosed in square brackets
     ("O=P(O)(O)[C@H]1C[C@@H]2CC[C@H]1[C@H]2P(=O)(O)O",
      "[(1R,2S,4S,7S)-bicyclo[2.2.1]heptane-2,7-diyl]bis(phosphonic acid)"),

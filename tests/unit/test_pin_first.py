@@ -94,7 +94,9 @@ def test_a_molecule_the_main_path_names_keeps_its_name_and_is_not_named_again(ti
     assert calls == []
 
 
-_FLOOR_NITROGEN_CATION = "CC(C)[C@@H](C(=O)O)[n+]1ccc2c(c1)C(=O)C1=CC(C)(C)CC1C2(C)O"
+# the former example ('CC(C)[C@@H](C(=O)O)[n+]1ccc2c(c1)C(=O)C1=CC(C)(C)CC1C2(C)O') is named by the PIN path now
+# ('...-5H-cyclopenta[g]isoquinolin-2-ium', its fused ring cation numbered by its fused name), so it reaches no floor
+_FLOOR_NITROGEN_CATION = "Nc1c2c([nH+]c3cc(Cl)ccc13)C[C@@H]1C=C(CC[NH3+])C[C@H]2C1"
 
 
 def _asks_of_the_pin_tier(monkeypatch, smiles, tier):

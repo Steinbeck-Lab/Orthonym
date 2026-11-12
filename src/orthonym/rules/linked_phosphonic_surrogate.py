@@ -6,6 +6,12 @@ from typing import Optional
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
+#: on a carbon or on a ring nitrogen: (the Blue Book) "phosphonic... acid... can only be used
+#: when P... is attached to atoms of hydrogen, carbon or another atom of a parent hydride such as N" ('(piperidin-1-yl)
+#: phosphonochloridic acid'); on an acyclic amine N the acid is a phosphoramidic acid,:35608,
+#: 'N,N-dimethylphosphoramidic acid (PIN)'), not matched
+PHOSPHONIC_ACID_SMARTS = Chem.MolFromSmarts('[#6,$([#7;R;+0;D3])][PX4;+0](=[OX1])([OX2H1])[OX2H1]')
+
 #: The surrogate's sulfonic-acid suffix: '<parent>[-<locants>]-<n>sulfonic acid'.
 _SULFONIC_SUFFIX_RE = re.compile(
     r'^(?P<head>.+?)(?:-(?P<locs>\d+[a-z]?[\x27′]*(?:,\d+[a-z]?[\x27′]*)+))?-?(?P<mult>di|tri|tetra)sulfonic acid$')

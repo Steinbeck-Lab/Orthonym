@@ -33,8 +33,10 @@ def _assert_named(smiles, expected):
 
 
 STEREO_ROWS = [
-    ("C[C@@H](C(=O)OC)[NH]", "(2S)-(1-methoxy-1-oxopropan-2-yl)amino"),
-    ("C/C=N\\[O]", "(1Z)-(ethylideneamino)oxy"),
+    # each descriptor at the front of the prefix that holds its unit, the Blue Book); the parents
+    # 'amino' and 'oxy' have no locant 2 or 1 (was '(2S)-(1-methoxy...)amino', '(1Z)-(ethylideneamino)oxy')
+    ("C[C@@H](C(=O)OC)[NH]", "[(2S)-1-methoxy-1-oxopropan-2-yl]amino"),
+    ("C/C=N\\[O]", "[(1Z)-ethylideneamino]oxy"),
 ]
 
 
@@ -105,7 +107,8 @@ def test_the_descriptors_of_every_branch_are_cited_in_the_bracket_of_the_branch(
 
 def test_the_stereo_pass_does_not_change_a_name_that_the_composition_gives():
     """The stereo pass is the last class of the offer: a molecule whose plain name takes the stereo at the front keeps it."""
-    _assert_named("C[C@@H](O)[C]1[CH][CH][CH][CH]1", "(1R)-1-(1-hydroxyethyl)cyclopentane-1,2,3,4,5-pentayl")
+    # the centre is C-1 of the hydroxyethyl prefix, the Blue Book), not C-1 of the cyclopentane
+    _assert_named("C[C@@H](O)[C]1[CH][CH][CH][CH]1", "1-[(1R)-1-hydroxyethyl]cyclopentane-1,2,3,4,5-pentayl")
 
 
 def test_the_atom_coverage_reads_a_radical_name_with_its_flag_only_in_the_stereo_pass():

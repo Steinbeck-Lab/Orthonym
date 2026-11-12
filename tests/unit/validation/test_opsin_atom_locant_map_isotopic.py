@@ -51,7 +51,8 @@ def test_a_name_without_a_label_has_its_locant_map_as_before():
 @pytest.mark.parametrize("smiles,expected", [
     # two centres a deuterium makes, composed on the stereo-free name
     ("[H][C@@]1(C[C@](CC(C1C2=CC=C(C=C2)OCC)([2H])[2H])([2H])CCC)[2H]",
-     "(4S,6S)-1-ethoxy-4-[4-propyl(2,2,4,6-2H4)cyclohexyl]benzene"),
+     # the two centres are in the cyclohexyl prefix, the Blue Book); benzene has none
+     "1-ethoxy-4-[(4S,6S)-4-propyl(2,2,4,6-2H4)cyclohexyl]benzene"),
     ("[H][C@@]1(C2=C(C3=CC=CC=C3N2)C4(CC4)CN1C(=O)C)[2H]",
      "(1'S)-1-(spiro[cyclopropane-1,4'-(1-2H1)tryptoline]-2'-yl)ethan-1-one"),
 ])

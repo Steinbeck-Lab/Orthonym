@@ -10,6 +10,8 @@ out are (:2873) and the specific methods of (:41555).
 from rdkit import Chem
 
 
+from .ring_ion_numbering import bare_fused_ring_locants  # noqa: F401,E402 (re-exported for ions)
+
 def cites_a_locant(name: str) -> bool:
     """A neutral name that carries a digit numbers its own parent hydride: its indicated
     hydrogen, hydro prefixes, ring fusion or substituents. That numbering does not number the
