@@ -98,6 +98,14 @@ class TestIsCompleteNameExtension:
         """
         assert _is_complete_name("acridin") is False
 
+    @pytest.mark.unit
+    def test_is_complete_name_rejects_a_fusion_component(self):
+        """OPSIN's fusion component 'cyclopenta[a]phenanthrene' is no retained name: a fusion
+        name is formed by the fusion rules, and this one lacks the indicated
+        hydrogen its mancude ring system needs, the Blue Book). Promoted, it
+        labelled the fused builder's '15H-cyclopenta[a]phenanthrene' below the PIN."""
+        assert _is_complete_name("cyclopenta[a]phenanthrene") is False
+
 
 class TestPINAllowList:
     """Signal 2 (_PIN_ALLOW frozenset) authority assertions.

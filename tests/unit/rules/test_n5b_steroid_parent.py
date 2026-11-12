@@ -7,6 +7,7 @@ system (the parent component) designations of the other component(s)"; (b) (:121
  (:12493) "Anthracene, phenanthrene, acridine, carbazole, xanthene and its chalcogen
 analogues, purine, and cyclopenta[a]phenanthrene are exceptions; traditional numberings are
 retained", which numbers the fusion carbon atoms 5, 8, 9, 10, 13 and 14 like the others."""
+import pytest
 from rdkit import Chem
 
 from orthonym.rules.bridged_fused_pin import hydro, parents, selection
@@ -61,3 +62,17 @@ def test_hydro_state_marks_the_fusion_carbons_by_structure():
     expect = {a.GetIdx() for a in mol.GetAtoms()
               if sum(1 for n in a.GetNeighbors() if n.GetIdx() in atoms) >= 3}
     assert len(expect) == 6 and state.fusion == frozenset(expect)
+
+
+@pytest.mark.opsin_gate
+def test_the_mancude_steroid_ring_system_takes_its_fusion_pin():
+    """The fully unsaturated ring system is '15H-cyclopenta[a]phenanthrene', its indicated
+    hydrogen by, the Blue Book), a PIN; 'gona-1(10),2,4,6,8(14),9(11),12,16-octaene'
+    names it on a Chapter stereoparent, which has no PIN:50943)."""
+    from tests.support.pin_tiers import tier_row
+    from tests.support.rt_assert import assert_full_rt
+    smiles = "C1=Cc2ccc3c(ccc4ccccc43)c2C1"
+    for tier in ("pin", "best-effort"):
+        row = tier_row(smiles, tier)
+        assert (row["name"], row["tier"]) == ("15H-cyclopenta[a]phenanthrene", "pin_verified"), (tier, row)
+    assert_full_rt("15H-cyclopenta[a]phenanthrene", smiles)
