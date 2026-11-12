@@ -16,7 +16,7 @@ Functions and classes are given by name, not by line number, so that you can fin
 
 ```text
 name_compound(smiles, ...)           one Orthonym per call
-  Orthonym.name()                    four wrappers, then the body
+  Orthonym.name()                    eight wrappers, then the body
     _name_with_pin_promotion         PIN tier: a second run if no name
     isotope decorator, wildcard check
     _name_impl()
@@ -40,12 +40,16 @@ name_compound(smiles, ...)           one Orthonym per call
 
 When `name_compound` is called while another naming is already running, which is how recursion happens, it builds a fresh `Orthonym` and looks the call up in a memo (`cached_nested_call`). A fresh instance does not have the flags of the outer call, so the flags travel in context variables (see [Tiers are flags](#tiers-are-flags)).
 
-### 2. `Orthonym.name`: four wrappers and a body
+### 2. `Orthonym.name`: eight wrappers and a body
 
-`name` carries four decorators, outermost first.
+`name` carries eight decorators, outermost first.
 
 | Wrapper | What it does |
 |:--|:--|
+| `failure_mode_scope` | Applies the `on_failure` argument (`failure_mode.py`). The caller's own `"empty"` call runs as a `"label"` call, and a failure becomes `""`; `"raise"` is `raise_on_limit=True`. |
+| `halogen_drawing_scope` | For the caller's own call only: names the input through another drawing of the same compound when one applies (an iodine drawing, a substituted metallocene through its cyclopentyl drawing, or a charge-separated drawing with no name as drawn) (`assembly/halogen_drawing.py`). Any other input runs `name` as before. |
+| `_input_scope` | Opens the input scope of the caller's own call (`_lone_pair_input_enter`), so every scope below works on the string that is named. A `Chem.Mol` input becomes its SMILES here. |
+| `default_tier_name_scope` | When the caller's own best-effort call leaves the molecule without a name, gives it the name of `default_tier_row_for`, as `name_tiered` does (`assembly/default_tier_offer.py`). It also asks for the PIN tier's name of a molecule named in a lower class (`pin_first.pin_tier_checked`). |
 | `_metal_offer_scope` | For the caller's own call only. When the input is a metal drawing that has another drawing with the same standard InChIKey (the ionic drawing of a covalent one, the bonded drawing of an organometal cation drawn beside its anion, or the drawing without the dative bonds), names the drawing as written and the other drawing, each as a call of its own, and keeps the better name (`assembly/metal_offer.py`). The name of the other drawing is recorded as not the PIN. |
 | `_form_choice_scope` | Names the charge forms of your input (`_charge_forms`) and keeps the best one. |
 | `_book_retry_scope` | When a name written in the book's spelling leaves the molecule unnamed at a wider tier, names it again with the older spelling (`mechanical_forms`). |
@@ -73,7 +77,7 @@ When a gate rejects the name of a class later on, that class is added to `_exclu
 For a molecule no special class took, `_name_impl` runs three steps.
 
 1. `_perceive` finds the functional groups (SMARTS patterns in `perception/functional_groups.py`), the ring systems (`perception/rings.py`), the multiple bonds and the stereocentres, and fills a `MolecularFeatures` object. Stereo goes through `assign_stereochemistry` in `perception/stereo.py`. Do not call RDKit's CIP labeller directly: `assign_stereochemistry` chooses the most accurate labeller that is available.
-2. `_classify` picks the principal group (`get_principal_group` in `rules/seniority.py`), finds out whether the molecule is polyfunctional, and chooses ring or chain as the parent (`select_parent` in `rules/parent_selection.py`, the P-44 rule).
+2. `_classify` picks the principal group (`get_principal_group` in `rules/seniority.py`), finds out whether the molecule is polyfunctional, and chooses ring or chain as the parent (`select_parent` in `rules/parent_selection.py`, the seniority order for parent structures).
 3. `composer.assemble_name` builds the name. A few inline branches in `_assemble_name_impl` (amidines, hydrazides) go first. Then `dispatch_inner` (`assembly/inner_dispatch.py`) walks `INNER_DISPATCH_TABLE`. Unlike the outer table, this loop stops at the first handler that applies **and succeeds**: a handler that returns `None` hands the molecule to the next one. The last entry, `general_acyclic`, is a catch-all and handles what is left.
 
 The inner handlers live in `assembly/handlers/` and call the nomenclature rules in `rules/`, the helpers of `assembly/naming_utils.py` (locants, enclosing marks, alphanumerical order) and the substituent namers. `--dump-tree` prints the handler that built a name. The handlers are listed with their files on the [Rule index](rule-index.md#from-a-handler-id-to-its-code).
@@ -97,7 +101,7 @@ If the result is now a failure label, up to seven rescues get a turn. They are o
 | `_try_general_engine_recovery` | The general engine is on (`valid` and wider). It also runs when a handler raised `OrthonymLimitError` or any other exception. |
 | `_try_demote_senior_group_rescue` | `valid` and wider: names the ring parent when a senior group on a substituent had taken over. |
 | a second call of `try_decompose` | Any tier, with the gate on: the decomposition engine as a last resort. |
-| `_try_alternate_parent_rescue` | `valid` and wider: tries the next parent of the P-44 ranking. |
+| `_try_alternate_parent_rescue` | `valid` and wider: tries the next parent in the seniority order for parent structures. |
 | `_try_np_systematic_downgrade` | `best-effort`, even when a name exists: replaces a retained natural-product parent name by a systematic name if that reads back. |
 | `_try_besteffort_clean_general_fallthrough` | `best-effort`: runs the general engine again in a clean context. |
 | `_try_perf_budget_t4_rescue` | `best-effort`: when a work budget ran out. |
@@ -219,24 +223,23 @@ The three vocabularies below are easy to confuse. The `producer` of the row uses
 | `tier_a_ring` | The ring cascade, a long handler. It tries complex rings, polycycles, partly saturated rings, heterocycles and benzene, picks among the candidates (`select_best_candidate`), and calls the general engine itself for spiro parents. |
 | `general`, `GENERAL` | In the outer table: a pass-through that returns `None` on purpose. `general_acyclic` in the inner table is the real catch-all. |
 | `composer`, `assemble_name` | Assembles a name from parts. The inner dispatch runs inside it. |
-| `polycyclic` and `polycyclics` | `rules/polycyclic.py` generates von Baeyer descriptors (P-23). `rules/polycyclics.py` names polycyclic aromatic hydrocarbons. |
+| `polycyclic` and `polycyclics` | `rules/polycyclic.py` generates von Baeyer descriptors. `rules/polycyclics.py` names polycyclic aromatic hydrocarbons. |
 | `bicyclo`, `tricyclo`, `vonbaeyer_universal` | Von Baeyer namers for two rings, for three rings, and the general analysis of a cage. Several modules use each of them, `polycyclic.py` among them. |
 | `T4`, `t4_floor`, `t4_coverage` | The universal namer of the `best-effort` tier. "T1" to "T5" in older comments are the tier ids: T1 `pin_verified`, T2 `pin_unverified`, T3 `systematic_verified`, T4 `best_effort`, T5 `abstain`. |
 | `pin_path` | A `source` value for the strict path: class handlers, composer and inner handlers. It is not a module boundary, and not a promise that the name is a PIN. The `cis`/`trans` offer of a monocycle's pair at `best-effort` carries it too. |
 | `source` | Coarse. It records the last producer that wrote a value, and on a decline it can name a producer that ran and failed. Do not use it to count producers: `producer` is the field for that. |
-| `candidate_pool`, `CandidatePool`, `HANDLER_POLICIES` | The candidate names of one naming call. `add` scores a name and voids it when its length ratio is below the floor or, for the handlers of the `ring_b` tier in `HANDLER_POLICIES`, when its confidence is below the gate. `best` returns the first candidate whose handler returns directly, or else the first one added. The pool almost always holds a single candidate, because the first inner handler that succeeds returns its own name; the Tier-A ring handler is the exception and picks among its own candidates with `select_best_candidate`. The pool does not rank parents: the parent is chosen in `_classify`, by `select_parent`, and the P-44 ranking of parent candidates is `rules/p44_scorer.py`. The real source of alternatives is the routing: a rejected class is excluded and the next one is tried. Ranking of finished names is `offer_pool`. |
+| `candidate_pool`, `CandidatePool`, `HANDLER_POLICIES` | The candidate names of one naming call. `add` scores a name and voids it when its length ratio is below the floor or, for the handlers of the `ring_b` tier in `HANDLER_POLICIES`, when its confidence is below the gate. `best` returns the first candidate whose handler returns directly, or else the first one added. The pool almost always holds a single candidate, because the first inner handler that succeeds returns its own name; the Tier-A ring handler is the exception and picks among its own candidates with `select_best_candidate`. The pool does not rank parents: the parent is chosen in `_classify`, by `select_parent`, and the ranking of parent candidates by the seniority order for parent structures is `rules/p44_scorer.py`. The real source of alternatives is the routing: a rejected class is excluded and the next one is tried. Ranking of finished names is `offer_pool`. |
 | `Offer`, `offer_pool` | Whole finished names that compete in `_finish`. Not the same as `candidate_pool`. |
 | `SELF-01`, `E1` | In comments: SELF-01 is the OPSIN read-back of `_final_opsin_validity_gate`; E1 is the atom-coverage certificate. |
 | `StoutClass` | The enum of the outer classes. The prefix is historical. |
 | "Phase 158", "v25 G1", "WSB-03" | Tags in comments that name the internal work item that added the code. They are not rules, and the notes they refer to are not in the repository. The [internals pages](reference/internals/index.md) strip the leading tag of a docstring. |
 | `BlueBookV2.md:4667` | A line number in a text conversion of the Blue Book that is not in the repository. Find the rule by its P-number in the Blue Book instead. |
-| `P-31.1.4.2.4`, `P-31.1.4.3.4` | Not Blue Book ids. P-31.1.4 has sub-rules `.1` to `.4` only. The numbering criteria are in P-14.4. Check any id that you copy from a comment. |
 
 ## Citing the Blue Book
 
 The authority is the [IUPAC 2013 Recommendations](https://iupac.qmul.ac.uk/BlueBook/) ("the Blue Book"). When you cite a rule in code or in a test, give the section that the book defines and the criterion inside it, and read the whole paragraph: the sentence that decides is often the last one. A rule number copied from a comment may be wrong; look it up.
 
-If you search a text or OCR conversion of the book, expect a few traps. Headings can carry markup (`### **P-14.3.4.2**`), so a pattern anchored on `P-14.3.4.` misses them. In some conversions the hyphen of `P-16` is a double quote and spaces are exclamation marks, so a search for `P-16.5` finds nothing. Whole chapter headings can be missing (P-2, P-4 and P-7). Figures and ring-numbering diagrams are the least reliable part; check them against the web edition.
+If you search a text or OCR conversion of the book, expect a few traps. Headings can carry markup (bold marks around the section number), so a pattern anchored on a section number misses them. In some conversions the hyphen of a section number is a double quote and spaces are exclamation marks, so a search for the number finds nothing. Whole chapter headings can be missing. Figures and ring-numbering diagrams are the least reliable part; check them against the web edition.
 
 ## Where the data lives
 
