@@ -1610,7 +1610,7 @@ class VonBaeyerAnalyzer:
         the SAME units again, so the budget trajectory (and any PerfBudgetExceeded
         abstention) is unchanged. RWMol and calls outside a scope run the impl directly.
         """
-        key = (frozenset(ring_atoms), frozenset(bridgeheads))
+        key = (frozenset(ring_atoms), frozenset(bridgeheads), getattr(self, "_allow_multiatom_bridge", True))
         state = {"hit": True, "tripped": None}
 
         def _fresh():
@@ -1653,8 +1653,9 @@ class VonBaeyerAnalyzer:
         # more rings searched the same main ring 15 times in one request (8 analyses, two
         # searches each). The key carries the main-bridge preference, which ``analyze`` switches
         # off for its second pass over a cage whose preferred main bicycle cannot be numbered, and
-        # the value computed with it on is not the value with it off. (A plain Mol's key, left as
-        # it was, does not carry it: its first value serves both passes.)
+        # the value computed with it on is not the value with it off. A plain Mol's keys carry it
+        # too (``ORTHONYM_MEMO=verify`` found a ring system whose two passes chose different main
+        # rings and bridges, and the first value had served both).
         #
         # A hit replays the units of the search it replaces, as a plain Mol's always did: the budget
         # trajectory (and any PerfBudgetExceeded) is what the recomputations charged, never more.
@@ -1676,7 +1677,7 @@ class VonBaeyerAnalyzer:
             core = (smi, order, bonds, frozenset(ring_atoms), frozenset(bridgeheads))
             if isinstance(mol, Chem.RWMol):
                 return core + ("rwmol", getattr(self, "_allow_multiatom_bridge", True))
-            return core
+            return core + (getattr(self, "_allow_multiatom_bridge", True),)
 
         def _by_object():
             return cached_by_key(mol, "polycyclic.main_ring", key, _fresh)

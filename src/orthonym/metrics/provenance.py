@@ -983,3 +983,9 @@ def get_provenance() -> dict:
         "split_verified_names": _SPLIT_VERIFIED_NAMES.get(),
         "breadth_promoted_names": _BREADTH_PROMOTED_NAMES.get(),
     }
+
+
+def tier_flags() -> tuple:
+    """The four tier flags of the current naming (best-effort, general fallback, aromatic general, full coverage): a
+    memo-key part of a value a producer computes differently at another tier."""
+    return (best_effort_ctx.get(), general_fallback_ctx.get(), allow_aromatic_general_ctx.get(), full_coverage_ctx.get())

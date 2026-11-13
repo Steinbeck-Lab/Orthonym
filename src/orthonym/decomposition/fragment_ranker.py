@@ -27,13 +27,15 @@ _NO_FG_RANK = 999
 
 
 def score_fragment_seniority(frag_smiles: Optional[str]) -> Tuple[int, int, int, int, int]:
-    """:func:`_score_fragment_seniority_impl`, memoised for the life of the process:
-    the score is a pure function of ``frag_smiles`` (an RDKit parse, the functional
-    groups it carries and its ring/heavy-atom counts; no provenance, no budget), so
-    one process computes it once per string. ``ORTHONYM_MEMO=off|verify`` and
-    ``ORTHONYM_PROCESS_CACHE=0`` bypass the memo exactly as for ``fg_detect``."""
-    from ..assembly.memo import pure_cache_or_compute
-    return pure_cache_or_compute("score_fragment_seniority", frag_smiles,
+    """:func:`_score_fragment_seniority_impl`, memoised for the life of the process. The score is not a function of
+    ``frag_smiles`` alone: the principal group of an ester asks whether its functional-class name can be built
+    (``rules.seniority._acyclic_ester_offered``), and that naming depends on the tier flags and the run context (the
+    PIN promotion re-run above all), so the key carries both (``ORTHONYM_MEMO=verify`` found a score of the same SMILES
+    that differed between the two runs). ``ORTHONYM_MEMO=off|verify`` and ``ORTHONYM_PROCESS_CACHE=0`` bypass the
+    memo exactly as for ``fg_detect``."""
+    from ..assembly.memo import pure_cache_or_compute, run_context_key
+    from ..metrics.provenance import tier_flags
+    return pure_cache_or_compute("score_fragment_seniority", (frag_smiles, tier_flags(), run_context_key()),
                                  lambda: _score_fragment_seniority_impl(frag_smiles))
 
 

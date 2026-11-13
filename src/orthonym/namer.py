@@ -10480,7 +10480,7 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
     if not include_confidence:
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
-            from .assembly.nested_memo import cached_nested_call, renaming_state
+            from .assembly.nested_memo import cached_nested_naming, renaming_state
             # The ambient state of a re-entrant naming (``nested_memo.renaming_state``: the tier flags,
             # decision A's N-acyl float scope, the peptide handler's attempt,...) changes the name, so it is a
             # key part.
@@ -10488,7 +10488,7 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
                     trivial_fallback, general_fallback, general_fallback_unverified,
                     allow_aromatic_general, full_coverage, mode, binding_proof,
                     renaming_state())
-            return cached_nested_call("name_compound_nested", _key, lambda: _name_compound_impl(
+            return cached_nested_naming(_key, smiles, lambda: _name_compound_impl(
                 smiles, style, include_confidence,
                 enable_triviality_controller=enable_triviality_controller,
                 enable_group_splitting=enable_group_splitting, trivial_fallback=trivial_fallback,

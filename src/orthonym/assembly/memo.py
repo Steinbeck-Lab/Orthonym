@@ -26,6 +26,7 @@ Dependency-light on purpose (``contextvars`` + ``os`` and the provenance context
 import contextlib
 import contextvars
 import os
+import threading
 from collections import OrderedDict
 
 from ..metrics.provenance import wider_tier_ctx
@@ -85,10 +86,10 @@ pin_promotion_var = contextvars.ContextVar("orthonym_pin_promotion", default=Fal
 _PROMOTION_INDEPENDENT = frozenset({
     "fg_detect", "sugar_c_substituted", "opsin_extended_smiles",
     "polycyclic.main_ring_struct",
-    # five process-wide pure namespaces keyed by SMILES strings alone: an InChIKey,
-    # two identity verdicts, an offer match and a fragment seniority score
+    # four process-wide pure namespaces keyed by SMILES strings alone: an InChIKey,
+    # two identity verdicts and an offer match
     "self_consistency_full_key", "full_inchikey_offer_match",
-    "protonation_site_verdict", "radical_identity_verdict", "score_fragment_seniority",
+    "protonation_site_verdict", "radical_identity_verdict",
 })
 
 
@@ -163,6 +164,12 @@ def _ck(namespace, key):
     if pin_promotion_var.get():
         return (namespace, key, "pin-promotion") + tag
     return (namespace, key) + tag
+
+
+def has(namespace, key) -> bool:
+    """True when the open scope holds a value for ``(namespace, key)``."""
+    cache = _cache_var.get()
+    return cache is not None and _ck(namespace, key) in cache
 
 
 def run_context_key():
@@ -394,6 +401,7 @@ _PROCESS_MISSES = [0]
 def clear_process_cache() -> None:
     """Drop every process-wide entry (tests; a worker that changes engine flags)."""
     _process_cache.clear()
+    _process_gate.clear()
     _PROCESS_HITS[0] = _PROCESS_MISSES[0] = 0
 
 
@@ -417,13 +425,18 @@ def pure_cache_or_compute(namespace, key, compute_fn):
     else:
         _process_cache.move_to_end(ck)
         _PROCESS_HITS[0] += 1
+        if ck in _process_gate:
+            note_nacyl_gate()
         return val
+    mark = nacyl_gate_mark()
     val = cache_or_compute(namespace, key, compute_fn)
     _PROCESS_MISSES[0] += 1
     try:
         _process_cache[ck] = val
+        if nacyl_gate_mark() != mark:
+            _process_gate.add(ck)
         if len(_process_cache) > _PROCESS_MAX:
-            _process_cache.popitem(last=False)
+            _process_gate.discard(_process_cache.popitem(last=False)[0])
     except TypeError:
         pass
     return val
@@ -449,7 +462,10 @@ def cache_or_compute(namespace, key, compute_fn, compared=None):
         return compute_fn()
     ck = _ck(namespace, key)
     if _MODE == "verify":
+        mark = nacyl_gate_mark()
         val = compute_fn()
+        if nacyl_gate_mark() != mark:
+            cache[(_GATE_KEY, ck)] = True
         _part = compared or (lambda v: v)
         if ck in cache and _part(cache[ck]) != _part(val):
             # Record BEFORE raising: the naming cascade swallows the exception, so
@@ -467,11 +483,16 @@ def cache_or_compute(namespace, key, compute_fn, compared=None):
         if record is not _NO_RECORD:
             from ..metrics.abstention import restore_abstention
             restore_abstention(record)
+        if (_GATE_KEY, ck) in cache:
+            note_nacyl_gate()
         return cache[ck]
     from ..metrics.abstention import peek_abstention
     before = peek_abstention()
+    mark = nacyl_gate_mark()
     val = compute_fn()
     cache[ck] = val
+    if nacyl_gate_mark() != mark:
+        cache[(_GATE_KEY, ck)] = True
     after = peek_abstention()
     if after is not before:
         cache[(_ABSTENTION_KEY, ck)] = after
@@ -480,3 +501,24 @@ def cache_or_compute(namespace, key, compute_fn, compared=None):
 
 _ABSTENTION_KEY = "__abstention__"
 _NO_RECORD = object()
+
+#: The N-acyl float gate (``decomposition.engine._nacyl_float_gate``) behaves differently inside the peptide handler's
+#: refusal scope (``engine._NACYL_FLOAT_REFUSALS``) and outside it, so a value whose computation reached the gate
+#: depends on the scope, and one that did not, does not. The gate counts every decision it makes
+#: (:func:`note_nacyl_gate`); a memo entry whose computation moved the count is marked (``(_GATE_KEY, ck)``), and a hit
+#: on a marked entry counts once more, so a computation that a hit stands for reads as having reached the gate. The
+#: fragment cache shares a name across the scope only when its naming never reached the gate
+#: (``fragment_naming.name_fragment_recursively``).
+_GATE_KEY = "__nacyl_gate__"
+_gate = threading.local()
+_process_gate: set = set()
+
+
+def note_nacyl_gate() -> None:
+    """Count one decision of the N-acyl float gate (or a memo hit standing for a computation that made one)."""
+    _gate.count = getattr(_gate, "count", 0) + 1
+
+
+def nacyl_gate_mark() -> int:
+    """The gate count of this thread: a computation reached the gate when the count moved across it."""
+    return getattr(_gate, "count", 0)
