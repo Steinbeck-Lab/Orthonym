@@ -38,12 +38,22 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "OC[C@H]1O[C@@H](OC23CC4CC(CC(C4)C2)C3)[C@H](O)[C@@H](O)[C@@H]1O",
 })
+# change-asserted-value 2026-11-13: the best-effort name of the adamantyl glucoside was the strict path's
+# 'tricyclo[3.3.1.1^3,7]decan-1-yl β-D-glucopyranoside'. A split name with a part that is never a PIN (the von Baeyer
+# name of a retained parent, 'adamantane (PIN)', the Blue Book) no longer replaces the pipeline's name that has
+# none; the glycoside class name carries no PIN label either Names,:53239, examples without '(PIN)').
+# OPSIN 2.9.0 reads the new name back to the full InChIKey; undoing decomposition.engine._pin_part_lost restores the
+# old name.
+BEST_EFFORT_OWN = {
+    "OC[C@H]1O[C@@H](OC23CC4CC(CC(C4)C2)C3)[C@H](O)[C@@H](O)[C@@H]1O":
+        "(2S,3R,4S,5S,6R)-2-[(adamantan-1-yl)oxy]-6-(hydroxymethyl)oxane-3,4,5-triol",
+}
 
 
 def _dt_name_compound(smiles):
     from orthonym import name_compound
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
-        return declined_pin_row(smiles)["name"]
+        return declined_pin_row(smiles, best_effort_same=smiles not in BEST_EFFORT_OWN)["name"]
     return name_compound(smiles, on_failure="label")
 
 
@@ -212,4 +222,4 @@ class TestGlycosideByteIdentityControls:
 
     @pytest.mark.parametrize("smiles,expected", list(CONTROLS.items()))
     def test_control_best_effort_tier_unchanged(self, smiles, expected):
-        assert _best_effort(smiles) == expected
+        assert _best_effort(smiles) == BEST_EFFORT_OWN.get(smiles, expected)

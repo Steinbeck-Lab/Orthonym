@@ -131,6 +131,9 @@ def _name_fragment_once(smiles: str) -> Optional[str]:
     from ..metrics.provenance import (get_provenance, record_non_pin_fragment,
                                       restore_provenance)
     before = get_provenance()
+    # the source the nested naming writes, not the outer naming's: a name served without a producer record
+    # ('acetic acid') left the outer 'general_engine' in place, and 'acetic acid' and its 'acetyl' read non-PIN
+    restore_provenance({**before, "source": None})
     try:
         # The same acid is asked for again by every site, classifier and enclosing candidate of one
         # naming (a succinate half-ester dendrimer: 7,711 asks of 49 acids). The call is made outside

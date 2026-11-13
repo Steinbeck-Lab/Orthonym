@@ -30,8 +30,11 @@ this file pins for it is the name, not a budget margin.
 NO inner-op threshold can both abstain them quickly and let chlorophyll finish on the
 main path (inv 16 — target shown unsatisfiable). The guarantee this test pins is the
 categorical one: a >20-min compute-bound HANG becomes a bounded, deterministic
-abstain-or-name. The wall bound below (55 s) is generous headroom over the measured
-~28 s worst case at HEAD, NOT a performance target. The Case-3 prune made each unit a
+abstain-or-name. The wall bound below (90 s) is generous headroom over the measured
+worst case, NOT a performance target. It was 55 s over a ~28 s worst case; the vancomycin
+witness came to 40-44 s alone (2026-11-13), and 46-52 s once the glycoside assembler stopped
+citing a sugar it cannot name as a 'glycosyloxy' prefix: that broken name had ended the split
+search one split early, and the search now tries one more split for the same final name. The Case-3 prune made each unit a
 more expensive one (the cheapest units, one bitmask AND per pair, left the count): a row
 that still abstains at 12M now takes 1.4-1.9x as long (measured 2026-10-20, shared box:
 Ni-corrin 14-15 s -> 21-25 s; 30 abstaining PubChem rows 689 s -> 977 s in all).
@@ -43,9 +46,9 @@ import pytest
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
-# Generous OS-kill bound: >> the measured ~28 s worst case, << the pre-fix >20-min
+# Generous OS-kill bound: >> the measured ~52 s worst case, << the pre-fix >20-min
 # hang. A process that does NOT return inside this window is the hang (test fails).
-_WALL_KILL_S = 55
+_WALL_KILL_S = 90
 
 # ── HANG witnesses that must now abstain CLEANLY (was: >20-min SIGKILL) ──────
 # InChIKey / ChEBI provenance in a temp dir; SMILES pinned here as the contract.
@@ -148,7 +151,7 @@ def test_hang_witness_abstains_cleanly(label, smiles):
     The 'must abstain' clause was the guard's first form: the hang was the defect and
     an abstain the bounded outcome. Since the breadth work the thiopeptide and the
     vancomycin witnesses are NAMED at best-effort within the same wall bound (5 s and
-    24 s here, bound 55 s), and OPSIN 2.9.0 reads each name back to the input's FULL
+    24 s at the time, bound now 90 s), and OPSIN 2.9.0 reads each name back to the input's FULL
     InChIKey (an InChIKey; an InChIKey, stereo layer
     included). A name that round-trips exactly is not what the guard exists to stop;
     an unparseable, partial or atom-dropped one still fails here, as does a return
