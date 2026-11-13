@@ -68,3 +68,22 @@ def test_a_bridged_cation_with_letter_locants_is_named():
     row = tier_row("C[N@@+]1(CC[C@]23C4C(=C)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O)CC6CC6.[Br-]", "valid")
     assert row["name"] == ("(1S,4R)-4-(cyclopropylmethyl)-10,17-dihydroxy-4-methyl-14-methylidene-12-oxa-4-azapentacyclo"
                            "[9.6.1.0^1,13.0^5,17.0^7,18]octadeca-7(18),8,10-trien-4-ium bromide"), row
+
+
+@pytest.mark.opsin_gate
+def test_the_numbering_of_one_bare_ring_is_computed_once_per_naming(monkeypatch):
+    # a cation naming asked for the numbering of one bare ring up to 222 times (time-out audit 2026-11-12)
+    from orthonym.assembly.memo import pop_scope, push_scope
+    from orthonym.rules import ring_ion_numbering as rin
+    computed = []
+    real = rin._named_locants
+    monkeypatch.setattr(rin, "_named_locants", lambda *a: computed.append(1) or real(*a))
+    mol = Chem.MolFromSmiles("c1cnc2ncnn2c1")
+    token = push_scope()
+    try:
+        first = bare_fused_ring_locants(mol)
+        first[0] = "edited"                         # a caller's edit does not reach the stored numbering
+        second = bare_fused_ring_locants(Chem.Mol(mol))
+    finally:
+        pop_scope(token)
+    assert len(computed) == 1 and second[0] != "edited"
