@@ -1989,6 +1989,26 @@ def _note_unproven_split(budget_before) -> None:
     _fn._fragment_guard.unproven_floor = floor
 
 
+def _nacyl_refusal_count() -> Optional[int]:
+    """The number of floats the N-acyl refusal scope (``_NACYL_FLOAT_REFUSALS``) has withheld so
+    far; None outside the scope. Read before a split for ``_split_met_refused_float``."""
+    refusals = _NACYL_FLOAT_REFUSALS.get()
+    return len(refusals) if refusals is not None else None
+
+
+def _split_met_refused_float(refused_before: Optional[int]) -> bool:
+    """True when the refusal scope withheld a float during a split (the count of
+    ``_nacyl_refusal_count`` grew since ``refused_before``). Inside the scope (the peptide attempt)
+    a fragment name that needs a float onto a non-suffix nitrogen is withheld
+    (``_nacyl_float_gate``), and the split is left unnamed. It is not unnamable: outside the scope
+    the float names it (demoted). It is unproven in the sense of ``_note_unproven_split``: the
+    search that follows it (every other bond, each remainder named in full) is the one the
+    scope's caller (``routing.dispatch_table._handle_peptide``) pays for and then discards for the
+    demoted float, so the engine bounds it as it bounds the search after an unproven split."""
+    count = _nacyl_refusal_count()
+    return refused_before is not None and count is not None and count > refused_before
+
+
 def _exploration_exhausted() -> bool:
     """True when the analysis-call budget has spent the share that the searches may spend on
     other bonds once the molecule has met an unproven split (``_note_unproven_split``). A budget
@@ -2053,6 +2073,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     if _split_key is not None and _memo.side_get("unproven_split", _split_key):
         _note_unproven_split(_budget_before)
         return None
+    _refused_before = _nacyl_refusal_count()    # floats withheld before this split (below)
 
     # Cleave and cap
     # For ether bonds, the acid side (larger fragment) gets H-cap (no OH),
@@ -2217,12 +2238,9 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     if _split_parent_is_junior(mol, _expressed, {bond.get("acid_atom")}) or _split_parent_amide_is_junior(mol, bond, fragment_names):
         return None
 
-    # Assemble (delegate to fragment_assembly module)
-    # a phase /: thread fragment_smiles additively; only the glycoside
-    # assembler reads it, every other assembler ignores the kwarg.
-    # Incr-1a: thread the parent SMILES too -- the glycoside assembler
-    # RT-gates the STRUCTURAL aglycone-substituent fallback against it (0-wrong).
-    # Purely additive; every other assembler ignores the kwarg.
+    # Assemble (delegate to fragment_assembly module). Only the glycoside assembler reads
+    # fragment_smiles (a phase /) and the parent SMILES, against which it RT-gates the
+    # STRUCTURAL aglycone-substituent fallback (Incr-1a, 0-wrong); the others ignore both.
     _outcome: Dict[str, str] = {}
     _assembled = assemble_fragment_name(
         bond["type"], fragment_names, style=style,
@@ -2234,6 +2252,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     # reports that it built a name it could not prove: the split is UNPROVEN, which is not the
     # same as unnamed. The name is not used. The molecule's searches are bounded from here
     # (``_exploration_exhausted``); a repeat of the split is not named again.
+    if not _assembled and _split_met_refused_float(_refused_before):    # bounded the same way
+        _note_unproven_split(_budget_before)
     if not _assembled and _outcome.get("unproven"):
         _note_unproven_split(_budget_before)
         if _split_key is not None:
