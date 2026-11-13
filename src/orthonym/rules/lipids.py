@@ -91,9 +91,13 @@ def _isolated_acid_smiles_uncached(mol, carbonyl_idx: int, ester_o_idx: int,
 
 
 #: the nesting of:func:`_name_fragment` in one naming: an acyl group whose acid carries an ester of its own (an
-#: estolide) is named at depth 2; a deeper probe names part of a polyester, never an acyl group of the name
+#: estolide) is named at depth 2, and the acyl group of a linear oligoester of a hydroxy acid is named inside the acyl
+#: group it is the acid of (the 3-hydroxybutanoate pentamer of milestone1500 names its acids down to depth 3,
+#: "3-(benzoyloxy)propanoic acid (PIN)"; with 2 the inner acid fell to the general engine and the name to
+#: systematic_verified). Deeper probes add time on branched polyesters (an octaester siloxane cage, PubChem CID 152882583:
+#: 131 s with 3, 160 s with 5) and are not made.
 _FRAGMENT_DEPTH = contextvars.ContextVar("orthonym_lipid_fragment_depth", default=0)
-_MAX_FRAGMENT_DEPTH = 2
+_MAX_FRAGMENT_DEPTH = 3
 
 
 def _name_fragment(smiles: Optional[str]) -> Optional[str]:

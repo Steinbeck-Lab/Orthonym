@@ -7962,7 +7962,7 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
             m.dispatch_table._PEPTIDE_NAME_STANDS, m.enumerator._gate_is_reentrant(),
             getattr(m.group_splitting._IN_SPLIT_PROBE, 'active', False), m.locant_omission.forced_locant_reason(),
             m.locant_omission._ISOTOPIC_NAMING_SCOPE.get(), m.locant_omission._ISOTOPE_PARENT_POSITIONAL.get(),
-            m.memo.book_forms_var.get())
+            m.memo.book_forms_var.get(), BRANCH_FALLBACK.get())
 
 
 def name_substituent_fragment(
@@ -8017,8 +8017,11 @@ def name_substituent_fragment(
         hit = cache.get(ck)
         if hit is not None and hit[0] is mol:
             _pv.replay_non_pin_log(hit[2])
+            if (_memo._GATE_KEY, ck) in cache:
+                _memo.note_nacyl_gate()     # the naming this hit stands for reached the N-acyl float gate
             return hit[1]
     before = _nsf_budget_state()
+    gate_mark = _memo.nacyl_gate_mark()
     _pv.push_touched_log()
     _pv.push_non_pin_log()
     try:
@@ -8038,6 +8041,8 @@ def name_substituent_fragment(
         # log, so a log that kept repeats doubled with each level of nested hits (2**24 replays for a
         # 24-level branched peptide), while the replay of the compacted log leaves the same record.
         cache[ck] = (mol, value, stored)
+        if _memo.nacyl_gate_mark() != gate_mark:
+            cache[(_memo._GATE_KEY, ck)] = True
     return value
 
 

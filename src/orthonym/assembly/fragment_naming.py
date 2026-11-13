@@ -144,6 +144,27 @@ def _resolve_cycle_hits(mark: int, met: frozenset) -> None:
             log.append(met)
 
 
+def note_fragment_request(canonical: str) -> None:
+    """Count an ask for ``canonical`` whose answer depends on whether it is on the visited set (a fragment named as a
+    molecule, a decomposition that refuses a molecule named up the stack)."""
+    requests = getattr(_fragment_guard, 'fragment_requests', None)
+    if requests is not None:
+        requests[canonical] = requests.get(canonical, 0) + 1
+
+
+def named_up_the_stack(canonical: str) -> bool:
+    """True when ``canonical`` is on the visited set, i.e. named up the call stack; the ask is counted
+    (:func:`note_fragment_request`), since its answer depends on that set."""
+    note_fragment_request(canonical)
+    return canonical in _get_visited()
+
+
+def fragment_request_count(canonical: str) -> int:
+    """How many times the outermost ``name`` asked:func:`name_fragment_recursively` for ``canonical``: a naming that
+    did not move the count never asked for that fragment (``nested_memo.cached_nested_naming``)."""
+    return (getattr(_fragment_guard, 'fragment_requests', None) or {}).get(canonical, 0)
+
+
 def in_fragment_recursion() -> bool:
     """True while a fragment is being named as a molecule on behalf of a substituent prefix
     (``name_fragment_recursively``): the name is then the source of a prefix, not a name offered."""
@@ -630,6 +651,7 @@ def enter_name_scope(smiles=None):
         _fragment_guard.naming_passes = 0
         _fragment_guard.naming_pass_cap = None
         _fragment_guard.offers_made = set()
+        _fragment_guard.fragment_requests = {}
     return d
 
 
@@ -942,13 +964,40 @@ def is_top_level_naming() -> bool:
     return get_naming_depth() == 0
 
 
-def _remember_fragment_name(runtime_cache: dict, cache_key: str, value, met: frozenset) -> None:
+def _remember_fragment_name(runtime_cache: dict, cache_key: str, value, met: frozenset, gated: bool = False,
+                            shared_key: Optional[str] = None) -> None:
     """Keep ``value`` for ``cache_key``: under the bare key when the naming met no cycle, else with the SMILES it met
-    (:func:`_cycle_hits_since`) under:data:`_CTX_KEY`."""
+    (:func:`_cycle_hits_since`) under:data:`_CTX_KEY`. A naming that reached the N-acyl float gate (``gated``) is
+    marked (``memo._GATE_KEY``); one made inside the refusal scope that did not is kept for the scope outside it too
+    (``shared_key``), where the same naming makes the same name."""
+    from .memo import _GATE_KEY
     if met:
         runtime_cache[(_CTX_KEY, cache_key)] = (met, value)
     else:
         runtime_cache[cache_key] = value
+    if gated:
+        runtime_cache[(_GATE_KEY, cache_key)] = True
+    elif (shared_key is not None and shared_key != cache_key and shared_key not in runtime_cache
+            and (_CTX_KEY, shared_key) not in runtime_cache):
+        _remember_fragment_name(runtime_cache, shared_key, value, met)
+
+
+def _runtime_fragment_name(runtime_cache: dict, key: str, visited: set):
+    """The entry of the runtime cache for ``key``: a name, a refusal ``(_NEG_CACHE, vocabulary)`` made in the current
+    refusal vocabulary, or None. A name computed beside a cycle hit is served only where the same SMILES are on the
+    visited set, and it logs them for the fragment that is being named around it."""
+    dynamic = runtime_cache.get(key)
+    if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
+        dynamic = None      # a refusal made in another vocabulary counts for nothing here
+    if dynamic is None:
+        in_context = runtime_cache.get((_CTX_KEY, key))
+        if in_context is not None and in_context[0] <= visited:
+            dynamic = in_context[1]
+            if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
+                dynamic = None
+            else:
+                _note_cycle_hit(in_context[0])
+    return dynamic
 
 
 def name_fragment_recursively(smiles: str, style: str = 'pin',
@@ -982,6 +1031,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         return None
     if canonical is None:
         return None
+    note_fragment_request(canonical)
 
     # Cache key is style-aware so a systematic name never poisons the pin cache
     # (or vice versa). For the default 'pin' style the key IS ``canonical`` and
@@ -999,29 +1049,30 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
 
     # The isotopic scope that cites the hydro locants (``locant_omission.scope_cites_hydro_locants``, the decorator's
     # second try) names the fragment again: a name made without the locants is not the name made with them.
-    # The same holds for the isotope decorator's pass that withholds phane names (``phane_names_withheld``).
+    # The same holds for the isotope decorator's pass that withholds phane names (``phane_names_withheld``), and for
+    # the N-acyl float refusal scope of the peptide handler's attempt (``engine.nacyl_float_refusing``): a fragment
+    # named there withholds the float and takes another name (``ORTHONYM_MEMO=verify`` found a peptide whose fragment
+    # names, and with them the tier, depended on which scope named a fragment first). A name whose naming never reached
+    # the float gate (``memo._GATE_KEY``) is the same in both scopes, and it is shared between them.
     from ..assembly.locant_omission import scope_cites_hydro_locants
     from ..opsin_capabilities import _PHANE_WITHHELD
     runtime_key = cache_key + "\x00hydro-locants" if scope_cites_hydro_locants() else cache_key
     runtime_key = runtime_key + "\x00phane-withheld" if _PHANE_WITHHELD.get() else runtime_key
+    from ..decomposition.engine import nacyl_float_refusing
+    from .memo import _GATE_KEY, nacyl_gate_mark, note_nacyl_gate
+    shared_key = runtime_key
+    refusing = nacyl_float_refusing()
+    runtime_key = runtime_key + "\x00nacyl-refusing" if refusing else runtime_key
 
     # Tier 2: runtime dynamic cache — populated during this naming session
     runtime_cache = getattr(_fragment_guard, 'cache', None)
     visited = _get_visited()
     if runtime_cache is not None:
-        dynamic = runtime_cache.get(runtime_key)
-        if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
-            dynamic = None      # a refusal made in another vocabulary counts for nothing here
-        if dynamic is None:
-            # a name computed beside a cycle hit is served only where the same SMILES are on the visited set
-            in_context = runtime_cache.get((_CTX_KEY, runtime_key))
-            if in_context is not None and in_context[0] <= visited:
-                dynamic = in_context[1]
-                if isinstance(dynamic, tuple) and dynamic[1] != _refusal_vocabulary():
-                    dynamic = None
-                else:
-                    # the name carries its context to the fragment that is being named around it
-                    _note_cycle_hit(in_context[0])
+        dynamic = _runtime_fragment_name(runtime_cache, runtime_key, visited)
+        if dynamic is not None and (_GATE_KEY, runtime_key) in runtime_cache:
+            note_nacyl_gate()       # the naming this hit stands for reached the float gate
+        elif dynamic is None and refusing and (_GATE_KEY, shared_key) not in runtime_cache:
+            dynamic = _runtime_fragment_name(runtime_cache, shared_key, visited)
         if isinstance(dynamic, tuple):      # a refusal: (_NEG_CACHE, the vocabulary that made it)
             return None
         if dynamic is not None:
@@ -1073,6 +1124,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         # default 'pin' request; for a 'systematic' request skip it (returning a
         # pin fallback would answer the wrong question) and fall through to the
         # abstention below. Cache under the style-aware key. (a review review NIT 9.)
+        gate_mark = nacyl_gate_mark()
         fallback_name = (name_pipeline_only(canonical) if style == 'pin'
                          else None)
         # the answer of the depth net, a name or none, is a function of the whole visited set (its size, and what the
@@ -1081,7 +1133,8 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         _note_cycle_hit(visited_now)
         if fallback_name is not None and not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
-                _remember_fragment_name(runtime_cache, runtime_key, fallback_name, visited_now)
+                _remember_fragment_name(runtime_cache, runtime_key, fallback_name, visited_now,
+                                        nacyl_gate_mark() != gate_mark, shared_key)
             return fallback_name
         # Task 0.1: fragment could not be named (depth safety net).
         from ..metrics.abstention import AbstentionCode, record_abstention
@@ -1095,7 +1148,9 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     try:
         from ..errors import is_refusal_sentinel
         from ..namer import name_compound
+        gate_mark = nacyl_gate_mark()
         result = name_compound(canonical, style=style)
+        gated = nacyl_gate_mark() != gate_mark
         met = _cycle_hits_since(hit_mark, canonical)
         _resolve_cycle_hits(hit_mark, met)
         # THE chokepoint where a WHOLE-MOLECULE naming becomes a NAME COMPONENT.
@@ -1115,12 +1170,13 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             # refused it standalone). Negative-cache it so the partition search
             # never re-descends this dead end (giant-molecule hang fix).
             if runtime_cache is not None:
-                _remember_fragment_name(runtime_cache, runtime_key, (_NEG_CACHE, _refusal_vocabulary()), met)
+                _remember_fragment_name(runtime_cache, runtime_key, (_NEG_CACHE, _refusal_vocabulary()), met, gated,
+                                        shared_key)
             return None
         if result:
             # Populate runtime cache with successful result
             if runtime_cache is not None:
-                _remember_fragment_name(runtime_cache, runtime_key, result, met)
+                _remember_fragment_name(runtime_cache, runtime_key, result, met, gated, shared_key)
             return result
         # Task 0.1: fragment could not be named (empty result).
         # NOT negative-cached: an empty result can be depth-INDUCED (name_compound's

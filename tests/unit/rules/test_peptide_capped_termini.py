@@ -261,8 +261,12 @@ class TestSideChainTrapAbstains:
         glutamine with ITS OWN alpha-carboxyl also amidated -- two primary
         carboxamides on one residue (side chain + alpha), which
         `_strip_terminal_amide`'s exactly-one-match requirement correctly
-        refuses to disambiguate. Must abstain, never emit a wrong/misplaced
-        name."""
+        refuses to disambiguate. Must never emit a wrong/misplaced name: it
+        abstains, or it names the molecule by another route, which OPSIN reads
+        back to the input. The decomposition names it ('...pentanediamide', the
+        residue with both amides as the parent) since its fragment cache keeps
+        the names of the peptide handler's attempt apart (the memo key fix of
+        2026-11-13); before, it abstained."""
         smi = (
             "CC[C@H](C)[C@H](NC(=O)CN)C(=O)NCC(=O)N[C@@H](C)C(=O)"
             "N[C@H](C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCCCN)C(=O)"
@@ -275,9 +279,9 @@ class TestSideChainTrapAbstains:
             "[C@@H](C)CC)[C@@H](C)O)[C@@H](C)O)C(C)C)C(C)C"
         )
         result = _dt_name_compound(smi)
-        assert is_failure_name(result), (
-            f"glutamine C-terminal double-amide must abstain (ambiguous "
-            f"side-chain vs alpha amide), got: {result}"
+        assert is_failure_name(result) or same_key(smi, result), (
+            f"glutamine C-terminal double-amide must abstain or read back to "
+            f"the input (ambiguous side-chain vs alpha amide), got: {result}"
         )
 
     def test_c_terminal_aldehyde_out_of_scope_abstains(self):

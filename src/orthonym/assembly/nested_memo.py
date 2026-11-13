@@ -19,7 +19,7 @@ mode recomputes).
 from typing import Any, Callable, Tuple
 
 from . import fragment_naming as _fn
-from .memo import cache_or_compute, side_get, side_put
+from .memo import cache_or_compute, has, side_get, side_put
 from ..metrics import provenance as _pv
 
 # The keys here MUST equal the keys ``_pv.get_provenance`` returns (verified at
@@ -210,3 +210,44 @@ def cached_nested_call(namespace: str, key: tuple, fn: Callable[[], Any], *,
         # effects already happened; persist the metadata for a future hit.
         side_put(namespace, key, state["meta"])
     return result
+
+
+def cached_nested_naming(key: tuple, smiles: str, fresh: Callable[[], Any]) -> Any:
+    """``fresh`` (a nested ``name_compound`` of ``smiles``) through the ``name_compound_nested`` memo, keyed on ``key``
+    and on whether ``smiles`` is on the visited set: a fragment named as a molecule is on that set during its own naming
+    (``fragment_naming.name_fragment_recursively``), and a naming that asks for that fragment there is answered with no
+    name, which the same SMILES named from outside that recursion is not. A naming that never asked for its own SMILES
+    (``fragment_naming.fragment_request_count``) is the same in both states, and it is served to both. A naming that met
+    another fragment on the visited set (a cycle, answered with no name) made a name that depends on that set: as in the
+    fragment cache (``fragment_naming._cycle_hits_since``), it is served only where those SMILES are on the visited set
+    again, and a hit logs them again for the fragment named around it. ``ORTHONYM_MEMO=verify`` found both: a nested name
+    served across the two states differed from the name made afresh."""
+    from ..perception.molcache import canon_smiles
+    visited = _fn._get_visited()
+    try:
+        canonical = canon_smiles(smiles) or smiles
+    except Exception:  # noqa: BLE001 - an unreadable SMILES keys as written
+        canonical = smiles
+    own_key = key + (canonical in visited,)
+    if not has("name_compound_nested", own_key):
+        other = key + (canonical not in visited,)
+        if has("name_compound_nested", other) and side_get("name_compound_nested.own", other) is False:
+            own_key = other     # that naming never asked for its own SMILES: the same name in this state
+    met = side_get("name_compound_nested.met", own_key)
+    if met and not met <= visited:
+        return fresh()
+    state = {"fresh": False}
+
+    def _counted():
+        state["fresh"] = True
+        mark = _fn._cycle_hit_mark()
+        asked = _fn.fragment_request_count(canonical)
+        value = fresh()
+        side_put("name_compound_nested.met", own_key, _fn._cycle_hits_since(mark, smiles))
+        side_put("name_compound_nested.own", own_key, _fn.fragment_request_count(canonical) != asked)
+        return value
+
+    value = cached_nested_call("name_compound_nested", own_key, _counted)
+    if not state["fresh"] and met:
+        _fn._note_cycle_hit(met)
+    return value

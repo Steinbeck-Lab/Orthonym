@@ -901,6 +901,8 @@ def gate_nonsuffix_nacyl_float(amine_smiles: Optional[str],
     if (not float_name or not amine_smiles
             or _nacyl_float_n_is_suffix_nitrogen(amine_smiles, amine_name)):
         return float_name
+    from ..assembly.memo import note_nacyl_gate
+    note_nacyl_gate()       # what follows depends on the refusal scope (``memo._GATE_KEY``)
     refusals = _NACYL_FLOAT_REFUSALS.get()
     if refusals is not None:
         refusals.append(float_name)
@@ -2755,12 +2757,11 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # If this SMILES is already in the visited set (being named up the
     # call stack), skip the probe — the caller already determined the
     # assembled name was inadequate, so proceed directly to decomposition.
-    from ..assembly.fragment_naming import _get_visited
+    from ..assembly.fragment_naming import named_up_the_stack
     from ..assembly.ester_prefix_probe import names_another_molecule, probe_name
 
     existing_smiles = Chem.MolToSmiles(mol)
-    visited = _get_visited()
-    if existing_smiles in visited:
+    if named_up_the_stack(existing_smiles):
         # Already being named up the call stack — cycle detected.
         # Return None to let the caller's assembly pipeline handle naming
         # instead of decomposing (which would produce garbled results).

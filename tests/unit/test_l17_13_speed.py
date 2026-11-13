@@ -233,4 +233,5 @@ def test_the_fragment_naming_key_is_unchanged_in_its_ambient_components():
     mol = _mol()
     key = sn._nsf_memo_key(mol, FRAG, ATTACH, None)
     assert key[0] == id(mol) and key[3] == tuple(FRAG)
-    assert key[10:] == _reference_ambient()[1:14]
+    assert key[10:-1] == _reference_ambient()[1:14]
+    assert key[-1] is sn.BRANCH_FALLBACK.get()      # the located-branch fallback writes a branch the strict namer declines

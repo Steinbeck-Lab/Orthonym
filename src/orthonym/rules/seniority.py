@@ -1385,7 +1385,8 @@ def _senior_pseudoester_group(mol, functional_groups, head):
 def _pseudoester_offered(mol, matches) -> bool:
     """True when the functional-class name of the pseudoester of ``matches`` can be built
     (:func:`orthonym.rules.esters.name_noncarbon_ester`, the producer of its handler). Memoised for the naming call
-    (``assembly.memo``), keyed on the atom order of the molecule and the matches."""
+    (``assembly.memo``), keyed on the atom order of the molecule, the matches and the tier flags
+    (``metrics.provenance.tier_flags``, as for:func:`_acyclic_ester_offered`)."""
     from ..assembly.memo import cache_or_compute
     from rdkit import Chem
 
@@ -1398,7 +1399,9 @@ def _pseudoester_offered(mol, matches) -> bool:
             return False
         finally:
             _PSEUDOESTER_OFFER_ACTIVE.discard(id(mol))
-    return bool(cache_or_compute("pseudoester_offer", (Chem.MolToSmiles(mol, canonical=False), tuple(matches)), build))
+    from ..metrics.provenance import tier_flags
+    return bool(cache_or_compute("pseudoester_offer", (Chem.MolToSmiles(mol, canonical=False), tuple(matches),
+                                                       tier_flags()), build))
 
 
 #: The amide classes a ring amide (a lactam) is perceived as; the lactam is a pseudoketone (class 16).
@@ -1449,7 +1452,12 @@ def _acyclic_ester_offered(mol, matches) -> bool:
     functional-class name cannot be built (the alcohol component a polycyclic lactone) would be the principal group of a
     name that does not cite it, or cites it as a prefix of a ring parent with no ester suffix to carry it, so the lactone
     keeps its place and the ester is cited as an acyloxy prefix of the ring parent, as it was. Memoised for the naming
-    call (``assembly.memo``), keyed on the atom order of the molecule and the matches."""
+    call (``assembly.memo``), keyed on the atom order of the molecule, the matches and the tier flags
+    (``metrics.provenance.tier_flags``; ``ORTHONYM_MEMO=verify`` found an offer that a best-effort naming could build
+    and the PIN-tier naming of the same ester could not; the memo's own run context separates the PIN promotion
+    re-run). The offer of the
+    outermost molecule is made once per ``name`` (``fragment_naming.first_whole_molecule_offer``), so a recompute of
+    that key in the same naming can differ from the stored value; the stored value is the offer that was made."""
     if not matches:
         return False
     from ..assembly.memo import cache_or_compute
@@ -1467,7 +1475,8 @@ def _acyclic_ester_offered(mol, matches) -> bool:
             return False
         finally:
             _ESTER_OFFER_ACTIVE.reset(token)
-    return bool(cache_or_compute("acyclic_ester_offer", (atom_order_smiles, tuple(matches)), build))
+    from ..metrics.provenance import tier_flags
+    return bool(cache_or_compute("acyclic_ester_offer", (atom_order_smiles, tuple(matches), tier_flags()), build))
 
 
 def _is_ring_ester(mol, match) -> bool:
