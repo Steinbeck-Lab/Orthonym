@@ -1712,7 +1712,7 @@ def _tied_single_split(mol, bonds: List[Dict], style: str):
     if len(group) == 1:
         return best, _named_split(mol, best, style)
     return choose_split(
-        mol, group, best, style, _try_single_bond_decompose,
+        mol, group, best, style, _split_named,
         lambda name, m, bond: _coverage_is_adequate(name, m, bond_type=bond["type"]),
         _exploration_exhausted)
 
@@ -1720,13 +1720,13 @@ def _tied_single_split(mol, bonds: List[Dict], style: str):
 def _named_split(mol, bond: Dict, style: str = "pin") -> Optional[str]:
     """The name of the split ``bond``: ``_try_single_bond_decompose``'s and, for an amide split whose parent ties with
     another amide of the molecule, the choice of and (``amide_ties``)."""
-    name = _try_single_bond_decompose(mol, bond, style)
+    name = _split_named(mol, bond, style)
     if not name or bond.get("type") != "amide":
         return name
     from .amide_ties import resolved_amide_split_name
     from .bond_cleavage import find_cleavable_bonds
     return resolved_amide_split_name(
-        mol, bond, name, style, _try_single_bond_decompose, find_cleavable_bonds,
+        mol, bond, name, style, _split_named, find_cleavable_bonds,
         lambda n, m, b: _coverage_is_adequate(n, m, bond_type=b["type"]) and _name_quality_is_acceptable(n, m))
 
 
@@ -2007,6 +2007,12 @@ def _exploration_exhausted() -> bool:
         return False
     remaining = getattr(_fn._fragment_guard, "analysis_budget", None)
     return remaining is not None and remaining <= floor
+
+
+def _split_named(mol, bond: Dict, style: str = "pin") -> Optional[str]:
+    """``_try_single_bond_decompose``, memoised for the naming scope (``split_memo``)."""
+    from .split_memo import memoised_split
+    return memoised_split(mol, bond, style, lambda: _try_single_bond_decompose(mol, bond, style))
 
 
 def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[str]:

@@ -35,7 +35,7 @@ from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_licence import apply_unit_licences, unit_has_no_free_position
 #:func:`_isotope_round_trips_once` once per top-level naming for one candidate, structure and reading state
-from .isotope_memos import round_trips_memoised as _isotope_round_trips, skeleton_naming_memoised
+from .isotope_memos import _smiles_of, round_trips_memoised as _isotope_round_trips, skeleton_naming_memoised
 from .isotope_offsets import restrict_offsets, search_space
 from .isotope_phane_locants import composite_sort_key, composite_tokens as _phane_tokens
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
@@ -586,7 +586,7 @@ def _isotope_round_trips_once(candidate_name: str, original_mol: Chem.Mol,
         # input's '(8-2H)') is refused. The refusal of a bond-shift isomer is
         # recorded (``_BOND_SHIFT_PARSE_REFUSED``): the name accepted after it
         # carries a higher locant than the one of the same constitution.
-        if Chem.MolToSmiles(parsed) != Chem.MolToSmiles(original_mol):
+        if Chem.MolToSmiles(parsed) != _smiles_of(original_mol):
             if not _same_fixed_h_inchi(parsed, original_mol):
                 if _RADICAL_READING.get() or not tautomer_accepted(parsed, original_mol):
                     return False

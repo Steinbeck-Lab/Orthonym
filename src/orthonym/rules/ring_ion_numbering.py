@@ -40,6 +40,22 @@ def bare_fused_ring_locants(ring_mol, mol=None, ring_system=()) -> Optional[Dict
     heavy = [a for a in ring_mol.GetAtoms() if a.GetAtomicNum() > 1]
     if not heavy or not all(a.IsInRing() for a in heavy) or len(Chem.GetMolFrags(ring_mol)) != 1:
         return None
+    # One naming of the cation asks for the numbering of one bare ring again and again (an alkaloid cation of the
+    # time-out audit: 216 calls, 12 s): memoised for the naming call on the indexed graph of the ring, which the
+    # locants are keyed on; a copy is returned, so no caller edits the stored numbering. A hit replays the provenance
+    # the nested naming left (a non-PIN ring component marks the cation non-PIN on a repeat as well) and charges no
+    # budget: a hit does no work (``nested_memo.cached_nested_call``).
+    from ..assembly.nested_memo import cached_nested_call
+    graph = (tuple((a.GetAtomicNum(), a.GetFormalCharge(), a.GetIsotope(), a.GetIsAromatic(), a.GetTotalNumHs(),
+                    int(a.GetChiralTag())) for a in ring_mol.GetAtoms()),
+             tuple((b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()), int(b.GetStereo()))
+                   for b in ring_mol.GetBonds()))
+    locants = cached_nested_call("bare_fused_ring_locants", graph, lambda: _named_locants(ring_mol, heavy),
+                                 replay_budgets=False)
+    return dict(locants) if locants else None
+
+
+def _named_locants(ring_mol, heavy) -> Optional[Dict[int, object]]:
     try:
         from ..errors import is_failure_name
         from ..namer import Orthonym

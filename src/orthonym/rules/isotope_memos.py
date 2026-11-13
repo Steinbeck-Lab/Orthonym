@@ -4,6 +4,26 @@ computes again and compares)."""
 from rdkit import Chem
 
 
+#: ``id(mol) -> (mol, its SMILES)`` for the molecules the placement search reads against: one search reads one
+#: ``original_mol`` up to 75,000 times, and its SMILES (the memo key) cost 0.5 ms each time on a large labelled molecule
+#: (an ISO row of the 2026-11-12 time-out audit: 14 of 49 s). The entry holds the molecule, so its id cannot be reused
+#: while the entry lives, and a hit is checked by identity. The decorator never edits ``original_mol`` in place (every
+#: label move works on a ``Chem.Mol``/``RWMol`` copy). At most ``_SMILES_SLOTS`` entries, the oldest dropped first.
+_SMILES_OF: dict = {}
+_SMILES_SLOTS = 64
+
+
+def _smiles_of(mol: Chem.Mol) -> str:
+    hit = _SMILES_OF.get(id(mol))
+    if hit is not None and hit[0] is mol:
+        return hit[1]
+    smiles = Chem.MolToSmiles(mol)
+    if len(_SMILES_OF) >= _SMILES_SLOTS:
+        _SMILES_OF.pop(next(iter(_SMILES_OF)))
+    _SMILES_OF[id(mol)] = (mol, smiles)
+    return smiles
+
+
 def round_trips_memoised(candidate_name: str, original_mol: Chem.Mol, stereo_blind: bool = False) -> bool:
     """:func:`isotopes._isotope_round_trips_once`, once per top-level naming for the same candidate, structure and reading
     state. The placement search of the decorator reads one candidate again and again (a labelled mixture of
@@ -16,7 +36,7 @@ def round_trips_memoised(candidate_name: str, original_mol: Chem.Mol, stereo_bli
     from .isotope_compare import TAUTOMER_READING
     try:
         state = TAUTOMER_READING.get()
-        key = (candidate_name, Chem.MolToSmiles(original_mol), stereo_blind, _iso._RADICAL_READING.get(),
+        key = (candidate_name, _smiles_of(original_mol), stereo_blind, _iso._RADICAL_READING.get(),
                _iso._pin_spellings(), None if state is None else (state["possible"], state["accept"]))
     except Exception:  # noqa: BLE001 - a state that cannot be keyed is checked afresh
         return _iso._isotope_round_trips_once(candidate_name, original_mol, stereo_blind)
