@@ -2359,7 +2359,9 @@ def _assemble_multi_glycoside(
                 else:
                     glycosyloxy_prefixes.append(name)
             else:
-                glycosyloxy_prefixes.append(name)
+                # neither a glycosyloxy group nor a sugar ('water', an aglycone of its own): no prefix of the
+                # 'glycosyloxy' kind cites it, and its name in front of the core names no molecule
+                return None
 
     if not glycosyloxy_prefixes:
         return None

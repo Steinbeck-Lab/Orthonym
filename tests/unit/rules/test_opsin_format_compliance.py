@@ -541,8 +541,14 @@ CANARY_KNOWN_DEFECTS = {
         # lane/l17 change-asserted-value (item 2): was '...pregna-1,4-dien-17,21-diyl dipropanoate'; (the Blue Book) (a)
         # elides the terminal 'e' of an 'ene' ending only "when followed by a suffix... beginning with 'a', 'e', 'i', 'o', 'u', or
         # 'y'", and 'diyl' begins with 'd': 'pregna-1,4-diene-17,21-diyl'. OPSIN 2.9.0 reads the name to the input's full InChIKey.
-        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11-hydroxy-16-methyl-3,20-dioxopregna-1,4-diene-17,21-diyl dipropanoate",
-        "DK-P101CIP", (550,),
+        # split-names lane (2026-11-13, change-asserted-value): was the DK-P101CIP stereoparent name '...3,20-dioxopregna-
+        # 1,4-diene-17,21-diyl dipropanoate' INTRODUCTION, the Blue Book "PINs are not identified for the
+        # compounds in this Chapter"); the decomposition no longer prefers that name, a non-PIN part, to the pipeline's
+        # systematic name (decomposition.engine._pin_part_lost). OPSIN 2.9.0 reads it back to the full InChIKey; the
+        # component choice and numbering were not checked against a book row, so the row is a change detector.
+        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11-hydroxy-10,13,16-trimethyl-3-oxo-17-[(propanoyloxy)acetyl]-6,7,8,9,10,"
+        "11,12,13,14,15,16,17-dodecahydro-3H-cyclopenta[a]phenanthren-17-yl propanoate",
+        "DK-STEROIDYL", (550,),
     ),
     "NC(=O)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O": (
         "histidylglutamylasparagine",

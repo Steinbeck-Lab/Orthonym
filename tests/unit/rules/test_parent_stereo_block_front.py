@@ -40,8 +40,14 @@ def test_a_ceramide_cites_the_amide_block_first():
     # (PIN)' (:33040). The stereodescriptor of the parent still opens the name. Independent check: the test below reads
     # the name back with OPSIN to the input's full InChIKey. Mutation: it fails at the lane start.
     ('COCC(=O)N(c1c(C)cccc1C)[C@@H](C)C(=O)O', "(2S)-2-[N-(2,6-dimethylphenyl)-2-methoxyacetamido]propanoic acid"),
+    # split-names lane (2026-11-13, change-asserted-value): was '(2R,3S,4R,5S)-N-acetyl-5-amino-4-(β-D-
+    # galactopyranosyloxy)hexane-1,2,3,6-tetrol', the decomposition's N-acyl join, a float labelled below the PIN. The
+    # decomposition no longer prefers a name with a non-PIN part to the pipeline's name that has none
+    # (decomposition.engine._pin_part_lost): the amide is the suffix N-Substitution, the Blue Book), and
+    # the stereodescriptors of the substituent stand in its prefix. OPSIN 2.9.0 reads it back (below).
     ('CC(=O)N[C@@H](CO)[C@@H](O[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)[C@@H](O)[C@H](O)CO',
-     "(2R,3S,4R,5S)-N-acetyl-5-amino-4-(\u03b2-D-galactopyranosyloxy)hexane-1,2,3,6-tetrol"),
+     "N-[(2S,3R,4S,5R)-1,4,5,6-tetrahydroxy-3-{[(2R,3R,4S,5R,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxy}hexan-"
+     "2-yl]acetamide"),
 ])
 def test_an_n_acyl_join_keeps_the_amine_block_first(smiles, expected):
     # CHEBI:183423 (the amido prefix of since task A9), CHEBI:152323 (decomposition engine, below the PIN)

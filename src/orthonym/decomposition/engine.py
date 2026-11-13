@@ -2703,11 +2703,24 @@ def _declined_leaves_no_provenance(fn):
     return _wrapper
 
 
+def _pin_part_lost(existing_name: str, candidate: str, mol) -> bool:
+    """True when ``candidate`` carries a non-PIN part (``metrics.provenance.name_carries_non_pin_part``) and the
+    acceptable ``existing_name`` carries none."""
+    from ..metrics.provenance import get_provenance, name_carries_non_pin_part
+    prov = get_provenance()
+    return (name_carries_non_pin_part(prov, candidate) and not name_carries_non_pin_part(prov, existing_name)
+            and _name_quality_is_acceptable(existing_name, mol))
+
+
 def _existing_is_preferred_to(existing_name: str, candidate: str, mol) -> bool:
     """The pipeline's name beats ``candidate`` (a decomposition name) when the candidate is worse than it
     (``_decomposition_is_worse``) and it names this molecule, not another (``names_another_molecule``: asked of OPSIN
-    only here, for a name that would be preferred, and once for each name)."""
-    if not existing_name or not _decomposition_is_worse(candidate, existing_name, mol):
+    only here, for a name that would be preferred, and once for each name). It beats it too when the candidate carries
+    a part that is never a PIN (a demoted N-acyl float, 'N-acetyl-...oxan-3-yl β-D-galactopyranoside') and the
+    pipeline's acceptable name carries none ('N-[...oxan-3-yl]acetamide')."""
+    if not existing_name:
+        return False
+    if not _decomposition_is_worse(candidate, existing_name, mol) and not _pin_part_lost(existing_name, candidate, mol):
         return False
     from ..assembly.ester_prefix_probe import names_another_molecule
     return not names_another_molecule(existing_name, mol)
