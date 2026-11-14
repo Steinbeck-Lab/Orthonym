@@ -341,3 +341,41 @@ def test_no_share_without_an_armed_budget_or_a_naming_scope():
     finally:
         fn._fragment_guard.analysis_budget = saved
         memo.pop_scope(token)
+
+
+def test_a_split_that_meets_a_refused_nacyl_float_bounds_the_search():
+    # Inside the N-acyl refusal scope (the peptide attempt) a fragment name that needs a float
+    # onto a non-suffix nitrogen is withheld and recorded (``engine._nacyl_float_gate``); the
+    # split is left unnamed though it is not unnamable. Its search is bounded as an unproven
+    # split's. Outside the scope, or when nothing was withheld, an unnamed split bounds nothing.
+    mol, bond = _first_bond("CC(=O)OCC")
+
+    def assembler(refuse):
+        def run(bond_type, fragment_names, style="pin", fragment_smiles=None,
+                parent_smiles=None, outcome=None):
+            fn.spend_analysis_call(40)
+            refusals = engine._NACYL_FLOAT_REFUSALS.get()
+            if refuse and refusals is not None:
+                refusals.append("N-acetyl...")
+            return None
+        return run
+
+    for scope, refuse, exhausted in ((True, True, True), (True, False, False),
+                                     (False, True, False)):
+        token = memo.push_scope()
+        saved = getattr(fn._fragment_guard, "analysis_budget", None)
+        fn._fragment_guard.analysis_budget = 500
+        fn._fragment_guard.unproven_floor = None
+        scope_token = engine._NACYL_FLOAT_REFUSALS.set([]) if scope else None
+        try:
+            with patch.object(fn, "_ANALYSIS_CALL_BUDGET", 500), \
+                    patch.object(engine, "_UNPROVEN_EXPLORATION_SHARE", 16), \
+                    patch("orthonym.decomposition.fragment_assembly.assemble_fragment_name",
+                          assembler(refuse)):
+                assert _try_single_bond_decompose(mol, bond) is None
+                assert engine._exploration_exhausted() is exhausted, (scope, refuse)
+        finally:
+            if scope_token is not None:
+                engine._NACYL_FLOAT_REFUSALS.reset(scope_token)
+            fn._fragment_guard.analysis_budget = saved
+            memo.pop_scope(token)
