@@ -5,6 +5,80 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.1.0...v1.2.0) (2026-11-14)
+
+
+### Features
+
+* anhydrides joined by -SS-, an acyl hypohalite, a noncarbon peroxy link or a sulfonyl-S-acyl link get their anhydride names ([#235](https://github.com/Steinbeck-Lab/Orthonym/issues/235)) ([fc74ca5](https://github.com/Steinbeck-Lab/Orthonym/commit/fc74ca5e3e0f833ce0321e819d298228c2b160dd))
+* carbamic thio acids and ring-acid ester prefixes get their PIN names ('diethylcarbamodithioic acid', '3-(methoxycarbonyl)naphthalene-2-carboxylic acid') ([#237](https://github.com/Steinbeck-Lab/Orthonym/issues/237)) ([c142e65](https://github.com/Steinbeck-Lab/Orthonym/commit/c142e65bdc9362e4f46d7239c345333bd04e1a65))
+* fused-ring suffixes at best-effort, arene thiols and 'tetrol' elision ('naphthalene-2-thiol', 'naphthalene-1,4,5,8-tetrol') ([#239](https://github.com/Steinbeck-Lab/Orthonym/issues/239)) ([2561736](https://github.com/Steinbeck-Lab/Orthonym/commit/25617366e9f6d73eeefe4a8817ac798805c4feaf))
+* mixed chalcocarbonic acids carry their italic element locant ('carbamothioic O-acid') ([#236](https://github.com/Steinbeck-Lab/Orthonym/issues/236)) ([bd7fefd](https://github.com/Steinbeck-Lab/Orthonym/commit/bd7fefd73b95f25a581bdbc0b87cc15852020357))
+* name element sets and radical drawings of organometallic compounds ([#221](https://github.com/Steinbeck-Lab/Orthonym/issues/221)) ([bf11b15](https://github.com/Steinbeck-Lab/Orthonym/commit/bf11b159a719c582c2867719316d97ddb7705aa9))
+* name hydride element sets and mixtures by their components ([#222](https://github.com/Steinbeck-Lab/Orthonym/issues/222)) ([d537374](https://github.com/Steinbeck-Lab/Orthonym/commit/d537374375df607d90019adddc75c759ee473744))
+* nomenclature coverage and correctness updates ([#210](https://github.com/Steinbeck-Lab/Orthonym/issues/210)) ([765871c](https://github.com/Steinbeck-Lab/Orthonym/commit/765871c1442ccc9ee1a9c3424c8b933c1ce88aad))
+* nomenclature coverage and correctness updates ([#223](https://github.com/Steinbeck-Lab/Orthonym/issues/223)) ([4b0b007](https://github.com/Steinbeck-Lab/Orthonym/commit/4b0b0078cfaf6aad442e4cf711d358add5de2f96))
+* nomenclature coverage and correctness updates ([#229](https://github.com/Steinbeck-Lab/Orthonym/issues/229)) ([74e20fe](https://github.com/Steinbeck-Lab/Orthonym/commit/74e20fe98d615c4882a3ace29553ab05e919dd76))
+* nomenclature coverage and correctness updates ([#231](https://github.com/Steinbeck-Lab/Orthonym/issues/231)) ([9f4951f](https://github.com/Steinbeck-Lab/Orthonym/commit/9f4951f77ee54a5b7b5f6be601049fb1f663b792))
+* nomenclature coverage and correctness updates ([#232](https://github.com/Steinbeck-Lab/Orthonym/issues/232)) ([9be6762](https://github.com/Steinbeck-Lab/Orthonym/commit/9be676274b6e5fa5d9f690b4242c35c31a787574))
+* nomenclature coverage and correctness updates ([#241](https://github.com/Steinbeck-Lab/Orthonym/issues/241)) ([a6832af](https://github.com/Steinbeck-Lab/Orthonym/commit/a6832af105d4913cf3984b09eae698f8c7617cdb))
+* nomenclature coverage and correctness updates ([#243](https://github.com/Steinbeck-Lab/Orthonym/issues/243)) ([abadcf5](https://github.com/Steinbeck-Lab/Orthonym/commit/abadcf5bdce08600b55f28360fcd1e0d6e90a15a))
+* nomenclature coverage and correctness updates ([#244](https://github.com/Steinbeck-Lab/Orthonym/issues/244)) ([14f26dc](https://github.com/Steinbeck-Lab/Orthonym/commit/14f26dc343688e6d159580c6238201ce0a5d1884))
+* nomenclature coverage and correctness updates ([#250](https://github.com/Steinbeck-Lab/Orthonym/issues/250)) ([d2d0a63](https://github.com/Steinbeck-Lab/Orthonym/commit/d2d0a63051ffbefc741aa890614f3dec5b99ca16))
+* nomenclature coverage and correctness updates ([#251](https://github.com/Steinbeck-Lab/Orthonym/issues/251)) ([030b8b1](https://github.com/Steinbeck-Lab/Orthonym/commit/030b8b1ed42387f379d1632aa1a372812f8d7f38))
+* nomenclature coverage and correctness updates ([#252](https://github.com/Steinbeck-Lab/Orthonym/issues/252)) ([b246563](https://github.com/Steinbeck-Lab/Orthonym/commit/b2465636c43aedceb692cc77b152da833e13b355))
+* nomenclature coverage and correctness updates ([#253](https://github.com/Steinbeck-Lab/Orthonym/issues/253)) ([0775ca5](https://github.com/Steinbeck-Lab/Orthonym/commit/0775ca5dd2b20854572d8fc3454434efa3720451))
+* nomenclature coverage and correctness updates ([#254](https://github.com/Steinbeck-Lab/Orthonym/issues/254)) ([7e27b76](https://github.com/Steinbeck-Lab/Orthonym/commit/7e27b766435124770570f5e948bdf75706ece10b))
+* nomenclature coverage and correctness updates ([#262](https://github.com/Steinbeck-Lab/Orthonym/issues/262)) ([98b6368](https://github.com/Steinbeck-Lab/Orthonym/commit/98b6368c13e735944244e462d081f35543980349))
+* peptides get their systematic PIN names ('(3S)-3-amino-4-{[(2S)-1-{[(1S)-1-carboxyethyl]amino}-4-methyl-1-oxopentan-2-yl]amino}-4-oxobutanoic acid') ([#238](https://github.com/Steinbeck-Lab/Orthonym/issues/238)) ([3bf94aa](https://github.com/Steinbeck-Lab/Orthonym/commit/3bf94aa600c1dd8b0d821cf9366ecd8a36ddd425))
+* **polycycles:** the main ring of a ring system of 16 or more rings is a longest cycle ([#208](https://github.com/Steinbeck-Lab/Orthonym/issues/208)) ([fa34061](https://github.com/Steinbeck-Lab/Orthonym/commit/fa3406187509d4d37c3f61c308bb4225d35448c9))
+* **prefixes:** acyl branches on ring acids take their acyl prefix at the PIN tier ([#209](https://github.com/Steinbeck-Lab/Orthonym/issues/209)) ([5148dbc](https://github.com/Steinbeck-Lab/Orthonym/commit/5148dbc63830b50828672b3c519e4639467000d1))
+* protonated amines and ring nitrogens beside a senior group are named on the cation parent ([#233](https://github.com/Steinbeck-Lab/Orthonym/issues/233)) ([65c9515](https://github.com/Steinbeck-Lab/Orthonym/commit/65c951554c89a8f7750df23a78834310e1d16a6d))
+* ring-assembly thiols and arene -ol beside side-chain alcohols get their PIN ('[1,1'-biphenyl]-4,4'-dithiol', '6-(hydroxymethyl)naphthalen-2-ol') ([#240](https://github.com/Steinbeck-Lab/Orthonym/issues/240)) ([1023399](https://github.com/Steinbeck-Lab/Orthonym/commit/1023399ae361ab34c80221977ed27c7eb24d6ab2))
+
+
+### Bug Fixes
+
+* an 'azonia' cation name is never labelled the PIN ([#234](https://github.com/Steinbeck-Lab/Orthonym/issues/234)) ([30cfc76](https://github.com/Steinbeck-Lab/Orthonym/commit/30cfc76b42cd6cc759b358e0742ac50b0d417b36))
+* cite a zwitterion cation prefix among the anion parent prefixes ([#263](https://github.com/Steinbeck-Lab/Orthonym/issues/263)) ([cc4bd31](https://github.com/Steinbeck-Lab/Orthonym/commit/cc4bd31008eadccd31f32638e92e6038e42b4205))
+* **decomposition:** bound the search after a split left unnamed by a refused N-acyl float ([#273](https://github.com/Steinbeck-Lab/Orthonym/issues/273)) ([244e10f](https://github.com/Steinbeck-Lab/Orthonym/commit/244e10f1836a47dc0d46d695888dbd0c012f705e))
+* key the naming memos on the state that computes their values ([#271](https://github.com/Steinbeck-Lab/Orthonym/issues/271)) ([822ec99](https://github.com/Steinbeck-Lab/Orthonym/commit/822ec99f7582e53e12c19f51f8cf3a2c0bf618c1))
+* name the bare steroid ring system by its fusion name ([#264](https://github.com/Steinbeck-Lab/Orthonym/issues/264)) ([6ce6d8c](https://github.com/Steinbeck-Lab/Orthonym/commit/6ce6d8c74884650f79c6406e4ac393372e36bc42))
+* nomenclature correctness updates ([#205](https://github.com/Steinbeck-Lab/Orthonym/issues/205)) ([7959540](https://github.com/Steinbeck-Lab/Orthonym/commit/7959540becfd0c9a7776eee2fda427f72dda49ac))
+* nomenclature correctness updates ([#207](https://github.com/Steinbeck-Lab/Orthonym/issues/207)) ([d8c252e](https://github.com/Steinbeck-Lab/Orthonym/commit/d8c252e60da8c65f1bb7f7c7d22e93fc97c1df40))
+* nomenclature correctness updates ([#211](https://github.com/Steinbeck-Lab/Orthonym/issues/211)) ([f2850fb](https://github.com/Steinbeck-Lab/Orthonym/commit/f2850fb03506be5fe0d91c355b58f3f1eb8b50af))
+* nomenclature correctness updates ([#212](https://github.com/Steinbeck-Lab/Orthonym/issues/212)) ([a49cc8a](https://github.com/Steinbeck-Lab/Orthonym/commit/a49cc8a31d79c2e4fd9a5950590640cda4afe5f3))
+* nomenclature correctness updates ([#213](https://github.com/Steinbeck-Lab/Orthonym/issues/213)) ([26100cd](https://github.com/Steinbeck-Lab/Orthonym/commit/26100cdda90e20ae333dc7608774aad71a307641))
+* nomenclature correctness updates ([#214](https://github.com/Steinbeck-Lab/Orthonym/issues/214)) ([d9a7f82](https://github.com/Steinbeck-Lab/Orthonym/commit/d9a7f827b8bac8d6e1b7516c265aa2b2487eb856))
+* nomenclature correctness updates ([#215](https://github.com/Steinbeck-Lab/Orthonym/issues/215)) ([e600de0](https://github.com/Steinbeck-Lab/Orthonym/commit/e600de04fa2769125629ada61fb2c9c20543d71d))
+* nomenclature correctness updates ([#224](https://github.com/Steinbeck-Lab/Orthonym/issues/224)) ([b71fc2b](https://github.com/Steinbeck-Lab/Orthonym/commit/b71fc2b45815954011d54f2a3b5abc65a7d97d93))
+* nomenclature correctness updates ([#225](https://github.com/Steinbeck-Lab/Orthonym/issues/225)) ([2b7db7f](https://github.com/Steinbeck-Lab/Orthonym/commit/2b7db7f919973c0afac2200a18608da72eecd962))
+* nomenclature correctness updates ([#226](https://github.com/Steinbeck-Lab/Orthonym/issues/226)) ([ac50e48](https://github.com/Steinbeck-Lab/Orthonym/commit/ac50e4843c6cf5b7db88b9f0ea7b3ed72b7dcc1e))
+* nomenclature correctness updates ([#227](https://github.com/Steinbeck-Lab/Orthonym/issues/227)) ([6480930](https://github.com/Steinbeck-Lab/Orthonym/commit/6480930f8e93f73a8fd60acd838a17e0bfff7907))
+* nomenclature correctness updates ([#228](https://github.com/Steinbeck-Lab/Orthonym/issues/228)) ([5812618](https://github.com/Steinbeck-Lab/Orthonym/commit/5812618a9da071abc4e957cccd2888d910c82c63))
+* nomenclature correctness updates ([#230](https://github.com/Steinbeck-Lab/Orthonym/issues/230)) ([9d9180f](https://github.com/Steinbeck-Lab/Orthonym/commit/9d9180f418f35cc55651494a5d67f32fa2afc6c8))
+* nomenclature correctness updates ([#242](https://github.com/Steinbeck-Lab/Orthonym/issues/242)) ([898ff74](https://github.com/Steinbeck-Lab/Orthonym/commit/898ff740529fe4c95b5cd9b9eef83c948b8868a8))
+* nomenclature correctness updates ([#245](https://github.com/Steinbeck-Lab/Orthonym/issues/245)) ([4fc4800](https://github.com/Steinbeck-Lab/Orthonym/commit/4fc48009be6541f1d787ba5f13abfcb17834cb53))
+* nomenclature correctness updates ([#246](https://github.com/Steinbeck-Lab/Orthonym/issues/246)) ([85a1b3e](https://github.com/Steinbeck-Lab/Orthonym/commit/85a1b3e2f2916fa1985d676701614f4815ea87cf))
+* nomenclature correctness updates ([#247](https://github.com/Steinbeck-Lab/Orthonym/issues/247)) ([cf4bd6c](https://github.com/Steinbeck-Lab/Orthonym/commit/cf4bd6c9b31faa16c0a8484839ad689bfb2eafed))
+* nomenclature correctness updates ([#248](https://github.com/Steinbeck-Lab/Orthonym/issues/248)) ([71e2c00](https://github.com/Steinbeck-Lab/Orthonym/commit/71e2c00ee4de2dc0d068cfda3ca8f6ca18dbfeee))
+* nomenclature correctness updates ([#249](https://github.com/Steinbeck-Lab/Orthonym/issues/249)) ([f05e456](https://github.com/Steinbeck-Lab/Orthonym/commit/f05e456ad3cb3567a52aa2da7dcdbe0db91328b1))
+* nomenclature correctness updates ([#265](https://github.com/Steinbeck-Lab/Orthonym/issues/265)) ([4d7a4db](https://github.com/Steinbeck-Lab/Orthonym/commit/4d7a4dbca8f7c9af7ce600678b228d91e81ce5aa))
+* place substituent stereodescriptors on their prefix; ring-N bis(phosphonic acid); fused ring cation numbering ([#268](https://github.com/Steinbeck-Lab/Orthonym/issues/268)) ([185fb11](https://github.com/Steinbeck-Lab/Orthonym/commit/185fb11aa7995b0dc8da3e504d17cf7a14397d03))
+* split names keep a clean pipeline name and cite only sugars as glycosyloxy prefixes ([#272](https://github.com/Steinbeck-Lab/Orthonym/issues/272)) ([fa3312e](https://github.com/Steinbeck-Lab/Orthonym/commit/fa3312e84e1f90fe167a83aa619870f3d6670976))
+* stop the cage numbering loop and name steroid and benzodioxole rings by fusion ([#259](https://github.com/Steinbeck-Lab/Orthonym/issues/259)) ([526dd21](https://github.com/Steinbeck-Lab/Orthonym/commit/526dd212e3d4fe75055e1bde47f7979057b1be08))
+
+
+### Performance Improvements
+
+* reuse repeated split verdicts, ring ion numbering and isotope SMILES ([#270](https://github.com/Steinbeck-Lab/Orthonym/issues/270)) ([1be46be](https://github.com/Steinbeck-Lab/Orthonym/commit/1be46bedeee7e83936f82f6e1e4b3c250cfb3ad8))
+
+
+### Documentation
+
+* **readme:** the PubChem figure as a Certificate of Analysis ([#267](https://github.com/Steinbeck-Lab/Orthonym/issues/267)) ([b1867c1](https://github.com/Steinbeck-Lab/Orthonym/commit/b1867c1af6bce9379877f3cb3a97877d4ee7e23d))
+* the guide says Blue Book rules in words; rule index and architecture page match the code ([#269](https://github.com/Steinbeck-Lab/Orthonym/issues/269)) ([7074677](https://github.com/Steinbeck-Lab/Orthonym/commit/7074677d606011cbc2ad4d6fb002cba7b59db4a3))
+
 ## [1.1.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.9...v1.1.0) (2026-11-03)
 
 
