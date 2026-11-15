@@ -3283,17 +3283,17 @@ def route_charged(mol, style: str = 'pin') -> str:
     # (the Blue Book): a disubstituted halogen(III) cation R2X+ (diaryl-
     # iodanium) is named on the halogen parent hydride + '-ium' — the SYSTEMATIC PIN
     # ((C6H5)2I+ -> diphenyliodanium), the cation mirror of the diphenyliodanuide
-    # -uide anion. classify_cation returns 'unknown' for a halogen centre and the
-    # generic neutralize path cannot build it (drop-charge -> invalid neutral halogen
-    # radical; add-H -> the wrong λ-parent), so emit_halogen_onium owns it directly.
-    # RT-gated (0-wrong): a mis-built name fails CLOSED. Tightly scoped (halogen, +1,
-    # degree>=2) so no other cation class is disturbed. Likewise a silicon, germanium or boron centre that lost
-    # a hydride ion, the Blue Book: 'triphenylsilylium (PIN)'): emit_group_ylium.
+    # -uide anion. classify_cation returns 'unknown' for a halogen centre and the generic neutralize path cannot
+    # build it (drop-charge -> a neutral halogen radical; add-H -> the λ-parent): emit_halogen_onium owns it.
+    # RT-gated (0-wrong). Likewise a Si/Ge/B centre that lost a hydride ion, the Blue Book, emit_group_ylium)
+    # and a substituted As/Sb/Bi onium, emit_pnictogen_onium).
     if n_cations == 1 and not n_anions:
         from .group14_centres import emit_group_ylium
         from .ions import emit_halogen_onium
+        from .pnictogen_onium import emit_pnictogen_onium
         ho = (emit_halogen_onium(mol, sites['cations'][0]['atom_idx'])
-              or emit_group_ylium(mol, sites['cations'][0]['atom_idx']))
+              or emit_group_ylium(mol, sites['cations'][0]['atom_idx'])
+              or emit_pnictogen_onium(mol, sites['cations'][0]['atom_idx']))
         if ho and _cation_name_rt_ok(ho, mol):
             return ho
 

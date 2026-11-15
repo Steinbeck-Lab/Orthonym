@@ -5711,6 +5711,19 @@ class _AttachLocantUnknown:
 ATTACH_LOCANT_UNKNOWN = _AttachLocantUnknown()
 
 
+def _amidine_off_the_chain(name: str, chain_length: int) -> bool:
+    """True when the amidine name ``name`` of a capped fragment holds an N-substituent ("N'-hydroxymethanimidamide",
+    "N'-methylethanimidamide") or a carbon its chain stem does not hold: the string forms of:func:`parent_to_prefix`
+    would drop it ('carbamimidoyl') or count it into the chain ('carbamimidoylmethyl'), another molecule.
+     names the substituted group from the structure ("N'-hydroxycarbamimidoyl"), which a later tier does."""
+    if not name.endswith('imidamide'):
+        return False
+    if re.search(r"N'?(?:,N'?)*-", name):
+        return True
+    m = re.search(r'(?:an)?imidamide$', name)
+    return not name.endswith('carboximidamide') and {'meth': 1, 'eth': 2}.get(name[:m.start()]) != chain_length
+
+
 def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> str:
     """Convert a parent compound name to substituent prefix form.
 
@@ -6039,11 +6052,10 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
                 "carboxy", "count-derived locant on a multi-position stem")
         return "carboxy"
 
-    # ---- Amidine: -carboximidamide / -imidamide ---- (IUPAC
-    # MUST precede the general -amide regex which would wrongly match "-imidamide"
-    # and return "carbamoyl" (amide prefix) for an amidine group.
+    # ---- Amidine: -carboximidamide / -imidamide ---- (IUPAC; before the -amide regex ("carbamoyl").
     # e.g., "methanimidamide" -> "carbamimidoyl" (terminal C1; chain_length-1 = 0)
-    # e.g., "propanimidamide" -> "carbamimidoyl" with chain stem for longer chains
+    if _amidine_off_the_chain(name, chain_length):      # an N-substituted or branched amidine: see the helper
+        return _decline_unjustifiable("carbamimidoyl", "an N-substituted or branched amidine")
     if name.endswith('carboximidamide'):
         stem = name[:-15]  # remove "carboximidamide"
         if stem:

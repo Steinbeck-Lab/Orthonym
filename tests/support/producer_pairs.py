@@ -153,7 +153,10 @@ PAIRS = [
     # a holdout split by full InChIKey or connectivity), read from a trace of ``_try_general_engine_recovery_impl``; it was a
     # stilbenedisulfonic acid until the ring with the most principal groups became the parent, since when
     # the benzene writer names that one ('inner:tier_a_ring')
-    ("NC(=NO)NCCC[C@H]([NH3+])C(=O)[O-]", "best-effort", "engine:t4"),
+    # (the N-hydroxyarginine zwitterion this list held named through until the amidine converter stopped writing
+    # 'carbamimidoyl' for -C(=NOH)NH2 (lane organic-all): 'inner:general_acyclic' names it now, at the same tier; the
+    # homoarginine zwitterion of dev2000 is named by on both sides of that change)
+    ("NC(=[NH2+])NCCCC[C@H]([NH3+])C(=O)[O-]", "best-effort", "engine:t4"),
     # (the second row of this list names the ester by functional class since the ring carboxamide commit of lane l17,
     # 83a5e16318: 'methyl 4-{[1,3-dihydroxy-1-(4-hydroxy-3-methoxyphenyl)propan-2-yl]oxy}-3-methoxybenzene-1-carboxylate'
     # is built by the ester family of the inner table, and is no longer asked; the first and the third row stay T4's)
