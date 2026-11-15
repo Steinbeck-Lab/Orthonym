@@ -43,6 +43,7 @@ from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 from .isotope_unit_slots import multiplied_unit_slots as _multiplied_unit_slots
 from .lambda_convention import LAMBDA as _LAMBDA
 from .adducts import isotopes_only_in_hydrogen_components as labels_in_named_hydrogens  # noqa: F401 (namer)
+from .isotope_locant_map import decorate_by_locant_map as _decorate_by_locant_map
 
 #: One locant of a replacement or Hantzsch-Widman stem: a number, a letter, and the lambda number the
 #: lambda convention attaches to it: '5λ5-azaspiro', '1λ6,2λ4-disulfane').
@@ -4211,6 +4212,7 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     if name is None:
         from .isotope_hydro_locants import decorate_with_hydro_locants
         name = decorate_with_hydro_locants(stripped, _passes)
+    name = name or _decorate_by_locant_map(original, _name_skeleton(namer, Chem.MolToSmiles(stripped)))  # lane I
     if name and "—" in name:    # the components without a label keep their unmodified names
         name = _slots.unlabelled_components_kept(name, _name_skeleton(namer, Chem.MolToSmiles(stripped)), original)
     return name
