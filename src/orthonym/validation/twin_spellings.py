@@ -104,6 +104,7 @@ from .anhydride_acids import ANHYDRIDE_ACIDS_RULE, anhydride_acids_round_trip
 from .halido_twin import halido_twin
 from .long_count_read_back import LONG_COUNT_RULE, long_count_round_trip
 from .opsin_ambiguity import ambiguity_messages
+from .hydrogen_word_read_back import HYDROGEN_WORDS_RULE, hydrogen_word_round_trip
 from .polyester_twin import polyester_has_free_acid, polyester_twin
 from .preselected_cage_twin import preselected_cage_twin
 from .thioperoxol_twin import ships_at_general_tier, thioperoxol_twin_round_trip
@@ -283,6 +284,69 @@ def twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
     return "+".join(rules)
 
 
+#: an adduct name: components joined by em dashes, then the proportions ('ethane—boron (1/1)',
+_ADDUCT_NAME = re.compile(r"(?P<body>[^—]+(?:—[^—]+)+) \((?P<ratio>\d+(?:/\d+)+)\)")
+COMPONENT_ORDER_RULE = "component_order"
+
+
+def component_order_twin(name: str) -> Optional[str]:
+    """The adduct name with its first component, and that component's proportion, moved to the end; None when
+    ``name`` is not an adduct name of matching proportions.
+
+     "Organic adducts" (the Blue Book): "the individual components are cited in the order of seniority
+    of classes (see ", and radicals head, so a radical component is cited first
+    ('phenylboranylidene—bromomethane (1/1)'). OPSIN reads a leading radical word as a substituent prefix of the
+    rest ("believes there to be 1 components") and reads the same components in the other order
+    ('bromomethane—phenylboranylidene (1/1)'). The order of the components carries no structure, so the twin
+    names the same mixture; with two radical components the twin still starts with one and is not read."""
+    twins = component_order_twins(name)
+    return twins[0] if twins else None
+
+
+def component_order_twins(name: str) -> list:
+    """Every rotation of the components of the adduct name ``name`` (with their proportions), the first component
+    moved to the end first: a radical component cited in the middle ('pyridine—methylarsanylidene—...',
+    the seniority order of within the classes) is last in one of them. Empty when ``name`` is not an adduct
+    name of matching proportions or has more than:data:`_MAX_ROTATED` components."""
+    m = _ADDUCT_NAME.fullmatch(name)
+    if m is None:
+        return []
+    parts, ratio = m.group("body").split("—"), m.group("ratio").split("/")
+    if len(parts) != len(ratio) or len(parts) > _MAX_ROTATED:
+        return []
+    return ["—".join(parts[k:] + parts[:k]) + " (" + "/".join(ratio[k:] + ratio[:k]) + ")"
+            for k in range(1, len(parts))]
+
+
+#: the most components whose rotations are read (each rotation is one OPSIN read)
+_MAX_ROTATED = 6
+
+
+def component_order_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
+    """:data:`COMPONENT_ORDER_RULE` when OPSIN rejects ``name``, the OPSIN in use reads adducts with a radical
+    component (``opsin_capabilities.radical_adduct_enabled``; never OPSIN 2.9.0) and the twin of
+    :func:`component_order_twin` reads to the input's full InChIKey with the same radical graph and protonation sites
+    (``namer._shipped_name_round_trip``) and to exactly the drawn structure (``adducts._parse_reproduces_depiction``:
+    the key does not see where a charge or a hydron sits); else None."""
+    twins = component_order_twins(name) if smiles else []
+    if not twins:
+        return None
+    from ..opsin_capabilities import radical_adduct_enabled
+    if not radical_adduct_enabled():
+        return None
+    from ..namer import _shipped_name_round_trip, _validity_gate_name_to_smiles
+    if _validity_gate_name_to_smiles(name) is not None:
+        return None  # OPSIN reads the name itself: no twin
+    from rdkit import Chem
+    from ..rules.adducts import _parse_reproduces_depiction
+    mol = Chem.MolFromSmiles(smiles)
+    for twin in twins:
+        if (mol is not None and _shipped_name_round_trip(twin, smiles) == "verified" and not ambiguity_messages(twin)
+                and _parse_reproduces_depiction(twin, mol)):
+            return COMPONENT_ORDER_RULE
+    return None
+
+
 def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
     """The twin families a general tier ships a name through: a name no OPSIN grammar reads at any tier and for
     which the engine has no other spelling (the halogen -uide names, ``validation.uide_twin``), and an additive
@@ -300,7 +364,8 @@ def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[s
     if found is not None and found[1] in (("halido_o",), ("preselected_cage",)):
         return twin_round_trip(name, smiles)
     return (uide_twin_round_trip(name, smiles) or long_count_round_trip(name, smiles)
-            or (thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None))
+            or (thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None)
+            or component_order_round_trip(name, smiles) or hydrogen_word_round_trip(name, smiles))
 
 
 def _opsin_reads(name: str, radical: bool) -> bool:
@@ -360,7 +425,8 @@ def twin_gate_ships(name: str, smiles: Optional[str], general_tier: bool = False
     # the acids of a poly-anhydride are read one by one: no OPSIN reading of the name or of a spelling of it
     pv.record_gate_outcome(
         pv.acid_split_outcome(rules) if rules == ANHYDRIDE_ACIDS_RULE
-        else pv.reconstructed_outcome(rules) if rules == LONG_COUNT_RULE else pv.twin_outcome(rules), name)
+        else pv.reconstructed_outcome(rules) if rules in (LONG_COUNT_RULE, HYDROGEN_WORDS_RULE)
+        else pv.twin_outcome(rules), name)
     return True
 
 

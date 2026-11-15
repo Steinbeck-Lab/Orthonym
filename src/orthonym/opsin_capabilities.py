@@ -25,11 +25,14 @@ from . import jars
 #: reading (``rules.hydrocarbon_series``, ``rules.replacement_chain_prefix``, ``validation.long_count_read_back``)
 MAX_READABLE_COUNT = 50
 
-#: capability -> (a name only newer OPSIN reads, its structure as SMILES)
+#: capability -> (a name only newer OPSIN reads, its structure as SMILES, read with OPSIN's radical setting)
+#: "radical_adduct": an adduct name with a radical component "Organic adducts", the Blue Book), which
+#: OPSIN 2.9.0 reads as a substituent and the main branch reads as the mixture
 _PROBES = {
-    "phane": ("1,4(1,4)-dibenzenacyclohexaphane", "C1Cc2ccc(cc2)CCc2ccc1cc2"),
-    "halogen_uide": ("diphenyliodanuide", "[I-](c1ccccc1)c1ccccc1"),
-    "composite_assembly": ("1^1,2^1:2^4,3^1-terphenyl", "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1"),
+    "phane": ("1,4(1,4)-dibenzenacyclohexaphane", "C1Cc2ccc(cc2)CCc2ccc1cc2", False),
+    "halogen_uide": ("diphenyliodanuide", "[I-](c1ccccc1)c1ccccc1", False),
+    "composite_assembly": ("1^1,2^1:2^4,3^1-terphenyl", "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", False),
+    "radical_adduct": ("ethane\u2014boranylidyne (1/1)", "[B].CC", True),
 }
 _NONE: Dict[str, bool] = {key: False for key in _PROBES}
 _CACHE: Dict[str, Dict[str, bool]] = {}
@@ -51,8 +54,8 @@ def _probe(path: str) -> Dict[str, bool]:
     ``jvm_bridge.OpsinUnavailable`` when it cannot answer."""
     from .jvm_bridge import OpsinUnavailable, opsin_stdout
     answer = {}
-    for key, (name, smiles) in _PROBES.items():
-        text, served = opsin_stdout(name, False, path)
+    for key, (name, smiles, radical) in _PROBES.items():
+        text, served = opsin_stdout(name, radical, path)
         if not served:
             raise OpsinUnavailable(f"in-process OPSIN did not read the probe name {name!r}")
         answer[key] = _same_structure((text or "").strip(), smiles)
@@ -94,7 +97,8 @@ def _store(path: str, answer: Dict[str, bool]) -> None:
 
 
 def opsin_capabilities() -> Dict[str, bool]:
-    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool}`` for the OPSIN this process uses."""
+    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool}`` for the OPSIN
+    this process uses."""
     from .jvm_bridge import OpsinUnavailable
     try:
         active = jars.active_opsin()
@@ -142,3 +146,9 @@ def composite_assembly_enabled() -> bool:
     """True when the OPSIN in use reads ring assembly names with composite locants. A capability set
     without the entry (a test that stands in for OPSIN 2.9.0) reads as "cannot"."""
     return bool(opsin_capabilities().get("composite_assembly", False))
+
+
+def radical_adduct_enabled() -> bool:
+    """True when the OPSIN in use reads an adduct name with a radical component ('ethane\u2014boranylidyne (1/1)').
+    A capability set without the entry (an older sidecar, a test that stands in for OPSIN 2.9.0) reads as "cannot"."""
+    return bool(opsin_capabilities().get("radical_adduct", False))

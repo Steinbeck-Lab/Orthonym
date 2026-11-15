@@ -92,6 +92,18 @@ HYDROGEN_COMPONENT_NAMES: Dict[str, str] = {
     "[H-]": "hydride",
     "N": "ammonia",
 }
+#: The hydrogen ions and the isotopically modified dihydrogens "Names for hydrogen atoms and ions", Table
+#: 8.1, the Blue Book; nuclide descriptors,:43728). OPSIN reads none of these words: an adduct name
+#: with one ships through ``validation.hydrogen_word_read_back`` only when it reproduces the drawn structure exactly.
+#: Keys are RDKit's canonical SMILES of the fragment.
+HYDROGEN_ION_AND_ISOTOPE_NAMES: Dict[str, str] = {
+    "[H+]": "hydron", "[1H+]": "proton", "[2H+]": "deuteron", "[3H+]": "triton",
+    "[2H-]": "deuteride", "[3H-]": "tritide", "[1H-]": "protide",
+    "[2HH]": "(2H1)dihydrogen", "[H][2H]": "(2H1)dihydrogen", "[2H][2H]": "(2H2)dihydrogen",
+    "[3HH]": "(3H1)dihydrogen", "[H][3H]": "(3H1)dihydrogen",
+    "[3H][3H]": "(3H2)dihydrogen", "[2H][3H]": "(2H1,3H1)dihydrogen",
+}
+_HYDRIDE_IONS = ("[H-]", "[1H-]", "[2H-]", "[3H-]")
 
 
 # Terminal ligands of a mononuclear metal halide / oxide component, keyed by
@@ -278,9 +290,9 @@ def _parse_reproduces_depiction(name: str, mol) -> bool:
     monoiodide (1/1)' reads back as [Cu+]I). A name OPSIN cannot read, or an
     unavailable OPSIN, fails closed.
     """
-    from orthonym.namer import _same_canonical_smiles, _validity_gate_name_to_smiles
+    from orthonym.namer import _same_canonical_smiles
     try:
-        parsed = _validity_gate_name_to_smiles(name)
+        parsed = _adduct_opsin_read(name)
         if not parsed:
             return False
         if _same_canonical_smiles(parsed, Chem.MolToSmiles(mol)):
@@ -618,6 +630,10 @@ def _hydrate_word_form(named: List[Tuple[str, int]],
     return f"{base} {prefix}hydrate"
 
 
+#: the hydrogen cations of ``HYDROGEN_ION_AND_ISOTOPE_NAMES``, Table 8.1)
+_HYDRON_WORDS = frozenset({"hydron", "proton", "deuteron", "triton"})
+
+
 def _hydrogen_components(mol) -> Dict[str, str]:
     """The entries of ``HYDROGEN_COMPONENT_NAMES`` that ``mol`` may take: dihydrogen always; ammonia
     when the assembly holds no true metal; the hydride ion when every true metal is admitted to
@@ -626,11 +642,31 @@ def _hydrogen_components(mol) -> Dict[str, str]:
     from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
     metals = {a.GetSymbol() for a in mol.GetAtoms() if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO}
     names = {"[HH]": HYDROGEN_COMPONENT_NAMES["[HH]"]}
+    names.update({smi: word for smi, word in HYDROGEN_ION_AND_ISOTOPE_NAMES.items()
+                  if word.endswith("dihydrogen")})                              # the isotopic dihydrogens
     if not metals:
         names["N"] = HYDROGEN_COMPONENT_NAMES["N"]
+        names.update({smi: word for smi, word in HYDROGEN_ION_AND_ISOTOPE_NAMES.items() if word in _HYDRON_WORDS})
     if all(has_mechanism(m, CARBANION_SALTS) for m in metals):
         names["[H-]"] = HYDROGEN_COMPONENT_NAMES["[H-]"]
+        names.update({smi: HYDROGEN_ION_AND_ISOTOPE_NAMES[smi] for smi in _HYDRIDE_IONS[1:]})
     return names
+
+
+def isotopes_only_in_hydrogen_components(mol) -> bool:
+    """True when every isotope label of the multi-component ``mol`` sits in a hydrogen-only component that
+    :data:`HYDROGEN_ION_AND_ISOTOPE_NAMES` names ('[2H][2H]' -> '(2H2)dihydrogen', '[2H+]' -> 'deuteron'): the
+    adduct name carries the label in that component's word, so the isotope decorator (``rules.isotopes``), which
+    writes descriptors into the name of the unlabelled skeleton, has nothing to place."""
+    try:
+        frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=False)
+    except Exception:
+        return False
+    if len(frags) < 2:
+        return False
+    labelled = [f for f in frags if any(a.GetIsotope() for a in f.GetAtoms())]
+    return bool(labelled) and all(
+        f.GetNumHeavyAtoms() == 0 and Chem.MolToSmiles(f) in HYDROGEN_ION_AND_ISOTOPE_NAMES for f in labelled)
 
 
 def _zero_metal_name(ordered, named, frag_mols) -> Optional[str]:
@@ -678,12 +714,31 @@ def _full_key(smiles: Optional[str]) -> Optional[str]:
         return None
 
 
+def _adduct_opsin_read(name: str) -> Optional[str]:
+    """OPSIN's SMILES of the adduct name ``name``, or of its component-order twin when OPSIN rejects ``name`` and
+    the OPSIN in use reads adducts with a radical component (``validation.twin_spellings.component_order_twin``: a
+    leading radical word is read as a prefix); None otherwise. The validity gate checks that twin again."""
+    from orthonym.namer import _validity_gate_name_to_smiles
+    parsed = _validity_gate_name_to_smiles(name)
+    if parsed is None:
+        from orthonym.opsin_capabilities import radical_adduct_enabled
+        from orthonym.validation.twin_spellings import component_order_twins
+        for twin in (component_order_twins(name) if radical_adduct_enabled() else []):
+            parsed = _validity_gate_name_to_smiles(twin)
+            if parsed is not None:
+                break
+    if parsed is None:  # a hydrogen word OPSIN does not read ('benzene—hydron (1/1)')
+        from orthonym.validation.hydrogen_word_read_back import read_back_with_hydrogen_words
+        parsed = read_back_with_hydrogen_words(name)
+    return parsed
+
+
 def _reads_back_as(name: str, expected_smiles: str) -> bool:
-    """True iff OPSIN reads ``name`` to exactly ``expected_smiles`` (equal RDKit
-    canonical isomeric SMILES). Fail-closed on no parse or no OPSIN."""
-    from orthonym.namer import _same_canonical_smiles, _validity_gate_name_to_smiles
+    """True iff OPSIN reads ``name`` (or its component-order twin, ``_adduct_opsin_read``) to exactly
+    ``expected_smiles`` (equal RDKit canonical isomeric SMILES). Fail-closed on no parse or no OPSIN."""
+    from orthonym.namer import _same_canonical_smiles
     try:
-        parsed = _validity_gate_name_to_smiles(name)
+        parsed = _adduct_opsin_read(name)
         return bool(parsed) and _same_canonical_smiles(parsed, expected_smiles)
     except Exception:
         return False
@@ -806,8 +861,7 @@ def _readable_spellings_once(ordered: List[Tuple[str, int]],
     counts = [c for _s, c in ordered]
     whole = _assemble_adduct_name(named)
     try:
-        from orthonym.namer import _validity_gate_name_to_smiles
-        parsed = _validity_gate_name_to_smiles(whole)
+        parsed = _adduct_opsin_read(whole)
     except Exception:
         parsed = None
     expected = _mixture_smiles(ordered)

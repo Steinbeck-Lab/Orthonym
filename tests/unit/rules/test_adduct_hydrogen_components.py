@@ -34,7 +34,9 @@ def _reads_dihydrogen() -> bool:
 def test_best_effort_name(smiles, expected):
     res = name_best_effort(smiles)
     if "dihydrogen" in expected and not _reads_dihydrogen():
-        assert res["name"] is None, res          # the read-back cannot confirm it: no name, never a wrong one
+        # OPSIN 2.9.0 reads no dihydrogen in a mixture: the name ships through the component reader
+        # (validation/hydrogen_word_read_back.py), which reproduces the drawn structure exactly
+        assert res["name"] == expected and res["gate_outcome"] == "reconstructed:hydrogen_words", res
         return
     assert res["name"] == expected and res["tier"] == "systematic_verified" and not res["is_pin"], res
     assert name_is_rt_exact(res["name"], smiles), res
@@ -62,7 +64,11 @@ def test_zero_oxidation_number_is_for_metals_only():
     assert "boron(0)" not in name
 
 
-def test_unreadable_hydrogen_spellings_decline():
-    # OPSIN reads no name for the proton or for isotopic dihydrogen: those mixtures stay unnamed
-    for smiles in ("[H+].Oc1ccccc1", "[2HH].CCO"):
-        assert not name_best_effort(smiles)["name"]
+def test_hydrogen_words_opsin_does_not_read_ship_through_the_component_reader():
+    # OPSIN reads no 'hydron' and no isotopic dihydrogen, the Blue Book;: the
+    # component reader reads each component alone and requires the drawn structure exactly
+    for smiles, name in (("[H+].Oc1ccccc1", "phenol—hydron (1/1)"),
+                         ("[2HH].CCO", "ethanol—(2H1)dihydrogen (1/1)")):
+        res = name_best_effort(smiles)
+        assert res["name"] == name and res["gate_outcome"] == "reconstructed:hydrogen_words", res
+        assert res["tier"] == "systematic_verified" and not res["is_pin"], res

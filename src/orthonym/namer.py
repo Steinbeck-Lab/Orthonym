@@ -5117,8 +5117,8 @@ class Orthonym:
             if is_top_level_naming():
                 _iso_probe = Chem.MolFromSmiles(smiles)
                 if _iso_probe is not None:
-                    from .rules.isotopes import decorate_isotopic_name, has_isotopes
-                    if has_isotopes(_iso_probe):
+                    from .rules.isotopes import decorate_isotopic_name, has_isotopes, labels_in_named_hydrogens
+                    if has_isotopes(_iso_probe) and not labels_in_named_hydrogens(_iso_probe):
                         # The skeleton is named without the hydro ring assembly producer: its
                         # name takes no isotopic descriptor (rules/ring_assemblies.py, the
                         # comment at hydro_assembly_withheld).
@@ -6234,7 +6234,7 @@ class Orthonym:
             if _is_coord_list or _is_np_list:
                 verified = "identity"
             else:
-                verified = _pv.VERIFIED_FIELD_BY_OPSIN_LABEL.get(opsin, verified)
+                verified = _pv.verified_field_of_read(opsin, gate_opsin_label, verified)
         # Spelling checks that do not rely on the round trip (validation/pin_spelling.py):
         # a round trip proves the molecule, never the spelling ('pyrido[1,2-b]pyridazin-
         # 6-one' reads back to the input as well as the PIN '6H-pyrido[1,2-b]pyridazin-
@@ -7152,8 +7152,8 @@ class Orthonym:
                     # never "verified_reconstructor" (a future task that
                     # supplies real `name_facts` and reaches the reconstructor
                     # branch may introduce its own distinct label then).
-                    from .validation.reconstruct import verify_or_none
-                    if verify_or_none(cand, smiles, name_facts=None) is None:
+                    from .validation.reconstruct import verify_or_none  # a twin first (component_order_twin)
+                    if not twin_gate_ships(cand, smiles, True) and verify_or_none(cand, smiles, name_facts=None) is None:
                         return None
                     opsin_status = "verified"
             if cand and not is_failure_name(cand):

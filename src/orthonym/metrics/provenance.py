@@ -145,6 +145,16 @@ VERIFIED_FIELD_BY_OPSIN_LABEL = {
     _CIP_DIALECT_LABEL: "opsin_cip_dialect",
 }
 
+def verified_field_of_read(opsin: str, gate_opsin_label: str, default: str) -> str:
+    """The ``verified`` field of a row from its ``opsin`` label; when the label says the name itself was read
+    ("verified") but the validity gate read a spelling of this very name (its twin, its acids, the reconstructor,
+    ``gate_opsin_label``), the field names what was read."""
+    field = VERIFIED_FIELD_BY_OPSIN_LABEL.get(opsin, default)
+    if field == "opsin" and gate_opsin_label in VERIFIED_OPSIN_LABELS:
+        return VERIFIED_FIELD_BY_OPSIN_LABEL[gate_opsin_label]
+    return field
+
+
 #: the values of ``verified`` that earn the tier pin_verified: a read-back of the name, or of
 #: its twin spelling, of the acids of a poly-anhydride name, or the exact-match list identity
 VERIFIED_FIELD_FOR_PIN_TIER = ("opsin", "opsin_twin", "opsin_acids", "identity")

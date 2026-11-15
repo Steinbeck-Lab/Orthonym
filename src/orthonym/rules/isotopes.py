@@ -42,6 +42,7 @@ from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 from .isotope_unit_slots import multiplied_unit_slots as _multiplied_unit_slots
 from .lambda_convention import LAMBDA as _LAMBDA
+from .adducts import isotopes_only_in_hydrogen_components as labels_in_named_hydrogens  # noqa: F401 (namer)
 
 #: One locant of a replacement or Hantzsch-Widman stem: a number, a letter, and the lambda number the
 #: lambda convention attaches to it: '5λ5-azaspiro', '1λ6,2λ4-disulfane').
