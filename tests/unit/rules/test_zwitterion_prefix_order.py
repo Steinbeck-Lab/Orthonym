@@ -15,12 +15,14 @@ twin. OPSIN 2.9.0 reads every best-effort name below back to the full InChIKey o
 """
 import pytest
 
+from tests.support.opsin_marks import release_aminiumyl_only
 from tests.support.pin_tiers import tier_row
 from tests.support.rt_assert import name_is_rt_exact
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 
+@release_aminiumyl_only
 @pytest.mark.parametrize("smiles,pin,best_effort", [
     ("CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
      "3-(acetyloxy)-4-(N,N-dimethylmethanaminiumyl)butanoate",

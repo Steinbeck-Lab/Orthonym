@@ -11,6 +11,7 @@ import pytest
 
 from orthonym.metrics.provenance import wider_tier_ctx
 from orthonym.validation.twin_spellings import twin_of, twin_round_trip
+from tests.support.opsin_marks import needs_aminiumyl_opsin, release_aminiumyl_only
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -39,9 +40,29 @@ def test_the_twin_of_another_structure_does_not_verify_the_name():
     assert twin_round_trip("(N,N-dimethylmethanaminiumyl)acetate", "C[N+](C)(C)CCC(=O)[O-]") is None
 
 
+@release_aminiumyl_only
 def test_a_wider_tier_spells_the_azaniumyl_form_and_the_default_tier_the_pin():
     from orthonym import Orthonym
     from orthonym.cli import _emit_tier_flags
     assert Orthonym(style="pin").name(BETAINE) == "(N,N-dimethylmethanaminiumyl)acetate"
     assert Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(BETAINE) == "(trimethylazaniumyl)acetate"
+    assert not wider_tier_ctx.get()
+
+
+@needs_aminiumyl_opsin
+@pytest.mark.parametrize("smiles, name, tier", [
+    (BETAINE, "(N,N-dimethylmethanaminiumyl)acetate", "pin_verified"),
+    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate", "pin_verified"),
+    ("C[N+](C)(C)CCOP(=O)([O-])OCC(O)CO", "2,3-dihydroxypropyl 2-(N,N-dimethylmethanaminiumyl)ethyl phosphate",
+     "pin_verified"),
+    ("C[N+](C)(C)[C-](C)C", "2-(N,N-dimethylmethanaminiumyl)propan-2-ide", "pin_verified"),        #:42517
+    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(N,N-dimethylmethanaminiumyl)ethyl sulfate", "pin_verified"),
+    ("C[N+](C)(C)c1ccccc1C(=O)[O-]", "2-(N,N-dimethylmethanaminiumyl)benzoate", "pin_verified"),
+])
+def test_an_opsin_that_reads_aminiumyl_gives_every_tier_the_pin(smiles, name, tier):
+    # dan2097/opsin#355: OPSIN's main branch reads the '-aminiumyl' prefix, so the wider tiers spell the PIN too
+    from orthonym.cli import _tiered_namer
+    for t in ("pin", "best-effort"):
+        row = _tiered_namer("pin", t).name_tiered(smiles)
+        assert (row["name"], row["tier"]) == (name, tier)
     assert not wider_tier_ctx.get()

@@ -9118,7 +9118,8 @@ def _name_substituent_fragment_uncached(
 # FORM CHOICE (OPSIN-grounded, 169.6-04 deviation, documented in SUMMARY):
 # The Blue Book PIN for a quaternary-ammonium cation substituent is the
 # `-aminiumyl` form (`(N,N-dimethylmethanaminiumyl)acetate`, line 42470). OPSIN
-# 2.9.0 does NOT implement the `-aminiumyl` substituent-suffix form (verified:
+# 2.9.0 does NOT implement the `-aminiumyl` substituent-suffix form (OPSIN's main
+# branch does, dan2097/opsin#355: ``opsin_capabilities.aminiumyl_enabled``; verified:
 # `(N,N-dimethylmethanaminiumyl)acetate`, `(methanaminiumyl)acetate` are both
 # UNPARSEABLE), but it DOES round-trip the equivalent `azane`-based PIN form
 # `(trimethylazaniumyl)acetate` -> `C[N+](C)(C)CC(=O)[O-]` (and the multi-N-
@@ -9132,7 +9133,7 @@ def _name_substituent_fragment_uncached(
 
 # W4-I4 /: parent-hydride cation stem for the onium
 # substituent prefix (stem + 'iumyl'). Nitrogen keeps 'azaniumyl' (the amine-based
-# '-methanaminiumyl' PIN is OPSIN-unparseable; azaniumyl is the OPSIN-valid form).
+# '-methanaminiumyl' PIN is not read by OPSIN 2.9.0; azaniumyl is the form it reads).
 _ONIUM_PREFIX_STEM = {
     'N': 'azan', 'P': 'phosphan', 'As': 'arsan', 'Sb': 'stiban',
     'O': 'oxidan', 'S': 'sulfan', 'Se': 'selan', 'Te': 'tellan',
@@ -9213,11 +9214,12 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
         return lambda_ion_name(cat, '', _onium_suffix)
 
     # (the Blue Book) '(N,N-dimethylmethanaminiumyl)acetate (PIN)': a nitrogen with three methyl groups is
-    # the '-aminiumyl' prefix at the default tier, which OPSIN does not read; the twin spelling ``aminiumyl_azaniumyl``
-    # (``validation.twin_spellings``) proves the structure. A wider tier spells the form OPSIN reads, 'trimethylazaniumyl'.
+    # the '-aminiumyl' prefix at the default tier; where OPSIN does not read it, the twin spelling ``aminiumyl_azaniumyl``
+    # (``validation.twin_spellings``) proves the structure and a wider tier spells the form OPSIN reads, 'trimethylazaniumyl'.
+    from ..opsin_capabilities import aminiumyl_enabled
     from ..validation.twin_spellings import pin_spellings_on
-    if (pin_spellings_on() and not as_free_ion and cat.GetSymbol() == 'N' and cat.GetDegree() == 4
-            and cat.GetTotalNumHs() == 0 and sub_prefixes == ['methyl'] * 3):
+    if (not as_free_ion and cat.GetSymbol() == 'N' and cat.GetDegree() == 4 and cat.GetTotalNumHs() == 0
+            and sub_prefixes == ['methyl'] * 3 and (pin_spellings_on() or aminiumyl_enabled())):
         return 'N,N-dimethylmethanaminiumyl'
     # a five-bond S+ is a λ4-sulfanium: '(tetramethyl-λ4-sulfaniumyl)'
     prefix = lambda_ion_name(cat, _compose_n_substituent_prefix(sub_prefixes), _onium_suffix)
@@ -9244,9 +9246,8 @@ def record_amine_cation_prefix(fragment: str) -> None:
     '(*N*,*N*-dimethylmethanaminiumyl)acetate (PIN)':42473),
     '2-(*N*,*N*-dimethylmethanaminiumyl)propan-2-ide (PIN)'
     :42517), and for a polycation the substitutive '-bis(aminium)'
-    :42154,:42366). The round-trip parser reads none of the
-    '-aminiumyl' forms, so the verified azaniumyl/azanium form ships at a
-    general tier. An N+ with no carbon group keeps 'azaniumyl (preselected
+    :42154,:42366). OPSIN 2.9.0 reads none of the '-aminiumyl'
+    forms, so the verified azaniumyl/azanium form ships at a general tier. An N+ with no carbon group keeps 'azaniumyl (preselected
     prefix)' (:42303), and the P/As/O/S onium stems have no amine-type suffix
     ('methyldi(phenyl)phosphaniumyl' is part of a PIN at:42468)."""
     from ..metrics.provenance import record_non_pin_fragment

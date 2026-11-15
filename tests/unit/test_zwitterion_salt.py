@@ -27,6 +27,7 @@ from rdkit import Chem
 from orthonym.rules.charged_router import route_charged
 from orthonym.assembly.substituent_naming import cation_to_prefix
 from orthonym.perception.ions import get_ion_sites
+from tests.support.opsin_marks import release_aminiumyl_only
 
 
 def _rc(smiles, style="pin"):
@@ -50,6 +51,7 @@ class TestCationToPrefixProducer:
 
     substituent_naming.py had ZERO cation-prefix capability before this plan."""
 
+    @release_aminiumyl_only
     def test_trimethyl_quaternary_ammonium(self):
         """(CH3)3N+- on an anion parent -> N,N-dimethylmethanaminiumyl at the default tier, the Blue Book
         '(N,N-dimethylmethanaminiumyl)acetate (PIN)'); a wider tier spells the OPSIN-readable 'trimethylazaniumyl'."""

@@ -749,8 +749,9 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
         # The choline head '2-(trimethylazaniumyl)ethyl' cites a carbon-substituted
         # N+ as azaniumyl; its PIN form is '2-(N,N-dimethylmethanaminiumyl)ethyl'
         # method (1),; prints no PIN for the
-        # zwitterion), which cannot be verified -- the same rule and the same
-        # label as every other such prefix.
+        # zwitterion), which OPSIN 2.9.0 cannot read -- the same rule and the same
+        # label as every other such prefix (``cation_to_prefix`` spells the PIN
+        # form where the OPSIN in use reads it).
         from ..assembly.substituent_naming import record_amine_cation_prefix
         record_amine_cation_prefix(head_alkyl)
     # functional-class diester: [<glyceryl>] <head-alkyl> phosphate (glyceryl bracketed first)

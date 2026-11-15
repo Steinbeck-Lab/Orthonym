@@ -32,6 +32,18 @@ needs_axial_opsin = pytest.mark.skipif(
 #: a test of OPSIN 2.9.0, which reads no axial descriptor: skipped when the active OPSIN reads one
 release_axial_only = pytest.mark.skipif(
     caps.opsin_capabilities().get("axial", False), reason="describes OPSIN 2.9.0, which reads no axial descriptor")
+#: skipped unless the active OPSIN reads an '-aminiumyl' prefix ('(N,N-dimethylmethanaminiumyl)acetate')
+needs_aminiumyl_opsin = pytest.mark.skipif(
+    not caps.aminiumyl_enabled(), reason="needs an OPSIN that reads '-aminiumyl' prefixes: ORTHONYM_OPSIN=main")
+#: a test of OPSIN 2.9.0, which reads no '-aminiumyl' prefix: skipped when the active OPSIN reads one
+release_aminiumyl_only = pytest.mark.skipif(
+    caps.aminiumyl_enabled(), reason="describes OPSIN 2.9.0, which reads no '-aminiumyl' prefix")
+
+
+def by_aminiumyl(release: str, reads_aminiumyl: str) -> str:
+    """The expected wider-tier name: ``reads_aminiumyl`` where the active OPSIN reads an '-aminiumyl' prefix (the
+    wider tiers then spell the PIN prefix), else ``release`` (OPSIN 2.9.0)."""
+    return reads_aminiumyl if caps.aminiumyl_enabled() else release
 #: a test of the twin route of a halogen -uide name: skipped when the active OPSIN reads such a name
 release_uide_only = pytest.mark.skipif(
     caps.opsin_capabilities()["halogen_uide"],

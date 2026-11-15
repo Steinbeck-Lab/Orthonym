@@ -2,6 +2,7 @@
 import pytest
 
 from orthonym.cli import _tiered_namer
+from tests.support.opsin_marks import release_aminiumyl_only
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -21,6 +22,7 @@ def test_an_n_substituted_carboxamide_on_a_ring_is_a_carbamoyl_prefix(smiles, na
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
+@release_aminiumyl_only
 def test_a_carboxy_group_behind_an_ester_oxygen_keeps_the_phosphate_ester_name():
     # the carboxy rule of the amide branch (a carboxy group behind a nitrogen is the branch's) stops at N only; the
     # glycerophospholipid keeps its phosphate ester name at the wider tier (it lost it to a replacement name)

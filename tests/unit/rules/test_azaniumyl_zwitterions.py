@@ -21,6 +21,7 @@ from orthonym.rules import azaniumyl_zwitterions, charged_router
 from tests.support.rt_assert import name_is_rt_exact
 from tests.support.pin_tiers import tier_row as _row
 from tests.support.pin_tiers import tier_row
+from tests.support.opsin_marks import release_aminiumyl_only
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -136,6 +137,7 @@ def _retained_zwitterion_rows():
     return sorted(RETAINED_AMINO_ACID_ZWITTERIONS.items())
 
 
+@release_aminiumyl_only
 @pytest.mark.parametrize("smiles, retained", _retained_zwitterion_rows())
 def test_a_retained_zwitterion_takes_the_azaniumyl_name_unless_none_is_built(smiles, retained):
     for tier in TIERS:

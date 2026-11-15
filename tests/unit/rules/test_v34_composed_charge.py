@@ -13,6 +13,7 @@ from orthonym.validation.opsin_roundtrip import opsin_parse
 from tests.support.jars import jar_or_skip
 from tests.support.rt_assert import assert_full_rt
 from tests.support import v34_charged_probe as v34_probe
+from tests.support.opsin_marks import release_aminiumyl_only
 
 BE = dict(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
 
@@ -23,6 +24,7 @@ CONTROLS = [
 ]
 
 
+@release_aminiumyl_only
 @pytest.mark.parametrize("smi,expected", CONTROLS)
 def test_composed_charge_controls_unchanged(smi, expected):
     assert Orthonym(**BE).name(smi) == expected
@@ -426,6 +428,7 @@ def test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong():
     assert_full_rt(name, smi)
 
 
+@release_aminiumyl_only
 def test_ws7_control_betaine_still_prefers_route_charged_pin():
     """ must NOT regress the PIN charged path: betaine is still named by
     `route_charged` as `(trimethylazaniumyl)acetate`, NOT the floor's uglier

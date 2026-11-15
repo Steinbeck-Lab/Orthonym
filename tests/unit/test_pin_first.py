@@ -18,6 +18,7 @@ import pytest
 
 from orthonym import name_compound
 from orthonym.cli import _tiered_namer
+from tests.support.opsin_marks import release_aminiumyl_only
 from tests.support.rt_assert import assert_full_rt
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -58,6 +59,7 @@ def test_every_entry_point_gives_the_same_pin(smiles, name):
     assert (record["name"], record["tier"]) == (name, "pin_verified"), record
 
 
+@release_aminiumyl_only
 def test_a_twin_verified_pin_leaves_the_readable_name_to_the_wider_tier():
     """'2-(N,N-dimethylmethanaminiumyl)ethyl dodecyl phosphate' is the PIN-tier name, read back only through a twin
     spelling; the wider tier keeps the name OPSIN reads."""

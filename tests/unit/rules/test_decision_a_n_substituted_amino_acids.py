@@ -59,7 +59,7 @@ from pathlib import Path
 import pytest
 
 from orthonym import Orthonym
-from tests.support.opsin_marks import needs_phane_opsin, release_capabilities
+from tests.support.opsin_marks import needs_phane_opsin, release_capabilities, by_aminiumyl
 from tests.support.rt_assert import assert_full_rt
 from tests.support.default_tier import (  # noqa: E402
     declined_at_default,
@@ -246,8 +246,10 @@ def test_gate_refuses_in_scope_and_demotes_outside():
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,best_effort", [
-    ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", "(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate"),
-    ("C[N+](C)(C)C[C@@H](O)CC(=O)[O-]", "(3S)-3-hydroxy-4-(trimethylazaniumyl)butanoate"),
+    ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", by_aminiumyl("(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate",
+                                                    "(3R)-4-(N,N-dimethylmethanaminiumyl)-3-hydroxybutanoate")),
+    ("C[N+](C)(C)C[C@@H](O)CC(=O)[O-]", by_aminiumyl("(3S)-3-hydroxy-4-(trimethylazaniumyl)butanoate",
+                                                     "(3S)-4-(N,N-dimethylmethanaminiumyl)-3-hydroxybutanoate")),
 ])
 def test_carnitine_is_labelled_below_the_pin_tier(namer, smiles, best_effort):
     """0 Blue Book hits; the PIN tier verifies no name for the L and D zwitterions (the strict

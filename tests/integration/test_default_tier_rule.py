@@ -36,7 +36,7 @@ from tests.support.default_tier import (
     assert_default_tier_declines,
     strict_path_row,
 )
-from tests.support.opsin_marks import release_opsin_only
+from tests.support.opsin_marks import release_aminiumyl_only, release_opsin_only
 from tests.support.rt_assert import assert_full_rt, name_best_effort
 from tests.unit.rules.test_d1_coordination_v36 import HEME_B
 
@@ -61,6 +61,7 @@ def test_a_pin_verified_name_is_emitted():
     assert name_compound(CAFFEINE) == row["name"]
 
 
+@release_aminiumyl_only
 def test_the_trimethyl_betaine_is_the_aminiumyl_pin():
     """ (the Blue Book) '(N,N-dimethylmethanaminiumyl)acetate (PIN)': OPSIN reads no '-aminiumyl' prefix, the
     twin '(trimethylazaniumyl)acetate' proves the structure (``validation.twin_spellings``, ``aminiumyl_azaniumyl``)."""

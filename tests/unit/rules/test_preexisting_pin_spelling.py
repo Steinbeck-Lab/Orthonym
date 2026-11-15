@@ -13,6 +13,7 @@ per the Blue Book.
 import pytest
 
 from orthonym.errors import is_failure_name
+from tests.support.opsin_marks import release_aminiumyl_only
 from tests.support.rt_assert import name_best_effort, name_is_rt_exact
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
@@ -260,6 +261,7 @@ SPELLING_FEATURE_ROWS = [
 ]
 
 
+@release_aminiumyl_only
 @pytest.mark.parametrize("smiles,present,absent", SPELLING_FEATURE_ROWS,
                          ids=[r[0] for r in SPELLING_FEATURE_ROWS])
 def test_spelling_features(smiles, present, absent):

@@ -25,6 +25,7 @@ from rdkit.Chem import inchi
 
 from orthonym import name_compound
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.opsin_marks import release_aminiumyl_only
 
 
 def _full_rt(smiles: str, name: str) -> bool:
@@ -115,6 +116,7 @@ class TestCationSubstituentPrefix:
         assert "aminiumyl" not in name, name
         assert "phosphonooxy-N,N,N-trimethylethan" not in name, name
 
+    @release_aminiumyl_only
     def test_direct_attach_cation_prefix_routes_through_cation_to_prefix(self):
         """A fragment whose OWN attach atom IS the cationic centre (the
         direct-attachment shape cation_to_prefix is built for) must produce

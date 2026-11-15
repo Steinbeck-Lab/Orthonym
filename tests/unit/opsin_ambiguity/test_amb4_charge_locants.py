@@ -14,6 +14,7 @@ from orthonym.rules.charged_router import emit_primary_amine_anide
 from orthonym.rules.ion_locants import ring_ylium_may_be_locant_free
 from orthonym.rules.ions import apply_ion_suffix_to_name
 from orthonym.rules.ring_position_kinds import one_kind_of_substitutable_position
+from tests.support.opsin_marks import by_aminiumyl
 
 from ._helpers import ambiguity_messages, assert_clean, name_row
 
@@ -294,7 +295,8 @@ def test_zwitterion_cites_the_locant_of_the_cation_on_a_ring_parent(smiles, name
 @pytest.mark.parametrize("smiles,name", [
     ("C1CCCC(CC1)(C(=O)[O-])[P+](c2ccccc2)(c2ccccc2)c2ccccc2",
      "1-(triphenylphosphaniumyl)cycloheptanecarboxylate"),
-    ("C[N+](C)(C)C1CCCCC1C(=O)[O-]", "2-(trimethylazaniumyl)cyclohexanecarboxylate"),
+    ("C[N+](C)(C)C1CCCCC1C(=O)[O-]", by_aminiumyl("2-(trimethylazaniumyl)cyclohexanecarboxylate",
+                                                  "2-(N,N-dimethylmethanaminiumyl)cyclohexanecarboxylate")),
 ])
 def test_zwitterion_of_a_ring_carboxylate_cites_the_locant_of_the_cation(smiles, name):
     # (the Blue Book): the locant of the substituent of the ring parent is cited,
@@ -320,7 +322,7 @@ def test_zwitterion_of_benzoate_is_the_aminiumyl_pin_and_its_twin(smiles, pin, w
     # the default tier ships the name pin_verified (ruling R5, RULINGS-ANION.md); the wider tiers spell the same atoms
     # '(trimethylazaniumyl)', which OPSIN 2.9.0 reads (validation/twin_spellings.py), without the PIN label.
     row = assert_clean(smiles)
-    assert row["name"] == wider
+    assert row["name"] == by_aminiumyl(wider, pin)      # an OPSIN that reads '-aminiumyl' (main): the PIN at every tier
     pin_row = name_row(smiles, tier="pin")
     assert (pin_row["name"], pin_row["tier"]) == (pin, "pin_verified")
 

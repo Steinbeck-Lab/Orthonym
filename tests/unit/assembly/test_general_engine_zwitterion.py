@@ -48,6 +48,7 @@ from rdkit import Chem, RDLogger
 
 from orthonym.assembly import general_engine as ge
 from orthonym.namer import Orthonym
+from tests.support.opsin_marks import release_aminiumyl_only
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -454,6 +455,7 @@ def test_charged_species_unchanged_best_effort_tier(smiles, expected):
     assert _name(smiles, "best-effort") == expected
 
 
+@release_aminiumyl_only
 def test_the_betaine_is_spelled_by_its_tier():
     assert _name(BETAINE, "pin") == "(N,N-dimethylmethanaminiumyl)acetate"
     assert _name(BETAINE, "best-effort") == "(trimethylazaniumyl)acetate"

@@ -25,6 +25,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.opsin_marks import release_aminiumyl_only
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -354,6 +355,7 @@ def test_charged_species_naming(smiles, expected_substr):
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
 
+@release_aminiumyl_only
 @pytest.mark.integration
 @pytest.mark.opsin_gate
 def test_carnitine_ester_zwitterion_tier_contract():

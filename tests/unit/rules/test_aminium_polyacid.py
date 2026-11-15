@@ -34,6 +34,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.opsin_marks import by_aminiumyl
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -116,7 +117,8 @@ def test_l_carnitine_is_no_pin_and_takes_the_composed_name(namer):
     from tests.support.pin_tiers import tier_row
     smiles = "C[N+](C)(C)C[C@H](O)CC(=O)[O-]"
     assert _dt_obj_row(namer, smiles)["is_pin"] is False
-    assert tier_row(smiles, "best-effort")["name"] == "(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate"
+    assert tier_row(smiles, "best-effort")["name"] == by_aminiumyl(
+        "(3R)-3-hydroxy-4-(trimethylazaniumyl)butanoate", "(3R)-4-(N,N-dimethylmethanaminiumyl)-3-hydroxybutanoate")
 
 
 @pytest.mark.opsin_gate

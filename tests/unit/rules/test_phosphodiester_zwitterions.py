@@ -22,6 +22,7 @@ from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.perception.ions import get_ion_sites
 from orthonym.rules import charged_router
+from tests.support.opsin_marks import release_aminiumyl_only
 from tests.support.rt_assert import name_is_rt_exact
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -53,6 +54,7 @@ def _row(smiles, tier):
     return Orthonym(style="pin", **(_emit_tier_flags(tier) if tier != "pin" else {})).name_tiered(smiles)
 
 
+@release_aminiumyl_only
 @pytest.mark.parametrize("smiles, pin, general", ROWS)
 def test_the_default_tier_names_the_diester_with_the_aminiumyl_pin(smiles, pin, general):
     row = _row(smiles, "pin")
@@ -60,6 +62,7 @@ def test_the_default_tier_names_the_diester_with_the_aminiumyl_pin(smiles, pin, 
     assert name_is_rt_exact(row["name"], smiles), row
 
 
+@release_aminiumyl_only
 @pytest.mark.parametrize("smiles, pin, general", ROWS)
 def test_the_best_effort_tier_names_it_with_the_azaniumyl_prefix_below_the_pin(smiles, pin, general):
     row = _row(smiles, "best-effort")
@@ -87,6 +90,7 @@ def test_the_builder_declines_other_shapes(smiles):
     assert phosphodiester_zwitterion_name(mol, cation, p.GetIdx(), ester) == ""
 
 
+@release_aminiumyl_only
 def test_the_monoester_zwitterion_takes_the_aminiumyl_pin_spelling_too():
     smiles = "C[N+](C)(C)CCOP(=O)(O)[O-]"
     row = _row(smiles, "pin")

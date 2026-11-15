@@ -33,6 +33,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.opsin_marks import release_aminiumyl_only
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -79,6 +80,7 @@ def test_unverifiable_pin_form_ships_demoted(smiles, expected):
 # The nitrogen with three methyl groups is the '-aminiumyl' PIN of the book's own example, the Blue Book;
 #,:42517), spelled at the default tier and read through its twin (the maintainers' ruling of 2026-11-01).
 # The twin '(trimethylazaniumyl)...' is what OPSIN reads, and the independent read-back below reads it.
+@release_aminiumyl_only
 @pytest.mark.parametrize("smiles,expected", [
     ("C[N+](C)(C)CC(=O)[O-]", "(N,N-dimethylmethanaminiumyl)acetate"),                 #:42473
     ("C[N+](C)(C)[C-](C)C", "2-(N,N-dimethylmethanaminiumyl)propan-2-ide"),            #:42517
@@ -91,6 +93,7 @@ def test_the_trimethyl_nitrogen_is_the_aminiumyl_pin_verified_through_its_twin(s
     assert name_is_rt_exact(expected, smiles)
 
 
+@release_aminiumyl_only
 def test_the_plasmalogen_choline_is_named_at_best_effort_with_the_azaniumyl_prefix():
     # the default tier builds no name for it (the choline head of this route is spelled 'trimethylazaniumyl' by
     # ``rules.lipids`` and recorded as no PIN); the best-effort tier ships the verified azanium name below the PIN

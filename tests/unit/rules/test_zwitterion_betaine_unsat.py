@@ -4,6 +4,7 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.opsin_marks import release_aminiumyl_only
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
@@ -76,6 +77,7 @@ def test_unsaturated_betaine_integration(namer, smi, expected):
     assert _dt_obj_name(namer, smi) == expected
 
 
+@release_aminiumyl_only
 @pytest.mark.opsin_gate
 def test_the_unsaturated_betaine_cites_its_descriptor_in_front():
     """ "NAMING OF STEREOISOMERS" (the Blue Book),:44643: stereodescriptors "are placed at the

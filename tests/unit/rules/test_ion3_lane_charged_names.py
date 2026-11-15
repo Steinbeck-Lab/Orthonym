@@ -32,6 +32,7 @@ The names of the classes the Blue Book gives no example of are not PINs: the tie
 import pytest
 from rdkit import Chem
 
+from tests.support.opsin_marks import release_aminiumyl_only
 from tests.support.rt_assert import _full_inchikey, _independent_parse, name_best_effort
 
 # The suite runs with the OPSIN validity gate off. A ring ion whose parent hydride is offered first without its charges
@@ -100,14 +101,19 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("smiles,expected,rule", [pytest.param(*c, id=c[0]) for c in CASES])
+def _on_release(expected):
+    """A '(trimethylazaniumyl)' name is the wider tiers' spelling where OPSIN reads no '-aminiumyl' prefix (2.9.0)."""
+    return [release_aminiumyl_only] if "trimethylazaniumyl" in expected else []
+
+
+@pytest.mark.parametrize("smiles,expected,rule", [pytest.param(*c, id=c[0], marks=_on_release(c[1])) for c in CASES])
 def test_name_pinned_and_read_back(smiles, expected, rule):
     row = name_best_effort(smiles)
     assert row["name"] == expected, (rule, row["name"], row["tier"])
     assert _reads_back(smiles, row["name"])
 
 
-@pytest.mark.parametrize("smiles", [c[0] for c in CASES])
+@pytest.mark.parametrize("smiles", [pytest.param(c[0], marks=_on_release(c[1])) for c in CASES])
 def test_class_without_a_blue_book_example_is_no_pin(smiles):
     """The Blue Book gives no example of these ions: the name is valid, not preferred."""
     assert name_best_effort(smiles)["tier"] != "pin_verified"
@@ -187,6 +193,7 @@ def test_amine_anion_zwitterion_of_an_onium_prefix_is_named_at_the_pin_tier(smil
     assert (default["name"], default["tier"]) == (expected, "pin_verified")
 
 
+@release_aminiumyl_only
 def test_amine_anion_zwitterion_of_an_azaniumyl_prefix_is_below_the_pin():
     """A carbon group on the N+ makes an amine cation, whose PIN prefix is built on 'aminium' method (1),:42296)."""
     row = name_best_effort("C[N+](C)(C)CC[NH-]")
@@ -240,7 +247,7 @@ CONTROLS = [
 ]
 
 
-@pytest.mark.parametrize("smiles,expected", CONTROLS, ids=[c[0] for c in CONTROLS])
+@pytest.mark.parametrize("smiles,expected", [pytest.param(*c, id=c[0], marks=_on_release(c[1])) for c in CONTROLS])
 def test_controls_keep_their_names(smiles, expected):
     assert name_best_effort(smiles)["name"] == expected
 
@@ -293,7 +300,10 @@ def test_ring_ion_centre_of_silicon(smiles, expected):
 
 def test_silicon_is_no_ring_halogen():
     """The halogens' share of the admission (the non-PIN record of a replacement name, the benzo-heterocycle producer) stays theirs."""
-    from orthonym.rules.lambda_convention import FUSED_RING_LAMBDA_HALOGENS, RING_ION_LAMBDA_ELEMENTS
+    from orthonym.rules.lambda_convention import (
+        FUSED_RING_LAMBDA_HALOGENS,
+        RING_ION_LAMBDA_ELEMENTS,
+    )
     assert "Si" not in FUSED_RING_LAMBDA_HALOGENS and "Si" in RING_ION_LAMBDA_ELEMENTS
 
 
