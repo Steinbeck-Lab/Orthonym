@@ -4,8 +4,9 @@ RDKit gives chlorine and bromine the bonding number 1 only, and none to their an
 λ3-chlorane (``CC(C)(C)Cl=C``) or of a two-bond chloranuide (``C[Cl-]C``), and the engine has no molecule to name.
 Iodine has the bonding numbers 1, 3, 5 and 7 in RDKit, and the producers of the λ-iodanes, the iodanuides and the
 iodine rings name its drawing.:func:`iodine_drawing_row` names the molecule drawn with iodine in place of every such
-atom and writes the chlorine or bromine stem for each iodine stem of that name; every iodine of the drawing is one of
-those atoms, because an input with iodine of its own is not drawn again.
+atom and writes the chlorine or bromine stem for each iodine stem of that name. An input with iodine of its own
+(:attr:`HalogenDrawing.own_iodine`) gives a name whose iodine stems are not all drawn atoms: each choice of stems to
+respell is read back, and the first that OPSIN reads to the input's drawing ships.
 
 What the element changes, and how each is kept out of a shipped name:
 
@@ -41,6 +42,9 @@ _RELAXED = Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_PROPERT
 _MULTIPLIER = r'(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|bis|tris|tetrakis)'
 #: the iodine stem as (the start of) a substituent prefix: 'iodyl', 'iodosyl', 'iodonio', 'λ3-iodanyl', '...ylidene'
 _SUBSTITUENT_FORM = re.compile(r'iod(?:yl|osyl|onio|an(?:uid|id)?yl)')
+#: the stem as the parent of an enclosed prefix: a λ hydride ('λ3-iodanyl'), an 'a' prefix ('1λ3-ioda-2,5-dioxa...'),
+#: a Hantzsch-Widman ring ('1λ3-iodinan-1-yl', 'iodolane', 'iodetane', 'iodirane', 'iodepane')
+_PARENT_STEM = re.compile(r'iod(?:an|a|in|ol|et|ir|ep)')
 #: a locant ('2', "1,2'", 'N') right before the stem or its λ: the stem begins the prefix the locant belongs to
 _LOCANT_END = re.compile(r"(?:[0-9][0-9,']*|[A-Z][0-9,'A-Z]*)$")
 
@@ -50,6 +54,8 @@ class HalogenDrawing(NamedTuple):
     stem: str               # 'chlor' or 'brom'
     key: str                # the full standard InChIKey of the input
     radical: bool           # the input has a radical centre (OPSIN reads the name with -r)
+    smiles: str = ''        # the input, compared atom by atom with the read-back (``validation.depiction_match``)
+    own_iodine: bool = False  # the input has iodine of its own: not every iodine stem of the drawing's name is respelled
 
 
 def relaxed_mol(smiles: str) -> Optional[Chem.Mol]:
@@ -67,13 +73,13 @@ def relaxed_mol(smiles: str) -> Optional[Chem.Mol]:
 
 def halogen_drawing(smiles) -> Optional[HalogenDrawing]:
     """The iodine drawing of ``smiles``, or None: not a string, no Cl or Br in it, RDKit reads it (nothing to draw
-    again), an iodine of its own, unreadable atoms not all chlorine or all bromine, a charge other than -1, 0 or +1
+    again), unreadable atoms not all chlorine or all bromine, a charge other than -1, 0 or +1
     on one, or an iodine drawing RDKit does not read with the hydrogens and radical electrons of the input."""
     if not isinstance(smiles, str) or ('Cl' not in smiles and 'Br' not in smiles) \
             or Chem.MolFromSmiles(smiles) is not None:
         return None
     mol = relaxed_mol(smiles)
-    if mol is None or any(a.GetAtomicNum() == 53 for a in mol.GetAtoms()):
+    if mol is None:
         return None
     table = Chem.GetPeriodicTable()
     unread = [a for a in mol.GetAtoms() if a.GetSymbol() in _STEMS
@@ -81,18 +87,22 @@ def halogen_drawing(smiles) -> Optional[HalogenDrawing]:
     symbols = {a.GetSymbol() for a in unread}
     if len(symbols) != 1 or any(abs(a.GetFormalCharge()) > 1 for a in unread):
         return None
+    radicals = {a.GetIdx(): unpaired_electrons(a) for a in unread}
+    if any(radicals[a.GetIdx()] and a.GetFormalCharge() for a in unread):
+        return None     # an odd-electron charged centre has no name of the λ-convention
     work = Chem.RWMol(mol)
     for atom in unread:
         drawn = work.GetAtomWithIdx(atom.GetIdx())
         drawn.SetNumExplicitHs(atom.GetTotalNumHs())   # the hydrogens of the input, not those iodine would take
         drawn.SetNoImplicit(True)
+        drawn.SetNumRadicalElectrons(radicals[atom.GetIdx()])
         drawn.SetAtomicNum(53)
     try:
         Chem.SanitizeMol(work)
         iodine_smiles = Chem.MolToSmiles(work)
     except Exception:  # noqa: BLE001 -- an iodine drawing RDKit cannot read is not offered
         return None
-    if any(work.GetAtomWithIdx(a.GetIdx()).GetNumRadicalElectrons() != a.GetNumRadicalElectrons() for a in unread):
+    if any(work.GetAtomWithIdx(i).GetNumRadicalElectrons() != n for i, n in radicals.items()):
         return None     # iodine would hold another bonding number: not the input's structure
     if Chem.MolFromSmiles(iodine_smiles) is None:
         return None
@@ -100,7 +110,16 @@ def halogen_drawing(smiles) -> Optional[HalogenDrawing]:
     if not key:
         return None
     return HalogenDrawing(iodine_smiles, _STEMS[symbols.pop()], key,
-                          any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()))
+                          any(radicals.values()) or any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()), smiles,
+                          any(a.GetAtomicNum() == 53 for a in mol.GetAtoms()))
+
+
+def unpaired_electrons(atom) -> int:
+    """1 when the halogen ``atom`` has an odd number of nonbonding electrons, else 0: seven valence electrons, less
+    its formal charge and its bonds (hydrogens included). "Nonstandard bonding numbers": a neutral chlorine
+    with two bonds is the λ3 radical ('1λ3-chlorinan-1-yl', read by OPSIN as ``Cl1CCCCC1`` with -r); RDKit, which reads
+    the atom without its valence check, gives it none."""
+    return (7 - atom.GetFormalCharge() - atom.GetTotalValence()) % 2
 
 
 def _depth(text: str) -> int:
@@ -119,30 +138,111 @@ def stem_may_change_the_spelling(iodine_name: str) -> bool:
     * The stem after other letters of its prefix ('difluoro-λ3-iodanyl') when another part of the name begins with
       the same letters ('difluoroethyl'): the comparison of the two reaches the stem.
     A stem in the parent (the hydride, the ring, an 'a' prefix of the parent) is in no prefix."""
-    for found in re.finditer('iod', iodine_name):
-        i = found.start()
-        before = iodine_name[:i]
-        if before[-1:].isalpha() and not re.search(r'(?:yl|' + _MULTIPLIER + r')$', before):
-            return True
-        word = re.match(r'[a-z]+', iodine_name[i:]).group(0)
-        if _depth(before) == 0 and not _SUBSTITUENT_FORM.match(word):
-            continue
-        head = before[:-1] if before.endswith('-') else before
-        lam = re.search(r'λ\d+$', head)
-        if lam:
-            head = head[:lam.start()]
-        if _LOCANT_END.search(head) or re.search(_MULTIPLIER + r'$', head):
-            return True
-        if lam and head.endswith('-'):
-            head = head[:-1]
-        key = re.search(r'[a-z]*$', head).group(0)
-        if not key:
-            return True
-        rest = iodine_name[:len(head) - len(key)] + ' ' + iodine_name[i + len(word):]
-        if any(w.startswith(key) or re.sub('^' + _MULTIPLIER, '', w).startswith(key)
-               for w in re.split(r'[^a-z]+', rest) if w):
-            return True
-    return False
+    return any(stem_risk(iodine_name, found.start()) for found in re.finditer('iod', iodine_name))
+
+
+def stem_risk(iodine_name: str, i: int) -> Optional[str]:
+    """Why respelling the 'iod' at offset ``i`` of ``iodine_name`` could need another spelling
+    (:func:`stem_may_change_the_spelling`): 'elision' (a letter before the stem), 'order' (the stem sorts a prefix),
+    or None."""
+    before = iodine_name[:i]
+    if before[-1:].isalpha() and not re.search(r'(?:yl|' + _MULTIPLIER + r')$', before):
+        return 'elision'
+    word = re.match(r'[a-z]+', iodine_name[i:]).group(0)
+    if _depth(before) == 0 and not _SUBSTITUENT_FORM.match(word):
+        return None
+    head = before[:-1] if before.endswith('-') else before
+    lam = re.search(r'λ\d+$', head)
+    if lam:
+        head = head[:lam.start()]
+    if _LOCANT_END.search(head) or re.search(_MULTIPLIER + r'$', head):
+        return 'order'
+    if lam and head.endswith('-'):
+        head = head[:-1]
+    key = re.search(r'[a-z]*$', head).group(0)
+    if not key:
+        return 'order'
+    rest = iodine_name[:len(head) - len(key)] + ' ' + iodine_name[i + len(word):]
+    if any(w.startswith(key) or re.sub('^' + _MULTIPLIER, '', w).startswith(key)
+           for w in re.split(r'[^a-z]+', rest) if w):
+        return 'order'
+    return None
+
+
+def _ranks(keys):
+    return [sorted(range(len(keys)), key=lambda j: (keys[j], j)).index(j) for j in range(len(keys))]
+
+
+def prefix_order_kept(iodine_name: str, name: str) -> bool:
+    """True when the respelled ``name`` cites its detachable prefixes in the order of the iodine drawing's name, unit by
+    unit, and that order is still the alphanumerical one: the spelling parser (``validation.spelling.units``) reads
+    both names into the same units with as many prefixes each, and the prefixes' keys sort the same way.
+     "Simple prefixes... are arranged alphabetically" (the Blue Book) and (g) (the lowest locants
+    to the prefix cited first) then give the respelled name the iodine name's citation order and numbering. A
+    prefix the parser misreads ('iodosyl' as 'iodo') keeps a key that sorts on the same side of every prefix cited
+    before it; a prefix cited after the stem's sorts after 'iod', hence after 'chlor' and 'brom'."""
+    from ..validation.spelling.units import parse_name
+    try:
+        _s, encs_b, before = parse_name(iodine_name)
+        _s, encs_a, after = parse_name(name)
+    except Exception:  # noqa: BLE001 -- a name the parser cannot read keeps the decline
+        return False
+    if len(before) != len(after) or len(encs_b) != len(encs_a):
+        return False
+    # every enclosure the respelling changed is an enclosed prefix the parser read
+    read = {id(p.enc) for u in after for p in u.prefixes if p.kind == 'enclosed' and p.enc is not None}
+    if any(eb.content != ea.content and id(ea) not in read for eb, ea in zip(encs_b, encs_a)):
+        return False
+    for b, a in zip(before, after):
+        kb = [p.key.lower() for p in b.prefixes if not p.nested]
+        ka = [p.key.lower() for p in a.prefixes if not p.nested]
+        if len(kb) != len(ka) or _ranks(kb) != _ranks(ka) or ka != sorted(ka):
+            return False
+    return True
+
+
+def _respelled(iodine_name: str, chosen, stem: str) -> Optional[str]:
+    """``iodine_name`` with ``stem`` for the 'iod' at each offset of ``chosen`` (offsets in:func:`_spelled_apart`'s
+    text, where 'benziod' keeps the 'o' of 'benzo' before the stem: (f), the Blue Book, elides it only
+    before a vowel); None when a chosen stem may need another spelling that:func:`prefix_order_kept` cannot settle."""
+    text = _spelled_apart(iodine_name)
+    risks = [stem_risk(text, i) for i in chosen]
+    if 'elision' in risks or any(r == 'order' and (_depth(text[:i]) == 0 or not _PARENT_STEM.match(text, i))
+                                 for r, i in zip(risks, chosen)):
+        return None     # a simple prefix ('iodyl', 'iodosyl'): the parser does not read it, its order stays unproven
+    out = text
+    for i in sorted(chosen, reverse=True):
+        start = i - 1 if out[max(0, i - 6):i] == 'benzo-' else i
+        out = out[:start] + stem + out[i + 3:]
+    out = out.replace('benzo-iod', 'benziod')
+    if 'order' in risks and not prefix_order_kept(iodine_name, out):
+        return None
+    return out
+
+
+def _spelled_apart(iodine_name: str) -> str:
+    return iodine_name.replace('benziod', 'benzo-iod')
+
+
+#: the most iodine stems of a name whose subsets are read back for an input with iodine of its own (2^8 reads)
+_MAX_STEMS = 8
+
+
+def _candidate_names(iodine_name: str, drawing: HalogenDrawing):
+    """The respelled names to read back, in order: every stem for an input without iodine of its own; else each
+    choice of stems, fewest first."""
+    from itertools import combinations
+    offsets = [m.start() for m in re.finditer('iod', _spelled_apart(iodine_name))]
+    if not drawing.own_iodine:
+        choices = [offsets]
+    elif len(offsets) > _MAX_STEMS:
+        choices = []
+    else:
+        choices = [list(c) for k in range(1, len(offsets)) for c in combinations(offsets, k)]
+    for chosen in choices:
+        name = _respelled(iodine_name, chosen, drawing.stem)
+        if name is not None:
+            yield name
 
 
 def _declined(namer, smiles: str) -> dict:
@@ -172,11 +272,10 @@ def iodine_drawing_row(namer, smiles) -> Optional[dict]:
     # 'benzo' elides its 'o' before the vowel of 'iod' ('benziodoxole') and keeps it before 'chlor'/'brom'
     # (f), the Blue Book: "the terminal letter 'o' of 'benzo' in names of 'benzoheterocycles' formed by
     # fusion of a benzene ring to a heteromonocycle whose name begins with a vowel"): that elision is spelled here
-    if (row.get('tier') == 'abstain' or not iodine_name
-            or stem_may_change_the_spelling(iodine_name.replace('benziod', 'benzo-iod'))):
+    if row.get('tier') == 'abstain' or not iodine_name:
         return _declined(namer, smiles)
-    name = iodine_name.replace('benziod', 'benzo' + drawing.stem).replace('iod', drawing.stem)
-    if not _reads_back(name, drawing):
+    name = next((n for n in _candidate_names(iodine_name, drawing) if _reads_back(n, drawing)), None)
+    if name is None:
         return _declined(namer, smiles)
     from rdkit.Chem import rdMolDescriptors
     return {**row, 'name': name, 'tier': 'systematic_verified', 'is_pin': False, 'source': 'iodine_drawing',
@@ -185,9 +284,11 @@ def iodine_drawing_row(namer, smiles) -> Optional[dict]:
 
 
 def _reads_back(name: str, drawing: HalogenDrawing) -> bool:
-    """OPSIN (the engine's jar) reads ``name`` to the full standard InChIKey of the input. The parse is read without
-    RDKit's valence check, as the input is: the shared parser of ``validation/atom_coverage.py`` drops a parse RDKit
-    cannot sanitize, and RDKit sanitizes no λ3-chlorane."""
+    """OPSIN (the engine's jar) reads ``name`` to the full standard InChIKey of the input, and to the input's drawing
+    atom by atom (``validation.depiction_match``: the key does not see a hydrogen on an over-valent halogen,
+    ``C1CC[Cl]CC1`` and ``C1CC[ClH]CC1`` share one). The parse is read without RDKit's valence check, as the input is:
+    the shared parser of ``validation/atom_coverage.py`` drops a parse RDKit cannot sanitize, and RDKit sanitizes no
+    λ3-chlorane."""
     from ..jvm_bridge import opsin_stdout
     from ..validation.atom_coverage import _opsin_cli_stdout, find_opsin_jar
     jar = find_opsin_jar()
@@ -197,8 +298,12 @@ def _reads_back(name: str, drawing: HalogenDrawing) -> bool:
     if not served:
         text = None if drawing.radical else _opsin_cli_stdout(name, jar)
     lines = (text or '').strip().split('\n')
-    mol = relaxed_mol(lines[0].strip()) if lines and lines[0].strip() else None
-    return mol is not None and Chem.MolToInchiKey(mol) == drawing.key
+    read = lines[0].strip() if lines else ''
+    mol = relaxed_mol(read) if read else None
+    if mol is None or Chem.MolToInchiKey(mol) != drawing.key:
+        return False
+    from ..validation.depiction_match import depiction_matches
+    return depiction_matches(relaxed_mol(drawing.smiles), read, halogens_only=True)
 
 
 def halogen_drawing_scope(fn):

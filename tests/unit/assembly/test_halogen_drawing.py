@@ -57,7 +57,6 @@ def test_the_default_tier_declines_the_name_of_another_drawing():
 @pytest.mark.parametrize("smiles", [
     "CCO",                          # RDKit reads it: named as before
     "C=Ic1ccccc1",                  # RDKit reads the iodane itself
-    "C=Clc1ccc(I)cc1",              # an iodine of its own: an iodine stem could not be told apart
     "C=Clc1ccc(Br=C)cc1",           # a chlorine and a bromine: one stem each, not told apart
 ])
 def test_no_iodine_drawing(smiles):
@@ -105,9 +104,9 @@ def test_a_name_whose_spelling_the_element_may_change_is_declined(smiles):
             Orthonym(**_BEST_EFFORT).name(smiles, raise_on_limit=True)
 
 
-@pytest.mark.parametrize("smiles", ["Cl1CC1", "C[Cl+16](C)C", "C(C"])
+@pytest.mark.parametrize("smiles", ["C[Cl-]1CCCCC1", "C[Cl+16](C)C", "C(C"])
 def test_an_input_no_iodine_drawing_holds_still_raises(smiles):
-    # a ring chlorine with two bonds: iodine would carry a radical electron the input does not
+    # a chloranuide with three bonds has an odd number of electrons: no name of the λ-convention
     assert halogen_drawing(smiles) is None
     with pytest.raises(ValueError):
         Orthonym(**_BEST_EFFORT).name(smiles)
