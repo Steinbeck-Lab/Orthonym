@@ -457,6 +457,11 @@ _GENERAL_ONLY_ANIONS = frozenset(
 )
 
 
+#: retained anion names the Blue Book does not hold (0 hits in the Blue Book): OPSIN reads them, so they name the
+#: anion, but never as a PIN ('bistriflimide': the systematic name is bis(trifluoromethanesulfonyl)azanide,
+_TRIVIAL_ANION_NAMES = frozenset({'bistriflimide'})
+
+
 def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
     """
     Look up retained name for an anion by its SMILES.
@@ -491,7 +496,12 @@ def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
 
     # Check organic anions first
     if canonical in RETAINED_ANIONS:
-        return RETAINED_ANIONS[canonical]
+        name = RETAINED_ANIONS[canonical]
+        if name in _TRIVIAL_ANION_NAMES:
+            # a name the recommendations do not hold labels the name that cites it below the PIN
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(name, rule='P-72.2.2.2', detail='trivial anion name; not in the recommendations')
+        return name
 
     # Check inorganic anions
     if canonical in INORGANIC_ANIONS:

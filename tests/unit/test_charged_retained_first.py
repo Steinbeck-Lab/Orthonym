@@ -35,3 +35,13 @@ def test_retained_recovered_round_trip():
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
     for smi, name in [("[SH3+]", "sulfanium"), ("N[O-]", "aminoxide")]:
         assert opsin_roundtrip_check(smi, name)["passed"]
+
+
+@pytest.mark.opsin_gate
+def test_bistriflimide_is_no_pin():
+    """'bistriflimide' is not in the recommendations (0 hits in the Blue Book); the systematic name of the anion is
+    bis(trifluoromethanesulfonyl)azanide: the name ships, below the PIN."""
+    from tests.support.rt_assert import name_best_effort
+    for smiles in ("O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F", "[Li+].O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F"):
+        r = name_best_effort(smiles)
+        assert "bistriflimide" in r["name"] and not r["is_pin"] and r["tier"] == "systematic_verified", r
