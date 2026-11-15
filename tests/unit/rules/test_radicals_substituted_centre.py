@@ -141,7 +141,6 @@ def _sites(smiles):
     "[SiH]1CCCC1",                 # the centre is a ring atom
     "COC(=O)C[B-]",                # a charged centre
     "[B][N+](C)(C)C",              # an ionic ligand
-    "C[P](C)(C)C",                 # non-standard valence (lambda5)
     "[B]",                         # no ligand: the mononuclear producer's, not this one's
     "[2H][B]C",                    # a labelled hydrogen the name could not state
 ], ids=lambda s: s)

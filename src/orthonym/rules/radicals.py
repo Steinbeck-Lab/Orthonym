@@ -2112,8 +2112,15 @@ def _name_substituted_centre_radical(mol, site: Dict[str, Any]) -> str:
     if not parent:
         return ''
     heavy = [nb for nb in atom.GetNeighbors() if nb.GetAtomicNum() > 1]
+    bonding = atom.GetDegree() + atom.GetTotalNumHs() + n_e
+    # 'Monovalent radicals' (the Blue Book), 'tert-butoxytri(phenyl)-λ5-phosphanyl (PIN)' (:40442):
+    # a Group 15 centre with bonding number 5 is the λ5 parent hydride radical "Nonstandard bonding
+    # numbers"). Built by the all-organic program, so it is never labelled a PIN here (``_ship`` demotes it).
+    lambda5 = element in _LAMBDA5_ELEMENTS and bonding == 5
+    if lambda5:
+        parent = '-λ5-' + parent
     if (not heavy or any(b.GetBondType() != Chem.BondType.SINGLE for b in atom.GetBonds())
-            or atom.GetDegree() + atom.GetTotalNumHs() + n_e != _STANDARD_BONDING_NUMBER[element]
+            or (bonding != _STANDARD_BONDING_NUMBER[element] and not lambda5)
             or any(nb.GetAtomicNum() == 1 and nb.GetIsotope() for nb in atom.GetNeighbors())
             or _centre_extends_to_chain(atom)):
         return ''
@@ -2136,8 +2143,47 @@ def _name_substituted_centre_radical(mol, site: Dict[str, Any]) -> str:
         descriptor = bool(_LIGAND_DESCRIPTOR.search(candidate))
         if descriptor and not _tier_is_general():
             continue
-        shipped = _ship(mol, candidate, descriptor)
+        shipped = _ship(mol, candidate, descriptor or lambda5)
+        if shipped and lambda5:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(shipped)
         if shipped:
+            return shipped
+    return ''
+
+
+#: Group 15 centres named as λ5 parent hydride radicals when they hold five bonds and electrons
+_LAMBDA5_ELEMENTS = frozenset({'P', 'As', 'Sb'})
+
+
+def _name_chalcogen_centre_radical(mol, idx: int) -> str:
+    """A monovalent S, Se or Te radical whose one group:func:`_name_chalcogen_radical` does not name (a nitrile
+    carbon, an amidine carbon, a nitrogen) named as a substituted mononuclear centre: (the Blue Book)
+    "named on the basis of preselected parent radical names, such as 'sulfanyl', 'selanyl'", with its group a
+    prefix from the trusted ligand namer (``rules.centre_ligands``), as:func:`_name_substituted_centre_radical`
+    names a Group 13-15 centre. Built by the all-organic program: shipped by the strict radical read-back and never
+    as a PIN."""
+    atom = mol.GetAtomWithIdx(idx)
+    parent = _CHALCOGEN_RADICAL.get(atom.GetSymbol())
+    if (parent is None or atom.GetNumRadicalElectrons() != 1 or atom.GetFormalCharge() or atom.GetDegree() != 1
+            or atom.GetTotalNumHs() or atom.IsInRing()
+            or atom.GetBonds()[0].GetBondType() != Chem.BondType.SINGLE):
+        return ''
+    from ..assembly.universal_halane import names_the_input
+    if not names_the_input(mol):
+        return ''
+    from .centre_ligands import _candidate_ligand_lists
+    from ..assembly.naming_utils import enclose_if_compound
+    for names in _candidate_ligand_lists(mol, idx):
+        if len(names) != 1:
+            continue
+        candidate = enclose_if_compound(names[0]) + parent
+        if bool(_LIGAND_DESCRIPTOR.search(candidate)) and not _tier_is_general():
+            continue
+        shipped = _ship(mol, candidate, True)
+        if shipped:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(shipped)
             return shipped
     return ''
 
@@ -2320,7 +2366,7 @@ def name_radical(mol, style: str = 'pin') -> str:
             return chain
         # chalcogen analogues and ring-N radicals.
         for producer in (_name_chalcogen_radical, _name_ring_n_radical, _name_carbon_radical,
-                         _name_nitrene, _name_methane_centred_radical):
+                         _name_nitrene, _name_methane_centred_radical, _name_chalcogen_centre_radical):
             named = producer(mol, site['atom_idx'])
             if named:
                 return named

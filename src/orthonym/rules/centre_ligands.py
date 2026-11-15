@@ -100,6 +100,14 @@ def centre_ligand_prefixes(mol, center_idx: int, ring_first: bool = True, skip=(
         frag = sorted(atoms)
         if _is_acyl_on_chalcogen(mol, nb, center_idx):
             name = _acyl_on_chalcogen_prefix(mol, nb.GetIdx(), center_idx)
+            if not name and center.GetNumRadicalElectrons():
+                # an acyl group the acyl helper does not name ('tert-butoxycarbonyl': an ester carbon) on a radical
+                # centre is a ligand like any other (the caller's read-back decides; never a PIN). An -uide or
+                # -onium centre keeps its decline, which lets a route OPSIN 2.9.0 reads name it.
+                name = _ligand_prefix(mol, frag, nb.GetIdx(), ring_first)
+                if name:
+                    from ..metrics.provenance import record_non_pin_fragment
+                    record_non_pin_fragment(name)
         else:
             name = _ligand_prefix(mol, frag, nb.GetIdx(), ring_first)
         if not name:
