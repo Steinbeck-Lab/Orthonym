@@ -39,6 +39,9 @@ _PROBES = {
     #: "aminiumyl": a cationic prefix built on an amine cation:42296,:42473
     #: '(N,N-dimethylmethanaminiumyl)acetate (PIN)'; dan2097/opsin#355), which OPSIN 2.9.0 does not read
     "aminiumyl": ("(N,N-dimethylmethanaminiumyl)acetate", "C[N+](C)(C)CC([O-])=O", False),
+    #: "polyester": the functional-class name of a polyol ester of different acids method (1),:31840
+    #: 'propane-1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)'; dan2097/opsin#354), which OPSIN 2.9.0 does not read
+    "polyester": ("propane-1,2,3-triyl 1,2-diacetate 3-propanoate", "CCC(=O)OCC(OC(C)=O)COC(C)=O", False),
 }
 _NONE: Dict[str, bool] = {key: False for key in _PROBES}
 _CACHE: Dict[str, Dict[str, bool]] = {}
@@ -103,7 +106,7 @@ def _store(path: str, answer: Dict[str, bool]) -> None:
 
 
 def opsin_capabilities() -> Dict[str, bool]:
-    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool, "axial": bool, "aminiumyl": bool}`` for the OPSIN
+    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool, "axial": bool, "aminiumyl": bool, "polyester": bool}`` for the OPSIN
     this process uses."""
     from .jvm_bridge import OpsinUnavailable
     try:
@@ -158,6 +161,13 @@ def aminiumyl_enabled() -> bool:
     """True when the OPSIN in use reads an '-aminiumyl' prefix ('(N,N-dimethylmethanaminiumyl)acetate'). A capability
     set without the entry (an older sidecar, a test that stands in for OPSIN 2.9.0) reads as "cannot"."""
     return bool(opsin_capabilities().get("aminiumyl", False))
+
+
+def polyester_enabled() -> bool:
+    """True when the OPSIN in use reads the functional-class name of a polyol ester of different acids
+    ('propane-1,2,3-triyl 1,2-diacetate 3-propanoate'). A capability set without the entry (an older sidecar, a test
+    that stands in for OPSIN 2.9.0) reads as "cannot"."""
+    return bool(opsin_capabilities().get("polyester", False))
 
 
 def radical_adduct_enabled() -> bool:

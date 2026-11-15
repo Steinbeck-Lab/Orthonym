@@ -64,7 +64,7 @@ import pytest
 
 from orthonym.errors import is_failure_name
 from orthonym.namer import Orthonym
-from tests.support.opsin_marks import release_opsin_only
+from tests.support.opsin_marks import release_opsin_only, release_polyester_only
 
 # NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
 # name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
@@ -147,9 +147,11 @@ CASES = [
 ]
 
 #: the phane carve-out ships the phane names OPSIN 2.9.0 cannot read; an OPSIN that reads them (main) ships the same
-#: name through the self-consistency read-back, so the carve-out representative describes 2.9.0 only.
+#: name through the self-consistency read-back, so the carve-out representative describes 2.9.0 only. The same holds
+#: for the polyol polyester names, which an OPSIN that reads the multi-anion name reads without the acyloxy twin.
+_RELEASE_ONLY = {"phane": release_opsin_only, "polyol_polyester": release_polyester_only}
 _PARAMS = [
-    pytest.param(c, marks=release_opsin_only, id=c["carveout"]) if c["carveout"] == "phane"
+    pytest.param(c, marks=_RELEASE_ONLY[c["carveout"]], id=c["carveout"]) if c["carveout"] in _RELEASE_ONLY
     else pytest.param(c, id=c["carveout"])
     for c in CASES
 ]

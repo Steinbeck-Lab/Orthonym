@@ -40,6 +40,7 @@ from rdkit import Chem
 from orthonym.validation.polyester_twin import polyester_twin
 from orthonym.validation.twin_spellings import twin_of, twin_round_trip
 from tests.support.default_tier import default_tier_row
+from tests.support.opsin_marks import release_polyester_only
 from tests.support.rt_assert import _canon, _independent_parse, assert_full_rt, name_best_effort
 
 # (smiles, the name the producer gives, the twin) -- the first two are the Blue Book's printed PINs
@@ -91,6 +92,7 @@ def test_opsin_reads_the_twin_to_the_input(smiles, name, twin):
     assert parsed is not None and _canon(parsed) == _canon(smiles)
 
 
+@release_polyester_only
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,name,twin", BB_ROWS)
 def test_the_default_tier_gives_the_blue_book_name_through_its_twin(smiles, name, twin):
@@ -230,6 +232,7 @@ def test_a_substituted_anion_takes_bis_with_enclosing_marks(smiles, name, twin):
     assert polyester_twin(name) == twin
 
 
+@release_polyester_only
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,name,twin", SUBSTITUTED_ROWS + [LOOK_ALIKE])
 def test_the_twin_reads_the_bis_spelling_to_the_full_key(smiles, name, twin):

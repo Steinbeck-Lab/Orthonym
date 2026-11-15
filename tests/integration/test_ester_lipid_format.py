@@ -7,6 +7,7 @@ import subprocess
 import pytest
 from orthonym.namer import name_compound
 from tests.support.jars import jar_or_none
+from tests.support.opsin_marks import by_polyester, release_polyester_only
 from tests.support.rt_assert import assert_full_rt
 
 
@@ -108,7 +109,8 @@ class TestPolyfunctionalEsterDemotion:
     # 'propane-1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)' (:31833). The PIN tier
     # now builds the method (1) PIN. OPSIN 2.9.0 has no grammar for it and reads it
     # through its acyloxy twin ('validation.polyester_twin'), so the default tier,
-    # which ships a name only when OPSIN reads it directly, keeps the method (2) name.
+    # which ships a name only when OPSIN reads it directly, keeps the method (2) name;
+    # an OPSIN that reads the method (1) name (dan2097/opsin#354) gets the PIN there too.
     # Both run in production state (the OPSIN validity gate on).
     DIGLYCERIDE = "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
     DIGLYCERIDE_METHOD_1 = "(2S)-2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate"
@@ -126,9 +128,10 @@ class TestPolyfunctionalEsterDemotion:
         assert (row["name"], row["tier"]) == (self.DIGLYCERIDE_METHOD_1, "pin_verified"), row
         assert name_reads_back(row["name"], self.DIGLYCERIDE)
         result = name_compound(self.DIGLYCERIDE)
-        assert result == self.DIGLYCERIDE_METHOD_2, result
+        assert result == by_polyester(self.DIGLYCERIDE_METHOD_2, self.DIGLYCERIDE_METHOD_1), result
         assert name_is_rt_exact(result, self.DIGLYCERIDE)
 
+    @release_polyester_only
     @pytest.mark.opsin_gate
     def test_diglyceride_has_acyloxy_prefixes(self):
         """Method (2) at the default tier: the junior ester is an acyloxy prefix of

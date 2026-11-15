@@ -486,10 +486,12 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
         # anions — 'propane-1,2,3-triyl 1,3-diacetate 2-propanoate'. This clean
         # two-word-list form takes a free hydroxy as a prefix of the organyl group, as the identical-anion form does
         # ('2-hydroxypropane-1,3-diyl diacetate'); a glyco / phospho prefix defers to the general (acyloxy)-prefix
-        # pipeline (method (2), acceptable in general nomenclature). OPSIN reads the multi-anion form only through its
-        # acyloxy twin (``validation.polyester_twin``).
+        # pipeline (method (2), acceptable in general nomenclature). OPSIN 2.9.0 reads the multi-anion form only through
+        # its acyloxy twin (``validation.polyester_twin``); an OPSIN that reads it (``polyester_enabled``) reads the PIN
+        # of the partial ester at every tier.
         from ..metrics.provenance import best_effort_ctx
-        if glyco_atoms or phospho_atoms or (oh_atoms and best_effort_ctx.get()):
+        from ..opsin_capabilities import polyester_enabled
+        if glyco_atoms or phospho_atoms or (oh_atoms and best_effort_ctx.get() and not polyester_enabled()):
             return None         # a general tier ships the form OPSIN reads: the ester-family name of the partial ester
         from collections import defaultdict as _defaultdict
         _groups = _defaultdict(list)

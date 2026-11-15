@@ -18,6 +18,7 @@ on the book's row). The label asks the one reading of the rule of the spelling c
 import pytest
 from rdkit import Chem
 
+from tests.support.opsin_marks import release_polyester_only
 from tests.support.rt_assert import assert_full_rt
 from tests.support.pin_tiers import tier_row
 
@@ -73,11 +74,12 @@ def test_an_ester_of_a_polyol_of_no_one_group_is_the_substitutive_pin(smiles, na
 
 
 @pytest.mark.parametrize("smiles", [
-    "CC(=O)OCCOC(=O)CCl", "CC(=O)OCC(OC(=O)CCl)COC(C)=O", "CC(=O)Oc1ccc(OC(=O)C(Cl)Cl)cc1", "CC(=O)OCOC=O",
+    "CC(=O)OCCOC(=O)CCl", pytest.param("CC(=O)OCC(OC(=O)CCl)COC(C)=O", marks=release_polyester_only), "CC(=O)Oc1ccc(OC(=O)C(Cl)Cl)cc1", "CC(=O)OCOC=O",
     "CC(=O)OCCCOC(=O)CCl",
 ])
 def test_the_method_two_names_of_a_multivalent_polyol_stay_below_the_pin(smiles):
     """The PIN of these is method (1), '1,4-phenylene acetate dichloroacetate' (:31840), which OPSIN 2.9.0 does not read;
-    the best-effort tier names them by method (2), below the PIN."""
+    the best-effort tier names them by method (2), below the PIN. An OPSIN that reads the method (1) name of a polyol of
+    one parent ('propane-1,2,3-triyl...') gives the glycerol ester its PIN."""
     row = tier_row(smiles, "best-effort")
     assert row["name"] and not row["is_pin"] and row["tier"] != "pin_verified", row
