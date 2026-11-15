@@ -1758,8 +1758,8 @@ def _redundant_bracket_spelling(
     ``smiles`` and as the same molecule (equal canonical isomeric SMILES). A string
     with a lone-pair stereocentre is left as it is: the standard reading of such a
     centre depends on where it is written (:func:`_lone_pair_standard_spelling`)."""
-    if not smiles or '[' not in smiles:
-        return None
+    if not smiles or '[' not in smiles or '|' in smiles:
+        return None  # a CX layer (a biaryl axis, |wU:..|) is not written by the rewrite (as input_mol.canonical_spelling)
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
@@ -2276,8 +2276,8 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     if not ignore_stereo and cn_configuration_verdict(input_smiles, opsin_smiles) == "mismatch":
         return "mismatch"
     # nor some other double-bond configurations (an amidine C=N): validation/key_blind_double_bonds.py
-    from .validation.key_blind_double_bonds import key_blind_double_bond_verdict
-    _kb = None if ignore_stereo else key_blind_double_bond_verdict(input_smiles, opsin_smiles)
+    from .validation.axis_identity import key_blind_verdict  # and a biaryl axis (validation/axis_identity.py)
+    _kb = None if ignore_stereo else key_blind_verdict(input_smiles, opsin_smiles, name)
     if _kb == "mismatch":
         return "mismatch"
     if _kb == "omission":
@@ -3142,8 +3142,8 @@ def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
         if protonation_site_verdict(input_smiles, opsin_smiles, name) == "mismatch":
             return "failed"
         # Nor some double-bond configurations (an amidine C=N): validation/key_blind_double_bonds.py.
-        from .validation.key_blind_double_bonds import key_blind_double_bond_verdict
-        _kb = key_blind_double_bond_verdict(input_smiles, opsin_smiles)
+        from .validation.axis_identity import key_blind_verdict  # and a biaryl axis (validation/axis_identity.py)
+        _kb = key_blind_verdict(input_smiles, opsin_smiles, name)
         if _kb == "mismatch":
             return "failed"
         if _kb == "omission":
@@ -8671,12 +8671,11 @@ class Orthonym:
             _PIN_PROMOTION_WRAPPED.reset(wrapped)
 
     def _exit_round_trip_check(self, name: str, smiles: str) -> str:
-        """The check every public naming entry point applies to the name it is about
-        to return: the round trip (:meth:`_exit_round_trip_check_rt`), then, for an
-        input with a lone-pair stereocentre, the configuration check that does not go
-        through RDKit's reading (:meth:`_exit_lone_pair_check`)."""
-        return self._exit_lone_pair_check(
-            self._exit_round_trip_check_rt(name, smiles), smiles)
+        """The check every public naming entry point applies to the name it is about to return: the round trip
+        (:meth:`_exit_round_trip_check_rt`), then the configuration checks no InChIKey sees: a lone-pair stereocentre
+        read without RDKit (:meth:`_exit_lone_pair_check`) and a biaryl axis (``validation.axis_identity.exit_check``)."""
+        from .validation.axis_identity import exit_check
+        return exit_check(self, self._exit_lone_pair_check(self._exit_round_trip_check_rt(name, smiles), smiles), smiles)
 
     def _exit_lone_pair_check(self, name: str, smiles: str) -> str:
         """Lone-pair stereocentres (TRIAGE.md 'Lone-pair stereocentres -- RDKit

@@ -101,6 +101,7 @@ from typing import Callable, Optional, Tuple
 
 from ..metrics.provenance import wider_tier_ctx
 from .anhydride_acids import ANHYDRIDE_ACIDS_RULE, anhydride_acids_round_trip
+from .axis_identity import axial_locant_twin
 from .halido_twin import halido_twin
 from .long_count_read_back import LONG_COUNT_RULE, long_count_round_trip
 from .opsin_ambiguity import ambiguity_messages
@@ -246,6 +247,7 @@ TWIN_RULES: Tuple[Tuple[str, Callable[[str], str]], ...] = (
     ("halido_o", halido_twin),
     ("preselected_cage", preselected_cage_twin),
     ("chalcocarbonic_acid_locant", _acid_locant),
+    ("axial_locant", axial_locant_twin),
 )
 
 
@@ -359,9 +361,11 @@ def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[s
     for it: the reconstructor reads it (``validation.long_count_read_back``). The preselected name of a cage of one
     noncarbon element ('bicyclo[2.2.1]heptasilane', ``validation.preselected_cage_twin``) ships here too: it has no
     PIN, the Blue Book, a compound without carbon), it is the name (:23614) selects, the 'a'
-    name being only "for use in general nomenclature", and no OPSIN grammar reads it."""
+    name being only "for use in general nomenclature", and no OPSIN grammar reads it. A biaryl axis cited with its
+    locant ('(1M)-', ``validation.axis_identity``) ships here too: the name without the axis leaves a stereogenic unit
+    out, and no OPSIN reads a locant before an axial descriptor (dan2097/opsin#356)."""
     found = twin_of(name)
-    if found is not None and found[1] in (("halido_o",), ("preselected_cage",)):
+    if found is not None and found[1] in (("halido_o",), ("preselected_cage",), ("axial_locant",)):
         return twin_round_trip(name, smiles)
     return (uide_twin_round_trip(name, smiles) or long_count_round_trip(name, smiles)
             or (thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None)

@@ -66,6 +66,10 @@ def name_ring_assembly(
     pool.add(assembly_name, "ring_assembly", features)
     # composer.py:993 inline: _inject_stereo_if_missing(features, pool.best.name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
+    #: a biaryl axis of the caller's input is cited at the front of the assembly name, '(1M)-' (kept only
+    # when OPSIN reads it back to the input's axis, validation/axis_identity.py)
+    from ...validation.axis_identity import caller_axis_decorated
+    final_name = caller_axis_decorated(features.mol, final_name) or final_name
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="ring_assembly", iupac_section_cite="P-28", fragment_legacy=final_name),

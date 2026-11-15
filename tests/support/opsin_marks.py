@@ -25,6 +25,13 @@ release_opsin_only = pytest.mark.skipif(
 needs_composite_opsin = pytest.mark.skipif(
     not caps.composite_assembly_enabled(),
     reason="needs an OPSIN that reads composite locants (1^1,2^1:2^4,3^1-terphenyl): ORTHONYM_OPSIN=main")
+#: skipped unless the active OPSIN reads an aryl-aryl axis descriptor '(M)-' (ORTHONYM_OPSIN=main)
+needs_axial_opsin = pytest.mark.skipif(
+    not caps.opsin_capabilities().get("axial", False),
+    reason="needs an OPSIN that reads axial descriptors ('(M)-[1,1'-binaphthalene]-2,2'-diol'): ORTHONYM_OPSIN=main")
+#: a test of OPSIN 2.9.0, which reads no axial descriptor: skipped when the active OPSIN reads one
+release_axial_only = pytest.mark.skipif(
+    caps.opsin_capabilities().get("axial", False), reason="describes OPSIN 2.9.0, which reads no axial descriptor")
 #: a test of the twin route of a halogen -uide name: skipped when the active OPSIN reads such a name
 release_uide_only = pytest.mark.skipif(
     caps.opsin_capabilities()["halogen_uide"],

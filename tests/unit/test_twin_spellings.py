@@ -104,7 +104,7 @@ def test_the_rules_apply_in_table_order():
     assert [rule for rule, _ in TWIN_RULES] == [
         "bridge_sulfano", "bridge_disulfano", "bridge_azano", "interior_phenalene", "isotope_letter_once",
         "isotope_count_one", "aminiumyl_azaniumyl", "assembly_diyl_enclosed", "polyester_acyloxy", "halido_o",
-        "preselected_cage", "chalcocarbonic_acid_locant"]
+        "preselected_cage", "chalcocarbonic_acid_locant", "axial_locant"]
 
 
 def test_twin_of_is_pure_and_a_twin_is_not_rewritten_again():

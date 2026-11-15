@@ -33,6 +33,9 @@ _PROBES = {
     "halogen_uide": ("diphenyliodanuide", "[I-](c1ccccc1)c1ccccc1", False),
     "composite_assembly": ("1^1,2^1:2^4,3^1-terphenyl", "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", False),
     "radical_adduct": ("ethane\u2014boranylidyne (1/1)", "[B].CC", True),
+    #: "axial": an aryl-aryl axis descriptor without a locant,:49797; dan2097/opsin#353), which OPSIN
+    #: 2.9.0 does not read and the main branch reads (the key cannot see the axis: ``validation.axis_identity``)
+    "axial": ("(M)-[1,1'-binaphthalene]-2,2'-diol", "Oc1ccc2ccccc2c1-c1c(O)ccc2ccccc12", False),
 }
 _NONE: Dict[str, bool] = {key: False for key in _PROBES}
 _CACHE: Dict[str, Dict[str, bool]] = {}
@@ -97,7 +100,7 @@ def _store(path: str, answer: Dict[str, bool]) -> None:
 
 
 def opsin_capabilities() -> Dict[str, bool]:
-    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool}`` for the OPSIN
+    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool, "axial": bool}`` for the OPSIN
     this process uses."""
     from .jvm_bridge import OpsinUnavailable
     try:

@@ -391,12 +391,12 @@ def opsin_roundtrip_check(
             result["passed"] = True
             # the InChI drops the hydrogens of a hypervalent halogen (validation/key_blind_hydrogens.py)
             from .key_blind_hydrogens import key_blind_hydrogen_verdict
-            from .key_blind_double_bonds import key_blind_double_bond_verdict
+            from .axis_identity import key_blind_verdict  # a double bond, or a biaryl axis (axis_identity.py)
             if key_blind_hydrogen_verdict(smiles, opsin_smiles) == "mismatch":
                 result["passed"] = False
                 result["error"] = "hydrogen_mismatch"
             # nor some double-bond configurations (an amidine C=N; validation/key_blind_double_bonds.py)
-            elif key_blind_double_bond_verdict(smiles, opsin_smiles) == "mismatch":
+            elif key_blind_verdict(smiles, opsin_smiles, name) == "mismatch":
                 result["passed"] = False
                 result["error"] = "double_bond_configuration_mismatch"
             # nor does it see the radical graph: 'but-3-en-2-yl' parses to C[CH]C=C, which has the key of [CH2]C=CC

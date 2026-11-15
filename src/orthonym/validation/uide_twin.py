@@ -74,11 +74,13 @@ def uide_twin_outcome(outcome: Optional[str]) -> bool:
       input's (``carveout:fullerene``, recorded by the validity gate for a best-effort request: OPSIN reads no
       fullerene name);
     * a stereo name whose OPSIN reading differs only where OPSIN ranks a mancude ring without the averaging
-      (``cip_dialect_verified:<count>_units``, ``validation.cip_dialect``): the best-effort tier ships it."""
+      (``cip_dialect_verified:<count>_units``, ``validation.cip_dialect``): the best-effort tier ships it;
+    * a biaryl axis cited with its locant, read back through its locant-free twin with the axis compared atom by
+      atom (``twin_verified:axial_locant``, ``validation.axis_identity``): no OPSIN reads the locant (opsin#356)."""
     from ..metrics.provenance import (GATE_OUTCOME_CIP_DIALECT_PREFIX, GATE_OUTCOME_RECONSTRUCTED_PREFIX, carveout_outcome,
                                       twin_outcome)
     from .thioperoxol_twin import thioperoxol_twin_outcome
-    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), twin_outcome("preselected_cage"),
+    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), twin_outcome("preselected_cage"), twin_outcome("axial_locant"),
                         carveout_outcome("phane"), carveout_outcome("fullerene"))
             or thioperoxol_twin_outcome(outcome)
             or bool(outcome and outcome.startswith((GATE_OUTCOME_RECONSTRUCTED_PREFIX, GATE_OUTCOME_CIP_DIALECT_PREFIX))))
