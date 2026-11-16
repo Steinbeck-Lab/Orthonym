@@ -29,7 +29,7 @@ from rdkit import Chem
 
 from ..data.metal_scope import (BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION, DATIVE, DISCONNECT, GROUP_13_HYDRIDE_METALS,
                                 GROUP_1, GROUP_2, ION_SALTS, RECONNECT_RADICAL, has_mechanism,
-                                has_valence)
+                                METAL_SCOPE, has_valence)
 from ..data.organometallics import TERMINAL_LIGAND_PREFIXES
 from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
@@ -315,6 +315,18 @@ _HALIDE_SMARTS_KEYS: FrozenSet[str] = frozenset({
 })
 
 
+def bonded_valence_ok(mol: "Chem.Mol", metal_idx: int) -> bool:
+    """True when the oxidation number of the metal atom ``metal_idx`` as drawn (its formal charge, plus the orders of
+    its bonds, dative bonds aside, to atoms that are not metals of the table, plus its hydrogen atoms) is one of the charges of its cations in
+    ``data/metal_scope.py`` (``has_valence``). A standard InChIKey does not bound the charge of a metal, so the
+    bonded producers that name a drawing outside the ionic one ask the table first."""
+    metal = mol.GetAtomWithIdx(metal_idx)
+    bonds = sum(b.GetBondTypeAsDouble() for b in metal.GetBonds()
+                if b.GetBondType() != Chem.BondType.DATIVE and b.GetOtherAtom(metal).GetSymbol() not in METAL_SCOPE)
+    number = metal.GetFormalCharge() + bonds + metal.GetTotalNumHs()
+    return float(number).is_integer() and has_valence(metal.GetSymbol(), int(number))
+
+
 def _build_sigma_ligand_groups(mol: "Chem.Mol",
                                metal_idx: int,
                                walk_through: "FrozenSet[str]" = frozenset(),
@@ -391,8 +403,11 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
         # =N-C6H5): its ligand name is the 'ylidene', 'ylidyne' or 'imino' prefix of
         # Definitions of terms, "names for substituent groups as defined in Section can also be used
         # as ligand names"; ``rules.organometallics._multiply_bonded_ligand_name``).
+        # A silicon or germanium atom joined by such a bond is the 'silylidene', 'germylidene' (or '-ylidyne')
+        # radical of its parent hydride, when the metal's oxidation number is in the table.
         multiple = (bonded_names and neighbor_bond.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
-                    and neighbor_atom.GetSymbol() in ('C', 'N'))
+                    and (neighbor_atom.GetSymbol() in ('C', 'N')
+                         or (neighbor_atom.GetSymbol() in ('Si', 'Ge') and bonded_valence_ok(mol, metal_idx))))
         if neighbor_bond.GetBondTypeAsDouble() > 1.5 and not multiple:
             return None
 

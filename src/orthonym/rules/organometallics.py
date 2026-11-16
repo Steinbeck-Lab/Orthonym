@@ -265,6 +265,27 @@ def _takes_hydride_suffixes(symbol: str, naming_system: str) -> bool:
     return symbol in _GROUP14_SUFFIX_ELEMENTS or (symbol in _GROUP13_HYDRIDE_METALS and naming_system == 'hydride_parent')
 
 
+def _mixed_or_grouped_prefix(ordered, enclose) -> str:
+    """:func:`_mixed_ligand_prefix` for distinct ligands; identical ligands take one multiplier beside the others
+    ; 'trichlorido(methyl)titanium',, never 'methyl(methyl)(methyl)...'."""
+    from ..assembly.naming_utils import alpha_sort_key
+    grouped = _group_ligand_counts(ordered)
+    if all(count == 1 for count, _nm in grouped):
+        return _mixed_ligand_prefix(ordered, enclose)
+    grouped = sorted(grouped, key=lambda t: (alpha_sort_key(t[1]), t[1]))
+    return ''.join(_ligand_token(count, nm, k == 0, metal=True) for k, (count, nm) in enumerate(grouped))
+
+
+def _halido_additive_name(all_tokens, metal_name: str) -> str:
+    """The additive name of a halide-plus-organyl complex: ligands "cited in alphanumerical order";,
+    locants and enclosing marks ignored), recorded for the read-back of its 'chloro' spelling as the bonded branch
+    records its own (``validation.halido_twin``: OPSIN reads no 'chlorido')."""
+    from ..assembly.naming_utils import alpha_sort_key
+    from ..validation.halido_twin import note_bonded_halido_name
+    all_tokens.sort(key=lambda t: (alpha_sort_key(t[0]), t[0]))
+    return note_bonded_halido_name(''.join(tok for _key, tok in all_tokens) + metal_name)
+
+
 def _mixed_ligand_prefix(ordered, enclose) -> str:
     """Distinct ligands in order, (the Blue Book): the first cited ligand takes no marks unless it is
     compound or has a locant ('ethyl(methyl)(phenyl)phosphane (PIN)',:39171; 'butyl(ethyl)(propyl)amine',:7332),
@@ -701,7 +722,46 @@ def _extended_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: 
                           naming_system: str, metal_symbol: str) -> Optional[str]:
     """The name of one organic sigma-ligand of a metal, or ``None`` (fail closed).
 
-    ``is_group14`` and ``naming_system`` are those of the metal (``METAL_NAMES``)."""
+    ``is_group14`` and ``naming_system`` are those of the metal (``METAL_NAMES``). The scopes of
+    :func:`_scoped_ligand_name` first; then, at the best-effort tier, any ligand of a metal named directly
+    (:func:`_bonded_metal_ligand_name`)."""
+    name = _scoped_ligand_name(mol, metal_complex, lg, is_group14=is_group14, naming_system=naming_system,
+                               metal_symbol=metal_symbol)
+    if name is not None or naming_system != 'metal_direct':
+        return name
+    return _bonded_metal_ligand_name(mol, metal_complex, lg, metal_symbol)
+
+
+def _bonded_metal_ligand_name(mol: Any, metal_complex: Any, lg: Any, metal_symbol: str) -> Optional[str]:
+    """The substituent prefix of a ligand joined by one bond to a metal admitted to bonded names and named directly
+    ('(2-oxocyclohexyl)', 'methoxy'), at the best-effort tier only, or ``None``.
+
+     "Definitions of terms" (the Blue Book): "names for substituent groups as defined in Section
+    can also be used as ligand names"; coordination nomenclature is the method for Groups 3-12 and gives
+    no PIN. The metal's oxidation number as drawn must be one of its charges in ``data/metal_scope.py``
+    (``perception.metals.bonded_valence_ok``): a standard InChIKey does not bound it. The Group 14 parent hydrides
+    never come here (a senior characteristic group outranks them,; the Group 13 metals keep the names of their
+    hydrides and their ions ('acetyl(ethoxy)alumanylium'), and a complex anion keeps its own names ('ferrocyanide')."""
+    from ..metrics.provenance import best_effort_ctx
+    from ..perception.metals import bonded_valence_ok, is_metal_element
+    if (not best_effort_ctx.get() or not has_mechanism(metal_symbol, BONDED_NAMES)
+            or metal_symbol in _GROUP13_HYDRIDE_METALS or len(metal_complex.metal_atom_indices) != 1
+            or mol.GetAtomWithIdx(metal_complex.metal_atom_indices[0]).GetFormalCharge() < 0
+            or not bonded_valence_ok(mol, metal_complex.metal_atom_indices[0])):
+        return None
+    atoms = set(lg.ligand_atom_indices)
+    central = set(metal_complex.metal_atom_indices)
+    attach = [a for a in atoms if any(nb.GetIdx() in central for nb in mol.GetAtomWithIdx(a).GetNeighbors())]
+    if len(attach) != 1 or is_metal_element(mol.GetAtomWithIdx(attach[0]).GetSymbol()):
+        return None
+    from ..assembly.substituent_enumerator import name_substituent
+    name = name_substituent(mol, atoms, attach[0])
+    return None if not name or name == 'substituent' else name
+
+
+def _scoped_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: bool,
+                        naming_system: str, metal_symbol: str) -> Optional[str]:
+    """The name of one organic sigma-ligand of a metal within the scopes below, or ``None``."""
     simple = _ligand_name_from_atoms(mol, lg.ligand_atom_indices)
     if simple is not None:
         return simple
@@ -874,6 +934,58 @@ _BARE_MULTIPLE_LIGANDS = frozenset(set(_HALIDE_LIGAND_PREFIXES.values()) | {'hyd
 _MULTIPLE_BOND_ENDINGS = {2: ('ylidene', 'imino'), 3: ('ylidyne',)}
 
 
+_GROUP14_YLIDENE_STEMS = {('Si', 2): 'silylidene', ('Si', 3): 'silylidyne',
+                          ('Ge', 2): 'germylidene', ('Ge', 3): 'germylidyne'}
+_HALOGEN_PREFIXES = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+
+def _group14_ylidene_ligand_name(mol: Any, metal_idx: int, attach: int, frag: set, order: int) -> Optional[str]:
+    """The ligand prefix of a silicon or germanium atom joined to the metal by a double or triple bond: the
+    '-ylidene' or '-ylidyne' radical of its mononuclear parent hydride with the substituent prefixes of its other
+    branches ('dimethylsilylidene', 'chloro(methyl)silylidene'), or ``None``.
+
+     "Specific method and retained names" (the Blue Book): the radical with two hydrogen atoms
+    removed from one atom of a Group 14 mononuclear parent hydride ends in '-ylidene' ('silylidene',:40484);
+    "Definitions of terms" (:39767) lets such substituent names serve as ligand names. Each branch is named by the
+    substitutive path (``name_substituent``; a lone halogen atom by its prefix), the prefixes are grouped, ordered and
+    enclosed as on a parent hydride (``_ligand_token``,. A branch that reaches the metal or another
+    branch, or one the substitutive path cannot name, gives ``None``."""
+    from ..assembly.substituent_enumerator import name_substituent
+    center = mol.GetAtomWithIdx(attach)
+    names: List[str] = []
+    used = {attach}
+    for nb in center.GetNeighbors():
+        j = nb.GetIdx()
+        if j == metal_idx:
+            continue
+        if j in used:
+            return None
+        comp, todo = {j}, [j]
+        while todo:
+            for x in mol.GetAtomWithIdx(todo.pop()).GetNeighbors():
+                k = x.GetIdx()
+                if k == metal_idx:
+                    return None
+                if k != attach and k not in comp:
+                    comp.add(k)
+                    todo.append(k)
+        if comp & used:
+            return None
+        used |= comp
+        if len(comp) == 1 and nb.GetSymbol() in _HALOGEN_PREFIXES:
+            name = _HALOGEN_PREFIXES[nb.GetSymbol()]
+        else:
+            name = name_substituent(mol, comp, j)
+        if not name or name == 'substituent':
+            return None
+        names.append(name)
+    if used != frag:
+        return None
+    grouped = _alphabetize_simple_ligands(_group_ligand_counts(names))
+    return (''.join(_ligand_token(count, name, k == 0) for k, (count, name) in enumerate(grouped))
+            + _GROUP14_YLIDENE_STEMS[(center.GetSymbol(), order)])
+
+
 def _multiply_bonded_ligand_name(mol: Any, metal_idx: int, lg: Any, bond: Any) -> Optional[str]:
     """The prefix of an organic ligand joined to the metal by one double or triple bond from a carbon or a nitrogen
     atom ('methylidene', 'benzylidene', 'ethylidyne', 'phenylimino'), or ``None``.
@@ -901,10 +1013,12 @@ def _multiply_bonded_ligand_name(mol: Any, metal_idx: int, lg: Any, bond: Any) -
                     and not b.GetOtherAtom(atom).GetIsotope() and not atom.GetIsotope()
                     for b in atom.GetBonds())):
         return 'carbonyl'
-    if (order is None or atom.GetSymbol() not in ('C', 'N')
+    if (order is None or atom.GetSymbol() not in ('C', 'N', 'Si', 'Ge')
             or any(mol.GetAtomWithIdx(i).GetFormalCharge() or mol.GetAtomWithIdx(i).GetNumRadicalElectrons()
                    or mol.GetAtomWithIdx(i).GetIsotope() for i in frag)):
         return None
+    if atom.GetSymbol() in ('Si', 'Ge'):
+        return _group14_ylidene_ligand_name(mol, metal_idx, attach, set(frag), order)
     name = _accepted_prefix_token(mol, frag, substituent_enumerator.name_substituent(
         mol, frag, attach, allow_mancude=False))
     if not name or not name.endswith(_MULTIPLE_BOND_ENDINGS[order]):
@@ -954,7 +1068,7 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
         lg.ligand_smarts_key is None and any(
             mol.GetBondBetweenAtoms(i, metal_idx) is not None
             and mol.GetBondBetweenAtoms(i, metal_idx).GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
-            and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N', 'O', 'S')
+            and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N', 'O', 'S', 'Si', 'Ge')
             for i in lg.ligand_atom_indices)
         for lg in metal_complex.ligand_groups)
     for lg in metal_complex.ligand_groups:
@@ -1281,9 +1395,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                     else:
                         mult = ''
                     all_tokens.append((name, f"{mult}({name})"))
-                all_tokens.sort(key=lambda t: t[0])
-                ligand_prefix = ''.join(tok for _key, tok in all_tokens)
-                full_name = f"{ligand_prefix}{metal_name}"
+                full_name = _halido_additive_name(all_tokens, metal_name)
                 ligand_tree_nodes = [
                     NameTreeNode(parent_stem=name, class_id='organometallic_ligand')
                     for name, _tok in all_tokens
@@ -1397,7 +1509,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                     ligand_prefix = multiplied_component(
                         len(ordered), ordered[0], _enclose_ligand(ordered[0]))
                 else:
-                    ligand_prefix = _mixed_ligand_prefix(ordered, _enclose_ligand)
+                    ligand_prefix = _mixed_or_grouped_prefix(ordered, _enclose_ligand)
                 full_name = f"{ligand_prefix}{metal_name}"
                 ligand_tree_nodes = [
                     NameTreeNode(parent_stem=nm, class_id='organometallic_ligand')

@@ -324,7 +324,10 @@ MORE_METAL_ROWS = [
     ("C1CC=CCCC=C1.Cl[Ni]Cl", "cycloocta-1,5-diene\u2014chloride\u2014nickel(2+) (1/2/1)"),
     ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Cu+2]", "copper bis(4-oxopent-2-en-2-olate)"),
     ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Cu+2]", "copper bis(1-oxido-2-sulfidopyridin-1-ium)"),
-    ("C[Cu+].[Cl-]", "methylcopper(1+)\u2014chloride (1/1)"),             # OPSIN 2.9.0 cannot read it: no name there
+    # the ionic drawing of the covalent compound (CONNECT_ANION, atom and charge ledger agrees), named like
+    # 'chlorido(methyl)titanium' through its 'chloro' twin, which OPSIN 2.9.0 and main read to the input's key
+    # (checked outside the engine, 2026-11-16); before, the additive branch did not record the name for that twin
+    ("C[Cu+].[Cl-]", "chlorido(methyl)copper"),
     # a dative drawing is named through the drawing without its dative bonds (DATIVE)
     ("Cl[Ni](Cl)(<-N)<-N", "ammonia\u2014chloride\u2014nickel(2+) (2/2/1)"),
     ("N->[Ni+2](<-N)(<-N)<-N", "ammonia\u2014nickel(2+) (4/1)"),
