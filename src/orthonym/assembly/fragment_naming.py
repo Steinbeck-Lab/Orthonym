@@ -777,6 +777,40 @@ def spend_fragment_work() -> bool:
     return True
 
 
+def _thread_naming_state() -> list:
+    """Every thread-local slot a ``name`` call reads or writes for the naming it runs: the fragment guard (session,
+    memo, inputs, budgets, trips), the caller's input string and its lone-pair spelling (``namer``), the relative
+    stereo slot, the candidate ledger and the abstention records."""
+    from .. import namer
+    from ..metrics import abstention, candidate_ledger
+    from ..rules import relative_stereo
+    return [_fragment_guard, namer._CALLER_INPUT, namer._LP_INPUT, relative_stereo._slot, candidate_ledger._slot,
+            abstention._slot]
+
+
+def name_in_fresh_frame(fn):
+    """Run ``fn`` as a fresh outermost naming in this thread: every thread-local naming slot
+    (:func:`_thread_naming_state`) is saved and cleared, ``fn`` runs in an empty ``contextvars.Context``, and the
+    slots are restored on exit, as a naming in a new thread would leave them. The hang-budget trips counted inside
+    are added to the outer count (:func:`hang_budget_trips` is never reset). What ``fn`` names arms the hang budgets
+    of one compound, as a compound named alone does. Used for an adduct component that the nested naming refused only
+    because it is a part of the caller's input (``rules.adducts._name_component``)."""
+    import contextvars
+    slots = _thread_naming_state()
+    saved = [dict(vars(slot)) for slot in slots]
+    for slot in slots:
+        vars(slot).clear()
+    try:
+        return contextvars.Context().run(fn)
+    finally:
+        inner_trips = hang_budget_trips()
+        for slot, state in zip(slots, saved):
+            vars(slot).clear()
+            vars(slot).update(state)
+        if inner_trips:
+            _fragment_guard.hang_budget_trips = hang_budget_trips() + inner_trips
+
+
 def hang_budget_trips() -> int:
     """How many times a hang budget ran out on this thread (``spend_perf_work``,
     ``spend_analysis_call``, ``spend_fragment_work``). A counter that is never reset:

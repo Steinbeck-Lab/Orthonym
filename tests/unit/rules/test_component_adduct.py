@@ -17,6 +17,11 @@ pytestmark = pytest.mark.opsin_gate
     ("[SiH4].[AlH3]", "alumane—silane (1/1)"),       # hydrides only: no element set, named by its components
     ("N.N.O", "ammonia—water (2/1)"),
     ("[Zn-].[Zn-].[Na+]", "sodium(1+)—zinc(1-) (1/2)"),
+    # OPSIN 2.9.0 and main@6ebd4ce60225 read this name to exactly the drawn neutral acid and amine (canonical SMILES
+    # equal, checked with both jars outside the engine, 2026-11-16); the acid is named as a compound of its own
+    # (``_name_component_once``, fresh frame). The earlier note that OPSIN reads it as the salt did not hold.
+    ("C1CCN(CC1)C2=CC3CCC2C3.OCl(=O)(O)O",
+     "1-(bicyclo[2.2.1]hept-2-en-2-yl)piperidine—trihydroxy(oxo)-λ5-chlorane (1/1)"),
 ])
 def test_named_by_its_components(smiles, expected):
     res = name_best_effort(smiles)
@@ -29,8 +34,6 @@ def test_named_by_its_components(smiles, expected):
     "[Th].N",                       # nor to AMMINE: no ammonia beside it
     "[B+3].[H-].[H-].[H-]",         # a one-atom p-block ion is never cited by its free-ion name ('boranetriylium')
     # "CCO.[O]" (radical component): tests/unit/rules/test_adduct_radical_switch.py
-    # OPSIN reads 'trihydroxy(oxo)-λ5-chlorane' beside an amine as the salt: the drawn structure is not reproduced
-    "C1CCN(CC1)C2=CC3CCC2C3.OCl(=O)(O)O",
 ])
 def test_no_name_unless_the_drawing_reads_back(smiles):
     assert name_best_effort(smiles)["name"] is None

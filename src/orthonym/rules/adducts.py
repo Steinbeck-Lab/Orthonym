@@ -28,6 +28,7 @@ Such a name is never a PIN (the Blue Book).
 """
 
 import contextvars
+import threading
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -404,12 +405,61 @@ def _name_component(frag_smi: str, style: str, *,
             general_fallback_unverified=general_fallback_unverified, charged_ok=charged_ok,
             ions_ok=ions_ok, single_atom_names=single_atom_names, own_names=own_names)
 
-    if (own_names or {}).get(frag_smi) or frag_smi.count(".") or len(frag_smi) < 4:
-        return once()
+    from orthonym.assembly.fragment_naming import hang_budget_trips
     from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
-    key = (frag_smi, style, general_fallback, allow_aromatic_general, general_fallback_unverified,
-           charged_ok, ions_ok, _naming_context(), renaming_state())
-    return cached_nested_call("adduct_component", key, once, replay_budgets=False)
+    trips = hang_budget_trips()
+    retry_allowed = getattr(_FRESH_FRAME, "allowed", False)
+    _FRESH_FRAME.allowed = False        # the namings below this component are not the last producer's own
+    try:
+        memoised = not ((own_names or {}).get(frag_smi) or frag_smi.count(".") or len(frag_smi) < 4)
+        key = (frag_smi, style, general_fallback, allow_aromatic_general, general_fallback_unverified,
+               charged_ok, ions_ok, _naming_context(), renaming_state()) if memoised else None
+        name = cached_nested_call("adduct_component", key, once, replay_budgets=False) if memoised else once()
+        if (name is not None or not retry_allowed or not general_fallback_unverified
+                or getattr(_FRESH_FRAME, "active", False) or hang_budget_trips() != trips
+                or _heavy_atoms(frag_smi) > _FRESH_FRAME_MAX_HEAVY_ATOMS):
+            return name
+        if memoised:     # the retry is memoised too, its None included: a repeat of the producer names it once
+            return cached_nested_call("adduct_component_fresh_frame", key,
+                                      lambda: _name_component_in_fresh_frame(once), replay_budgets=False)
+        return _name_component_in_fresh_frame(once)
+    finally:
+        _FRESH_FRAME.allowed = retry_allowed
+
+
+_FRESH_FRAME = threading.local()
+
+#: the largest component the fresh-frame retry names again: the parts the nested rescues refuse are small ions and
+#: radicals ('O=P[O-]', '[Si]O[Si]', tributylstannylium: 3-13 heavy atoms); a large component that fails nested
+#: fails alone too, and naming it again costs a whole search (measured: 105 of 106 slow PubChem rows hit the cap)
+_FRESH_FRAME_MAX_HEAVY_ATOMS = 15
+
+
+def _heavy_atoms(smiles: str) -> int:
+    mol = Chem.MolFromSmiles(smiles)
+    return mol.GetNumHeavyAtoms() if mol is not None else 0
+
+
+def _name_component_in_fresh_frame(once):
+    """In the last producer of a mixture name (:func:`_component_adduct_name_once`, whose strict read-back decides
+    what ships) a small component that:func:`_name_component` leaves without a name is named once more as a fresh
+    outermost naming (``fragment_naming.name_in_fresh_frame``), unless that naming tripped a hang budget. The
+    producers before it keep their names: their read-back compares the standard InChIKey, which does not see where a
+    proton sits.
+
+    Two rescues refuse a piece of the caller's input on purpose, because "the outer name is built from theirs"
+    (``universal_halane.names_the_input`` in ``late_charged_name``, and the top-level-only rescues of
+    ``Orthonym.name``), and a context variable of the caller withholds the lambda-convention names of a part such
+    as '[Si]O[Si]'. A component of a mixture is a compound of its own whose name the mixture name cites ("Names are
+    formed by citing the names of individual compounds", "Mixed organic – inorganic adducts",
+    the Blue Book), so it is offered what a compound named alone is offered. The whole name still ships only
+    when it reads back to the drawing."""
+    from orthonym.assembly.fragment_naming import name_in_fresh_frame
+    _FRESH_FRAME.active = True
+    try:
+        return name_in_fresh_frame(once)
+    finally:
+        _FRESH_FRAME.active = False
 
 
 def _name_component_once(frag_smi: str, style: str, *,
@@ -1186,9 +1236,12 @@ def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mo
     scoped = (any(_is_group14_metal_radical_piece(frag_mols[smi]) for smi, _count in components)
               and radical_adduct_enabled())
     token = _COMPONENT_ADDUCT_SCOPE.set(scoped)
+    allowed = getattr(_FRESH_FRAME, "allowed", False)
+    _FRESH_FRAME.allowed = True     # a thread attribute: the fresh frame clears the context variables
     try:
         return _component_adduct_words_and_name(components, frag_mols, mol, style)
     finally:
+        _FRESH_FRAME.allowed = allowed
         _COMPONENT_ADDUCT_SCOPE.reset(token)
 
 
