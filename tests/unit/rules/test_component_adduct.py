@@ -28,7 +28,7 @@ def test_named_by_its_components(smiles, expected):
     "[Th+4].[H-].[H-].[H-].[H-]",   # thorium is not admitted to CARBANION_SALTS: no hydride beside it
     "[Th].N",                       # nor to AMMINE: no ammonia beside it
     "[B+3].[H-].[H-].[H-]",         # a one-atom p-block ion is never cited by its free-ion name ('boranetriylium')
-    "CCO.[O]",                      # OPSIN reads no adduct with a radical component
+    # "CCO.[O]" (radical component): tests/unit/rules/test_adduct_radical_switch.py
     # OPSIN reads 'trihydroxy(oxo)-λ5-chlorane' beside an amine as the salt: the drawn structure is not reproduced
     "C1CCN(CC1)C2=CC3CCC2C3.OCl(=O)(O)O",
 ])

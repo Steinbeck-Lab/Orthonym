@@ -2877,7 +2877,8 @@ def _group14_metal_radical_element(mol) -> Optional[str]:
     '3,5,5-trimethylhexanoic acid—dioctylstannylidene (2/1)', so the adduct would not be
     named at all where its component's lambda-convention name ('9λ2-stannaheptadecane') is
     read back (measured: 2 eval molecules, 4 rows, lost at best-effort without this
-    condition). The piece keeps that naming."""
+    condition). The piece keeps that naming. With an OPSIN that reads adducts with a radical component, the last
+    producer of a mixture name may still use the radical word (``_radical_component_of_last_resort``)."""
     try:
         from rdkit import Chem as _Chem
         if len(_Chem.GetMolFrags(mol)) != 1:
@@ -2891,11 +2892,23 @@ def _group14_metal_radical_element(mol) -> Optional[str]:
         radical_atoms = [a.GetIdx() for a in mol.GetAtoms() if a.GetNumRadicalElectrons()]
         if radical_atoms != [outside[0].GetIdx()]:
             return None
-        if not _is_the_callers_input(mol):
+        if not (_is_the_callers_input(mol) or _radical_component_of_last_resort()):
             return None
         return outside[0].GetSymbol()
     except Exception:
         return None
+
+
+def _radical_component_of_last_resort() -> bool:
+    """True while the last producer of a mixture name names its components
+    (``rules.adducts.in_component_adduct_scope``) and the OPSIN in use reads adducts with a radical component
+    (``opsin_capabilities.radical_adduct_enabled``; OPSIN 2.9.0 reads none). The producers before it keep the
+    lambda-convention name of the piece, so a mixture named today keeps its name."""
+    from .adducts import in_component_adduct_scope
+    if not in_component_adduct_scope():
+        return False
+    from ..opsin_capabilities import radical_adduct_enabled
+    return radical_adduct_enabled()
 
 
 def _is_the_callers_input(mol) -> bool:

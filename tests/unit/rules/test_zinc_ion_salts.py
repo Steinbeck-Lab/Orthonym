@@ -350,6 +350,15 @@ def _salt_rows_of_other_metals():
     return rows
 
 
+def _radical_mixture_gain(row, now) -> bool:
+    """True when a row without a name gains one only because the OPSIN in use reads adducts with a radical
+    component (``opsin_capabilities.radical_adduct_enabled``)."""
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    from orthonym.validation.radical_identity import radical_profile
+    return (not row["name"] and bool(now.get("name")) and now.get("tier") != "abstain" and radical_adduct_enabled()
+            and bool(radical_profile(Chem.MolFromSmiles(row["smiles"]))))
+
+
 def test_other_metals_are_not_moved():            # reads the baseline fixture (constructed molecules)
     rows = _salt_rows_of_other_metals()
     assert len(rows) >= 30, len(rows)
@@ -387,6 +396,12 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
             continue
         now = namers[row["tier_req"]].name_tiered(row["smiles"])
         key = (row["smiles"], row["tier_req"])
+        if _radical_mixture_gain(row, now):
+            # an OPSIN that reads adducts with a radical component names such a mixture by its components
+            # (``rules.adducts``, test_adduct_radical_switch.py); OPSIN 2.9.0 reads none, so the row stays there. OPSIN
+            # reads such a name with its radical setting, through the component-order twin (label ``opsin_twin``).
+            assert now["verified"] in ("opsin", "opsin_twin") and not now["is_pin"], now
+            continue
         p10_name = respelled[key][1] if key in respelled else row["name"]
         if chapter_p10_name_is_no_pin(None, p10_name or ""):
             # relabel 2026-10-31: a salt of a Chapter anion ('copper diglycinate', is no

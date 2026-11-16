@@ -27,6 +27,7 @@ name -- and ships only when OPSIN reads the name back to exactly the drawn struc
 Such a name is never a PIN (the Blue Book).
 """
 
+import contextvars
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -104,6 +105,22 @@ HYDROGEN_ION_AND_ISOTOPE_NAMES: Dict[str, str] = {
     "[3H][3H]": "(3H2)dihydrogen", "[2H][3H]": "(2H1,3H1)dihydrogen",
 }
 _HYDRIDE_IONS = ("[H-]", "[1H-]", "[2H-]", "[3H-]")
+
+#: set while:func:`_component_adduct_name_once`, the last producer of a mixture name, names the components of a
+#: mixture with a tin or lead radical piece: that piece takes its radical name there when the OPSIN in use reads adducts with a radical component
+#: (``charged_router._group14_metal_radical_element``). The producers that run before it never see it set, so a
+#: mixture named today keeps its name.
+_COMPONENT_ADDUCT_SCOPE: contextvars.ContextVar = contextvars.ContextVar("component_adduct_scope", default=False)
+
+
+def _is_group14_metal_radical_piece(frag) -> bool:
+    """True for a component that holds a tin or lead atom with radical electrons."""
+    return any(a.GetSymbol() in ("Sn", "Pb") and a.GetNumRadicalElectrons() for a in frag.GetAtoms())
+
+
+def in_component_adduct_scope() -> bool:
+    """True while the last-resort component producer names the components of a mixture."""
+    return _COMPONENT_ADDUCT_SCOPE.get()
 
 
 # Terminal ligands of a mononuclear metal halide / oxide component, keyed by
@@ -358,7 +375,7 @@ def _naming_context() -> tuple:
     from .vonbaeyer_universal import cage_caps
     return (general_fallback_ctx.get(), best_effort_ctx.get(), allow_aromatic_general_ctx.get(),
             full_coverage_ctx.get(), best_effort_request_ctx.get(), cage_caps(), _session_depth(),
-            nacyl_float_refusing(), last_resort_active(),
+            nacyl_float_refusing(), last_resort_active(), in_component_adduct_scope(),
             getattr(_fragment_guard, 'perf_budget', None) is not None,
             getattr(_fragment_guard, 'analysis_budget', None) is not None)
 
@@ -506,6 +523,12 @@ def _name_component_once(frag_smi: str, style: str, *,
     # 1H-indole-3-carboxylate' for tropisetron); OPSIN 2.9.0 reads no r/s, so the
     # salt name built on it could not be read back either, and at the default
     # tier it shipped on the stereo-stripped branch.
+    return _passes_component_gate(frag_smi, name)
+
+
+def _passes_component_gate(frag_smi: str, name: str) -> Optional[str]:
+    """``name`` unless OPSIN rejects it and it is no exact-match list name (the gate of
+    :func:`_name_component_once`); None otherwise."""
     from orthonym.namer import _is_exact_match_list_name, _validity_gate_status
     from orthonym.validation.twin_spellings import opsin_spelling
     if (_validity_gate_status(opsin_spelling(name)) == "rejected"
@@ -1071,10 +1094,11 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
             or _component_adduct_name(components, frag_mols, mol, style))
 
 
-def _one_atom_component_word(smi: str, frag, gated: Dict[str, str]) -> Optional[str]:
+def _one_atom_component_word(smi: str, frag, gated: Dict[str, str], style: str = "pin") -> Optional[str]:
     """The name of a component with at most one heavy atom: the table ('water'), a hydrogen component or
-    ammonia that ``gated`` admits, a bare atom or a monoatomic ion ('bromide', 'sodium(1+)':
-    ``metal_atoms.lone_atom_name``) or a mononuclear parent hydride ('silane'); None otherwise."""
+    ammonia that ``gated`` admits, a bare atom or a monoatomic ion ('sodium(1+)': ``metal_atoms.lone_atom_name``), a
+    mononuclear parent hydride ('silane') or a closed-shell one-atom ion (:func:`_closed_ion_word`);
+    None otherwise."""
     if smi in SINGLE_ATOM_COMPONENT_NAMES:
         return SINGLE_ATOM_COMPONENT_NAMES[smi]
     if smi in HYDROGEN_COMPONENT_NAMES:
@@ -1083,7 +1107,52 @@ def _one_atom_component_word(smi: str, frag, gated: Dict[str, str]) -> Optional[
     name, on_parent_hydride = lone_atom_name_and_basis(frag)
     if name and on_parent_hydride and frag.GetAtomWithIdx(0).GetFormalCharge():
         return None             # a one-atom p-block ion keeps the adduct name of its drawing, never 'boranetriylium'
-    return name or _hydride_component_word(smi, frag, gated)
+    return (name or _hydride_component_word(smi, frag, gated) or _closed_ion_word(smi, frag, style)
+            or _radical_hydride_word(smi, frag, style))
+
+
+def _closed_ion_word(smi: str, frag, style: str) -> Optional[str]:
+    """The word of a closed-shell one-atom ion that no word above names: an anion the lone-atom namer leaves to the
+    anion classes ('[Br-]' -> 'bromide', ``metal_atoms.lone_atom_name_and_basis``) or an ion that carries hydrogen
+    ('[NH4+]' -> 'azanium'). It is the name the single-component pipeline gives the ion alone at the best-effort tier,
+    as for every other component of the mixture ("Names are formed by citing the names of individual compounds",
+     "Mixed organic – inorganic adducts", the Blue Book). None for a neutral or radical atom; the whole
+    name still ships only when it reads back to the drawing."""
+    if frag.GetNumAtoms() != 1:
+        return None
+    atom = frag.GetAtomWithIdx(0)
+    if not atom.GetFormalCharge() or atom.GetNumRadicalElectrons():
+        return None
+    word = _name_component(smi, style, general_fallback=True, allow_aromatic_general=True,
+                           general_fallback_unverified=True, charged_ok=True, ions_ok=True)
+    return None if not word or is_failure_name(word) else word
+
+
+def _radical_hydride_word(smi: str, frag, style: str) -> Optional[str]:
+    """The word of a neutral one-atom component with radical electrons ('[PbH2]' -> 'plumbylidene',
+    "Specific method and retained names", the Blue Book), only when the OPSIN in use reads adducts with a
+    radical component (``opsin_capabilities.radical_adduct_enabled``): the name a fresh best-effort instance gives the
+    piece alone, through the component gate.:func:`_name_component` cannot give it: a neutral one-atom part takes
+    only the table word there."""
+    if frag.GetNumAtoms() != 1:
+        return None
+    atom = frag.GetAtomWithIdx(0)
+    if atom.GetFormalCharge() or not atom.GetNumRadicalElectrons():
+        return None
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    if not radical_adduct_enabled():
+        return None
+    from orthonym.namer import Orthonym  # lazy: avoid import cycle
+    from orthonym.validation.thioperoxol_twin import embedded_name
+    try:
+        with embedded_name():
+            word = Orthonym(style=style, general_fallback=True, allow_aromatic_general=True,
+                            general_fallback_unverified=True).name(smi)
+    except Exception:
+        return None
+    if not word or not isinstance(word, str) or is_failure_name(word) or "not supported" in word:
+        return None
+    return _passes_component_gate(smi, word)
 
 
 def _component_adduct_name(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:
@@ -1099,7 +1168,8 @@ def _component_adduct_name(components: List[Tuple[str, int]], frag_mols, mol, st
     if len(components) < 2:
         return None
     from ..validation.radical_identity import radical_profile
-    if radical_profile(mol):
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    if radical_profile(mol) and not radical_adduct_enabled():
         return None             # OPSIN 2.9.0 reads no adduct with a radical component, even with -r
     from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
     key = (Chem.MolToSmiles(mol), style, _naming_context(), renaming_state())
@@ -1109,8 +1179,22 @@ def _component_adduct_name(components: List[Tuple[str, int]], frag_mols, mol, st
 
 
 def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:
-    """:func:`_component_adduct_name` once per naming: the words of the components of at most one heavy atom first
-    (cheap; any one without a name ends it), then the names of the others."""
+    """:func:`_component_adduct_name` once per naming. A mixture with a tin or lead radical piece is named in the
+    component-adduct scope (:func:`in_component_adduct_scope`) when the OPSIN in use reads adducts with a radical
+    component; the scope keys the memos apart (``assembly.memo._ck``), so only such mixtures name their pieces again."""
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    scoped = (any(_is_group14_metal_radical_piece(frag_mols[smi]) for smi, _count in components)
+              and radical_adduct_enabled())
+    token = _COMPONENT_ADDUCT_SCOPE.set(scoped)
+    try:
+        return _component_adduct_words_and_name(components, frag_mols, mol, style)
+    finally:
+        _COMPONENT_ADDUCT_SCOPE.reset(token)
+
+
+def _component_adduct_words_and_name(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:
+    """The words of the components of at most one heavy atom first (cheap; any one without a name ends it), then the
+    names of the others, then the read-back of the whole name."""
     from orthonym.assembly.fragment_naming import own_hang_budgets
     ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
     gated = _gated_hydrogen_components(mol)
@@ -1118,7 +1202,7 @@ def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mo
     for smi, _count in ordered:
         frag = frag_mols[smi]
         if frag.GetNumHeavyAtoms() <= 1:
-            word = _one_atom_component_word(smi, frag, gated)
+            word = _one_atom_component_word(smi, frag, gated, style)
             if not word:
                 return None
             words[smi] = word

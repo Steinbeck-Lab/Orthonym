@@ -142,6 +142,9 @@ def _ck(namespace, key):
         tag = tag + ("suffix-n-hydron",)
     if wider_tier_ctx.get():
         tag = tag + ("wider-tier",)       # the PIN spellings are off in a wider-tier call
+    from ..rules.adducts import in_component_adduct_scope
+    if in_component_adduct_scope():
+        tag = tag + ("component-adduct",)  # a tin or lead radical piece takes its radical name in that scope
     if retained_c2_unit_has_isotope_label():
         # the retained two-carbon parents cite their substituent locants while an isotope label sits on
         # the parent (``composition_primitives.retained_acetic_from_prefixes``), so a value computed in
