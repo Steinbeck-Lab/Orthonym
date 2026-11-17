@@ -153,9 +153,10 @@ def test_the_construction_declines_what_is_not_a_substituted_mononuclear_centre(
 
 
 def test_standard_bonding_numbers_are_those_of_table_1_3():
-    """ / Table 1.3 (the Blue Book-2746): 3 for B, Al, Ga and P, As, Sb; 4 for Si, Ge, Sn, Pb."""
+    """ "Standard bonding numbers" / Table 1.3 (the Blue Book-2752): 3 for B, Al, Ga, In, Tl and P, As,
+    Sb; 4 for Si, Ge, Sn, Pb."""
     assert rad._STANDARD_BONDING_NUMBER == {
-        "B": 3, "Al": 3, "Ga": 3, "Si": 4, "Ge": 4, "Sn": 4, "Pb": 4, "P": 3, "As": 3, "Sb": 3}
+        "B": 3, "Al": 3, "Ga": 3, "In": 3, "Tl": 3, "Si": 4, "Ge": 4, "Sn": 4, "Pb": 4, "P": 3, "As": 3, "Sb": 3}
     assert rad._CENTRE_RADICAL_ELEMENTS == frozenset(rad._STANDARD_BONDING_NUMBER)
 
 

@@ -2878,21 +2878,35 @@ def _group14_metal_radical_element(mol) -> Optional[str]:
     named at all where its component's lambda-convention name ('9λ2-stannaheptadecane') is
     read back (measured: 2 eval molecules, 4 rows, lost at best-effort without this
     condition). The piece keeps that naming. With an OPSIN that reads adducts with a radical component, the last
-    producer of a mixture name may still use the radical word (``_radical_component_of_last_resort``)."""
+    producer of a mixture name may still use the radical word (``_radical_component_of_last_resort``).
+
+    The Group 13 metals named on their parent hydrides (``data.metal_scope.GROUP_13_HYDRIDE_METALS``: 'alumane',
+    'gallane', 'indigane', 'thallane', preselected names, "PRESELECTED NAMES", the Blue Book) take the
+    same path at the best-effort tier, for the caller's own input only: 'Monovalent radicals' (:40426),
+    "named by adding the suffix 'yl' to the name of the parent hydride, eliding the final letter 'e'", and
+    'General method' (:40498) for '-ylidene'; (:37282) lists 'alumanyl'... 'thallanyl' as preselected
+    prefixes. '[(1E)-but-1-en-1-yl]alumanylidene' for ``CC/C=C/[Al]``. No such name is a PIN,:2056), so the
+    other tiers keep their refusal and its reason."""
     try:
         from rdkit import Chem as _Chem
         if len(_Chem.GetMolFrags(mol)) != 1:
             return None
         from .ions import _ORGANIC_NONMETALS
         outside = [a for a in mol.GetAtoms() if a.GetSymbol() not in _ORGANIC_NONMETALS]
-        if len(outside) != 1 or outside[0].GetSymbol() not in ('Sn', 'Pb'):
+        from ..data.metal_scope import GROUP_13_HYDRIDE_METALS
+        group13 = len(outside) == 1 and outside[0].GetSymbol() in GROUP_13_HYDRIDE_METALS
+        if len(outside) != 1 or (outside[0].GetSymbol() not in ('Sn', 'Pb') and not group13):
             return None
         if any(a.GetFormalCharge() for a in mol.GetAtoms()):
             return None
         radical_atoms = [a.GetIdx() for a in mol.GetAtoms() if a.GetNumRadicalElectrons()]
         if radical_atoms != [outside[0].GetIdx()]:
             return None
-        if not (_is_the_callers_input(mol) or _radical_component_of_last_resort()):
+        if group13:
+            from ..metrics.provenance import best_effort_request_ctx   # not best_effort_ctx: rescues at
+            if not (best_effort_request_ctx.get() is True and _is_the_callers_input(mol)):   # every tier set it
+                return None
+        elif not (_is_the_callers_input(mol) or _radical_component_of_last_resort()):
             return None
         return outside[0].GetSymbol()
     except Exception:
@@ -2933,7 +2947,9 @@ def _is_the_callers_input(mol) -> bool:
 
 
 def _has_tin_or_lead(mol) -> bool:
-    return any(a.GetAtomicNum() in (50, 82) for a in mol.GetAtoms())
+    """True when ``mol`` holds an atom whose radical centre ``_group14_metal_radical_element`` may admit: tin, lead
+    or a Group 13 parent-hydride metal (the admission depends on whether ``mol`` is the caller's input)."""
+    return any(a.GetAtomicNum() in (13, 31, 49, 50, 81, 82) for a in mol.GetAtoms())
 
 
 def _route_memo_key(mol, style: str):
@@ -2946,9 +2962,9 @@ def _route_memo_key(mol, style: str):
     aromatic-general, full-coverage), the N-acyl float scope, the peptide substitutive
     attempt, the forced-locant and isotope scopes, the gate re-entry and the
     session depth and a stand-in-capped probe (``rules.centre_ligands``) (the same set the decomposition memos key on,
-    ``decomposition.engine._name_fragment_t4_rescue``), of whether a tin or lead ion is the
-    caller's whole input or a piece of it (``_group14_metal_radical_element``), and of the
-    route's own nesting depth: a route that sits ``_MAX_ROUTE_DEPTH - 1`` levels down has
+    ``decomposition.engine._name_fragment_t4_rescue``), of whether a tin, lead or Group 13 piece is the
+    caller's whole input or a piece of it and of the best-effort request (``_group14_metal_radical_element``), and of
+    the route's own nesting depth: a route that sits ``_MAX_ROUTE_DEPTH - 1`` levels down has
     its own re-entry cut off, which a route at the top is not. The ion is its canonical isomeric SMILES
     (isotopes and radical electrons included)."""
     try:
@@ -2961,7 +2977,7 @@ def _route_memo_key(mol, style: str):
                                             forced_locant_reason)
     from ..assembly.substituent_enumerator import _gate_is_reentrant
     from ..decomposition.engine import nacyl_float_refusing
-    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx, best_effort_request_ctx,
                                       full_coverage_ctx, general_fallback_ctx)
     from ..routing import dispatch_table as _dispatch_table
     from .centre_ligands import capped_probe_ctx
@@ -2972,7 +2988,7 @@ def _route_memo_key(mol, style: str):
             forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(),
             _ISOTOPE_PARENT_POSITIONAL.get(), _gate_is_reentrant(),
             getattr(_fragment_guard, 'session_depth', 0),
-            _is_the_callers_input(mol) if _has_tin_or_lead(mol) else None)
+            _is_the_callers_input(mol) if _has_tin_or_lead(mol) else None, best_effort_request_ctx.get())
 
 
 def _memoised_route(fn):
@@ -3908,8 +3924,8 @@ def route_charged(mol, style: str = 'pin') -> str:
     # phosphonate, a ring member, one of several skeletal atoms) is no radical of the
     # mononuclear hydride: the route declines and the other producers name it.
     if _group14_centre is not None:
-        from .radicals import _GROUP14_HYDRIDE_RADICAL
-        if not neutral_name.endswith(_GROUP14_HYDRIDE_RADICAL[_group14_centre]):
+        from .radicals import _GROUP14_HYDRIDE_RADICAL   # a Group 13 centre: the heteroatom radical namer alone
+        if not neutral_name.endswith(_GROUP14_HYDRIDE_RADICAL.get(_group14_centre, '\0')):
             return ''
 
     # --- Step 5b (B1): ATOM-COVERAGE GUARD for the aminium re-entry.

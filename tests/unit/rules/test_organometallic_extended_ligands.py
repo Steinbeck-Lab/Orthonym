@@ -31,8 +31,10 @@ def test_ligands_in_alphanumerical_order():
     assert name_best_effort("FC(F)CC[Ti](Cl)(Cl)Cl")["name"] == "trichlorido(3,3-difluoropropyl)titanium"
 
 
-def test_valence_outside_the_table_stays_unnamed():
-    assert name_best_effort("C(C[Al])C(F)F")["name"] is None      # aluminium(1) is not one of its charges
+def test_valence_outside_the_table_gets_no_metal_name():
+    """Aluminium(1) is not one of its charges, so no organometallic name; the drawing is a radical on Al, named on
+    its parent hydride "General method", the Blue Book, '-ylidene' with elision of the final 'e')."""
+    assert name_best_effort("C(C[Al])C(F)F")["name"] == "(3,3-difluoropropyl)alumanylidene"
 
 
 def test_group14_parent_keeps_its_senior_group():

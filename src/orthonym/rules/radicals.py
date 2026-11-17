@@ -2028,8 +2028,9 @@ def _name_multiplicative_amine_radical(mol, radical_sites: List[Dict[str, Any]])
 # its standard bonding number, which the centre's bonds, hydrogens and unpaired electrons must add up to.
 # 'Standard bonding numbers' (the Blue Book), Table 1.3 (:2746): 3 for B, Al, Ga, 4 for Si, Ge,
 # Sn, Pb, 3 for P, As, Sb. (RDKit's default valence is no substitute: it is 2 for Sn and Pb.)
+# "Standard bonding numbers", Table 1.3 (the Blue Book): 3 for B, Al, Ga, In, Tl.
 _STANDARD_BONDING_NUMBER = {
-    'B': 3, 'Al': 3, 'Ga': 3,
+    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
     'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
     'P': 3, 'As': 3, 'Sb': 3,
 }

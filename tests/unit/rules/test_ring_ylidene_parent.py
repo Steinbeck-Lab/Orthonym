@@ -231,8 +231,9 @@ def test_two_drawings_of_the_guanidine_prefix_are_two_prefixes():
 STEREO_RING_YLIDENE = [
     ("C\\1COC2=C(/C1=C/C3=CN(C=N3)[Tl])C=C(C=C2)Br",
      "4-[(1E)-(6-bromo-3,4-dihydro-2H-1-benzopyran-4-ylidene)methyl]-1-(1λ1-thallamethyl)-1H-imidazole"),
+    # the whole input is an Al radical: named on its parent hydride "General method")
     ("C1=CC=C2C(=C1)C=CC(=N2)/C=C\\3/C4=CC=CC=C4S(=O)(=O)N3[Al]",
-     "2-{(1Z)-[8-(1λ1-aluminamethyl)-7,7-dioxo-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-9-ylidene]methyl}quinoline"),
+     "{(9Z)-7,7-dioxo-9-[(quinolin-2-yl)methylidene]-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-8-yl}alumanylidene"),
 ]
 
 
