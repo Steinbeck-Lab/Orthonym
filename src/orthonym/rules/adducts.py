@@ -113,6 +113,12 @@ _HYDRIDE_IONS = ("[H-]", "[1H-]", "[2H-]", "[3H-]")
 #: mixture named today keeps its name.
 _COMPONENT_ADDUCT_SCOPE: contextvars.ContextVar = contextvars.ContextVar("component_adduct_scope", default=False)
 
+#: set while ``rules.isotope_components.labelled_parts_adduct_name`` names an isotope-labelled mixture: a component
+#: that carries a nuclide is named as a compound alone (:func:`_name_component_in_fresh_frame`), where the isotope
+#: decorator of ``Orthonym.name`` runs (it runs at the top level only), so the part keeps its label. A fresh frame
+#: runs in an empty context, so the parts of that part are named as before.
+LABELLED_PARTS_ALONE: contextvars.ContextVar = contextvars.ContextVar("labelled_parts_alone", default=False)
+
 
 def _is_group14_metal_radical_piece(frag) -> bool:
     """True for a component that holds a tin or lead atom with radical electrons."""
@@ -405,6 +411,8 @@ def _name_component(frag_smi: str, style: str, *,
             general_fallback_unverified=general_fallback_unverified, charged_ok=charged_ok,
             ions_ok=ions_ok, single_atom_names=single_atom_names, own_names=own_names)
 
+    if LABELLED_PARTS_ALONE.get() and "[" in frag_smi and _has_label(frag_smi):
+        return _name_component_in_fresh_frame(once)     # not memoised: the key would not see the frame
     from orthonym.assembly.fragment_naming import hang_budget_trips
     from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
     trips = hang_budget_trips()
@@ -433,6 +441,11 @@ _FRESH_FRAME = threading.local()
 #: radicals ('O=P[O-]', '[Si]O[Si]', tributylstannylium: 3-13 heavy atoms); a large component that fails nested
 #: fails alone too, and naming it again costs a whole search (measured: 105 of 106 slow PubChem rows hit the cap)
 _FRESH_FRAME_MAX_HEAVY_ATOMS = 15
+
+
+def _has_label(smiles: str) -> bool:
+    mol = Chem.MolFromSmiles(smiles)
+    return mol is not None and any(a.GetIsotope() for a in mol.GetAtoms())
 
 
 def _heavy_atoms(smiles: str) -> int:

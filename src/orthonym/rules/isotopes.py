@@ -4214,8 +4214,8 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         name = decorate_with_hydro_locants(stripped, _passes)
     name = name or _decorate_by_locant_map(original, _name_skeleton(namer, Chem.MolToSmiles(stripped)))  # lane I
     if name and "—" in name:    # the components without a label keep their unmodified names
-        name = _slots.unlabelled_components_kept(name, _name_skeleton(namer, Chem.MolToSmiles(stripped)), original)
-    return name
+        return _slots.unlabelled_components_kept(name, _name_skeleton(namer, Chem.MolToSmiles(stripped)), original)
+    return name or _slots.labelled_parts_adduct_name(original, style, namer)    # a mixture: each part named alone
 
 
 #: A lone stereodescriptor without its locant at the front of a chain prefix ('[(E)-6-phenylhexa-1,5-dien-3-yl]').
