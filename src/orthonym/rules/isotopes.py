@@ -4166,13 +4166,10 @@ def _decorate_isotope_stereo(*args) -> Optional[str]:
 
 
 def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
-    """Fail-closed isotopic-substitution PIN +.
-
-    1. Parse + strip isotopes; if none, None.
-    2. Name the skeleton in systematic style (locanted parents).
-    3. Enumerate candidate descriptors (lowest-locant-first, and
-       accept the first whose OPSIN round-trip reproduces the original mol.
-    4. None if nothing round-trips (never a wrong labeled name).
+    """Fail-closed isotopic-substitution PIN +: strip the isotopes (none: None), name the skeleton
+    (locanted parents), accept the first candidate descriptor (lowest locants first, whose OPSIN round-trip
+    reproduces the input, else None. A labelled mixture at best-effort is named part by part first
+    (``rules.isotope_components.parts_first``).
 
     The passes (as drawn, the induced stereocentres unspecified, a tautomer read as the input) are
     ``rules.isotope_passes``. When none reads back, they run once more on the skeleton name the next
@@ -4185,6 +4182,8 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
+    if (first := _slots.parts_first(original, style, namer)) is not None:
+        return first
     from ..opsin_capabilities import phane_names_withheld
     from .isotope_alternative import alternative_skeleton_active, decorate_alternative, has_alternative
     from .isotope_passes import decorate_passes, labelled_ion_salt_name, lone_atom_isotope_name
@@ -4215,7 +4214,7 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     name = name or _decorate_by_locant_map(original, _name_skeleton(namer, Chem.MolToSmiles(stripped)))  # lane I
     if name and "—" in name:    # the components without a label keep their unmodified names
         return _slots.unlabelled_components_kept(name, _name_skeleton(namer, Chem.MolToSmiles(stripped)), original)
-    return name or _slots.labelled_parts_adduct_name(original, style, namer)    # a mixture: each part named alone
+    return name or _slots.parts_last(original, style, namer)    # a labelled salt: each part named alone
 
 
 #: A lone stereodescriptor without its locant at the front of a chain prefix ('[(E)-6-phenylhexa-1,5-dien-3-yl]').

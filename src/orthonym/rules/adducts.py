@@ -116,7 +116,9 @@ _COMPONENT_ADDUCT_SCOPE: contextvars.ContextVar = contextvars.ContextVar("compon
 #: set while ``rules.isotope_components.labelled_parts_adduct_name`` names an isotope-labelled mixture: a component
 #: that carries a nuclide is named as a compound alone (:func:`_name_component_in_fresh_frame`), where the isotope
 #: decorator of ``Orthonym.name`` runs (it runs at the top level only), so the part keeps its label. A fresh frame
-#: runs in an empty context, so the parts of that part are named as before.
+#: runs in an empty context, so the parts of that part are named as before. Set, it holds a list: the shareable memo
+#: entries of the parts named so far, then per labelled part whether its name is free of a non-PIN record
+#: (:func:`_noting_pin_record`).
 LABELLED_PARTS_ALONE: contextvars.ContextVar = contextvars.ContextVar("labelled_parts_alone", default=False)
 
 
@@ -411,8 +413,9 @@ def _name_component(frag_smi: str, style: str, *,
             general_fallback_unverified=general_fallback_unverified, charged_ok=charged_ok,
             ions_ok=ions_ok, single_atom_names=single_atom_names, own_names=own_names)
 
-    if LABELLED_PARTS_ALONE.get() and "[" in frag_smi and _has_label(frag_smi):
-        return _name_component_in_fresh_frame(once)     # not memoised: the key would not see the frame
+    clean_parts = LABELLED_PARTS_ALONE.get()
+    if clean_parts is not False and "[" in frag_smi and _has_label(frag_smi):
+        return _name_component_in_fresh_frame(lambda: _noting_pin_record(once, clean_parts))     # not memoised
     from orthonym.assembly.fragment_naming import hang_budget_trips
     from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
     trips = hang_budget_trips()
@@ -451,6 +454,22 @@ def _has_label(smiles: str) -> bool:
 def _heavy_atoms(smiles: str) -> int:
     mol = Chem.MolFromSmiles(smiles)
     return mol.GetNumHeavyAtoms() if mol is not None else 0
+
+
+def _noting_pin_record(once, clean_parts: list):
+    """``once`` inside the fresh frame of a labelled part; appends to ``clean_parts`` whether its name is free of a
+    non-PIN record of its own naming (``metrics.provenance.name_carries_non_pin_part``), which the empty context of
+    the frame would otherwise drop (``rules.isotope_components.labelled_parts_adduct_name`` reads it). The naming
+    starts with the shareable memo entries of the labelled parts named before it (``assembly.memo.shareable_entries``:
+    the names of nested ``name_compound`` calls, a pure function of their key), kept in the first item of
+    ``clean_parts``: two large parts of one mixture name their common substituents once."""
+    from orthonym.assembly.memo import recording_scopes, seeded_scopes, shareable_entries
+    from orthonym.metrics.provenance import get_provenance, name_carries_non_pin_part
+    with seeded_scopes(dict(clean_parts[0])), recording_scopes() as made:
+        name = once()
+    shareable_entries(made, into=clean_parts[0])
+    clean_parts.append(bool(name) and not name_carries_non_pin_part(get_provenance(), name))
+    return name
 
 
 def _name_component_in_fresh_frame(once):
@@ -674,7 +693,20 @@ def component_sort_key(frag_smi: str) -> tuple:
                 parent_key = component_class_key(frag_mol)
         except Exception:
             pass  # no PCG -> ranks after PCG-bearing organics
-    return (bucket, seniority, -n_groups, parent_key, -frag_mol.GetNumHeavyAtoms(), frag_smi)
+    return (bucket, seniority, -n_groups, parent_key, -frag_mol.GetNumHeavyAtoms(), _unlabelled_smiles(frag_mol),
+            frag_smi)
+
+
+def _unlabelled_smiles(frag_mol) -> str:
+    """The canonical SMILES of ``frag_mol`` without its nuclide labels: the order of the components does not see a
+    label "Alphanumerical order", the Blue Book: "the principles of alphanumerical order do not include
+    ... isotopic or stereochemical descriptors"), so a labelled component sorts where its unlabelled skeleton does."""
+    if not any(a.GetIsotope() for a in frag_mol.GetAtoms()):
+        return Chem.MolToSmiles(frag_mol)
+    bare = Chem.Mol(frag_mol)
+    for atom in bare.GetAtoms():
+        atom.SetIsotope(0)
+    return Chem.MolToSmiles(Chem.RemoveHs(bare, sanitize=False))
 
 
 #: "an appropriate numerical prefix, such as 'mono','di', 'tri'"

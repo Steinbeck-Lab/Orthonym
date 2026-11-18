@@ -9,7 +9,7 @@ too much costs a parse and nothing else.
 import re
 
 from ..assembly.naming_utils import _REPLACEMENT_FRONT_RE as _REPLACEMENT_STEM_RE
-from .isotope_components import labelled_parts_adduct_name  # noqa: F401 (rules.isotopes)
+from .isotope_components import labelled_parts_adduct_name, parts_first, parts_last  # noqa: F401
 
 #: The heteroatom locants of a Hantzsch-Widman ring opening a SUBSTITUENT's name inside its enclosing marks, the
 #: ``1,3-`` of ``(1,3-dioxolan-2-yl)`` or of ``(1,3-thiazol-2-yl)``: as for the benzo-fused rings
