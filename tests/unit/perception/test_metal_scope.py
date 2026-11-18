@@ -170,7 +170,9 @@ def test_zinc_has_its_mechanisms():
     assert has_mechanism("Zn", DATIVE) is True
     assert all(has_mechanism(s, DATIVE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", AMMINE) is True
-    assert all(has_mechanism(s, AMMINE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
+    # Groups 1 and 2 since 2026-11-18 (rerun-5 triage 2b): ammonia beside their ions is a component
+    assert all(has_mechanism(s, AMMINE) is True for s in GROUP_1 + GROUP_2)
+    assert all(has_mechanism(s, AMMINE) is False for s in NOT_ADMITTED)
     assert has_mechanism("Zn", ELEMENT) is True
     # lane LONE (2026-11-01): every metal is admitted to ELEMENT, so a lone atom, ion or isotope of any metal is named
     assert all(has_mechanism(s, ELEMENT) is True for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
@@ -213,8 +215,9 @@ def test_mechanism_lookup():
                  else frozenset({DISCONNECT}) if symbol in GROUP_1 and symbol != "Fr" else frozenset())   # Group 1: program 22
         # ELEMENT since lane LONE (2026-11-01): the atom and the ion alone ('sodium(1+)'); RECONNECT_RADICAL since
         # program 6 (2026-11-06): '[Li].CCC[CH2]' is named through 'CCCC[Li]'
+        # AMMINE since 2026-11-18 (rerun-5 triage 2b): 'ammonia—chloride—sodium(1+) (1/1/1)'
         assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT,
-                                                            RECONNECT_RADICAL}) | extra, symbol
+                                                            RECONNECT_RADICAL, AMMINE}) | extra, symbol
         assert is_named_metal(symbol) is True, symbol
     assert is_named_metal("Xx") is False
 

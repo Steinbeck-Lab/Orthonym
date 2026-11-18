@@ -226,12 +226,14 @@ def _ion_needs_enclosing_multiplier(name: str, *, organic_cation: bool = False) 
     # 'sulfanediide';, the Blue Book-40902): 'di' before it reads
     # as the anion of the dinuclear hydride ('diphosphanetriide', of diphosphane),
     # a component "ambiguous if multiplied by... 'di', 'tri'" (d),
-    #:7037), so it takes 'bis': 'trimagnesium bis(phosphanetriide)'.
+    #:7037), so it takes 'bis': 'trimagnesium bis(phosphanetriide)'. So does the 'uide' anion of
+    # such a hydride,:41093): 'diboranuide' reads as an anion of diborane,
+    # 'magnesium bis(boranuide)'.
     from .ions import _MONONUCLEAR_ANION_PARENT
     for parent, _bonding in _MONONUCLEAR_ANION_PARENT.values():
         stem = parent[:-1]
         if name.startswith(stem) and name[len(stem):] in (
-                'ide', 'ediide', 'etriide', 'etetraide'):
+                'ide', 'ediide', 'etriide', 'etetraide', 'uide'):
             return True
     return False
 

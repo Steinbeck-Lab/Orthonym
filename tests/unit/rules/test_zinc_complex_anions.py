@@ -102,7 +102,7 @@ def test_the_ammonia_component_is_cited_as_ammonia():
     ("[NH3+][Zn-2]([NH3+])([NH3+])[NH3+]", {"N": "ammonia"}),
     ("N.N.O", {}),                                      # no metal
     ("[NH4+].[Cl-]", {}),
-    ("[Na+].[Cl-].N", {}),                              # a metal that the table does not admit to AMMINE
+    ("[Na+].[Cl-].N", {"N": "ammonia"}),                # Groups 1 and 2 are admitted since 2026-11-18
     ("N.N.Cl[Tc]Cl", {}),                               # technetium: no mechanism
     ("N.N.Cl[Pt]Cl", {"N": "ammonia"}),                 # platinum is admitted since 2026-10-30
     ("N.N.Cl[Cd]Cl", {"N": "ammonia"}),                 # and cadmium, copper and the rest of lane B2
@@ -110,7 +110,7 @@ def test_the_ammonia_component_is_cited_as_ammonia():
     ("N.N.N.N.[Tc+2]", {}),
     ("[Zn+2].[Cu+2].N", {"N": "ammonia"}),
     ("[Zn+2].[Tc+2].N", {}),                            # one metal outside: the whole assembly is outside
-    ("[Zn+2].[Na+].N", {}),
+    ("[Zn+2].[Na+].N", {"N": "ammonia"}),
     ("[Si].N", {}),                                     # a metalloid is no true metal
 ])
 def test_the_guard_reads_the_table_for_every_metal_of_the_assembly(smiles, expected):
@@ -214,9 +214,11 @@ START_ROWS = {
     "[NH4+].[Cl-]": (
         ('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
         ('ammonium chloride', 'systematic_verified', False, None)),
+    # Groups 1 and 2 are admitted to AMMINE since 2026-11-18 (rerun-5 triage 2b): best-effort names the ammonia as a
+    # component, the Blue Book; 'ammonia',:7954, no PIN); OPSIN 2.9.0 and main read the names
     "[Na+].[Cl-].N": (
         ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
+        ('ammonia—chloride—sodium(1+) (1/1/1)', 'systematic_verified', False, None)),
     # the platinum rows of the start commit are admitted since 2026-10-30 (``ADMITTED_PLATINUM_AMMINES``), those of
     # cadmium, copper, nickel and cobalt since lane B2 (``ADMITTED_B2_AMMINES``): technetium, plutonium and thorium
     # take their places; the label text of an element without an entry in ``errors._METAL_NAMES`` is the generic one
@@ -237,7 +239,7 @@ START_ROWS = {
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Mg+2].N.N.N.N.N.N.[Cl-].[Cl-]": (
         ('magnesium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
+        ('ammonia—chloride—magnesium(2+) (6/2/1)', 'systematic_verified', False, None)),
     "N.N.N.N.[Tc+2].[O-]S(=O)(=O)[O-]": (
         ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
@@ -246,7 +248,7 @@ START_ROWS = {
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "CC(=O)O.N.[Na]": (
         ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
+        ('acetic acid—ammonia—sodium (1/1/1)', 'systematic_verified', False, None)),
     # zinc beside a metal that the table does not admit to AMMINE: the ammonia is not cited
     "[Zn+2].[Tc+2].N.N.N.N.N.N.N.N": (
         ('zinc compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
@@ -343,5 +345,7 @@ def test_the_other_metals_panel_holds_no_row_the_guard_could_reach():
         assert ammine_component_names(mol) == {}, row["smiles"]
 
 
-def test_zinc_and_the_bonded_metals_alone_are_admitted_to_ammine():
-    assert sorted(s for s, sc in METAL_SCOPE.items() if AMMINE in sc.mechanisms) == sorted(["Zn", *BONDED_METALS])
+def test_zinc_the_bonded_metals_and_groups_1_and_2_alone_are_admitted_to_ammine():
+    from orthonym.data.metal_scope import GROUP_1, GROUP_2      # Groups 1 and 2 since 2026-11-18
+    assert sorted(s for s, sc in METAL_SCOPE.items() if AMMINE in sc.mechanisms) == sorted(
+        {"Zn", *BONDED_METALS, *GROUP_1, *GROUP_2})

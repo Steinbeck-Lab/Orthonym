@@ -50,8 +50,7 @@ def test_names_made_before_are_unchanged(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles", [
-    "N.[Na+].[Cl-]",      # sodium is not admitted to AMMINE: no ammonia beside it (data/metal_scope.py)
-    "[Th].N",             # nor is thorium
+    "[Th].N",             # thorium is not admitted to AMMINE: no ammonia beside it (data/metal_scope.py)
 ])
 def test_refusals_on_purpose_stay(smiles):
     assert name_best_effort(smiles)["name"] is None

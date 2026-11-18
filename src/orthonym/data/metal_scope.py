@@ -76,7 +76,9 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     the component 'ammonia' of a adduct ('ammonia—zinc(2+) (4/1)' for ``[Zn+2].N.N.N.N``).
     The table of the other single-atom components holds no bare nitrogen, because a bare nitrogen
     fragment is more often a perception artefact than an ammonia of crystallisation; beside a metal
-    that is admitted here it is the ligand of an ammine complex. The Blue Book gives such a name no
+    that is admitted here it is cited as 'ammonia' (an ammine ligand of zinc or a bonded metal, ammonia of
+    crystallisation beside an ion of Groups 1 and 2, granted 2026-11-18): in an ionic, bonded ('butyllithium—ammonia
+    (1/1)'), neutral-atom or other-drawing name of the assembly alike. The Blue Book gives such a name no
     PIN: "preferred IUPAC names cannot be assigned to mixed adducts because preferred IUPAC names
     have not yet been determined for inorganic components" Mixed organic - inorganic
     adducts), and "The common names water, ammonia,... are used in these recommendations but their
@@ -84,7 +86,7 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     including them (see " Retained names). The coordination name cites the ligand
     as 'ammine' Definitions of terms); OPSIN 2.9.0 does not read it, so the adduct cites the
     name of the molecule. The producer is ``rules.metal_atoms.ammine_component_names``, read by
-    ``rules.adducts.name_adduct`` in a call with ``general_fallback_unverified`` (the best-effort tier).
+    ``rules.adducts.name_adduct`` at the tiers that build an adduct of ions (complete and best-effort).
 
 ``MACROCYCLE``
     the porphyrin dianion of a complex of the metal is cited on the porphyrin parent, as
@@ -158,8 +160,9 @@ bonded, dative, an atom or an ion) is attempted by the mechanisms above, so an i
 producer names fails for want of a name and not for want of support of the element. The failure
 label of such an input is ``UNNAMEABLE`` and not ``UNSUPPORTED_ELEMENT``
 (``errors.classify_failure_limit``, through ``has_complete_scope``). The elements of Groups 1 and 2
-are admitted to ``ION_SALTS``, ``CARBANION_SALTS`` and ``ZERO_VALENT`` (magnesium also to ``MACROCYCLE`` and
-``DISCONNECT``, lithium to caesium also to ``DISCONNECT``) and are not complete: their failures keep their label.
+are admitted to ``ION_SALTS``, ``CARBANION_SALTS``, ``ZERO_VALENT``, ``ELEMENT``, ``RECONNECT_RADICAL`` and ``AMMINE``
+(magnesium also to ``MACROCYCLE``, ``DISCONNECT``, ``CONNECT_ANION`` and ``BONDED_NAMES``, lithium to caesium also to
+``DISCONNECT``) and are not complete: their failures keep their label.
 
 The valences are the charges of the cation that a rewrite of the structure may give the metal
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
@@ -253,15 +256,18 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     # and (program 22, 2026-11-09) the bonded drawing of a salt, 'C(=O)O[Li]' named on its ionic drawing ('lithium
     #...carboxylate', ``DISCONNECT``, systematic_verified): Li, Na, K, Rb and Cs, each measured on the SureChEMBL
     # rows with that metal bonded (+211, +233, +59, +2, +6 named, none lost or changed); francium had no row
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL})
+    # Groups 1 and 2 take AMMINE (2026-11-18, rerun-5 triage item 2b): ammonia beside their ions is a component
+    # ('carbonate—ethene—ammonia—sodium(1+) (1/1/2/2)'); panel: 54 of 60 such rows named, none lost or changed
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL, AMMINE})
                           | (frozenset({DISCONNECT}) if symbol in GROUP_1_DISCONNECT else frozenset()),
                           frozenset({1}))
        for symbol in GROUP_1},
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}), frozenset({2}))
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL, AMMINE}),
+                          frozenset({2}))
        for symbol in GROUP_2},
     # magnesium porphyrins (the chlorophyll core) are named on the porphyrin dianion like zinc's
     "Mg": MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, MACROCYCLE, DISCONNECT, ELEMENT,
-                                RECONNECT_RADICAL, CONNECT_ANION, BONDED_NAMES}),
+                                RECONNECT_RADICAL, CONNECT_ANION, BONDED_NAMES, AMMINE}),
                      frozenset({2})),
     **{symbol: MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
     **{symbol: MetalScope(frozenset({ELEMENT}), frozenset()) for symbol in ELEMENT_ONLY_METALS},

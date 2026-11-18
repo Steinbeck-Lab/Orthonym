@@ -64,9 +64,9 @@ EM_DASH = "—"
 # ``rules/metal_atoms.py``) and bare N/ammonia (a bare nitrogen fragment is
 # more often a perception artefact than a genuine ammoniate; the exclusion is
 # deliberate). Beside a metal admitted to the mechanism ``AMMINE`` of
-# ``data/metal_scope.py`` the nitrogen is the ammonia of an ammine complex and is
-# cited as 'ammonia' in a call with ``general_fallback_unverified`` (the best-effort
-# tier; ``metal_atoms.ammine_component_names``).
+# ``data/metal_scope.py`` (zinc, the bonded metals, Groups 1 and 2) the nitrogen is
+# cited as the component 'ammonia' (``metal_atoms.ammine_component_names``), at the
+# tiers that build an adduct of ions (complete and best-effort).
 SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
     "O": "water",
     "F": "hydrogen fluoride",
@@ -85,8 +85,8 @@ SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
 # reads each name back ('ethanol—dihydrogen (1/1)', 'ethanol—sodium(1+)—hydride (1/1/1)'), and the
 # whole name ships only when it reproduces the drawn structure (``_parse_reproduces_depiction``).
 # gives a mixed organic-inorganic adduct no PIN (the Blue Book).
-#: Beside a metal, ammonia is the ammonia of an ammine complex (the ``AMMINE`` mechanism of
-#: ``data/metal_scope.py``, ``metal_atoms.ammine_component_names``) and the hydride ion that of a
+#: Beside a metal, ammonia is cited by the ``AMMINE`` mechanism of ``data/metal_scope.py``
+#: (``metal_atoms.ammine_component_names``) and the hydride ion as that of a
 #: hydride salt (``CARBANION_SALTS``): those two are taken from this table only when every true metal
 #: of the assembly is admitted to that mechanism (``_hydrogen_components``).
 HYDROGEN_COMPONENT_NAMES: Dict[str, str] = {
@@ -194,6 +194,23 @@ def _is_metal_atom_fragment(frag_mol) -> bool:
     return (frag_mol.GetNumHeavyAtoms() == 1
             and any(a.GetSymbol() in _METAL_ELEMENT_NAMES
                     for a in frag_mol.GetAtoms()))
+
+
+#: The metalloids among ``metal_atoms.METAL_ELEMENT_NAMES``: a hydride anion of one of them is no metal atom. The other
+#: members that are no true metal are left out: Al, Ga, In and Tl (their hydride anions keep the names that ship,
+#: 'aluminohydride', until the table admits them) and Sn, Pb, Bi and Po (4 unnamed PubChem mixtures with such an anion
+#: in the 2026-11-16 tracker tables: a lead, not built)
+_METALLOIDS = frozenset({"B", "Si", "Ge", "As", "Sb", "Te"})
+
+
+def _is_metalloid_hydride_anion(frag_mol) -> bool:
+    """True for a one-atom hydride anion of a metalloid ('[BH4-]', '[SiH3-]'): an anion of a parent hydride, named
+    by the component pipeline as one ('boranuide', "ANIONS FORMED BY ADDITION OF HYDRIDE IONS",
+    the Blue Book-41097, "the suffix 'uide' describes an anion formally derived by adding a hydride ion";
+    'silanide',,:40902), not by the element name of a metal atom, which gives it none."""
+    heavy = [a for a in frag_mol.GetAtoms() if a.GetAtomicNum() > 1]
+    return (len(heavy) == 1 and heavy[0].GetSymbol() in _METALLOIDS and heavy[0].GetTotalNumHs(includeNeighbors=True) > 0
+            and Chem.GetFormalCharge(frag_mol) < 0)
 
 
 def _ortho_fused_ring_bonds(mol) -> set:
@@ -428,7 +445,7 @@ def _name_component(frag_smi: str, style: str, *,
         name = cached_nested_call("adduct_component", key, once, replay_budgets=False) if memoised else once()
         if (name is not None or not retry_allowed or not general_fallback_unverified
                 or getattr(_FRESH_FRAME, "active", False) or hang_budget_trips() != trips
-                or _heavy_atoms(frag_smi) > _FRESH_FRAME_MAX_HEAVY_ATOMS):
+                or (_heavy_atoms(frag_smi) > _FRESH_FRAME_MAX_HEAVY_ATOMS and not _has_exotic_centre(frag_smi))):
             return name
         if memoised:     # the retry is memoised too, its None included: a repeat of the producer names it once
             return cached_nested_call("adduct_component_fresh_frame", key,
@@ -444,6 +461,33 @@ _FRESH_FRAME = threading.local()
 #: radicals ('O=P[O-]', '[Si]O[Si]', tributylstannylium: 3-13 heavy atoms); a large component that fails nested
 #: fails alone too, and naming it again costs a whole search (measured: 105 of 106 slow PubChem rows hit the cap)
 _FRESH_FRAME_MAX_HEAVY_ATOMS = 15
+
+
+#: the elements of an organic component whose charged or radical atom the nested producers name as well
+_COMMON_ELEMENTS = frozenset({"C", "N", "O", "S", "P", "Se", "F", "Cl", "Br", "I", "H"})
+
+
+def _has_exotic_centre(smiles: str) -> bool:
+    """True when a component larger than the fresh-frame cap has a charged atom outside ``_COMMON_ELEMENTS``
+    ('tricyclohexylstannylium', a bis(acyloxy)alumanylium), or a radical one (a boron radical) when the OPSIN in use
+    reads an adduct with a radical component (``opsin_capabilities.radical_adduct_enabled``; without it no name of
+    the mixture reads back, so the retry would be spent for nothing). The producers that name such a centre run for
+    the caller's whole input only, so the component, which they name alone, is refused nested; a large component
+    without one that fails nested fails alone too (2026-11-18 sizing without the cap: 10 of the 12 large components
+    the retry named have one, 28 of the 29 rows it slowed by more than 15 s have none). Measured with this gate
+    (trace, 2026-11-18, the 19 rows of the 550-row panel the retry touched): on OPSIN main 13 rows named through it
+    (8 a radical centre only, 3 a charged one, 2 both) and 2 rows slowed, no name either way; on OPSIN 2.9.0 the 3
+    charged rows named, the radical retries named nothing."""
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False
+    exotic = [a for a in mol.GetAtoms() if a.GetSymbol() not in _COMMON_ELEMENTS]
+    if any(a.GetFormalCharge() for a in exotic):
+        return True
+    if not any(a.GetNumRadicalElectrons() for a in exotic):
+        return False
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    return radical_adduct_enabled()
 
 
 def _has_label(smiles: str) -> bool:
@@ -474,7 +518,8 @@ def _noting_pin_record(once, clean_parts: list):
 
 def _name_component_in_fresh_frame(once):
     """In the last producer of a mixture name (:func:`_component_adduct_name_once`, whose strict read-back decides
-    what ships) a small component that:func:`_name_component` leaves without a name is named once more as a fresh
+    what ships) a small component (or a large one with an exotic centre,:func:`_has_exotic_centre`) that
+    :func:`_name_component` leaves without a name is named once more as a fresh
     outermost naming (``fragment_naming.name_in_fresh_frame``), unless that naming tripped a hang budget. The
     producers before it keep their names: their read-back compares the standard InChIKey, which does not see where a
     proton sits.
@@ -541,7 +586,7 @@ def _name_component_once(frag_smi: str, style: str, *,
         # before ('[H][H]' is 'molecular hydrogen' there)
         return single_atom_names[frag_smi]
     if frag_mol.GetNumHeavyAtoms() == 1:
-        if ions_ok and _is_metal_atom_fragment(frag_mol):
+        if ions_ok and _is_metal_atom_fragment(frag_mol) and not _is_metalloid_hydride_anion(frag_mol):
             return _metal_atom_component_name(frag_mol)
         if not (ions_ok and is_charged):
             return None if is_charged else (single_atom_names or SINGLE_ATOM_COMPONENT_NAMES).get(
@@ -753,9 +798,11 @@ _HYDRON_WORDS = frozenset({"hydron", "proton", "deuteron", "triton"})
 
 
 def _hydrogen_components(mol) -> Dict[str, str]:
-    """The entries of ``HYDROGEN_COMPONENT_NAMES`` that ``mol`` may take: dihydrogen always; ammonia
-    when the assembly holds no true metal; the hydride ion when every true metal is admitted to
-    ``CARBANION_SALTS`` (a metal the table does not admit is never composed with a hydride)."""
+    """The entries of ``HYDROGEN_COMPONENT_NAMES`` that ``mol`` may take: dihydrogen always; ammonia and the
+    hydron words when the assembly holds no true metal (beside a metal, ammonia comes from the ``AMMINE`` mechanism,
+    ``metal_atoms.ammine_component_names``, and a hydron from the producers of that drawing); the hydride ion when
+    every true metal is admitted to ``CARBANION_SALTS`` (a metal the table does not admit is never composed with a
+    hydride)."""
     from ..data.metal_scope import CARBANION_SALTS, has_mechanism
     from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
     metals = {a.GetSymbol() for a in mol.GetAtoms() if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO}

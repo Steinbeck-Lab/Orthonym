@@ -96,3 +96,71 @@ def test_fresh_frame_restores_the_naming_state():
         assert fn._fragment_guard.probe_attr == "outer"
     finally:
         del fn._fragment_guard.probe_attr
+
+
+# A component larger than the fresh-frame cap (15 heavy atoms) is retried only when it has a charged or radical atom
+# outside C, N, O, S, P, Se and the halogens (``adducts._has_exotic_centre``): the producers of such a centre
+# (stannylium, alumanylium) run for the caller's whole input only. A large component without one that fails nested
+# fails alone too, and a retry would cost a whole search (2026-11-18 PubChem rerun-5 triage item 2b).
+_LARGE_ROWS = [
+    ("C1CCC(CC1)[Sn+](C2CCCCC2)C3CCCCC3.C1=CC=C2C(=C1)C=CC(=C2C(=O)O)[O-]",
+     "1-carboxy-2-oxidonaphthalene—tricyclohexylstannylium (1/1)"),
+    ("CC(C1=CC(=CC=C1)OC2=CC=CC=C2)C(=O)O[Al+]OC(=O)C(C)C3=CC(=CC=C3)OC4=CC=CC=C4.[OH-]",
+     "bis{[2-(3-phenoxyphenyl)propanoyl]oxy}alumanylium—hydroxide (1/1)"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", _LARGE_ROWS)
+def test_large_component_with_an_exotic_centre_is_retried(smiles, expected):
+    res = name_best_effort(smiles)
+    assert (res["name"], res["tier"], res["is_pin"]) == (expected, "systematic_verified", False), res
+    assert name_is_rt_exact(res["name"], smiles)
+
+
+def test_without_the_exotic_centre_gate_the_large_component_declines(monkeypatch):
+    """Mutation: the cap applied to every large component again, the stannylium mixture has no name."""
+    from orthonym.rules import adducts
+    monkeypatch.setattr(adducts, "_has_exotic_centre", lambda smiles: False)
+    assert name_best_effort(_LARGE_ROWS[0][0])["name"] is None
+
+
+@pytest.mark.parametrize("smiles,exotic", [
+    ("C1CCC(CC1)[Sn+](C2CCCCC2)C3CCCCC3", True),
+    ("CCCCCCCCCC(=O)O[Al+]OC(=O)CCCCCCCCC", True),
+    ("CCCC[N+](CCCC)(CCCC)CCCC", False),                        # an ammonium: the nested producers name it
+    ("CCCCCCCCCCCCCCCCCC(=O)[O-]", False),
+    ("CCCCCCCCCCCCCCCCCC[Se+](C)C", False),
+])
+def test_exotic_centre(smiles, exotic):
+    from orthonym.rules.adducts import _has_exotic_centre
+    assert _has_exotic_centre(smiles) is exotic
+
+
+def test_a_radical_centre_is_retried_only_where_opsin_reads_radical_adducts(monkeypatch):
+    """A boron radical: no name of the mixture reads back unless the OPSIN in use reads an adduct with a radical
+    component, so the retry is spent only then."""
+    from orthonym import opsin_capabilities as caps
+    from orthonym.rules.adducts import _has_exotic_centre
+    for enabled in (False, True):
+        monkeypatch.setattr(caps, "radical_adduct_enabled", lambda enabled=enabled: enabled)
+        assert _has_exotic_centre("[B]c1ccc(S(=O)(=O)c2ccccc2)cc1") is enabled
+
+
+@pytest.mark.parametrize("exotic", [False, True])
+def test_a_large_plain_component_spends_no_retry(monkeypatch, exotic):
+    """Spy: a large component without an exotic centre that the nested naming leaves without a name is not named
+    again in the fresh frame; the same input with the gate forced open is (the trace's positive control)."""
+    from orthonym.rules import adducts
+    real = adducts._name_component_once
+    retried = []
+
+    def once(frag_smi, *a, **k):
+        if adducts._heavy_atoms(frag_smi) > adducts._FRESH_FRAME_MAX_HEAVY_ATOMS:
+            retried.append(getattr(adducts._FRESH_FRAME, "active", False))
+            return None
+        return real(frag_smi, *a, **k)
+    monkeypatch.setattr(adducts, "_name_component_once", once)
+    if exotic:
+        monkeypatch.setattr(adducts, "_has_exotic_centre", lambda smiles: True)
+    name_best_effort("CCCCCCCCCCCCCCCCCC(=O)O.O")
+    assert retried and any(retried) is exotic, retried
