@@ -2852,6 +2852,40 @@ def _parent_hydride_cation_name(mol) -> Optional[str]:
     return ylium if ylium and _cation_name_rt_ok(ylium, mol) else ''
 
 
+def _parent_hydride_ion_name(mol) -> Optional[str]:
+    """The ylium name of a cation (:func:`_parent_hydride_cation_name`) or the uide name of an anion
+    (:func:`_parent_hydride_uide_name`) of a metal named on its parent hydride; None when ``mol`` is neither."""
+    name = _parent_hydride_cation_name(mol)
+    return name if name is not None else _parent_hydride_uide_name(mol)
+
+
+def _parent_hydride_uide_name(mol) -> Optional[str]:
+    """The '-uide' name of an anion of a metal that ``data/metal_scope.py`` admits to ``PARENT_HYDRIDE_IONS`` (aluminium,
+    gallium, indium, thallium, tin, lead): the metal is the one atom of ``mol`` outside the organic allowlist, carries
+    the only charge (-1) and one bond more than the standard bonding number of its parent hydride. "ANIONS FORMED
+    BY ADDITION OF HYDRIDE IONS" (the Blue Book-41097): "the suffix 'uide' describes an anion formally derived by
+    adding a hydride ion" ('lithium tert-butylbis(2-methylpropyl)alumanuide',:41118). The name of
+    ``ions._emit_group13_uide`` when it reads back, else '' (declined); None when ``mol`` is no such anion. The
+    'aluminohydride' of the trivial table was the last resort for [AlH4-] before (user decision 2026-11-18: the -uide
+    name)."""
+    from ..data.metal_scope import PARENT_HYDRIDE_IONS, has_mechanism
+    from .ions import _ORGANIC_NONMETALS, _UIDE_STD_VALENCE, _UIDE_STEMS, _emit_group13_uide
+    outside = [a for a in mol.GetAtoms() if a.GetSymbol() not in _ORGANIC_NONMETALS]
+    if (len(outside) != 1 or len(Chem.GetMolFrags(mol)) != 1 or outside[0].GetFormalCharge() != -1
+            or outside[0].GetSymbol() not in _UIDE_STEMS or outside[0].GetNumRadicalElectrons()
+            or not has_mechanism(outside[0].GetSymbol(), PARENT_HYDRIDE_IONS)
+            or any(a.GetFormalCharge() for a in mol.GetAtoms() if a.GetIdx() != outside[0].GetIdx())):
+        return None
+    centre = outside[0]
+    # hydrogen and carbon ligands only (the example of the book): a halide complex keeps its additive name
+    # ('tetrachloroaluminate'); and one bond more than the standard bonding number of the parent hydride
+    if (any(n.GetAtomicNum() != 6 for n in centre.GetNeighbors())
+            or centre.GetDegree() + centre.GetTotalNumHs() != _UIDE_STD_VALENCE[centre.GetSymbol()] + 1):
+        return None
+    uide = _emit_group13_uide(mol, centre.GetIdx())
+    return uide if uide and _full_inchikey_rt_ok(mol, uide) else ''
+
+
 def _group14_metal_radical_element(mol) -> Optional[str]:
     """'Sn' or 'Pb' when ``mol`` is a neutral molecule of one fragment whose only atom
     outside the organic allowlist (``ions._has_metal``) is a single tin or lead atom, and
@@ -3226,7 +3260,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     # all of its radical electrons is the Group-14 mononuclear parent hydride of a radical
     # ('dimethylstannylidene'), named on the path silicon and germanium take below.
     _group14_centre = _group14_metal_radical_element(mol)
-    if (_ylium := _parent_hydride_cation_name(mol)) is not None or (_has_metal(mol) and _group14_centre is None):
+    if (_ylium := _parent_hydride_ion_name(mol)) is not None or (_has_metal(mol) and _group14_centre is None):
         return _ylium or ''
 
     # --- Step 2: multi-fragment (dot-disconnected salt / arbitrary) -> Plan 04.

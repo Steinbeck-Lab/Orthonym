@@ -138,12 +138,19 @@ def phane_names_withheld():
     producer offers a name. The isotope decorator, ``rules.isotopes``) inserts descriptors into the name of
     the isotope-stripped skeleton; the phane producers cite no isotopic modification, so a phane skeleton name cannot
     be labelled and the molecule would be left without a name, where the substitutive name of the same skeleton
-    takes the descriptors."""
+    takes the descriptors. The functional class names of the sulfur, selenium and tellurium oxoacid halides
+    ('sulfurous dichloride', ``rules.chalcogen_acid_halides``) are withheld in the same scope
+    (:func:`label_free_names_withheld`): OPSIN reads no descriptor on their oxygen or class words."""
     token = _PHANE_WITHHELD.set(True)
     try:
         yield
     finally:
         _PHANE_WITHHELD.reset(token)
+
+
+def label_free_names_withheld() -> bool:
+    """True inside:func:`phane_names_withheld`: the producers whose names take no isotopic descriptor offer none."""
+    return _PHANE_WITHHELD.get()
 
 
 def phane_enabled() -> bool:

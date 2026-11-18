@@ -196,10 +196,9 @@ def _is_metal_atom_fragment(frag_mol) -> bool:
                     for a in frag_mol.GetAtoms()))
 
 
-#: The metalloids among ``metal_atoms.METAL_ELEMENT_NAMES``: a hydride anion of one of them is no metal atom. The other
-#: members that are no true metal are left out: Al, Ga, In and Tl (their hydride anions keep the names that ship,
-#: 'aluminohydride', until the table admits them) and Sn, Pb, Bi and Po (4 unnamed PubChem mixtures with such an anion
-#: in the 2026-11-16 tracker tables: a lead, not built)
+#: The metalloids among ``metal_atoms.METAL_ELEMENT_NAMES``: a hydride anion of one of them is no metal atom. A metal
+#: that ``data/metal_scope.py`` admits to ``PARENT_HYDRIDE_IONS`` (Al, Ga, In, Tl, Sn, Pb) has its hydride anion named on
+#: its parent hydride as well ('alumanuide', user decision 2026-11-18, ``charged_router._parent_hydride_uide_name``)
 _METALLOIDS = frozenset({"B", "Si", "Ge", "As", "Sb", "Te"})
 
 
@@ -208,9 +207,10 @@ def _is_metalloid_hydride_anion(frag_mol) -> bool:
     by the component pipeline as one ('boranuide', "ANIONS FORMED BY ADDITION OF HYDRIDE IONS",
     the Blue Book-41097, "the suffix 'uide' describes an anion formally derived by adding a hydride ion";
     'silanide',,:40902), not by the element name of a metal atom, which gives it none."""
+    from ..data.metal_scope import PARENT_HYDRIDE_IONS, has_mechanism
     heavy = [a for a in frag_mol.GetAtoms() if a.GetAtomicNum() > 1]
-    return (len(heavy) == 1 and heavy[0].GetSymbol() in _METALLOIDS and heavy[0].GetTotalNumHs(includeNeighbors=True) > 0
-            and Chem.GetFormalCharge(frag_mol) < 0)
+    return (len(heavy) == 1 and heavy[0].GetTotalNumHs(includeNeighbors=True) > 0 and Chem.GetFormalCharge(frag_mol) < 0
+            and (heavy[0].GetSymbol() in _METALLOIDS or has_mechanism(heavy[0].GetSymbol(), PARENT_HYDRIDE_IONS)))
 
 
 def _ortho_fused_ring_bonds(mol) -> set:
@@ -904,7 +904,12 @@ def _reads_back_as(name: str, expected_smiles: str) -> bool:
     from orthonym.namer import _same_canonical_smiles
     try:
         parsed = _adduct_opsin_read(name)
-        return bool(parsed) and _same_canonical_smiles(parsed, expected_smiles)
+        if not parsed:
+            return False
+        if _same_canonical_smiles(parsed, expected_smiles):
+            return True
+        drawn = Chem.MolFromSmiles(expected_smiles)   # the hydrogen-word reader writes every hydrogen as an atom
+        return drawn is not None and Chem.MolToSmiles(Chem.AddHs(drawn)) == parsed
     except Exception:
         return False
 
@@ -1360,9 +1365,14 @@ def _component_adduct_words_and_name(components: List[Tuple[str, int]], frag_mol
         if not word or is_failure_name(word):
             return None
         words[smi] = word
-    name = _assemble_adduct_name([(words[smi], count) for smi, count in ordered])
+    named = [(words[smi], count) for smi, count in ordered]
+    name = _assemble_adduct_name(named)
     if not _parse_reproduces_depiction(name, mol):
-        return None
+        # a bare metal word takes the charge that balances the ions beside it ('ethanol—palladium—hydron' reads Pd2+):
+        # the neutral atom drawn is cited with its oxidation number zero, as in the adduct body
+        name = _zero_metal_name(ordered, named, frag_mols)
+        if name is None or not _parse_reproduces_depiction(name, mol):
+            return None
     from orthonym.metrics.provenance import record_non_pin_label
     record_non_pin_label(name, rule="P-14.8.2",
                          detail="a mixture named by its components has no preferred IUPAC name")

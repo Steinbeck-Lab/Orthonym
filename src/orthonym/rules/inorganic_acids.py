@@ -2534,6 +2534,10 @@ def name_inorganic_acid(mol) -> Optional[str]:
     hal_amide = name_p_oxoacid_halide_amide(mol)
     if hal_amide is not None:
         return hal_amide
+    from .chalcogen_acid_halides import name_chalcogen_oxoacid_halide   # SOCl2 'sulfurous dichloride'
+    chalco_halide = name_chalcogen_oxoacid_halide(mol)
+    if chalco_halide is not None:
+        return chalco_halide
     # a phase: FRN-modified phosphorus-acid ESTER (>=1 -O-R owner
     # AND >=1 class infix): methyl N,N-dimethylphosphoramidochloridite. A
     # non-overlapping addition; a plain phosphate/phosphite ester never reaches here.

@@ -229,13 +229,14 @@ def _ion_needs_enclosing_multiplier(name: str, *, organic_cation: bool = False) 
     #:7037), so it takes 'bis': 'trimagnesium bis(phosphanetriide)'. So does the 'uide' anion of
     # such a hydride,:41093): 'diboranuide' reads as an anion of diborane,
     # 'magnesium bis(boranuide)'.
-    from .ions import _MONONUCLEAR_ANION_PARENT
+    from .ions import _MONONUCLEAR_ANION_PARENT, _UIDE_STEMS
     for parent, _bonding in _MONONUCLEAR_ANION_PARENT.values():
         stem = parent[:-1]
         if name.startswith(stem) and name[len(stem):] in (
                 'ide', 'ediide', 'etriide', 'etetraide', 'uide'):
             return True
-    return False
+    # the 'uide' anion of a mononuclear hydride, substituted or not: 'bis(alumanuide)', 'bis(methylalumanuide)'
+    return any(name.endswith(parent[:-1] + 'uide') for parent in _UIDE_STEMS.values())
 
 
 # === AMINO ACID ZWITTERION PATTERNS ===

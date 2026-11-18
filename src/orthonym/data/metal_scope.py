@@ -133,8 +133,11 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     admitted are the ones the panel of the lane measured (`internal notes`).
 
 ``PARENT_HYDRIDE_IONS``
-    a cation of the metal whose bonds and hydrogens make up one less than its standard bonding number is named on
-    the mononuclear parent hydride of the metal, as a silicon or germanium centre is: "silane, SiH4, germane, GeH4,
+    a cation of the metal whose bonds and hydrogens make up one less than its standard bonding number, or an anion
+    whose bonds and hydrogens make up one more ('alumanuide', 'methylalumanuide'; "ANIONS FORMED BY ADDITION OF
+    HYDRIDE IONS", the Blue Book, 'lithium tert-butylbis(2-methylpropyl)alumanuide',:41118; user decision
+    2026-11-18, replacing the trivial 'aluminohydride'), is named on the mononuclear parent hydride of the metal, as a
+    silicon or germanium centre is: "silane, SiH4, germane, GeH4,
     stannane, SnH4, and plumbane, PbH4... by replacing the 'ane' ending... by the suffix 'ylium'"
     Cationic centers in parent hydrides, the Blue Book; 'triphenylsilylium (PIN)',:41557). The Blue Book
     names the organic compounds of tin and lead substitutively, on 'stannane' and 'plumbane', and gives them

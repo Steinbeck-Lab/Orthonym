@@ -63,7 +63,8 @@ def test_a_multiplied_uide_anion_takes_bis():
 
 @pytest.mark.parametrize("smiles, expected", [
     ("[BH4-]", True), ("[2H][B-]([2H])([2H])[2H]", True), ("[SiH3-]", True),
-    ("[BH3]", False), ("[AlH4-]", False), ("[SnH3-]", False), ("[B-]", False),
+    ("[BH3]", False), ("[B-]", False), ("[ZnH3-]", False),
+    ("[AlH4-]", True), ("[SnH3-]", True),          # admitted to PARENT_HYDRIDE_IONS (user decision 2026-11-18)
 ])
 def test_the_hydride_anion_predicate(smiles, expected):
     """Explicit deuterium neighbours count as hydrogens (``GetTotalNumHs(includeNeighbors=True)``)."""
@@ -74,8 +75,6 @@ def test_the_hydride_anion_predicate(smiles, expected):
 @pytest.mark.parametrize("smiles, name", [
     ("[BH4-]", "boranuide"),
     ("[BH4-].[Na+]", "sodium boranuide"),                # the salt producer
-    ("[AlH4-]", "aluminohydride"),                       # a metal: today's path
-    ("[Li+].[AlH4-]", "lithium aluminohydride"),
     ("[BH3].CCO", "ethanol—borane (1/1)"),               # no anion
     ("[ZnH2].CCO", None),                                # a metal hydride stays unnamed
     ("[MgH2].CCO", None),
@@ -104,3 +103,59 @@ def test_a_multiplied_uide_anion_of_another_hydride_takes_bis_too():
     """'calcium(2+)—phosphanuide (1/2)' (the adduct form shipped before) is now the salt 'calcium bis(phosphanuide)'."""
     row = _tier("best-effort").name_tiered("[PH4-].[PH4-].[Ca+2]")
     assert (row["name"], row["tier"]) == ("calcium bis(phosphanuide)", "systematic_verified")
+
+
+# The hydride anions of the metals ``data/metal_scope.py`` admits to PARENT_HYDRIDE_IONS (Al, Ga, In, Tl, Sn, Pb) are
+# named on the parent hydride as well: "ANIONS FORMED BY ADDITION OF HYDRIDE IONS" (the Blue Book-41097,
+# 'lithium tert-butylbis(2-methylpropyl)alumanuide',:41118). User decision 2026-11-18: 'alumanuide' replaces the
+# 'aluminohydride' of the trivial table (not an IUPAC name). A compound of aluminium has no PIN lists no Al).
+@pytest.mark.parametrize("smiles, name", [
+    ("[AlH4-]", "alumanuide"),
+    ("[Li+].[AlH4-]", "lithium alumanuide"),
+    ("[Na+].[AlH4-].[Na+].[AlH4-]", "disodium bis(alumanuide)"),     # was 'disodium dialuminohydride'
+    ("[Mg+2].[AlH4-].[AlH4-]", "magnesium bis(alumanuide)"),
+    ("[GaH4-]", "gallanuide"),
+    ("C[AlH3-]", "methylalumanuide"),
+    ("[AlH4-].CCO", "ethanol—alumanuide (1/1)"),
+    ("[GaH4-].c1ccccc1", "benzene—gallanuide (1/1)"),
+    ("[Li+].CC(C)(C)[AlH-](CC(C)C)CC(C)C", "lithium tert-butylbis(2-methylpropyl)alumanuide"),   # the book,:41118
+    ("[Mg+2].C[AlH3-].C[AlH3-]", "magnesium bis(methylalumanuide)"),
+])
+def test_a_metal_hydride_anion_is_named_on_its_parent_hydride(smiles, name):
+    from tests.support.rt_assert import name_is_rt_exact
+    row = _tier("best-effort").name_tiered(smiles)
+    assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
+    assert name_is_rt_exact(name, smiles)
+    assert Orthonym().name_tiered(smiles)["tier"] == "abstain"
+
+
+def test_a_metal_not_admitted_keeps_no_hydride_anion_name(monkeypatch):
+    """Mutation: aluminium taken out of PARENT_HYDRIDE_IONS, its hydride anion has no -uide name again."""
+    from orthonym.data import metal_scope
+    scope = metal_scope.METAL_SCOPE["Al"]
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Al", metal_scope.MetalScope(
+        scope.mechanisms - {metal_scope.PARENT_HYDRIDE_IONS}, scope.valences, scope.complete))
+    assert _tier("best-effort").name_tiered("[AlH4-]")["name"] == "aluminohydride"     # the trivial table again
+
+
+@pytest.mark.parametrize("smiles, name", [
+    ("[Al-](Cl)(Cl)(Cl)Cl", "tetrachloroaluminate"),     # a halide complex keeps its additive name
+    ("[Ga-](Cl)(Cl)(Cl)Cl", "tetrachlorogallate"),
+    ("[AlH2-]", "dihydridoaluminium(1-)"),               # not one bond above the standard bonding number
+])
+def test_other_anions_of_the_metals_keep_their_names(smiles, name):
+    assert _tier("best-effort").name_tiered(smiles)["name"] == name
+
+
+def test_an_organotin_uide_carries_the_label_its_silicon_sibling_does():
+    """ (:41097): "Method (1) leads to preferred IUPAC names"; tin is an element of, and the engine labels
+    'dichlorotri(methyl)silanuide' the same way."""
+    row = Orthonym().name_tiered("C[Sn-](C)(C)(C)C")
+    assert (row["name"], row["tier"]) == ("pentamethylstannanuide", "pin_verified")
+
+
+def test_a_multiplied_substituted_uide_anion_takes_bis():
+    """'dimethylsilanuide' would read as the anion with two methyl groups; (d) (the Blue Book) asks for
+    'bis'. The salt of a silicon -uide anion carries the label its siblings carry ('methylsilanuide (PIN)',."""
+    row = Orthonym().name_tiered("[Ca+2].C[SiH4-].C[SiH4-]")
+    assert (row["name"], row["tier"]) == ("calcium bis(methylsilanuide)", "pin_verified")
