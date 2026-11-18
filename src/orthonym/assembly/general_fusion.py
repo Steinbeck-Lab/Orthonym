@@ -23,6 +23,7 @@ are the documented bounded remainder.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional
 
 from rdkit import Chem
@@ -129,6 +130,9 @@ def _benzo_annulation_name(mol, target_smiles: str) -> Optional[str]:
         # locants — out of this single-level scope.
         if '[' in base_name:
             continue
+        # the heteroatom locants of a base component take brackets after a fusion prefix
+        #, the Blue Book: 'benzo[c][2]benzopyran', not 'benzo[c]2-benzopyran')
+        base_name = re.sub(r'^(\d+(?:,\d+)*)-', r'[\1]', base_name)
         for L in _FUSION_LETTERS[:12]:
             cand = f"benzo[{L}]{base_name}"
             if _affirmative_roundtrip(cand, target_smiles):

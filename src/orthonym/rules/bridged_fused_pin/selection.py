@@ -21,6 +21,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 from rdkit import Chem
 
+from ...data.opsin_misnumbered_parents import BRIDGE_LOCANT_ALIASED_PARENTS
 from ...perception.mancude import max_matching_size
 
 #: at most this many bridges (one, two or three independent divalent bridges)
@@ -719,6 +720,10 @@ def _best_splits(mol, system: Set[int], n_rings: int) -> Optional[List[Split]]:
             if splits is None:
                 return None
             top = [(nd, s) for nd, s in top if s in splits]
+        # OPSIN main reads locant 8 of pyrrolizine as its fusion carbon 7a (data.opsin_misnumbered_parents), the
+        # locant (the Blue Book) gives the first bridge atom: no bridged pyrrolizine name
+        if any(s.parent in BRIDGE_LOCANT_ALIASED_PARENTS for _, s in top):
+            return None
         least = min(nd for nd, _ in top)                       # (e)-(h)
         if least:
             return None

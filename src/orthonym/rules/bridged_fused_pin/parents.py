@@ -410,6 +410,8 @@ def fused_parent(mol, residual, tables_only: bool = False) -> Optional[FusedPare
     if got is None or len(order) != len(idx):
         return None
     name, fixed_items, source = got
+    if _opsin_misnumbers(name):
+        return None
     base = {idx[order[k]]: loc for k, loc in fixed_items}
     residual = set(residual)
     auts, exhaustive = skeleton_automorphisms(mol, residual, element_blind=False, cap=64)
@@ -423,3 +425,19 @@ def fused_parent(mol, residual, tables_only: bool = False) -> Optional[FusedPare
             seen.add(sig)
             out.append(numb)
     return FusedParent(name, tuple(out), source)
+
+
+
+def _opsin_misnumbers(name: str) -> bool:
+    """True when ``name`` is a parent that OPSIN 2.9.0 lays out otherwise than OPSIN main
+    (``data.opsin_misnumbered_parents``) while the OPSIN in use is not a main-branch build: a name numbered on it
+    would be read by OPSIN main as another structure. The molecule then takes the name the engine gives it without
+    this parent (its von Baeyer name,, as under OPSIN main."""
+    from ...data.opsin_misnumbered_parents import LAYOUT_MISNUMBERED_PARENTS
+    if name not in LAYOUT_MISNUMBERED_PARENTS:
+        return False
+    from ... import jars
+    try:
+        return jars.active_opsin(download=False)["label"] != "main"
+    except jars.JarUnavailable:
+        return True
