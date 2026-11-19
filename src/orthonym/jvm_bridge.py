@@ -85,7 +85,7 @@ import signal
 import threading
 from typing import Optional, Sequence, Tuple
 
-from orthonym.jvm_flags import JVM_CORE_HYGIENE_FLAGS, JVM_HYGIENE_FLAGS
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -266,24 +266,27 @@ def _start(pid: int) -> bool:
         # 25 molecules per worker), and a JVM killed by a SIGALRM guard leaks its
         # /tmp/hsperfdata_<user>/<pid> file, which is what lets a later JVM print
         # a warning onto stdout. See orthonym/jvm_flags.py for the mechanism.
-        base = [f"-Xmx{xmx}", *JVM_HYGIENE_FLAGS]
-        # Perf lever A2: JVM_HYGIENE_FLAGS now ends with JVM_PERF_FLAGS (SerialGC, C1-only).
-        # Both are accepted by every supported JDK, but a start-up failure must never be
-        # caused by a performance flag, so the ladder retries without them last.
-        base_core = [f"-Xmx{xmx}", *JVM_CORE_HYGIENE_FLAGS]
-        # JDK 24+ prints a 4-line "restricted method... System::load" warning to
-        # stderr for JPype's own native load. Harmless, but every worker process
-        # would emit it, so silence it where supported. The flag is UNKNOWN to
-        # JDK < 24 and would abort start-up there, hence the retry without it --
-        # a cosmetic flag must never be the reason the JVM fails to come up.
-        # The class-data archive (jvm_cds): tried first, and the rungs without it stay, so that an archive
-        # option can never be the reason the JVM fails to come up.
+        # ONE start, with options chosen up front from the JDK's version. JPype cannot start a JVM a second time in
+        # one process: after a failed startJVM the next attempt fails with "Can't find org.jpype.jar support
+        # library" (measured, JDK 11.0.33), so a ladder of fallback options never reached its later rungs. It cost
+        # every JDK 11 user the in-process JVM: '--enable-native-access' is unknown to JDK 11 ("Unrecognized
+        # option"), the first rung failed, and every OPSIN and centres call ran as a 'java -jar' subprocess
+        # (13C benzoic acid 111 s instead of 0.3 s; 80 PubChem rows 280 s instead of 41 s, same names).
+        # JVM_HYGIENE_FLAGS carries -Djava.awt.headless plus -XX:-UsePerfData. The perf-data flag matters most
+        # HERE: this is the highest-churn JVM in the tree (12 pool workers x maxtasksperchild=25 means a fresh JVM
+        # every 25 molecules per worker), and a JVM killed by a SIGALRM guard leaks its
+        # /tmp/hsperfdata_<user>/<pid> file, which is what lets a later JVM print a warning onto stdout. See
+        # orthonym/jvm_flags.py for the mechanism. Its perf flags (SerialGC, C1-only) are known to every supported
+        # JDK.
+        from .jvm_cds import _jvm_library, jdk_major
         from .jvm_cds import start_options as _cds_options
-        cds = _cds_options(classpath)
-        ladder = [[*base, "--enable-native-access=ALL-UNNAMED"], base,
-                  [*base_core, "--enable-native-access=ALL-UNNAMED"], base_core]
-        if cds:
-            ladder = [[*base, *cds, "--enable-native-access=ALL-UNNAMED"], [*base, *cds], *ladder]
+        opts = [f"-Xmx{xmx}", *JVM_HYGIENE_FLAGS, *_cds_options(classpath)]
+        major = jdk_major(_jvm_library())
+        if major is not None and major >= NATIVE_ACCESS_MIN_JDK:
+            # JDK 24+ prints a 4-line "restricted method... System::load" warning to stderr for JPype's own native
+            # load; the option silences it. Only a JDK that knows the option gets it.
+            opts.append("--enable-native-access=ALL-UNNAMED")
+        ladder = [opts]
         started = False
         with _alarm_held():
             for opts in ladder:
@@ -352,6 +355,11 @@ def _n2s():
     if _N2S is None and _N2S_CLS is not None:
         _N2S = _N2S_CLS.getInstance()
     return _N2S
+
+
+#: The first JDK given '--enable-native-access' (it silences JDK 24+'s warning for JPype's native load). JDK 11 does
+#: not know the option and refuses to start with it; JDK 21 is the oldest one measured with it.
+NATIVE_ACCESS_MIN_JDK = 21
 
 
 def _ensure_jvm() -> bool:

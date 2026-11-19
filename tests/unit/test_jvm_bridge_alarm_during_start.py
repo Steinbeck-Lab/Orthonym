@@ -77,14 +77,15 @@ FAILING_SCRIPT = textwrap.dedent("""
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="no SIGALRM")
 def test_a_failed_start_is_recorded_before_the_held_alarm_is_raised(opsin_available):
     """The alarm is raised, and the failed start is cached as it is without an alarm: the next call does
-    not try to start the JVM again (it would, four more attempts, every call, if the state stayed unset)."""
+    not try to start the JVM again. There is one attempt: JPype cannot start a JVM a second time in one
+    process (a second startJVM fails with "Can't find org.jpype.jar support library", JDK 11.0.33), so the
+    options are chosen before the start (``jvm_bridge.NATIVE_ACCESS_MIN_JDK``), not by retrying."""
     pytest.importorskip("jpype")
     if not opsin_available:
         pytest.skip("no JVM or OPSIN jar")
-    # without the class-data archive (jvm_cds), whose two extra rungs would make it six attempts
     done = subprocess.run([sys.executable, "-c", FAILING_SCRIPT], capture_output=True, text=True, timeout=300,
                           env={**os.environ, "ORTHONYM_JVM_BUDGET": "off", "ORTHONYM_JVM_CDS": "off"})
-    assert done.stdout.split("\n")[-2] == "timeout False False 4 4", done.stdout + done.stderr
+    assert done.stdout.split("\n")[-2] == "timeout False False 1 1", done.stdout + done.stderr
 
 
 @pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="no SIGALRM")
@@ -170,3 +171,32 @@ def test_alarm_held_does_nothing_without_a_python_handler_and_off_the_main_threa
     worker.start()
     worker.join()
     assert seen == ["body ran"]
+
+
+# The options the one start is given, for a JDK of a given major version (startJVM records them and fails).
+OPTIONS_SCRIPT = textwrap.dedent("""
+    import sys
+    import jpype
+    from orthonym import jvm_bridge, jvm_cds
+    jvm_cds.jdk_major = lambda library: int(sys.argv[1])
+    seen = []
+    def recording_start(*args, **kwargs):
+        seen.append(args)
+        raise OSError("recorded")
+    jpype.startJVM = recording_start
+    jvm_bridge._ensure_jvm()
+    print(len(seen), any("--enable-native-access" in str(a) for a in seen[0]))
+""")
+
+
+@pytest.mark.parametrize("major,native_access", [(11, False), (17, False), (21, True), (25, True)])
+def test_a_jdk_that_does_not_know_an_option_is_not_given_it(major, native_access, opsin_available):
+    """JDK 11 refuses '--enable-native-access' ("Unrecognized option"); a start with it failed, no second start
+    was possible, and every OPSIN and centres call ran as a 'java -jar' subprocess (a PubChem run on a Java 11
+    farm, 2026-11-19: 13C benzoic acid 111 s instead of 0.3 s)."""
+    pytest.importorskip("jpype")
+    if not opsin_available:
+        pytest.skip("no JVM or OPSIN jar")
+    done = subprocess.run([sys.executable, "-c", OPTIONS_SCRIPT, str(major)], capture_output=True, text=True,
+                          timeout=300, env={**os.environ, "ORTHONYM_JVM_BUDGET": "off"})
+    assert done.stdout.split("\n")[-2] == f"1 {native_access}", done.stdout + done.stderr
