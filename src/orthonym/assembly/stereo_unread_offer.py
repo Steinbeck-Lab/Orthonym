@@ -14,7 +14,12 @@ every cited unit the code the centres engine gives it (``validation.second_cip_l
 ``best_effort`` (the name's own string was not read back; no PIN label), as the default tier's Chapter row of
 '(1R,3s,5S)-tropan-3-ol' is (``default_tier_offer._withheld_chapter_p10_row``). It is an offer, not a return: it is
 made only for a molecule every other path of the tier left without a name, so no name that ships changes."""
+import contextvars
 from typing import Dict, Optional
+
+#: set while this offer labels its row: only then is a name the stereo-layer carve-out accepted admitted without a
+#: full read-back, so the main path still withdraws it and the default tier's own rows come first
+_OFFERING: "contextvars.ContextVar[bool]" = contextvars.ContextVar("orthonym_stereo_unread_offering", default=False)
 
 
 def stereo_unread_row(namer, smiles, held) -> Optional[Dict]:
@@ -22,6 +27,9 @@ def stereo_unread_row(namer, smiles, held) -> Optional[Dict]:
     tier's stereo-layer carve-out accepts and on whose cited units both CIP labellers agree; else None."""
     if not held or not isinstance(smiles, str) or not getattr(namer, "_general_fallback_unverified", False):
         return None
+    from ..rules.ring_selection import OFFER_OTHER_TIE_RING
+    if OFFER_OTHER_TIE_RING.get():          # a pass of the other-ring offer: its later offer and the outer cascade
+        return None                         # come first; this offer is the last resort of the outer naming
     from ..metrics import provenance as pv
     from ..metrics.abstention import peek_abstention, restore_abstention
     from .default_tier_offer import _has_stereo_layer
@@ -41,7 +49,11 @@ def stereo_unread_row(namer, smiles, held) -> Optional[Dict]:
                     or pv.get_provenance().get("gate_outcome") != pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY
                     or not cited_codes_agree(name, smiles, strip_stereo_blocks(name)[0])):
                 continue
-            got = namer._tier_row_and_pin_form(smiles, name, pv.get_provenance())[0]
+            token = _OFFERING.set(True)
+            try:
+                got = namer._tier_row_and_pin_form(smiles, name, pv.get_provenance())[0]
+            finally:
+                _OFFERING.reset(token)
             if got.get("name") == name and got.get("tier") not in (None, "abstain"):
                 row = dict(got, tier="best_effort", is_pin=False)
                 return row
@@ -56,15 +68,15 @@ def stereo_unread_row(namer, smiles, held) -> Optional[Dict]:
 
 def unread_stereo_admitted(namer, smiles, name, gate_outcome) -> bool:
     """Whether a general tier shows ``name`` for ``smiles`` without a full read-back: at the best-effort tier, an
-    inositol name, exact InChIKey, ``rules.inositols``) or a name the stereo-layer carve-out accepted for this
-    string (``gate_outcome``) on whose cited units both CIP labellers agree (this module's offer)."""
+    inositol name, exact InChIKey, ``rules.inositols``) or, while this module's offer labels its row, a name the
+    stereo-layer carve-out accepted for this string (``gate_outcome``) on whose cited units both CIP labellers agree."""
     if not getattr(namer, "_general_fallback_unverified", False):
         return False
     from ..rules.inositols import is_inositol_name_of
     if is_inositol_name_of(smiles, name):
         return True
     from ..metrics import provenance as pv
-    if gate_outcome != pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY:
+    if not _OFFERING.get() or gate_outcome != pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY:
         return False
     from ..rules.stereochemistry import strip_stereo_blocks
     from ..validation.second_cip_labeller import cited_codes_agree

@@ -131,15 +131,12 @@ class TestST1FlatDegradationRescue:
 
 
 class TestST1NeverWrongAndPinPreserved:
-    @pytest.mark.xfail(strict=True, reason=(
-        "be-flat-stereo-omission-voided-by-coverage-gate -- see "
-        ".planning/preexisting-triage/TRIAGE-2026-10-09.md. Same cage as the "
-        "sesquiterpene row: the stereo-stripped constitution is not shipped at the "
-        "best-effort tier (full InChIKey required, guide/checking.md) and OPSIN 2.9.0 "
-        "cannot read an R/S descriptor on the tricyclo[2.2.1.0^2,6]heptane cage."))
     def test_ez_chain_with_ring_substituent_ships_never_wrong(self):
         # E/Z on a chain parent + R/S in a ring substituent. Never abstain,
         # never wrong: FULL RT, or a stereo-stripped constitution (block-1 RT).
+        # OPSIN 2.9.0 reads no R/S descriptor on the tricyclo[2.2.1.0^2,6]heptane cage; the best-effort tier ships
+        # the name since the unread-stereo offer (2026-11-19): OPSIN places the (2E) block it reads, and both CIP
+        # labellers agree on the cage block (validation/second_cip_labeller.py).
         smi = "C/C(=C\\CC[C@]1(C)[C@H]2C[C@@H]3[C@H](C2)[C@@]31C)C(=O)O"
         name = _be_name(smi)
         assert not errors.is_failure_name(name)

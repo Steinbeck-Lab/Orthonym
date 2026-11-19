@@ -2292,9 +2292,11 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
     heavy_nbrs = [nb for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H']
     # (A) Mononuclear heteroatom parent-hydride radical (only H neighbours).
     if not heavy_nbrs and mol.GetNumHeavyAtoms() == 1:
-        # The element name ignores the hydrogen count and isotopes ([SH3] and
-        # [15NH2] would be 'sulfanyl' / 'azanyl'): the strict round trip decides.
-        return _ship(mol, _parent_hydride_radical_name(element, site['n_electrons']),
+        # The element name ignores the hydrogen count and isotopes ([15NH2] would be 'azanyl'): the strict
+        # round trip decides. The hydride-ion namer reads the hydrogen count, so a nonstandard bonding number
+        # gets its lambda descriptor ([SH3] 'λ4-sulfanyl',, not the 'sulfanyl' of HS.
+        from .hydride_ions import name_hydride_ion
+        return _ship(mol, name_hydride_ion(mol) or _parent_hydride_radical_name(element, site['n_electrons']),
                      False)
     # (B) Substituted nitrogen -> amine / imine / amide compound suffix.
     if element == 'N':

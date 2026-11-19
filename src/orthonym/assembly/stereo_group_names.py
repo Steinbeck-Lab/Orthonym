@@ -321,9 +321,9 @@ def group_descriptor_form(name: str, smiles: str, members, prefix: str) -> Optio
     doubled ('rac'), the others kept; None when the reading does not bind every member to its own descriptor, a
     descriptor binds a member and another unit, or the first rewritten descriptor is not R."""
     from ..rules.stereochemistry import strip_stereo_blocks
-    from ..validation.stereo_descriptors import stereo_block_units
-    try:
-        blocks = stereo_block_units(name, smiles, strip_stereo_blocks(name)[0])
+    from ..validation.stereo_descriptors import checked_block_units
+    try:   # a block OPSIN placed (shared locant, C2b) carries no token units: the length check below declines it
+        blocks = checked_block_units(name, smiles, strip_stereo_blocks(name)[0])
     except Exception:
         return None
     if not blocks:

@@ -15,26 +15,16 @@ from rdkit import Chem
 
 
 def cited_codes_agree(name: str, smiles: Optional[str], reduced: str) -> bool:
-    """True when ``validation.stereo_descriptors.stereo_block_units`` finds the reading of ``name`` for ``smiles``
+    """True when ``validation.stereo_descriptors.checked_block_units`` finds the reading of ``name`` for ``smiles``
     (``reduced`` = ``name`` with its descriptor blocks stripped) and RDKit's ``rdCIPLabeler`` gives every unit the
-    reading cites the code the centres engine gives it, and no two descriptor blocks of ``name`` share a locant. False on
-    anything it cannot establish."""
+    reading cites the code the centres engine gives it. False on anything it cannot establish."""
     try:
         from rdkit.Chem import rdCIPLabeler
         from ..perception.stereo import assign_stereochemistry
-        from ..rules.stereochemistry import strip_stereo_blocks
-        from .stereo_descriptors import _cip_descriptor_tokens, stereo_block_units
-        # A located token may land on any atom that carries its locant, in any part of the name, so two blocks that
-        # share a locant ('(1r,4r)' and '(1s,4s)' on two cyclohexyl groups) can be read swapped and still pass: such a
-        # name is not offered (review 2026-11-19).
-        blocks = _cip_descriptor_tokens(strip_stereo_blocks(name)[1]) or []
-        seen = set()
-        for block in blocks:
-            locants = {loc for loc, _code in block if loc is not None}
-            if locants & seen:
-                return False
-            seen |= locants
-        reading = stereo_block_units(name, smiles, reduced)
+        from .stereo_descriptors import checked_block_units
+        # Blocks that give one locant different codes could be read swapped onto each other's groups (review
+        # 2026-11-19): OPSIN places the blocks it reads, and only the others are searched (checked_block_units).
+        reading = checked_block_units(name, smiles, reduced, symmetric=False)
         if not reading:
             return False
         units = {u for block in reading for u in block.units}

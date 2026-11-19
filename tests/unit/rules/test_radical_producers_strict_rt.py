@@ -34,8 +34,6 @@ def _mol_sites(smi):
 
 @pytest.mark.parametrize("smi", [
     "NC(=O)CC[NH]",          # amine-family long form: '3-aminopropanamidyl' (wrong N)
-    "[SH3]",                 # mononuclear: 'sulfanyl' is [SH]
-    "[PH4]",                 # mononuclear: 'phosphanyl' is [PH2]
     "[15NH2]",               # mononuclear: 'azanyl' drops the isotope
     "[15NH]CC[NH]",          # multiplicative: drops the isotope
     "[NH]C[C@H](C)[NH]",     # multiplicative: drops the stereo
@@ -48,6 +46,10 @@ def test_heteroatom_radical_producer_never_ships_an_unverified_name(smi):
 @pytest.mark.parametrize("smi,expected", [
     ("[NH2]", "azanyl"),
     ("[SH]", "sulfanyl"),
+    # the hydrogen count is read (rules/hydride_ions.py): a nonstandard bonding number carries its lambda descriptor,
+    # 'yl' on the parent hydride name, (the Blue Book '(λ4-sulfanyl)'); OPSIN reads both back
+    ("[SH3]", "λ4-sulfanyl"),
+    ("[PH4]", "λ5-phosphanyl"),
     ("C[NH]", "methanaminyl"),
     ("[NH]CC[NH]", "(ethane-1,2-diyl)bis(aminyl)"),   # BB:40660 (PIN)
 ])

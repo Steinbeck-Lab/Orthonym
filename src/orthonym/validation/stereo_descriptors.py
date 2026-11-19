@@ -143,8 +143,42 @@ def _stereo_unit_given_by_parse(mol, omol, inv, unit) -> bool:
     return ob is not None and ob.GetStereo() != Chem.BondStereo.STEREONONE
 
 
-def stereo_block_units(name: str, smiles: Optional[str],
-                        reduced: str) -> Optional[List[StereoBlockUnits]]:
+def without_blocks(name: str, located, kept=()) -> str:
+    """``name`` without its located descriptor blocks (``rules.stereochemistry.locate_stereo_blocks``, each with its
+    hyphen), except the blocks whose index is in ``kept``."""
+    for i, (s, e, _t) in reversed(list(enumerate(located))):
+        if i not in kept:
+            name = name[:s] + name[e:]
+    return name
+
+
+def _unit_codes(mol) -> Dict[tuple, str]:
+    """The CIP code of every labelled stereo unit of ``mol`` (the centres engine), as ``{('a'|'b', idx): code}``."""
+    from ..perception.stereo import assign_stereochemistry
+    mol = Chem.Mol(mol)
+    assign_stereochemistry(mol)
+    return {**{('a', a.GetIdx()): a.GetProp('_CIPCode') for a in mol.GetAtoms() if a.HasProp('_CIPCode')},
+            **{('b', b.GetIdx()): b.GetProp('_CIPCode') for b in mol.GetBonds() if b.HasProp('_CIPCode')}}
+
+
+def _given_codes_agree(mol, omol, inv, given, codes, ocodes) -> bool:
+    """Does every unit of ``mol`` in ``given`` carry, in the parse ``omol`` (``inv``: atom of ``mol`` -> atom of
+    ``omol``), the CIP code it carries in ``mol``? The kept blocks' units are checked one by one, not only through
+    the InChIKey, which does not see a lone ring centre whose partner is unspecified."""
+    for kind, idx in given:
+        if kind == 'a':
+            ounit = ('a', inv[idx])
+        else:
+            b = mol.GetBondWithIdx(idx)
+            ob = omol.GetBondBetweenAtoms(inv[b.GetBeginAtomIdx()], inv[b.GetEndAtomIdx()])
+            ounit = ('b', ob.GetIdx() if ob is not None else -1)
+        if ocodes.get(ounit) != codes.get((kind, idx)):
+            return False
+    return True
+
+
+def stereo_block_units(name: str, smiles: Optional[str], reduced: str,
+                       kept: Tuple[int, ...] = ()) -> Optional[List[StereoBlockUnits]]:
     """The reading by which ``name`` describes the stereo of ``smiles``, or ``None``
     when there is none. One:class:`StereoBlockUnits` per descriptor block of
     ``name``, in the order ``rules.stereochemistry.strip_stereo_blocks`` removes them;
@@ -204,6 +238,9 @@ def stereo_block_units(name: str, smiles: Optional[str],
     (one of the two ring centres of cis,trans-1,3,5-trimethylcyclohexane that are
     not the pseudoasymmetric one) is not a unit a descriptor can name, and is left
     to condition 4. Fails closed (``None``) on anything it cannot establish.
+
+    ``kept``: the blocks ``reduced`` still carries (OPSIN read them and placed them on their own groups); only the
+    other blocks are searched, never on a unit the parse gives, and every given unit must carry the input's code.
     """
     if not name or not smiles or not reduced:
         return None
@@ -212,20 +249,17 @@ def stereo_block_units(name: str, smiles: Optional[str],
         from ..namer import _self_consistency_full_key   # call time: a patch of it is seen
         from ..rules.stereochemistry import locate_stereo_blocks, strip_stereo_blocks
         stripped, blocks = strip_stereo_blocks(name)
-        if stripped != reduced:
-            return None
         by_block = _cip_descriptor_tokens(blocks)
-        if not by_block:
-            return None
         located = locate_stereo_blocks(name)
-        if ([text for _s, _e, text in located] != blocks
-                or any(name[s:e] != text + "-" for s, e, text in located)):
+        if (not by_block or [text for _s, _e, text in located] != blocks
+                or any(name[s:e] != text + "-" for s, e, text in located)
+                or (without_blocks(name, located, kept) if kept else stripped) != reduced):
             return None
         multiplicity = [_block_multiplicity(name, s) for s, _e, _t in located]
         # (locant, code, multiplicity, index of its block), in the order of the name
         tokens = [(loc, code, multiplicity[bi], bi)
                   for bi, block_tokens in enumerate(by_block)
-                  for loc, code in block_tokens]
+                  for loc, code in block_tokens if bi not in kept]
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return None
@@ -270,10 +304,13 @@ def stereo_block_units(name: str, smiles: Optional[str],
         for oi, lab in enumerate(labels):
             by_label.setdefault(lab, []).append(oi)
         tried: Dict[frozenset, bool] = {}
+        codes, ocodes = (_unit_codes(mol), _unit_codes(omol)) if kept else ({}, {})
         for mt in matches:
             inv = {mi: oi for oi, mi in enumerate(mt)}
             given = {u for u in labelled
                      if _stereo_unit_given_by_parse(mol, omol, inv, u)}
+            if kept and not _given_codes_agree(mol, omol, inv, given, codes, ocodes):
+                continue
             # per token, the ways to choose its units: ``multiplicity`` distinct
             # units among those at its locant that carry its code
             options = []
@@ -288,6 +325,7 @@ def stereo_block_units(name: str, smiles: Optional[str],
                                  if bond_code.get(b.GetIdx()) == code)
                     elif atom_code.get(mi) == code:
                         c.append(('a', mi))
+                c = [u for u in c if not (kept and u in given)]
                 ways = list(itertools.islice(
                     itertools.combinations(dict.fromkeys(c), mult), 64))
                 if not ways:
@@ -331,9 +369,91 @@ def stereo_block_units(name: str, smiles: Optional[str],
         return None
 
 
+def swap_open(by_block) -> bool:
+    """Do two descriptor blocks (``_cip_descriptor_tokens``) cite one locant with different codes? A located token
+    is read on ANY atom that carries its locant, so such blocks can pass swapped onto each other's groups
+    ('1-[(1r,4r)-4-ethylcyclohexyl]-3-[(1s,4s)-4-methylcyclohexyl]urea', review 2026-11-19). Blocks that give one
+    locant the same code cannot be read into each other's codes; one block can still be read on another group whose
+    own centre the name leaves unspecified ('1-[(2R)-2-methylbutyl]-3-(2-methylpentyl)urea' for an input whose
+    pentyl C2 is R: the limit the single-block reading always had, roadmap C2b)."""
+    codes: Dict[str, Dict[int, set]] = {}
+    for bi, block in enumerate(by_block or ()):
+        for loc, code in block:
+            if loc is not None:
+                codes.setdefault(loc, {}).setdefault(bi, set()).add(code)
+    return any(len(by) > 1 and len(set().union(*by.values())) > 1 for by in codes.values())
+
+
+def _swap_is_symmetric(smiles: str, reduced: str, by_block) -> bool:
+    """Is every atom that a swap-open locant (:func:`swap_open`) can name in ONE constitutional symmetry class of
+    the input? Then the groups the blocks may swap between are equivalent, and either reading names one compound
+    ('bis[(1r,4r)-4-methylcyclohexyl][(1s,4s)-4-methylcyclohexyl]phosphane', "Achiral cyclic
+    compounds"). The atoms are those carrying the locant in OPSIN's numbering of ``reduced`` (``$_AV``)."""
+    from .opsin_roundtrip import _AV_LINE_RE, _extended_smiles
+    mol = Chem.MolFromSmiles(smiles)
+    m = _AV_LINE_RE.match((_extended_smiles(reduced) or "").strip())
+    omol = Chem.MolFromSmiles(m.group(1)) if m and mol is not None else None
+    if omol is None:
+        return False
+    labels = [x.strip().replace("'", "").replace('′', '') for x in m.group(2).split(';')]
+    mt = (mol.GetSubstructMatch(omol) or _bare_skeleton(mol).GetSubstructMatch(_bare_skeleton(omol)))
+    if len(mt) != mol.GetNumAtoms() or len(labels) != len(mt):
+        return False
+    rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False, includeChirality=False))
+    codes = _unit_codes(mol)
+    coded = {idx for kind, idx in codes if kind == 'a'} | {
+        a for kind, idx in codes if kind == 'b'
+        for a in (mol.GetBondWithIdx(idx).GetBeginAtomIdx(), mol.GetBondWithIdx(idx).GetEndAtomIdx())}
+    blocks_at: Dict[str, set] = {}
+    for bi, block in enumerate(by_block):
+        for loc, code in block:
+            if loc is not None:
+                blocks_at.setdefault(loc, set()).add((bi, code))
+    for loc, cited in blocks_at.items():
+        if len({bi for bi, _c in cited}) > 1 and len({c for _b, c in cited}) > 1:
+            if len({rank[mt[oi]] for oi, lab in enumerate(labels) if lab == loc and mt[oi] in coded}) > 1:
+                return False
+    return True
+
+
+def _opsin_placed_blocks(name: str, located, by_block):
+    """``(kept, reduced)``: ``kept`` = the blocks OPSIN reads (the stereo-free name with that block alone parses),
+    ``reduced`` = ``name`` without the other blocks, which OPSIN must read too. OPSIN places each kept block on its
+    own group; the unread blocks, searched by locant, must not be:func:`swap_open` among themselves. ``None`` when
+    that does not hold."""
+    from .opsin_roundtrip import _extended_smiles
+    kept = tuple(i for i in range(len(located)) if _extended_smiles(without_blocks(name, located, (i,))))
+    unread = [by_block[i] for i in range(len(located)) if i not in kept]
+    if not kept or not unread or swap_open(unread):
+        return None
+    reduced = without_blocks(name, located, kept)
+    return (kept, reduced) if _extended_smiles(reduced) else None
+
+
+def checked_block_units(name: str, smiles: Optional[str], reduced: str,
+                        symmetric: bool = True) -> Optional[List[StereoBlockUnits]]:
+    """:func:`stereo_block_units` for a name whose blocks are not:func:`swap_open` or swap only between equivalent
+    groups (:func:`_swap_is_symmetric`); for any other, the reading with the blocks OPSIN reads placed by OPSIN and only the others searched (their units; a kept block
+    has none), or ``None`` (C2b, 2026-11-19). ``symmetric=False`` leaves out the symmetric-swap reading: it checks each
+    shared locant on its own, so two equivalent groups can each take half of two blocks
+    ('1-[(1R,2S)-2-methylcyclohexyl]-3-[(1S,2R)-2-methylcyclohexyl]urea' passes for the (1R,2R)/(1S,2S) input; review
+    2026-11-19). The default tier keeps it (the plain reading it replaced accepted every such name); the best-effort
+    offer of a name OPSIN cannot read does not use it."""
+    from ..rules.stereochemistry import locate_stereo_blocks, strip_stereo_blocks
+    by_block = _cip_descriptor_tokens(strip_stereo_blocks(name)[1]) if name else None
+    if not swap_open(by_block):
+        return stereo_block_units(name, smiles, reduced)
+    if strip_stereo_blocks(name)[0] != reduced:
+        return None
+    if symmetric and _swap_is_symmetric(smiles, reduced, by_block):
+        return stereo_block_units(name, smiles, reduced)
+    placed = _opsin_placed_blocks(name, locate_stereo_blocks(name), by_block)
+    return None if placed is None else stereo_block_units(name, smiles, placed[1], placed[0])
+
+
 def stereo_descriptors_verified(name: str, smiles: Optional[str],
                                  reduced: str) -> bool:
     """Is every stereodescriptor of ``name`` right for ``smiles``, ``reduced`` being
-    the name with its descriptor blocks stripped? True iff:func:`stereo_block_units`
-    finds a reading; the conditions are stated there."""
-    return stereo_block_units(name, smiles, reduced) is not None
+    the name with its descriptor blocks stripped? True iff:func:`checked_block_units`
+    finds a reading; the conditions are stated at:func:`stereo_block_units`."""
+    return checked_block_units(name, smiles, reduced) is not None
