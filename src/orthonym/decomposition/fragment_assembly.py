@@ -3174,6 +3174,11 @@ def _alcohol_to_alkyl_by_rule(alcohol_name: str) -> Tuple[str, str]:
     # ``_is_monovalent_group_word``.
     if _POLYOL_NAME_RE.search(name):
         return name, "polyol"
+    # A retained inositol name ('myo-inositol', names a cyclohexanehexol: no hydroxy group of it is the
+    # linking one, and the recommendations give it no group form ('myo-inosityl' is read by no parser). Its
+    # substituent is the systematic '2,3,4,5,6-pentahydroxycyclohexyl', the Blue Book).
+    if name.endswith("inositol"):
+        return name, "polyol"
 
     # Systematic alcohol: "propan-1-ol" -> "propyl"
     # Strip locant + "-ol" suffix

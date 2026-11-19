@@ -521,7 +521,7 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
         suffix = _multiplied_acylate(acylates[0], n_acyl, substituted_by_loc[acyl_locants[0]])
 
     # --- prefixes (free-OH, glycosyl, phosphoryloxy) on the non-acyl positions ---
-    prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms)
+    prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms, mol)
     if prefix is None:
         return None  # unrecognized neutral phospho head group → defer
 
@@ -564,7 +564,38 @@ _HEAD_GROUP_ALKOXY = {
 }
 
 
-def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms=()) -> Optional[str]:
+def _phosphoryloxy_of_structure(mol, site) -> Optional[str]:
+    """The phosphoryloxy prefix of a phospho head named from its structure, its parts in alphanumerical order
+    : '(hydroxy{[(1S,2R,3R,4S,5S,6R)-2,3,4,5,6-pentahydroxycyclohexyl]oxy}phosphoryl)oxy', the form of
+     "Phosphatidylinositols" (the Blue Book, '(2R)-3-[(hydroxy{[(1s,2R,3R,4s,5S,6S)-2,3,4,5,6-
+    pentahydroxycyclohexyl]oxy}phosphoryl)oxy]propane-1,2-diyl dihexadecanoate'). The fourth oxygen of the phosphorus is
+    'hydroxy' (-OH); None for anything else."""
+    from ..assembly.naming_utils import alpha_sort_key
+    p_idx, head_o_idx = site[1], site[4]
+    if head_o_idx is None:
+        return None
+    head = _name_phospho_head_substituent(mol, head_o_idx)
+    if head is None:
+        return None
+    p = mol.GetAtomWithIdx(p_idx)
+    free = [nb for nb in p.GetNeighbors()
+            if nb.GetAtomicNum() == 8 and nb.GetDegree() == 1
+            and mol.GetBondBetweenAtoms(p_idx, nb.GetIdx()).GetBondType() == Chem.BondType.SINGLE]
+    if len(free) != 1 or p.GetDegree() != 4:
+        return None
+    o = free[0]
+    # An anion (P-O(-)) declines: ranks anions (class 4) above esters (class 9), so the phosphate anion
+    # is the principal characteristic group ('<glyceryl> <head> phosphate', routing/dispatch_table._handle_anion_small),
+    # not an 'oxido' prefix on the glycerol diester.
+    if o.GetFormalCharge() != 0 or o.GetTotalNumHs() != 1:
+        return None
+    word = "hydroxy"
+    parts = sorted([word, f"{apply_enclosing_marks(head, -1)}oxy"], key=alpha_sort_key)
+    inner = "".join(apply_enclosing_marks(x, -1) if x != word else x for x in parts)
+    return f"{apply_enclosing_marks(inner + 'phosphoryl', -1)}oxy"
+
+
+def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms=(), mol=None) -> Optional[str]:
     """Build the detachable-prefix string (hydroxy / glycosyloxy / phosphoryloxy)
     preceding the attachment. Returns None if a phospho head group is unrecognized
     in the substitutive (neutral) regime (honest-gate,)."""
@@ -580,6 +611,13 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
         subs.append((_alpha_key(gly), f"{num[a]}-({gly})"))
     for a in phospho_atoms:
         head_desc = atom_site[a][3]
+        if head_desc == "inositol" and mol is not None:
+            oxy = _phosphoryloxy_of_structure(mol, atom_site[a])
+            if oxy is None:
+                return None
+            from ..assembly.naming_utils import alpha_sort_key as _ask
+            subs.append((_ask(oxy), f"{num[a]}-{apply_enclosing_marks(oxy, -1)}"))
+            continue
         head_alkoxy = _HEAD_GROUP_ALKOXY.get(head_desc)
         if head_alkoxy is None:
             return None  # neutral substitutive form not RT-verified for this head → defer

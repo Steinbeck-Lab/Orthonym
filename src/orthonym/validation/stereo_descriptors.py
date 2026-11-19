@@ -178,7 +178,7 @@ def _given_codes_agree(mol, omol, inv, given, codes, ocodes) -> bool:
 
 
 def stereo_block_units(name: str, smiles: Optional[str], reduced: str,
-                       kept: Tuple[int, ...] = ()) -> Optional[List[StereoBlockUnits]]:
+                       kept: Tuple[int, ...] = (), words: bool = False) -> Optional[List[StereoBlockUnits]]:
     """The reading by which ``name`` describes the stereo of ``smiles``, or ``None``
     when there is none. One:class:`StereoBlockUnits` per descriptor block of
     ``name``, in the order ``rules.stereochemistry.strip_stereo_blocks`` removes them;
@@ -248,9 +248,9 @@ def stereo_block_units(name: str, smiles: Optional[str], reduced: str,
         import itertools
         from ..namer import _self_consistency_full_key   # call time: a patch of it is seen
         from ..rules.stereochemistry import locate_stereo_blocks, strip_stereo_blocks
-        stripped, blocks = strip_stereo_blocks(name)
+        stripped, blocks = strip_stereo_blocks(name, words)
         by_block = _cip_descriptor_tokens(blocks)
-        located = locate_stereo_blocks(name)
+        located = locate_stereo_blocks(name, words)
         if (not by_block or [text for _s, _e, text in located] != blocks
                 or any(name[s:e] != text + "-" for s, e, text in located)
                 or (without_blocks(name, located, kept) if kept else stripped) != reduced):
@@ -405,7 +405,8 @@ def _free_token_swap_open(by_block) -> bool:
                for bi, loc, code in tokens for bj, _l2, c2 in tokens)
 
 
-def _swapped_reading_passes(name: str, smiles: str, reduced: str, kept, reading, by_block) -> bool:
+def _swapped_reading_passes(name: str, smiles: str, reduced: str, kept, reading, by_block,
+                            words: bool = False) -> bool:
     """Does ``name`` also read onto the input with a locant-free token's unit and a unit of the opposite code of another
     block both inverted, the isomer a swapped reading names? Then the reading does not decide which group carries which
     code. Fails closed (True) when it cannot tell."""
@@ -441,7 +442,7 @@ def _swapped_reading_passes(name: str, smiles: str, reduced: str, kept, reading,
             alt = Chem.MolToSmiles(rw)
         except Exception:
             return True
-        if stereo_block_units(name, alt, reduced, tuple(kept)) is not None:
+        if stereo_block_units(name, alt, reduced, tuple(kept), words) is not None:
             return True
     return False
 
@@ -502,6 +503,8 @@ def checked_block_units(name: str, smiles: Optional[str], reduced: str,
     2026-11-19). The default tier keeps it (the plain reading it replaced accepted every such name); the best-effort
     offer of a name OPSIN cannot read does not use it."""
     from ..rules.stereochemistry import locate_stereo_blocks, strip_stereo_blocks
+    if name and strip_stereo_blocks(name)[0] != reduced and strip_stereo_blocks(name, True)[0] == reduced:
+        return _word_block_units(name, smiles, reduced)
     by_block = _cip_descriptor_tokens(strip_stereo_blocks(name)[1]) if name else None
     located_open = _located_swap_open(by_block)
     if not located_open and not _free_token_swap_open(by_block):
@@ -523,6 +526,50 @@ def checked_block_units(name: str, smiles: Optional[str], reduced: str,
     if not located_open:
         return unique(stereo_block_units(name, smiles, reduced), reduced)
     return None
+
+
+def _word_block_units(name: str, smiles: Optional[str], reduced: str) -> Optional[List[StereoBlockUnits]]:
+    """:func:`checked_block_units` for a name whose ``reduced`` form also drops a block at the start of a later word
+    (``rules.stereochemistry.strip_stereo_blocks(name, words=True)``: '(2R)-2,3-dihydroxypropyl (1S,2R,3R,4S,5S,6R)-
+    2,3,4,5,6-pentahydroxycyclohexyl phosphate'). Locants restart in every word of such a name, so a block read by its
+    locants alone could land in another word ('butan-2-yl (2R)-2-methylbutanoate' would pass for an input whose R is the
+    butan-2-yl carbon; review 2026-11-19): OPSIN places every block it reads, only the blocks it cannot read are
+    searched (on units the parse leaves open), and those must not cite one locant with different codes. ``None`` when
+    OPSIN reads no block, or every block."""
+    from ..rules.stereochemistry import locate_stereo_blocks, strip_stereo_blocks
+    by_block = _cip_descriptor_tokens(strip_stereo_blocks(name, True)[1])
+    if not by_block:
+        return None
+    placed = _opsin_placed_blocks(name, locate_stereo_blocks(name, True), by_block)
+    if placed is None:
+        return None
+    kept, red = placed
+    reading = stereo_block_units(name, smiles, red, kept, True)
+    if reading is None or not _free_token_swap_open([b for i, b in enumerate(by_block) if i not in kept]):
+        return reading
+    return None if _swapped_reading_passes(name, smiles, red, kept, reading, by_block, True) else reading
+
+
+def carve_out_reduced(name: str, parses=None, smiles: Optional[str] = None) -> str:
+    """The stereo-free form of ``name`` that the final gate's stereo-layer carve-out reads with OPSIN: the old stripper's
+    (``rules.stereochemistry.strip_stereo``), or, when OPSIN cannot read that one and a later word of the name starts
+    with a block, the form without that block too (``words=True``). A block that starts a later word is the second
+    organyl group of an ester:
+    '(2R)-2,3-dihydroxypropyl (1S,2R,3R,4S,5S,6R)-2,3,4,5,6-pentahydroxycyclohexyl phosphate'; the descriptor check
+    then has OPSIN place every block it reads (:func:`_word_block_units`). ``parses`` says whether OPSIN reads a name
+    (namer._final_opsin_validity_gate passes its own gate parse; default: an OPSIN SMILES exists). With ``smiles``
+    (the final gate), the wider form also needs the descriptor check to confirm every block: a block the check cannot
+    place stays in the stripped name, so OPSIN refuses it as before ('methyl (6R)-4-[(2R)-...]-3-hydroxybenzoate'
+    cites a ring carbon that is no stereocentre; read without '(6R)', the gate's descriptor repair would build a name
+    from it)."""
+    from ..rules.stereochemistry import strip_stereo
+    if parses is None:
+        from .opsin_roundtrip import _extended_smiles
+        parses = lambda n: bool(_extended_smiles(n))   # noqa: E731
+    old, wide = strip_stereo(name), strip_stereo(name, words=True)
+    if wide != old and not parses(old) and (smiles is None or checked_block_units(name, smiles, wide) is not None):
+        return wide
+    return old
 
 
 def stereo_descriptors_verified(name: str, smiles: Optional[str],

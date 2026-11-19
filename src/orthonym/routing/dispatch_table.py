@@ -967,6 +967,23 @@ def _handle_cation_quaternary(mol, smiles, canonical_smiles, features=None, *,
     return route_charged(mol, style) or None
 
 
+def _stereo_free_reads_to_constitution(name, mol) -> bool:
+    """Does OPSIN read ``name`` with its stereo blocks removed (``rules.stereochemistry.strip_stereo``) to the input
+    with its stereo removed (same InChIKey), while it does not read the whole name?"""
+    from orthonym.rules.stereochemistry import strip_stereo
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    stripped = strip_stereo(name, words=True)
+    if not stripped or stripped == name:
+        return False
+    back = opsin_parse(stripped)
+    bm = Chem.MolFromSmiles(back) if back else None
+    if bm is None:
+        return False
+    flat = Chem.Mol(mol)
+    Chem.RemoveStereochemistry(flat)
+    return Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(flat)
+
+
 def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
                         style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors namer.py:884-913 — dual-path with neutralize-recurse fallback.
@@ -1000,13 +1017,13 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     """
     # charged Slice A fix-a performance pass (class closure): this is the ester-anion
     # producer's 0-wrong gate. name_acid_ester_anion is NOT fail-closed at the
-    # producer -- a cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
-    # CIP-verify (e.g. the phosphate/sulfate MONOanion of a hexahydroxycyclohexane)
-    # must ABSTAIN, never ship stereo-unverified via the final-gate carve-out.
-    # Require the SAME strict full-InChIKey round-trip (constitution + stereo +
-    # charge) already applied to the poly-anion siblings
+    # producer: its name ships on the SAME strict full-InChIKey round-trip
+    # (constitution + stereo + charge) already applied to the poly-anion siblings
     # (dispatch_table.py::_handle_poly_anion, ions.py's single- and multi-anion
-    # branches).
+    # branches). A cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
+    # CIP-verify goes to the final gate's stereo carve-out instead, which checks
+    # every descriptor (ChEBI C3, 2026-11-19; it shipped them unchecked when this
+    # handler was written).
     from orthonym.rules.acid_ester_anion import name_acid_ester_anion
     from orthonym.rules.ions import _validate_anion_name
     ester_anion = name_acid_ester_anion(mol)
@@ -1019,6 +1036,15 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
                 validated = _validate_anion_name(mol, ester_anion)
                 if validated:
                     return validated
+        elif _stereo_free_reads_to_constitution(ester_anion, mol):
+            # OPSIN reads the name only without its stereo (an inositol owner: 'Failed to assign CIP stereochemistry').
+            # The final gate's stereo carve-out checks every descriptor against the input's CIP labels
+            # (validation/stereo_descriptors.checked_block_units; at best-effort both labellers must agree), so the name
+            # goes there instead of being dropped for route_charged's '...pentolate', which moves the charge onto a ring
+            # oxygen (ChEBI C3, 2026-11-19).
+            validated = _validate_anion_name(mol, ester_anion)
+            if validated:
+                return validated
         # strict RT could not confirm the name -> fall through (abstain / other paths)
 
     from orthonym.rules.charged_router import route_charged

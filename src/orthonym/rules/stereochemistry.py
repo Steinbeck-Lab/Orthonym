@@ -608,9 +608,17 @@ _STRIP_STEREO_NESTED_RE = re.compile(
     r"([\[(])\((?:[0-9]+[a-z]?[rsezRSEZ*]|[rsezRSEZ]|RS|SR|[,\-+ ])+\)-",
     re.IGNORECASE,
 )
+# ChEBI C3 (2026-11-19): the same block at the start of a later WORD of the name (the second organyl group of an ester,
+# '(2R)-2,3-dihydroxypropyl (1S,2R,3R,4S,5S,6R)-2,3,4,5,6-pentahydroxycyclohexyl phosphate'). Only the stereo-layer
+# carve-out and its descriptor check take it (``words=True``): there OPSIN places every block it reads
+# (validation/stereo_descriptors.checked_block_units), because locants restart in each word.
+_STRIP_STEREO_WORD_RE = re.compile(
+    r"([\[( ])\((?:[0-9]+[a-z]?[rsezRSEZ*]|[rsezRSEZ]|RS|SR|[,\-+ ])+\)-",
+    re.IGNORECASE,
+)
 
 
-def strip_stereo(name: str) -> str:
+def strip_stereo(name: str, words: bool = False) -> str:
     """Return *name* with leading stereo / relative-config descriptor blocks removed
     (to a fixpoint) — the OPSIN-validity stereo carve-out "where does OPSIN fail" probe (internal notes).
 
@@ -621,10 +629,10 @@ def strip_stereo(name: str) -> str:
     leading descriptor (``hexane``) and substituent enclosing groups (``(2-chloroethyl)``)
     untouched.
     """
-    return strip_stereo_blocks(name)[0]
+    return strip_stereo_blocks(name, words)[0]
 
 
-def strip_stereo_blocks(name: str):
+def strip_stereo_blocks(name: str, words: bool = False):
     """``(strip_stereo(name), blocks)``: the stripped name and every descriptor block
     it removed, in the order removed -- a parenthesised block WITH its parentheses
     (``'(7R,8S)'``, ``'(1r,4r)'``) or a relative-configuration word (``'rel'``,
@@ -658,11 +666,11 @@ def strip_stereo_blocks(name: str):
         # W4-S2: also strip nested substituent-stereo blocks (``[(1r,4r)-…``),
         # keeping the enclosing mark. Applied in the same fixpoint so a name with
         # both a leading and a nested block converges (read-only gate probe only).
-        s = _STRIP_STEREO_NESTED_RE.sub(_nested, s).strip()
+        s = (_STRIP_STEREO_WORD_RE if words else _STRIP_STEREO_NESTED_RE).sub(_nested, s).strip()
     return s, blocks
 
 
-def locate_stereo_blocks(name: str) -> List[Tuple[int, int, str]]:
+def locate_stereo_blocks(name: str, words: bool = False) -> List[Tuple[int, int, str]]:
     """``[(start, end, text)]``: where in ``name`` each descriptor block that
     :func:`strip_stereo_blocks` removes sits.
 
@@ -703,7 +711,7 @@ def locate_stereo_blocks(name: str) -> List[Tuple[int, int, str]]:
             s, pos = s[m.end():], pos[m.end():]
         _trim()
         keep_s, keep_pos, last = [], [], 0
-        for m in _STRIP_STEREO_NESTED_RE.finditer(s):
+        for m in (_STRIP_STEREO_WORD_RE if words else _STRIP_STEREO_NESTED_RE).finditer(s):
             # group(0) is '<mark>(<block>)-'; the block starts after the mark.
             found.append((pos[m.start() + 1], pos[m.end() - 1] + 1,
                           m.group(0)[1:-1]))

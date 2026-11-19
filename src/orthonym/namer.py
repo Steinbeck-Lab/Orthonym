@@ -2817,8 +2817,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # through the SAME decision the parsed path uses: a verified
     # constitutional mismatch suppresses, while `ok`/`inconclusive` still ship the
     # FULL stereo name (fail-OPEN on any comparison that could not be made).
-    from .rules.stereochemistry import strip_stereo
-    _stripped = strip_stereo(name)
+    from .validation.stereo_descriptors import carve_out_reduced   # also strips a block that starts a later word
+    _stripped = carve_out_reduced(name, lambda n: _validity_gate_status(n) == "parsed", smiles)
     if _stripped != name:
         _stripped_status = _validity_gate_status(_stripped)
         # -FOLLOWUP: _validity_gate_status is THREE-valued, and the stripped

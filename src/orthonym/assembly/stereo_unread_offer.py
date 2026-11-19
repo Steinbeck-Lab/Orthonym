@@ -38,8 +38,8 @@ def stereo_unread_row(namer, smiles, held) -> Optional[Dict]:
     try:
         from ..metrics.producer_trail import carried
         from ..namer import _final_opsin_validity_gate
-        from ..rules.stereochemistry import strip_stereo_blocks
         from ..validation.second_cip_labeller import cited_codes_agree
+        from ..validation.stereo_descriptors import carve_out_reduced
         for name in held:
             if not _has_stereo_layer(name):
                 continue
@@ -47,7 +47,7 @@ def stereo_unread_row(namer, smiles, held) -> Optional[Dict]:
             pv.record_source("general_engine")
             if (carried(name, _final_opsin_validity_gate(name, smiles)) != name
                     or pv.get_provenance().get("gate_outcome") != pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY
-                    or not cited_codes_agree(name, smiles, strip_stereo_blocks(name)[0])):
+                    or not cited_codes_agree(name, smiles, carve_out_reduced(name))):
                 continue
             token = _OFFERING.set(True)
             try:
@@ -78,6 +78,6 @@ def unread_stereo_admitted(namer, smiles, name, gate_outcome) -> bool:
     from ..metrics import provenance as pv
     if not _OFFERING.get() or gate_outcome != pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY:
         return False
-    from ..rules.stereochemistry import strip_stereo_blocks
     from ..validation.second_cip_labeller import cited_codes_agree
-    return cited_codes_agree(name, smiles, strip_stereo_blocks(name)[0])
+    from ..validation.stereo_descriptors import carve_out_reduced
+    return cited_codes_agree(name, smiles, carve_out_reduced(name))
