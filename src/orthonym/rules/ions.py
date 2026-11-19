@@ -228,7 +228,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
                     return 'sulfonate'
                 if double_o == 1:
                     return 'sulfinate'
-            elif nb.GetSymbol() == 'P' and nb_has_carbon:
+            elif nb.GetSymbol() in ('P', 'As', 'Sb') and nb_has_carbon:  #: As/Sb acids as P acids
                 return 'phosphonate'
 
             # (peroxy-acid anion): [O-]-O-C(=O)R (the acyl peroxo
@@ -1873,6 +1873,7 @@ def _try_neutralize_and_name_systematic(mol) -> str:
 _OXOACID_NEUTRAL_SUFFIXES = frozenset({
     'sulfonic acid', 'sulfinic acid',
     'phosphonic acid', 'phosphinic acid', 'phosphoric acid',
+    'arsonic acid', 'arsinic acid', 'stibonic acid', 'stibinic acid',
     'ous acid',  #: 'ous acid' -> 'ite' ('ethylphosphonite' from 'ethylphosphonous acid')
 })
 

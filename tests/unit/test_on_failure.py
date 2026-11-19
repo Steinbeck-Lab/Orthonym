@@ -29,8 +29,10 @@ ROOT = Path(__file__).resolve().parents[2]
 # (SMILES, the limit code of a structure that gets no name)
 UNNAMED = [
     # (the first row, 'C[C@H]1CC[C@H](NC(=O)c2ccccc2)CC1', is named 'N-[(1r,4r)-4-methylcyclohexyl]benzamide' since lane
-    # l17 and no longer gets no name; this peroxide-bridged dihydroanthracene (a dev2000 row) is declined at every tier)
-    ("C[C@]12OO[C@](CCC(=O)O)(c3ccccc31)c1ccccc12", "UNNAMEABLE"),
+    # l17 and no longer gets no name; the peroxide-bridged dihydroanthracene 'C[C@]12OO[C@](CCC(=O)O)c1ccccc12'
+    # is named 'cis-1-(3-hydroxy-3-oxopropyl)-8-methyl-15,16-dioxatetracyclo[...]' since lane chebi; this sydnone imine
+    # (CHEBI:230735) is declined at every tier)
+    ("CC1CCCC(C)N1[N+]1=NOC(=[N-])C1", "UNNAMEABLE"),
     ("F[Xe]F", "UNSUPPORTED_ELEMENT"),
     ("*CC", "WILDCARD_ATOMS"),
 ]

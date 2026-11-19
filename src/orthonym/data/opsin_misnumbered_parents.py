@@ -9,11 +9,12 @@ another structure, or not at all. While the OPSIN in use is not a main-branch bu
 used (``rules.bridged_fused_pin.parents.fused_parent``), and the molecule takes its von Baeyer name as it
 does under OPSIN main.
 
-OPSIN main also reads locant 8 of pyrrolizine as its fusion carbon 7a (PR #316, "Accept locant 8 for the
-pyrrolizine ring-fusion carbon"; dan2097/opsin#359). A bridged pyrrolizine numbers its first bridge atom
-8, the Blue Book: "Bridge atoms are numbered continuing from the highest locant of the
-fused ring system"), which OPSIN main then reads on the fusion carbon. Bridged pyrrolizines are therefore
-not used with any OPSIN: the names are right, but OPSIN main reads them as another structure.
+OPSIN main builds from PR #316 ("Accept locant 8 for the pyrrolizine ring-fusion carbon", cb88edec) up to the fix
+of dan2097/opsin#359 (a2f1a995, 2026-11-19) read locant 8 of pyrrolizine as its fusion carbon 7a. A bridged
+pyrrolizine numbers its first bridge atom 8, the Blue Book: "Bridge atoms are numbered continuing
+from the highest locant of the fused ring system"), so such a build reads the right name as another structure. A
+bridged pyrrolizine is therefore not named while the OPSIN in use fails the probe
+(``opsin_capabilities.bridged_pyrrolizine_reads_right``); OPSIN 2.9.0 and the fixed main read the names as written.
 
 How the table was measured: every fused or bridged ring token in the names of the PubChem run and the six
 paper sets (7,680,652 tokens, 31,550 fused parents, 13,197 bridged parents) and the engine's own parent

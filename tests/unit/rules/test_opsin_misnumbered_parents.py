@@ -6,19 +6,20 @@ OPSIN main 760d57c0f132:
 - OPSIN main lays out some fused ring systems otherwise than 2.9.0 does (its commits 093a195c and 75ff41fe), so a
   parent numbered by 2.9.0's reading ('benzo[4,5]cyclodeca[1,2-b]oxirene') puts its locants on other atoms when
   main reads the name. While the OPSIN in use is not a main build, such a parent is not used.
-- OPSIN main reads locant 8 of pyrrolizine as the fusion carbon 7a (its PR #316). "Numbering of bridge
-  atoms" (the Blue Book: "Bridge atoms are numbered continuing from the highest locant of the fused ring
-  system") gives the first bridge atom of '1,5-ethanopyrrolizine' locant 8, so OPSIN main reads such a name as
-  another structure. A bridged pyrrolizine is not used with any OPSIN.
+- OPSIN main builds from its PR #316 up to the fix of dan2097/opsin#359 read locant 8 of pyrrolizine as the fusion
+  carbon 7a. "Numbering of bridge atoms" (the Blue Book: "Bridge atoms are numbered continuing from the
+  highest locant of the fused ring system") gives the first bridge atom of '1,5-ethanopyrrolizine' locant 8, so such
+  a build reads the name as another structure. A bridged pyrrolizine is not named while the OPSIN in use fails the
+  probe; OPSIN 2.9.0 reads it right.
 
 The molecule then takes its von Baeyer name, below the PIN, as it does under OPSIN main."""
 import pytest
 
-from orthonym import Orthonym, jars
+from orthonym import Orthonym, jars, opsin_capabilities
 from orthonym.cli import _emit_tier_flags
 from orthonym.data.opsin_misnumbered_parents import BRIDGE_LOCANT_ALIASED_PARENTS, LAYOUT_MISNUMBERED_PARENTS
 from orthonym.jvm_budget import jvm_slots
-from orthonym.rules.bridged_fused_pin import parents
+from orthonym.rules.bridged_fused_pin import parents, selection
 from tests.support.opsin_marks import release_opsin_in_use
 from tests.support.rt_assert import name_is_rt_exact
 
@@ -55,13 +56,32 @@ def _row(smiles, tier):
         return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
-def test_bridged_pyrrolizine_takes_its_von_baeyer_name():
+def test_bridged_pyrrolizine_keeps_its_pin_with_an_opsin_that_reads_it():
+    """OPSIN 2.9.0 (and OPSIN main from a2f1a995) read locant 8 on the first bridge atom."""
+    if not opsin_capabilities.bridged_pyrrolizine_reads_right():
+        pytest.skip("the OPSIN in use reads locant 8 of pyrrolizine as C7a")
+    row = _row(PYRROLIZINE_BRIDGED, "pin")
+    assert (row["name"], row["tier"]) == (
+        "(9R)-9-(3,4-dichlorophenyl)tetrahydro-1H-1,5-ethanopyrrolizin-2(3H)-one", "pin_verified")
+    assert name_is_rt_exact(row["name"], PYRROLIZINE_BRIDGED)
+
+
+def test_bridged_pyrrolizine_takes_its_von_baeyer_name_where_8_is_misread(monkeypatch):
     assert "pyrrolizine" in BRIDGE_LOCANT_ALIASED_PARENTS
+    monkeypatch.setattr(selection, "bridged_pyrrolizine_reads_right", lambda: False)
+    monkeypatch.setattr(selection, "_DECLINED", {})
     row = _row(PYRROLIZINE_BRIDGED, "best-effort")
     assert (row["name"], row["tier"]) == (
         "(3R)-3-(3,4-dichlorophenyl)-7-azatricyclo[5.3.0.0^4,8]decan-5-one", "systematic_verified")
     assert name_is_rt_exact(row["name"], PYRROLIZINE_BRIDGED)
-    assert "pyrrolizin" not in (_row(PYRROLIZINE_BRIDGED, "pin").get("name") or "")
+
+
+def test_bridged_pyrrolizine_probe(monkeypatch):
+    _active(monkeypatch, "2.9.0")
+    assert opsin_capabilities.bridged_pyrrolizine_reads_right()
+    _active(monkeypatch, "main")
+    monkeypatch.setattr(opsin_capabilities, "opsin_capabilities", lambda: {"bridged_pyrrolizine": False})
+    assert not opsin_capabilities.bridged_pyrrolizine_reads_right()
 
 
 @pytest.mark.skipif(not release_opsin_in_use(), reason="OPSIN main numbers this parent as the engine then does")

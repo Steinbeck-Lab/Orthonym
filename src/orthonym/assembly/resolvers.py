@@ -290,6 +290,11 @@ _ANION_SUFFIX_MAP = {
     "sulfinic acid": "sulfinate",
     "phosphonic acid": "phosphonate",
     "phosphinic acid": "phosphinate",
+    #: the arsenic and antimony analogues of phosphonic/phosphinic acid
+    "arsonic acid": "arsonate",
+    "arsinic acid": "arsinate",
+    "stibonic acid": "stibonate",
+    "stibinic acid": "stibinate",
     # (code review 2026-06-02): RESERVED / unreachable-by-design. A correct
     # chemical mapping, but O-P phosphate ESTERS are deliberately excluded from
     # the oxoacid-anion routing upstream (classify_anion sends them to 'alkoxide',

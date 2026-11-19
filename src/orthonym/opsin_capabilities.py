@@ -42,6 +42,10 @@ _PROBES = {
     #: "polyester": the functional-class name of a polyol ester of different acids method (1),:31840
     #: 'propane-1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)'; dan2097/opsin#354), which OPSIN 2.9.0 does not read
     "polyester": ("propane-1,2,3-triyl 1,2-diacetate 3-propanoate", "CCC(=O)OCC(OC(C)=O)COC(C)=O", False),
+    #: "bridged_pyrrolizine": locant 8 of a bridged pyrrolizine on its first bridge atom, the Blue Book).
+    #: OPSIN 2.9.0 reads it so; main builds from PR #316 up to dan2097/opsin#359's fix (a2f1a995, 2026-11-19)
+    #: put it on the fusion carbon 7a. Unlike the others, OPSIN 2.9.0 has it (``bridged_pyrrolizine_reads_right``).
+    "bridged_pyrrolizine": ("8-methylhexahydro-1H-1,5-ethanopyrrolizine", "CC1CC2CCN3C1CCC23", False),
 }
 _NONE: Dict[str, bool] = {key: False for key in _PROBES}
 _CACHE: Dict[str, Dict[str, bool]] = {}
@@ -106,7 +110,7 @@ def _store(path: str, answer: Dict[str, bool]) -> None:
 
 
 def opsin_capabilities() -> Dict[str, bool]:
-    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool, "axial": bool, "aminiumyl": bool, "polyester": bool}`` for the OPSIN
+    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool, "radical_adduct": bool, "axial": bool, "aminiumyl": bool, "polyester": bool, "bridged_pyrrolizine": bool}`` for the OPSIN
     this process uses."""
     from .jvm_bridge import OpsinUnavailable
     try:
@@ -162,6 +166,19 @@ def composite_assembly_enabled() -> bool:
     """True when the OPSIN in use reads ring assembly names with composite locants. A capability set
     without the entry (a test that stands in for OPSIN 2.9.0) reads as "cannot"."""
     return bool(opsin_capabilities().get("composite_assembly", False))
+
+
+def bridged_pyrrolizine_reads_right() -> bool:
+    """True when the OPSIN in use reads locant 8 of a bridged pyrrolizine name on the first bridge atom, as OPSIN 2.9.0
+    and OPSIN main from a2f1a995 do; False for a main build of the window in which it read 8 as the fusion carbon (and
+    when a build cannot be probed). True in reduced mode (no jar): no read-back runs there, so nothing is offered on
+    the strength of this answer."""
+    try:
+        if jars.active_opsin()["label"] == "2.9.0":
+            return True
+    except jars.JarUnavailable:
+        return True
+    return bool(opsin_capabilities().get("bridged_pyrrolizine", False))
 
 
 def aminiumyl_enabled() -> bool:

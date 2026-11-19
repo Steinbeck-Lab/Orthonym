@@ -43,6 +43,7 @@ from .metrics.producer_trail import carried as _carried, noted as _noted, suspen
 from .rules.charged_fallback import late_charged_name as _late_charged_name
 from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, withdrawn_name
 from .rules.inositols import is_inositol_name_of   # no OPSIN grammar; exact InChIKey
+from .assembly.stereo_unread_offer import unread_stereo_admitted   # stereo OPSIN cannot read, two CIP labellers
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
 from .validation.fullerene_read_back import fullerene_gate_ships
@@ -6109,7 +6110,7 @@ class Orthonym:
                 and not self._disable_opsin_validity_gate
                 and not _DISABLE_VALIDITY_GATE
                 and _validity_gate_jar_present()
-                and not (_is_exact_match_list_name(smiles, name) or (self._general_fallback_unverified and is_inositol_name_of(smiles, name)))):
+                and not (_is_exact_match_list_name(smiles, name) or unread_stereo_admitted(self, smiles, name, gate_outcome))):
             if _shipped_name_round_trip(name, smiles) == "verified":
                 opsin = "verified"
                 gate_outcome = _pv.GATE_OUTCOME_FULL_KEY_VERIFIED

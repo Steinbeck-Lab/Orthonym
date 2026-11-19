@@ -15,8 +15,9 @@ suppressed another string, so the gate outcome recorded for the shipped string w
 'unverified'. ``name_tiered`` now checks such a name itself and labels it verified.
 The twentieth, the myo-inositol pentakisphosphate below, is a name with lowercase
 r/s descriptors, which OPSIN 2.9.0 cannot read: the last resort that had adopted it
- is gone, so the row abstains again, as in the code the paper measured
-.
+ is gone. Since the user decision of 2026-11-19 the best-effort tier ships it again, labelled
+best_effort, through the unread-stereo offer: OPSIN reads the stereo-stripped name to the input's
+constitution and two CIP labellers confirm every descriptor (``assembly.stereo_unread_offer``).
 
 Every row is also checked against the OPSIN jar directly (a Java subprocess, not
 the engine's own oracle), so the test does not rest on the code it tests.
@@ -86,12 +87,12 @@ def test_round_tripping_name_is_kept_and_labelled_verified(smiles):
     assert _jar_full_key(row["name"]) == _input_key(smiles)
 
 
-def test_pentakisphosphate_r_s_name_is_not_shown_at_best_effort():
-    assert _jar_full_key(PENTAKIS_NAME) == ""  # the reason: OPSIN cannot read it
+def test_pentakisphosphate_r_s_name_is_shown_at_best_effort_as_a_two_labeller_name():
+    assert _jar_full_key(PENTAKIS_NAME) == ""  # OPSIN cannot read it
     row = _be_row(PENTAKIS)
-    assert row["name"] is None, row
-    assert row["tier"] == "abstain" and row["limit_code"], row
-    assert row["gate_outcome"] == "suppressed", row
-    # the plain name at best-effort does not ship it either
+    assert (row["name"], row["tier"], row["is_pin"]) == (PENTAKIS_NAME, "best_effort", False), row
+    assert row["gate_outcome"] == "self_consistency_constitution_only", row
+    stripped = "2,3,4,5,6-pentakis(phosphonooxy)cyclohexan-1-ol"
+    assert _jar_full_key(stripped).split("-")[0] == _input_key(PENTAKIS).split("-")[0]
     name = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(PENTAKIS)
-    assert name != PENTAKIS_NAME
+    assert name == PENTAKIS_NAME

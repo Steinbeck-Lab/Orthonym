@@ -297,6 +297,9 @@ def default_tier_row_for(namer, smiles) -> Optional[Dict]:
     if row is None:
         from .stereo_composed_offer import stereo_composed_row
         row = stereo_composed_row(namer, smiles)
+    if row is None and held:
+        from .stereo_unread_offer import stereo_unread_row   # stereo OPSIN cannot read, two CIP labellers agree
+        row = stereo_unread_row(namer, smiles, held)
     if row is None:
         from .radical_offer import radical_last_resort_row
         row = radical_last_resort_row(namer, smiles)
