@@ -370,18 +370,80 @@ def stereo_block_units(name: str, smiles: Optional[str], reduced: str,
 
 
 def swap_open(by_block) -> bool:
-    """Do two descriptor blocks (``_cip_descriptor_tokens``) cite one locant with different codes? A located token
-    is read on ANY atom that carries its locant, so such blocks can pass swapped onto each other's groups
-    ('1-[(1r,4r)-4-ethylcyclohexyl]-3-[(1s,4s)-4-methylcyclohexyl]urea', review 2026-11-19). Blocks that give one
-    locant the same code cannot be read into each other's codes; one block can still be read on another group whose
-    own centre the name leaves unspecified ('1-[(2R)-2-methylbutyl]-3-(2-methylpentyl)urea' for an input whose
-    pentyl C2 is R: the limit the single-block reading always had, roadmap C2b)."""
+    """Can two descriptor blocks (``_cip_descriptor_tokens``) be read swapped onto each other's groups? A located token
+    is read on ANY atom that carries its locant, so blocks that cite one locant with different codes can
+    ('1-[(1r,4r)-4-ethylcyclohexyl]-3-[(1s,4s)-4-methylcyclohexyl]urea', review 2026-11-19); a locant-free token may
+    land on any unit with its code, so it can trade places with the opposite code of another block
+    (:func:`_free_token_swap_open`). Blocks that give one locant the same code cannot be read into each other's codes;
+    one block can still be read on another group whose own centre the name leaves unspecified
+    ('1-[(2R)-2-methylbutyl]-3-(2-methylpentyl)urea' for an input whose pentyl C2 is R: the limit the single-block
+    reading always had, roadmap C2b)."""
+    return _located_swap_open(by_block) or _free_token_swap_open(by_block)
+
+
+def _located_swap_open(by_block) -> bool:
+    """Do two blocks cite one locant with different codes?"""
     codes: Dict[str, Dict[int, set]] = {}
     for bi, block in enumerate(by_block or ()):
         for loc, code in block:
             if loc is not None:
                 codes.setdefault(loc, {}).setdefault(bi, set()).add(code)
     return any(len(by) > 1 and len(set().union(*by.values())) > 1 for by in codes.values())
+
+
+_OPPOSITE = {"R": "S", "S": "R", "r": "s", "s": "r", "E": "Z", "Z": "E"}
+
+
+def _free_token_swap_open(by_block) -> bool:
+    """Does a locant-free token of one block face its opposite code (R/S, r/s, E/Z) in another block? The two can pass
+    swapped: '(1R,3s)-3-[(S)-hydroxy(pyridin-2-yl)methyl]-1-methyl-3-phenylcyclobutan-1-ol' passed for the input whose
+    ring C1 is S and whose methyl C1 is R, '1R' read on the methyl carbon and '(S)' on the ring (ChEMBL 37 exposure
+    count, 2026-11-19: 12 of 950 names OPSIN cannot read). Other codes cannot trade places: an 'R' token never lands
+    on an 'r' unit."""
+    tokens = [(bi, loc, code) for bi, block in enumerate(by_block or ()) for loc, code in block]
+    return any(bi != bj and loc is None and _OPPOSITE.get(code) == c2
+               for bi, loc, code in tokens for bj, _l2, c2 in tokens)
+
+
+def _swapped_reading_passes(name: str, smiles: str, reduced: str, kept, reading, by_block) -> bool:
+    """Does ``name`` also read onto the input with a locant-free token's unit and a unit of the opposite code of another
+    block both inverted, the isomer a swapped reading names? Then the reading does not decide which group carries which
+    code. Fails closed (True) when it cannot tell."""
+    pairs, free_units, other = [], [], []
+    for bi, block in enumerate(by_block):
+        if bi in kept:
+            continue
+        for (loc, code), units in zip(block, reading[bi].token_units):
+            (free_units if loc is None else other).extend((bi, code, u) for u in units)
+    for bi, code, u in free_units:
+        for bj, c2, v in other:
+            if bj != bi and _OPPOSITE.get(code) == c2:
+                pairs.append((u, v))
+    if len(pairs) > 32:
+        return True
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return True
+    flip_bond = {Chem.BondStereo.STEREOE: Chem.BondStereo.STEREOZ, Chem.BondStereo.STEREOZ: Chem.BondStereo.STEREOE,
+                 Chem.BondStereo.STEREOCIS: Chem.BondStereo.STEREOTRANS,
+                 Chem.BondStereo.STEREOTRANS: Chem.BondStereo.STEREOCIS}
+    for pair in pairs:
+        rw = Chem.RWMol(mol)
+        for kind, idx in pair:
+            if kind == "a":
+                rw.GetAtomWithIdx(idx).InvertChirality()
+            else:
+                b = rw.GetBondWithIdx(idx)
+                if b.GetStereo() not in flip_bond:
+                    return True
+                b.SetStereo(flip_bond[b.GetStereo()])
+        try:
+            alt = Chem.MolToSmiles(rw)
+        except Exception:
+            return True
+        if stereo_block_units(name, alt, reduced, tuple(kept)) is not None:
+            return True
+    return False
 
 
 def _swap_is_symmetric(smiles: str, reduced: str, by_block) -> bool:
@@ -424,7 +486,7 @@ def _opsin_placed_blocks(name: str, located, by_block):
     from .opsin_roundtrip import _extended_smiles
     kept = tuple(i for i in range(len(located)) if _extended_smiles(without_blocks(name, located, (i,))))
     unread = [by_block[i] for i in range(len(located)) if i not in kept]
-    if not kept or not unread or swap_open(unread):
+    if not kept or not unread or _located_swap_open(unread):
         return None
     reduced = without_blocks(name, located, kept)
     return (kept, reduced) if _extended_smiles(reduced) else None
@@ -441,14 +503,26 @@ def checked_block_units(name: str, smiles: Optional[str], reduced: str,
     offer of a name OPSIN cannot read does not use it."""
     from ..rules.stereochemistry import locate_stereo_blocks, strip_stereo_blocks
     by_block = _cip_descriptor_tokens(strip_stereo_blocks(name)[1]) if name else None
-    if not swap_open(by_block):
+    located_open = _located_swap_open(by_block)
+    if not located_open and not _free_token_swap_open(by_block):
         return stereo_block_units(name, smiles, reduced)
     if strip_stereo_blocks(name)[0] != reduced:
         return None
-    if symmetric and _swap_is_symmetric(smiles, reduced, by_block):
-        return stereo_block_units(name, smiles, reduced)
+
+    def unique(reading, red, kept=()):
+        # a locant-free token facing its opposite code: the swapped isomer must not pass too
+        if reading is None or not _free_token_swap_open([b for i, b in enumerate(by_block) if i not in kept]):
+            return reading
+        return None if _swapped_reading_passes(name, smiles, red, kept, reading, by_block) else reading
+
+    if located_open and symmetric and _swap_is_symmetric(smiles, reduced, by_block):
+        return unique(stereo_block_units(name, smiles, reduced), reduced)
     placed = _opsin_placed_blocks(name, locate_stereo_blocks(name), by_block)
-    return None if placed is None else stereo_block_units(name, smiles, placed[1], placed[0])
+    if placed is not None:
+        return unique(stereo_block_units(name, smiles, placed[1], placed[0]), placed[1], placed[0])
+    if not located_open:
+        return unique(stereo_block_units(name, smiles, reduced), reduced)
+    return None
 
 
 def stereo_descriptors_verified(name: str, smiles: Optional[str],

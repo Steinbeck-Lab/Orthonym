@@ -145,3 +145,69 @@ def test_the_offer_does_not_pair_half_blocks_across_equivalent_groups():
     wrong = "1-[(1R,2S)-2-methylcyclohexyl]-3-[(1S,2R)-2-methylcyclohexyl]urea"
     with jvm_slots(1, purpose="unread-stereo-offer"):
         assert not cited_codes_agree(wrong, smiles, strip_stereo_blocks(wrong)[0])
+
+
+@pytest.mark.parametrize("smiles,right", [
+    ("C[C@]1(O)C[C@@](c2cccc(OC(F)(F)F)c2)([C@H](O)c2ccccn2)C1", True),     # ring C1 R, methyl C S: the name's
+    ("C[C@]1(O)C[C@@](c2cccc(OC(F)(F)F)c2)([C@@H](O)c2ccccn2)C1", False),   # ring C1 S, methyl C R
+])
+def test_a_locant_free_token_is_not_read_on_another_block_s_centre(smiles, right):
+    """A locant-free descriptor may name any unit with its code, so '(S)' of the side chain and '1R' of the ring could
+    be read swapped: '1R' on the side chain's methyl C1 and '(S)' on the ring C1 (ChEMBL 37, 12 of 950 names OPSIN
+    cannot read, 2026-11-19). "NAMING OF STEREOISOMERS": a descriptor states the unit at its locant. OPSIN now
+    places the '(S)' block it reads, and '1R' is read on the ring only."""
+    from orthonym.rules.stereochemistry import strip_stereo_blocks
+    from orthonym.validation.stereo_descriptors import checked_block_units, swap_open
+    name = ("(1R,3s)-3-[(S)-hydroxy(pyridin-2-yl)methyl]-1-methyl-3-[3-(trifluoromethoxy)phenyl]"
+            "cyclobutan-1-ol")
+    assert swap_open([[("1", "R"), ("3", "s")], [(None, "S")]])
+    assert not swap_open([[("1", "R")], [(None, "R")]])
+    assert not swap_open([[("1", "R")], [(None, "E")]])
+    with jvm_slots(1, purpose="unread-stereo-offer"):
+        for symmetric in (True, False):
+            reading = checked_block_units(name, smiles, strip_stereo_blocks(name)[0], symmetric=symmetric)
+            assert (reading is not None) is right
+
+
+@pytest.mark.parametrize("name,smiles,right", [
+    # review 2026-11-19: '(s)' faces '1r' of another unread block; OPSIN places neither, and the swapped isomer does
+    # not read the name, so the right name keeps its reading and the wrong code still fails
+    ("(s)-[(1R,2R)-2-methylcyclohexyl][(1S,2S)-2-methylcyclohexyl][(1r,4r)-4-methylcyclohexyl]methanol",
+     "O[C@]([C@@H]1CCCC[C@H]1C)([C@H]1CCCC[C@@H]1C)[C@H]1CC[C@H](C)CC1", True),
+    ("(r)-[(1R,2R)-2-methylcyclohexyl][(1S,2S)-2-methylcyclohexyl][(1r,4r)-4-methylcyclohexyl]methanol",
+     "O[C@]([C@@H]1CCCC[C@H]1C)([C@H]1CCCC[C@@H]1C)[C@H]1CC[C@H](C)CC1", False),
+    # a locant-free (Z) and the (2E) of the parent passed swapped onto each other's double bonds
+    ("(2E)-3-[(1r,4r)-4-[(Z)-2-phenylethenyl]cyclohexyl]prop-2-enoic acid",
+     "OC(=O)/C=C\\[C@H]1CC[C@H](/C=C/c2ccccc2)CC1", False),
+    ("(2E)-3-[(1r,4r)-4-[(Z)-2-phenylethenyl]cyclohexyl]prop-2-enoic acid",
+     "OC(=O)/C=C/[C@H]1CC[C@H](/C=C\\c2ccccc2)CC1", True),
+])
+def test_a_locant_free_token_passes_only_when_the_swapped_isomer_does_not(name, smiles, right):
+    """When OPSIN cannot place the blocks, a reading with a locant-free token that faces its opposite code is kept only
+    if the isomer of the swapped reading (both units inverted) does not read the name too."""
+    from orthonym.rules.stereochemistry import strip_stereo_blocks
+    from orthonym.validation.stereo_descriptors import checked_block_units
+    with jvm_slots(1, purpose="unread-stereo-offer"):
+        for symmetric in (True, False):
+            assert (checked_block_units(name, smiles, strip_stereo_blocks(name)[0],
+                                        symmetric=symmetric) is not None) is right
+
+
+def test_the_swapped_isomer_is_found_when_opsin_cannot_place_the_blocks(monkeypatch):
+    """Without OPSIN's placement the cyclobutanol name has a plain reading for both isomers; the swapped-isomer test
+    sees that and the check declines both, where the plain reading accepted the wrong one."""
+    from orthonym.rules.stereochemistry import strip_stereo_blocks
+    from orthonym.validation import stereo_descriptors as sd
+    name = ("(1R,3s)-3-[(S)-hydroxy(pyridin-2-yl)methyl]-1-methyl-3-[3-(trifluoromethoxy)phenyl]"
+            "cyclobutan-1-ol")
+    right = "C[C@]1(O)C[C@@](c2cccc(OC(F)(F)F)c2)([C@H](O)c2ccccn2)C1"
+    wrong = "C[C@]1(O)C[C@@](c2cccc(OC(F)(F)F)c2)([C@@H](O)c2ccccn2)C1"
+    reduced = strip_stereo_blocks(name)[0]
+    by_block = sd._cip_descriptor_tokens(strip_stereo_blocks(name)[1])
+    monkeypatch.setattr(sd, "_opsin_placed_blocks", lambda *a, **k: None)
+    with jvm_slots(1, purpose="unread-stereo-offer"):
+        for smiles in (right, wrong):
+            reading = sd.stereo_block_units(name, smiles, reduced)
+            assert reading is not None                       # the plain reading cannot tell the two apart
+            assert sd._swapped_reading_passes(name, smiles, reduced, (), reading, by_block)
+            assert sd.checked_block_units(name, smiles, reduced) is None
