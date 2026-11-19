@@ -156,6 +156,7 @@ class StoutClass(_StrEnumBase):
     PNICTOGEN_CARBOXYLIC_ACID = "pnictogen_carboxylic_acid"  # W3-P14 added-carbon -carboxylic acid on a P/As/Sb parent hydride: H2P-COOH -> phosphanecarboxylic acid; priority 47.65 — ahead of the generic acid namer in GENERAL)
     MONONUCLEAR_HYDRIDE_ADDED_CARBON = "mononuclear_hydride_added_carbon"  # v52 P3 / added-carbon -carbaldehyde/-carbonitrile on a bare Si/Ge/Sn/Pb/P/As/Sb/Bi parent hydride: H2P-CHO -> phosphanecarbaldehyde, H3Si-CN -> silanecarbonitrile; priority 47.66 — right after PNICTOGEN_CARBOXYLIC_ACID@47.65, ahead of the generic chain namer in GENERAL)
     INOSITOL = "inositol"                          # a phase follow-on cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE, below DECOMP_PRE_GENERAL; no free dense slot)
+    OXOACID_ANION = "oxoacid_anion"                 # ChEBI C1 anions of the inorganic oxoacids named from their acid: 'hydrogen arsorite', 'orthoperiodate'; priority 98400 — after every class namer)
     HYDRIDE_ION = "hydride_ion"                     # ChEBI C1 /// ions and radicals of homogeneous parent-hydride chains: trisulfanediide, alumaniumyl, λ4-sulfanyl; priority 98500 — after every class namer, before DECOMPOSITION_PRE_GENERAL)
     NUCLEOSIDE = "nucleoside"                       # a phase / decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL; strip-and-recognise, OPSIN-RT, fail-closed)
     # a phase FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -3335,6 +3336,41 @@ _register_dispatch(
                 "and (on an amide) nitro, nitroso, halogen groups: N-prefixes on the host's name; "
                 "fail-closed",
 )
+
+# --- ChEBI C1: OXOACID_ANION at priority 98400 (after every class namer, so a molecule named today keeps its name).
+# An anion of an inorganic oxoacid named from its acid: 'ic acid' -> 'ate', 'ous acid' -> 'ite', the hydroxy hydrogen
+# atoms left cited as 'hydrogen' ('hydrogen arsorite', 'tetrahydrogen orthoperiodate'; rules/oxoacid_anions.py).
+# Carbon-free: preselected at most; the read-back decides. Fail-closed; cascade-continuation on None. ---
+def _is_oxoacid_anion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """An anion of an inorganic oxoacid with a name in rules.inorganic_acids."""
+    if mol is None:
+        return False
+    from orthonym.rules.oxoacid_anions import name_oxoacid_anion
+    return name_oxoacid_anion(mol) is not None
+
+
+def _handle_oxoacid_anion(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """The name of an anion of an inorganic oxoacid, from its acid; else None. An anion of an acid the Blue Book does
+    not name (orthoperiodic, orthotelluric: Red Book) is recorded as a non-PIN part, so a salt that cites it is
+    labelled below the PIN."""
+    from orthonym.rules.oxoacid_anions import name_oxoacid_anion, red_book_word
+    name = name_oxoacid_anion(mol)
+    word = red_book_word(name)
+    if word:
+        from orthonym.metrics.provenance import record_non_pin_label
+        record_non_pin_label(word, rule="P-67.1.1.1",
+                             detail="an acid of the IUPAC Red Book (IR-8), not of the Blue Book's list")
+    return name
+
+
+_register_dispatch(
+    class_id=StoutClass.OXOACID_ANION, priority=98400, tier=1,
+    predicate=_is_oxoacid_anion, handler=_handle_oxoacid_anion,
+    iupac_section="Blue Book P-72.2.2.2.1 / P-67.1.1.1",
+    description="Anions of the inorganic oxoacids named from their acid ('ate'/'ite', 'hydrogen' prefixes); "
+                "graph classifier, fail-closed",
+)
+
 
 # --- ChEBI C1: HYDRIDE_ION at priority 98500 (after every class namer; before the general engine, so the general engine's
 # skeletal names of H2P+ / HS+ / HO+ / HN+ give way to 'phosphanylium', 'sulfanylium', 'oxidanylium', 'azanyliumyl'; before

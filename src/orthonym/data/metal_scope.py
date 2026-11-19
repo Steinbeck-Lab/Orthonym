@@ -287,6 +287,10 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     **{symbol: MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL}),
                        frozenset({4}))
        for symbol in ("Sn", "Pb")},
+    # bismuth: the ions and radicals of bismuthane to: 'bismuthanium', 'bismuthanuide'; the ChEBI lane of
+    # 2026-11-19, rules/hydride_ions.py); its neutral organic derivatives were already named on bismuthane
+    # ('triphenylbismuthane'), which the table does not gate
+    "Bi": MetalScope(frozenset({PARENT_HYDRIDE_IONS, ELEMENT}), frozenset({3})),
 }
 
 

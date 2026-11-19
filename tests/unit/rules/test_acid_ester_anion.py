@@ -148,17 +148,15 @@ def test_integration_failclosed_never_wrong_organic(namer):
 
 @pytest.mark.opsin_gate
 def test_integration_failclosed_never_wrong_inorganic(namer):
-    # diphosphate (multi-centre) -> fail closed, never a wrong molecule.
-    # B3: this input is carbon-free (O/P/H only), so it now correctly
-    # abstains via errors.py's structural honesty floor to the HONEST
-    # "inorganic compound (not supported)" message instead of the
-    # the contributor guide-flagged-dishonest "unknown organic compound" sentinel --
-    # this assertion was updated deliberately, not because the old string
-    # "looked wrong": the input has zero carbon atoms (verified: no 'C' in
-    # "OP(=O)([O-])OP(=O)([O-])[O-]"), and the project's own stated policy
-    # (the contributor guide a project rule / V36-a trace-B3 a) is that a carbon-free
-    # fragment must never surface the organic sentinel. 0-wrong is
-    # unaffected either way (both strings are abstentions, never a shipped
-    # name); only the honesty of the abstention message changed.
+    # diphosphate (multi-centre), carbon-free: never a wrong molecule. Since the oxoacid-anion producer (2026-11-19)
+    # the engine builds 'hydrogen diphosphate', read back to the full key), which the best-effort tier
+    # ships; the default tier declines it as every name it built that is no verified PIN (NO_VERIFIED_PIN: the text
+    # 'unknown organic compound', namer._default_tier_declined_row, the rule the metal-ion and ammonium-chloride rows
+    # of tests/unit/rules/test_metal_atoms.py pin too). Before, nothing was built and the honesty floor's
+    # 'inorganic compound (not supported)' was the label.
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
     out = namer.name("OP(=O)([O-])OP(=O)([O-])[O-]", on_failure="label")
-    assert out == "inorganic compound (not supported)"
+    assert out == "unknown organic compound"
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("OP(=O)([O-])OP(=O)([O-])[O-]")
+    assert (row["name"], row["tier"]) == ("hydrogen diphosphate", "systematic_verified")

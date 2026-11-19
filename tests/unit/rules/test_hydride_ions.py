@@ -34,6 +34,8 @@ CASES = [
     ("[SiH2+2]", "silanebis(ylium)"),            # 'ane' is cut only before one 'yl' or 'ylium'
     ("[OH+]", "oxidanylium"),                    #: lone pairs, no radical
     ("[H][S]([H])[H]", "λ4-sulfanyl"),
+    ("[H][Bi-]([H])[H]", "bismuthanuidyl"),      # bismuth: PARENT_HYDRIDE_IONS (data/metal_scope.py, 2026-11-19)
+    ("[H][Bi+]([H])([H])[H]", "bismuthanium"),
 ]
 
 
@@ -61,7 +63,7 @@ def test_hydride_ion_names_ship_at_best_effort_only(smiles, name):
     "[Li][H]",           # not a parent-hydride element
     "N",                 # a neutral hydride: no ionic or radical centre
     "[Cl]",              # a lone atom: rules/metal_atoms.lone_atom_name
-    "[H][Bi+]([H])[H]",  # bismuth is not admitted to PARENT_HYDRIDE_IONS (data/metal_scope.py)
+    "[H][Po][H]",        # polonium is not admitted to PARENT_HYDRIDE_IONS (data/metal_scope.py)
 ])
 def test_out_of_class_declines(smiles):
     assert name_hydride_ion(Chem.MolFromSmiles(smiles)) is None

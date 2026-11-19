@@ -285,8 +285,11 @@ def test_tin_and_lead_are_admitted_to_the_parent_hydride_cation_the_connection_a
         assert is_named_metal(symbol) is True and metal_scope.is_complete_metal(symbol) is False
         assert has_mechanism(symbol, DISCONNECT) is False and has_mechanism(symbol, BONDED_NAMES) is False
         assert has_mechanism(symbol, ION_SALTS) is False and has_mechanism(symbol, ELEMENT) is True     # lane LONE
-    # and the Group 13 metals, named on their preselected hydrides, the Blue Book)
-    assert not any(has_mechanism(s, PARENT_HYDRIDE_IONS) for s in set(METAL_SCOPE) - {"Sn", "Pb", "Al", "Ga", "In", "Tl"})
+    # and the Group 13 metals, named on their preselected hydrides, the Blue Book), and bismuth (the ions
+    # and radicals of bismuthane, to; ChEBI lane 2026-11-19), admitted to that and the element name alone
+    assert METAL_SCOPE["Bi"] == MetalScope(frozenset({PARENT_HYDRIDE_IONS, ELEMENT}), frozenset({3}))
+    assert not any(has_mechanism(s, PARENT_HYDRIDE_IONS)
+                   for s in set(METAL_SCOPE) - {"Sn", "Pb", "Al", "Ga", "In", "Tl", "Bi"})
 
 
 def test_the_true_metals_that_only_the_element_name_admits():
