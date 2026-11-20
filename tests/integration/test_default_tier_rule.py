@@ -313,12 +313,12 @@ def test_a_declined_metal_compound_does_not_say_its_element_is_unsupported(capsy
 
 
 def test_a_true_unsupported_element_decline_keeps_its_own_text():
-    # the covalent drawing Cl[Ca]Cl (Group 2 is not admitted to DISCONNECT): no name is built, the reason is
-    # UNSUPPORTED_ELEMENT
-    row = Orthonym().name_tiered("Cl[Ca]Cl")
+    # the covalent drawing Cl[Fr] (francium is the one metal of Groups 1 and 2 not admitted to DISCONNECT; calcium and
+    # radium are since the ChEBI lanes C5 and C1, 2026-11-20): no name is built, the reason is UNSUPPORTED_ELEMENT
+    row = Orthonym().name_tiered("Cl[Fr]")
     assert row["limit_code"] == "UNSUPPORTED_ELEMENT", row
-    assert row["name"] == "calcium compound (not supported)", row
-    assert name_compound("Cl[Ca]Cl", on_failure="label") == "calcium compound (not supported)"
+    assert row["name"] == "francium compound (not supported)", row
+    assert name_compound("Cl[Fr]", on_failure="label") == "francium compound (not supported)"
 
 
 def test_a_bonded_group1_drawing_is_named_on_its_ionic_drawing():

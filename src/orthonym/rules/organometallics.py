@@ -741,12 +741,12 @@ def _bonded_metal_ligand_name(mol: Any, metal_complex: Any, lg: Any, metal_symbo
     no PIN. The metal's oxidation number as drawn must be one of its charges in ``data/metal_scope.py``
     (``perception.metals.bonded_valence_ok``): a standard InChIKey does not bound it. The Group 14 parent hydrides
     never come here (a senior characteristic group outranks them,; the Group 13 metals keep the names of their
-    hydrides and their ions ('acetyl(ethoxy)alumanylium'), and a complex anion keeps its own names ('ferrocyanide')."""
+    hydrides and their ions ('acetyl(ethoxy)alumanylium'). A complex anion is named the same way, with the charge
+    number of the complex ('tetracyanonickel(2-)', as 'trimethylzinc(1-)'), when its oxidation number is in the table."""
     from ..metrics.provenance import best_effort_ctx
     from ..perception.metals import bonded_valence_ok, is_metal_element
     if (not best_effort_ctx.get() or not has_mechanism(metal_symbol, BONDED_NAMES)
             or metal_symbol in _GROUP13_HYDRIDE_METALS or len(metal_complex.metal_atom_indices) != 1
-            or mol.GetAtomWithIdx(metal_complex.metal_atom_indices[0]).GetFormalCharge() < 0
             or not bonded_valence_ok(mol, metal_complex.metal_atom_indices[0])):
         return None
     atoms = set(lg.ligand_atom_indices)
@@ -903,7 +903,9 @@ def _terminal_ligand_prefix(mol: Any, metal_idx: int, lg: Any) -> Optional[str]:
 
     The atom has the metal as its only neighbour, no charge, no radical and no isotope; its
     element, the order of its bond to the metal and its hydrogens pick a row of
-    ``TERMINAL_LIGAND_PREFIXES`` ('hydroxy' for -OH, 'oxo' for =O, 'sulfanylidene' for =S)."""
+    ``TERMINAL_LIGAND_PREFIXES`` ('hydroxy' for -OH, 'oxo' for =O, 'sulfanylidene' for =S). A singly bonded O- is
+    'oxido': "an anion name ending in 'ide' ends in 'ido' as a ligand" Definitions of terms), the oxide ion
+    as the ligand of 'oxido(dioxo)vanadium' (ChEBI lane C1, 2026-11-20)."""
     from rdkit import Chem
     idxs = lg.ligand_atom_indices
     if len(idxs) != 1:
@@ -912,8 +914,11 @@ def _terminal_ligand_prefix(mol: Any, metal_idx: int, lg: Any) -> Optional[str]:
     bond = mol.GetBondBetweenAtoms(metal_idx, idxs[0])
     order = {Chem.BondType.SINGLE: 1, Chem.BondType.DOUBLE: 2}.get(
         bond.GetBondType() if bond is not None else None)
-    if (order is None or atom.GetDegree() != 1 or atom.GetFormalCharge() != 0
-            or atom.GetNumRadicalElectrons() != 0 or atom.GetIsotope() != 0):
+    if (order is None or atom.GetDegree() != 1 or atom.GetNumRadicalElectrons() != 0 or atom.GetIsotope() != 0):
+        return None
+    if atom.GetFormalCharge() == -1 and (atom.GetSymbol(), order, atom.GetTotalNumHs()) == ('O', 1, 0):
+        return 'oxido'
+    if atom.GetFormalCharge() != 0:
         return None
     return TERMINAL_LIGAND_PREFIXES.get((atom.GetSymbol(), order, atom.GetTotalNumHs()))
 
@@ -1026,6 +1031,19 @@ def _multiply_bonded_ligand_name(mol: Any, metal_idx: int, lg: Any, bond: Any) -
     return name
 
 
+def _complex_anion_keeps_its_name(mol: Any) -> bool:
+    """True for a complex anion of one part that has a name of its own ('permanganate', 'ferrocyanide':
+    ``data.ion_retained_names.get_anion_name``, ``data.get_unverified_retained_name``): the ligand name
+    ('oxidotrioxomanganese') is not built for it, so the name it had is kept."""
+    from rdkit import Chem
+    if Chem.GetFormalCharge(mol) >= 0 or len(Chem.GetMolFrags(mol)) != 1:
+        return False
+    from ..data import get_unverified_retained_name
+    from ..data.ion_retained_names import get_anion_name
+    smiles = Chem.MolToSmiles(mol)
+    return bool(get_anion_name(smiles) or get_unverified_retained_name(smiles))
+
+
 def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
                                 ) -> Optional[Tuple[str, str, List[Any]]]:
     """The name of a mononuclear complex of a metal admitted to ``BONDED_NAMES`` (zinc) that the
@@ -1048,7 +1066,8 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
     organic groups bonded by one double or triple bond (``_multiply_bonded_ligand_name``); a halide, a
     pi-ligand or a ligand of more than one bond to the metal is left to the other branches. No PIN: (:39753) and ``rules.metal_labels``."""
     from rdkit import Chem
-    if metal_complex.is_multimetal or len(metal_complex.metal_atom_indices) != 1:
+    if (metal_complex.is_multimetal or len(metal_complex.metal_atom_indices) != 1
+            or _complex_anion_keeps_its_name(mol)):
         return None
     metal_idx = metal_complex.metal_atom_indices[0]
     metal = mol.GetAtomWithIdx(metal_idx)

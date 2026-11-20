@@ -97,6 +97,11 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
     'Ti': {'direct': 'titanium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Zr': {'direct': 'zirconium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Hf': {'direct': 'hafnium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    # the metals of ``data/metal_scope.py`` admitted to bonded names without an entry here (ChEBI lane C5, 2026-11-20)
+    'Ag': {'direct': 'silver',     'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Au': {'direct': 'gold',       'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Nb': {'direct': 'niobium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Ta': {'direct': 'tantalum',   'hydride_parent': None, 'naming_system': 'metal_direct'},
     # Task M1 (v51): Group 3 + lanthanides + actinides (metal-direct). These are
     # BEST-EFFORT σ-organometallic parents, no PIN derivation); every
     # `methyl<metal>` was verified to OPSIN-`-r` round-trip to `C[<sym>]`, and

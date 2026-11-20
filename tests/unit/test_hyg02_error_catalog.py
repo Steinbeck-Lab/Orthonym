@@ -32,11 +32,12 @@ def test_wildcard_raises_named_limit():
 
 # Lane LONE names every lone atom, monoatomic ion and isotope ('gold', 'carbon',
 # 'hydrogen', ``rules/metal_atoms.lone_atom_name``), so the witnesses below are compounds the
-# engine still cannot name: methylgold (no producer names it, and gold is not a metal of complete
-# scope in ``data/metal_scope.py``, so ``errors.classify_failure_limit`` gives UNSUPPORTED_ELEMENT
-# rather than UNNAMEABLE), the carbon(1+) ion (``lone_atom_name`` leaves a charged carbon atom to
-# the ion classes, which name none with three radical electrons) and tetraphosphorus.
-METAL_WITNESS = "C[Au]"
+# engine still cannot name: hydroxy(methyl)radium (no producer names it: radium is admitted to no bonded
+# mechanism in ``data/metal_scope.py``, so ``errors.classify_failure_limit`` gives UNSUPPORTED_ELEMENT
+# rather than UNNAMEABLE; methylgold has had its name since the ChEBI lane C5, 2026-11-20), the
+# carbon(1+) ion (``lone_atom_name`` leaves a charged carbon atom to the ion classes, which name none
+# with three radical electrons) and tetraphosphorus.
+METAL_WITNESS = "C[Ra]O"
 
 
 def test_metal_raises_unsupported_element():
@@ -68,7 +69,7 @@ def test_default_path_no_raise_and_legacy_strings():
     out = n.name("CC*", on_failure="label")  # must not raise
     assert isinstance(out, str)
     # name_compound with on_failure="label": metal -> exact legacy descriptive string.
-    assert name_compound(METAL_WITNESS, on_failure="label") == "gold compound (not supported)"
+    assert name_compound(METAL_WITNESS, on_failure="label") == "radium compound (not supported)"
     assert name_compound("CCO", on_failure="label") == "ethanol"  # in-scope unchanged
     # the default of the public call is no name at all (tests/unit/test_on_failure.py)
     assert n.name("CC*") == "" and name_compound(METAL_WITNESS) == ""

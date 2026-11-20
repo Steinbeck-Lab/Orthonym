@@ -164,8 +164,8 @@ producer names fails for want of a name and not for want of support of the eleme
 label of such an input is ``UNNAMEABLE`` and not ``UNSUPPORTED_ELEMENT``
 (``errors.classify_failure_limit``, through ``has_complete_scope``). The elements of Groups 1 and 2
 are admitted to ``ION_SALTS``, ``CARBANION_SALTS``, ``ZERO_VALENT``, ``ELEMENT``, ``RECONNECT_RADICAL`` and ``AMMINE``
-(magnesium also to ``MACROCYCLE``, ``DISCONNECT``, ``CONNECT_ANION`` and ``BONDED_NAMES``, lithium to caesium also to
-``DISCONNECT``) and are not complete: their failures keep their label.
+(magnesium also to ``MACROCYCLE``, ``DISCONNECT``, ``CONNECT_ANION`` and ``BONDED_NAMES``, lithium to caesium and the
+other Group 2 metals also to ``DISCONNECT``) and are not complete: their failures keep their label.
 
 The valences are the charges of the cation that a rewrite of the structure may give the metal
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
@@ -207,6 +207,9 @@ GROUP_1 = ("Li", "Na", "K", "Rb", "Cs", "Fr")
 #: the Group 1 metals admitted to ``DISCONNECT`` (program 22, 2026-11-09)
 GROUP_1_DISCONNECT = ("Li", "Na", "K", "Rb", "Cs")
 GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
+#: the Group 2 metals admitted to ``DISCONNECT`` (ChEBI lane C5, 2026-11-20; magnesium has its own entry; radium for
+#: ChEBI's radium dichloride)
+GROUP_2_DISCONNECT = ("Be", "Ca", "Sr", "Ba", "Ra")
 
 #: the metals admitted to ``ZERO_VALENT`` alone: the 28 of the 30 most frequent metals of PubChem's
 #: neutral-atom drawings that the panel of the lane named with no wrong name (Ar and Bi named none)
@@ -233,11 +236,13 @@ BONDED_METAL_VALENCES = {"Al": (3,), "Hg": (1, 2), "Pd": (2, 4), "Pt": (2, 4, 6)
                          "Ti": (2, 3, 4), "V": (2, 3, 4, 5), "W": (4, 5, 6)}
 
 #: the metals of the second panel of the lane (2026-10-30, 38 metals of PubChem's unnamed metal drawings, no wrong
-#: name), and uranium (2026-10-31): every mechanism zinc has, with the charges of their cations. Not complete.
+#: name), and uranium (2026-10-31): every mechanism zinc has, with the charges of their cations. Not complete. The ChEBI
+#: lane C1 (2026-11-20) added Cr 5, Ag 3 and Au 5 for ChEBI's chromium pentafluoride, silver trifluoride and gold
+#: pentafluoride, measured on the metal panel of the lane.
 MORE_BONDED_METAL_VALENCES = {"Zr": (2, 3, 4), "Hf": (4,), "Fe": (2, 3), "Co": (2, 3), "Ni": (2, 3, 4),
-                              "Cu": (1, 2), "Mo": (2, 3, 4, 5, 6), "Cr": (2, 3, 4, 6), "Rh": (1, 2, 3),
+                              "Cu": (1, 2), "Mo": (2, 3, 4, 5, 6), "Cr": (2, 3, 4, 5, 6), "Rh": (1, 2, 3),
                               "Re": (1, 3, 4, 5, 7), "Mn": (2, 3), "Ir": (1, 3, 4), "Y": (3,), "Os": (2, 3, 4, 6),
-                              "Ag": (1, 2), "Au": (1, 3), "Cd": (2,), "Ga": (3,), "In": (3,), "Tl": (1, 3),
+                              "Ag": (1, 2, 3), "Au": (1, 3, 5), "Cd": (2,), "Ga": (3,), "In": (3,), "Tl": (1, 3),
                               "Nb": (3, 5), "Ta": (5,), "Sc": (3,), "La": (3,), "Ce": (3, 4), "Sm": (2, 3),
                               "Eu": (2, 3), "Gd": (3,), "Nd": (3,), "Yb": (2, 3), "Lu": (3,), "Er": (3,), "Dy": (3,),
                               "Tb": (3,), "Pr": (3,), "Ho": (3,), "Tm": (2, 3), "U": (3, 4, 5, 6)}
@@ -258,14 +263,16 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     # ('potassium(0)'): the lane of 2026-10-30; the atom and the ion alone ('sodium(1+)'): lane LONE
     # and (program 22, 2026-11-09) the bonded drawing of a salt, 'C(=O)O[Li]' named on its ionic drawing ('lithium
     #...carboxylate', ``DISCONNECT``, systematic_verified): Li, Na, K, Rb and Cs, each measured on the SureChEMBL
-    # rows with that metal bonded (+211, +233, +59, +2, +6 named, none lost or changed); francium had no row
+    # rows with that metal bonded (+211, +233, +59, +2, +6 named, none lost or changed); francium had no row; the
+    # other Group 2 metals the same way (ChEBI lanes C5 and C1, 2026-11-20, ``GROUP_2_DISCONNECT``)
     # Groups 1 and 2 take AMMINE (2026-11-18, rerun-5 triage item 2b): ammonia beside their ions is a component
     # ('carbonate—ethene—ammonia—sodium(1+) (1/1/2/2)'); panel: 54 of 60 such rows named, none lost or changed
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL, AMMINE})
                           | (frozenset({DISCONNECT}) if symbol in GROUP_1_DISCONNECT else frozenset()),
                           frozenset({1}))
        for symbol in GROUP_1},
-    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL, AMMINE}),
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, ELEMENT, RECONNECT_RADICAL, AMMINE})
+                          | (frozenset({DISCONNECT}) if symbol in GROUP_2_DISCONNECT else frozenset()),
                           frozenset({2}))
        for symbol in GROUP_2},
     # magnesium porphyrins (the chlorophyll core) are named on the porphyrin dianion like zinc's

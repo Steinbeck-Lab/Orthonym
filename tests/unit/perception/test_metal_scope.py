@@ -188,7 +188,9 @@ def test_zinc_has_its_mechanisms():
     # program 22 (2026-11-09): Group 1 bonded drawings of salts are named on their ionic drawing ('C(=O)O[Li]')
     assert all(has_mechanism(s, DISCONNECT) is True for s in GROUP_1 if s != "Fr")
     assert has_mechanism("Fr", DISCONNECT) is False      # no measured row
-    assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_2 if s != "Mg")
+    # ChEBI lanes C5 and C1 (2026-11-20): every Group 2 bonded drawing of a salt too ('CCC(=O)O[Ca]OC(=O)CC',
+    # ChEBI's radium dichloride)
+    assert all(has_mechanism(s, DISCONNECT) is True for s in GROUP_2)
     assert has_mechanism("Mg", DISCONNECT) is True     # a bonded Mg-N / Mg-X drawing is named through its ionic drawing
     assert all(has_mechanism(s, DISCONNECT) is False for s in NOT_ADMITTED)
 
@@ -196,7 +198,7 @@ def test_zinc_has_its_mechanisms():
 def test_only_zinc_is_complete():
     """A metal is complete when the plan of its phase is done (``MetalScope.complete``): the failure label of
     an input of such metals that no producer names is UNNAMEABLE. Zinc is the one complete metal; the elements
-    of Groups 1 and 2 are admitted to ``ION_SALTS`` alone and are not complete."""
+    of Groups 1 and 2 are admitted to the salt mechanisms and are not complete."""
     complete = sorted(s for s, scope in METAL_SCOPE.items() if scope.complete)
     assert complete == ["Zn"], complete
     assert all(METAL_SCOPE[s].complete is False for s in GROUP_1 + GROUP_2)
@@ -212,7 +214,7 @@ def test_mechanism_lookup():
         # magnesium: porphyrins, its bonded drawings and, since program 6 (2026-11-06), the organomagnesium cation
         # beside its anion ('cyclopropylmagnesium bromide') and its bonded names
         extra = (frozenset({MACROCYCLE, DISCONNECT, CONNECT_ANION, BONDED_NAMES}) if symbol == "Mg"
-                 else frozenset({DISCONNECT}) if symbol in GROUP_1 and symbol != "Fr" else frozenset())   # Group 1: program 22
+                 else frozenset({DISCONNECT}) if symbol != "Fr" else frozenset())   # program 22, lanes C5 and C1
         # ELEMENT since lane LONE (2026-11-01): the atom and the ion alone ('sodium(1+)'); RECONNECT_RADICAL since
         # program 6 (2026-11-06): '[Li].CCC[CH2]' is named through 'CCCC[Li]'
         # AMMINE since 2026-11-18 (rerun-5 triage 2b): 'ammonia—chloride—sodium(1+) (1/1/1)'
