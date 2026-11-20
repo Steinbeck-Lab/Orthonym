@@ -1893,9 +1893,9 @@ def _polycyclic_substituent_name(
         if name:
             return name
     if allow_mancude:
-        # /P3: the universal cage + spiro engines (tricyclo+/adamantane +
-        # mancude cages; hetero/poly/unsaturated spiro), complete-tier only.
-        # Fail-closed (None) on any refusal.
+        # /P3: the universal cage + spiro engines (tricyclo+/adamantane + mancude cages; hetero/poly/unsaturated
+        # spiro), complete-tier only. Fail-closed (None) on any refusal.
+        from .fusion_name_ask import asked_for_a_fusion_name
         from .halogen_ring_fusion import halogen_benzo_substituent_name  # lane L3: fusion name first
         for _uni in (halogen_benzo_substituent_name, _universal_cage_substituent_name,
                      _universal_spiro_substituent_name):
@@ -1903,8 +1903,8 @@ def _polycyclic_substituent_name(
                 name = _uni(sub, attach_sub, allow_mancude=allow_mancude)
             except Exception:
                 name = None
-            if name:
-                return name
+            if name:   # a von Baeyer name of a system that takes a fusion name asks the PIN tier
+                return asked_for_a_fusion_name(name, sub) if _uni is _universal_cage_substituent_name else name
     return None
 
 

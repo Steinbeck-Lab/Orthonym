@@ -6438,7 +6438,11 @@ def _name_aryl_methyl_ether(mol, central_c_idx: int, oxygen_idx: int) -> Optiona
         # '[4-(hydroxymethyl)phenyl]methoxy', never '(4-(hydroxymethyl)phenyl)methoxy'.
         from .naming_utils import apply_enclosing_marks
         return f"{apply_enclosing_marks(ring_name, -1)}methoxy"
-    return "benzyloxy"
+    # two or more aromatic neighbours that are not two plain phenyls (the ring carbon of
+    # 10,11-dihydro-5H-dibenzo[a,d][7]annulene or of fluorene, a di(pyridinyl)methyl): 'benzyloxy' names one
+    # phenyl and would drop the rest (CHEBI:50189, '3-(benzyloxy)-8-methyl-8-azabicyclo[3.2.1]octane' for
+    # deptropine, refused by the gate); not a clean aryl-methyl ether, the docstring's None
+    return None
 
 
 def _check_retained_substituent(

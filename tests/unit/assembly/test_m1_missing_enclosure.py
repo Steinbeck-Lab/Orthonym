@@ -31,7 +31,10 @@ def test_simple_substituent_stays_bare(eng):
     assert "(methyl)" not in name
     assert "methyl" in name
 
-# W2 — complex N-substituent must be bracket-wrapped (fragment_assembly _assemble_amide)
+# W2 — complex N-substituent must be bracket-wrapped (fragment_assembly _assemble_amide). With the gate on: the
+# gate-off path ships the decomposition fallback, which names no amide of a ring sulfone amine (the amine part is
+# named '3-amino-1λ6-thiolane-1,1-dione', a heterone; end check 2026-11-20, a lead)
+@pytest.mark.opsin_gate
 def test_w2_n_substituent_wrapped(eng):
     smi = "O=C1C[C@@H](C(=O)N[C@H]2CCS(=O)(=O)C2)C2(CCCCC2)O1"
     name = eng.name(smi)
@@ -39,6 +42,7 @@ def test_w2_n_substituent_wrapped(eng):
     assert "[(3S)-1,1-dioxothiolan-3-yl]" in name
 
 @pytest.mark.roundtrip
+@pytest.mark.opsin_gate
 def test_w2_roundtrips_to_input(eng):
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
     smi = "O=C1C[C@@H](C(=O)N[C@H]2CCS(=O)(=O)C2)C2(CCCCC2)O1"

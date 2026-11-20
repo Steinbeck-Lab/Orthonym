@@ -1183,17 +1183,21 @@ def name_salt(mol, style: str = 'pin', *,
     from .adducts import _HYDRATE_MULTIPLIERS
     solvate_suffix = ''
     if neutrals:
-        water = [n for n in neutrals
-                 if Chem.MolToSmiles(n['mol'], canonical=True) == 'O']
-        other = [n for n in neutrals
-                 if Chem.MolToSmiles(n['mol'], canonical=True) != 'O']
-        if other:
+        kinds = [Chem.MolToSmiles(n['mol'], canonical=True) for n in neutrals]
+        if any(k != 'O' and k not in _HYDROHALIDE_WORDS for k in kinds):
             return ''  # unrecognized neutral co-former -> fail closed (0-wrong)
-        w = len(water)
-        hydrate_prefix = _HYDRATE_MULTIPLIERS.get(w)
-        if hydrate_prefix is None:
-            return ''  # water count outside the mono..deca table -> fail closed
-        solvate_suffix = ' ' + hydrate_prefix + 'hydrate'
+        if any(k != 'O' for k in kinds) and not _salt_of_an_organic_base_and_hydrohalogen_acid(frags):
+            return ''  # (3) names salts of organic bases with hydrohalogen acids only
+        # (3) (the Blue Book): "for salts of hydrohalogen acids only, the unaltered name of the base
+        # is followed by hydrofluoride, hydrobromide, hydrochloride, or hydroiodide" ('lysine monohydrochloride',
+        #:54550): a traditional method, below the PIN (_with_solvate_suffix); the hydrohalide before the hydrate
+        for word in sorted({_HYDROHALIDE_WORDS[k] for k in kinds if k != 'O'}) + (['hydrate'] if 'O' in kinds else []):
+            count = sum(1 for k in kinds if (k == 'O') == (word == 'hydrate') and (word == 'hydrate'
+                                                                                 or _HYDROHALIDE_WORDS[k] == word))
+            prefix = _HYDRATE_MULTIPLIERS.get(count)
+            if prefix is None:
+                return ''  # a count outside the mono..deca table -> fail closed
+            solvate_suffix += ' ' + prefix + word
 
     # --- Hydrogen prefix for partial salts (IUPAC ---
     # When an anion fragment still has protonated carboxylic acid groups
@@ -1285,6 +1289,20 @@ def _hydrogen_word_of_an_organic_acid(hydrogen_prefix: str, anions) -> bool:
         a['mol'].HasSubstructMatch(_ORGANIC_ACID_ANION) for a in anions)
 
 
+def _salt_of_an_organic_base_and_hydrohalogen_acid(frags) -> bool:
+    """ "salts of organic bases" (the Blue Book), method (3) "for salts of hydrohalogen acids only": every
+    cation holds carbon and every anion is a halide ion (review 2026-11-20: 'sodium chloride monohydrochloride',
+    'sodium acetate monohydrochloride' are outside the rule)."""
+    cations, anions = (frags or {}).get('cations') or [], (frags or {}).get('anions') or []
+    return bool(cations and anions) and all(
+        any(a.GetSymbol() == 'C' for a in f['mol'].GetAtoms()) for f in cations) and all(
+        f['mol'].GetNumAtoms() == 1 and f['mol'].GetAtomWithIdx(0).GetSymbol() in ('F', 'Cl', 'Br', 'I') for f in anions)
+
+
+#: the neutral hydrogen halide beside a salt (canonical SMILES) -> its word, (3)
+_HYDROHALIDE_WORDS = {'F': 'hydrofluoride', 'Cl': 'hydrochloride', 'Br': 'hydrobromide', 'I': 'hydroiodide'}
+
+
 def _with_solvate_suffix(mol, result: str, solvate_suffix: str, hydrogen_prefix: str = '', anions=()) -> str:
     """``result`` with the water of crystallization cited as the word 'hydrate', labelled below the PIN.
 
@@ -1298,8 +1316,9 @@ def _with_solvate_suffix(mol, result: str, solvate_suffix: str, hydrogen_prefix:
     name = result + solvate_suffix
     if solvate_suffix and result:
         from ..metrics.provenance import record_non_pin_label
-        record_non_pin_label(name, rule="P-14.8.1",
-                             detail="the word 'hydrate' is general nomenclature; a hydrate is an adduct (1/1) in a PIN")
+        hydrohalide = any(word in solvate_suffix for word in _HYDROHALIDE_WORDS.values())
+        record_non_pin_label(name, rule="P-77.1.3" if hydrohalide else "P-14.8.1",
+                             detail="the words 'hydrate' and 'hydrochloride' are general nomenclature, not PINs")
     elif result and _hydrogen_word_of_an_organic_acid(hydrogen_prefix, anions):
         from ..metrics.provenance import record_non_pin_label
         record_non_pin_label(name, rule="P-65.6.2.3.1",

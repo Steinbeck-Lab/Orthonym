@@ -107,7 +107,9 @@ def _name_ring_heterone(mol) -> Optional[str]:
     of the chalcogen cited with its locant, and the suffix 'one', 'dione' or 'thione' at that locant.
 
     Scope (fail-closed): one saturated monocycle of 3-10 members made of carbon, oxygen, nitrogen and chalcogen atoms,
-    one chalcogen of which carries one or two terminal =O, or one =S; no stereo; no group of the molecule senior to
+    one chalcogen of which carries one or two terminal =O, or one =S; stereo on ring atoms only (the block of the ring
+    is cited at the front,, and a numbering that ties on everything else gives R the lower locant,
+    (j)); no stereo in a substituent or on a double bond; no group of the molecule senior to
     the ketone class (the heterone takes the suffix only then,, and no ring ketone beside it. The numbering is
     the Hantzsch-Widman one (the heteroatoms,, then the lowest locant of the suffix, then of all the
     prefixes together (c), (f)) and of the one cited first (g)). The prefixes are the substituent
@@ -119,8 +121,7 @@ def _name_ring_heterone(mol) -> Optional[str]:
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
     for atom in atoms_of(mol):
-        if (atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0
-                or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED):
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
     for b in bonds_of(mol):
         if b.GetStereo() != Chem.BondStereo.STEREONONE:
@@ -150,6 +151,12 @@ def _name_ring_heterone(mol) -> Optional[str]:
     if found is None:
         return None
     site, exo, kind = found
+    if any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED and a.GetIdx() not in ring_set for a in atoms_of(mol)):
+        return None      # a centre in a substituent: its prefix would have to cite it
+    cip = _ring_cip_codes(mol, ring)
+    if cip is None or (cip and mol.GetAtomWithIdx(site).GetSymbol() != 'S'):
+        return None      # stereo for the ring sulfur only: Se/Te heterones are below the PIN, and a PIN of another
+                         # producer ('(1R,3S)-1-oxo-1λ4-selenolan-3-amine') must not give way to them (review 2026-11-20)
     # a heterone is the suffix only when no group of a senior class is present, and a ring ketone competes with it;
     # a carbonyl, an imine or a nitrile elsewhere (an acyl on the ring nitrogen) is such a group or may become one
     owned = {site, *exo}
@@ -180,7 +187,8 @@ def _name_ring_heterone(mol) -> Optional[str]:
     for het_key, loc in _monocycle_numberings(mol, ring):
         locants = sorted((loc[ring.index(a)], nm) for a, names in subs.items() for nm in names)
         cited = tuple(sorted((alpha_sort_key(nm), lc) for lc, nm in locants))
-        key = (het_key, loc[ring.index(site)], tuple(lc for lc, _nm in locants), cited)
+        stereo = tuple(_CIP_RANK[code] for _lc, code in sorted((loc[ring.index(a)], code) for a, code in cip.items()))
+        key = (het_key, loc[ring.index(site)], tuple(lc for lc, _nm in locants), cited, stereo)
         if best is None or key < best[0]:
             best = (key, loc)
     loc = best[1]
@@ -211,6 +219,9 @@ def _name_ring_heterone(mol) -> Optional[str]:
     prefix = "-".join(format_substituent_prefix(nm, sorted(groups[nm]), len(groups[nm]))
                       for nm in sorted(groups, key=alpha_sort_key))
     name = f"{prefix}-{core}" if prefix else core
+    if cip:
+        from .stereochemistry import format_stereodescriptor_string
+        name = format_stereodescriptor_string(sorted((loc[ring.index(a)], code) for a, code in cip.items())) + name
     if site_symbol != 'S':
         # words the ring heterone for a ring -SO- or -SO2- (:29436,:29444); selenium and tellurium are
         # taken by analogy gives the heterone for S, Se and Te, but for the acyclic ones)
@@ -219,6 +230,30 @@ def _name_ring_heterone(mol) -> Optional[str]:
                              detail="the ring heterone of P-64.4.2 is worded for a ring sulfur; the selenium and tellurium "
                                     "ring heterones are named by analogy")
     return name
+
+
+#: (j) (the Blue Book): "the lower locant is assigned to CIP stereodescriptors Z, R, M, and r... that
+#: are preferred to E, S, P, and s"
+_CIP_RANK = {'R': 0, 'r': 0, 'S': 1, 's': 1}
+
+
+def _ring_cip_codes(mol, ring):
+    """{ring atom: CIP code} of the ring's stereocentres: the labels of ``mol`` as the naming pipeline gave them, or of
+    the engine's labeller on a copy (``perception.stereo.assign_stereochemistry``); {} for a ring without stereo; None
+    when a ring atom drawn with a configuration has no code or the labelling fails (the name is then not built here).
+    The labels are never recomputed on another drawing: a lone-pair centre is labelled through a SMILES string, and a
+    redrawn sulfoxide written '[S@]1=O' at a ring-closure digit is read the other way ."""
+    tagged = [a for a in ring if mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED]
+    if not tagged:
+        return {}
+    from ..perception.stereo import assign_stereochemistry
+    work = Chem.Mol(mol)
+    try:
+        assign_stereochemistry(work)    # keeps the labels the naming pipeline gave ``mol`` (its done-marker is copied)
+    except Exception:  # noqa: BLE001 -- no labels, no stereo name
+        return None
+    codes = {a: work.GetAtomWithIdx(a).GetPropsAsDict().get('_CIPCode') for a in tagged}
+    return None if any(c not in _CIP_RANK for c in codes.values()) else codes
 
 
 def _mancude_thiophene_heterone(mol) -> Optional[str]:
