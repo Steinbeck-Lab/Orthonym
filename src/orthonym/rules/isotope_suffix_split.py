@@ -119,3 +119,40 @@ def decorate_with_one_suffix(namer, original: Chem.Mol, skeleton_name: str) -> O
                 record_non_pin_fragment(candidate)
                 return candidate
     return None
+
+
+#: a multiplied ring or chain suffix and the group it cites (``mark_label_on_one_of_multiplied_groups``)
+_MULTIPLIED_GROUP_SUFFIX = re.compile(
+    r"(?:di|tri|tetra|penta|hexa)(carboxylic acid|carboxamide|carbonitrile|carbaldehyde)(?![a-z])")
+#: the suffix group of each multiplied suffix, its carbon first
+_SUFFIX_GROUP = {
+    "carboxylic acid": _CARBOXY,
+    "carboxamide": Chem.MolFromSmarts("[CX3;!R](=[OX1])[NX3;$([NH2]),$([NH1][#1]),$([N]([#1])[#1])]"),
+    "carbonitrile": Chem.MolFromSmarts("[CX2;!R]#[NX1]"),
+    "carbaldehyde": Chem.MolFromSmarts("[CX3;!R;$([CH1]),$([C][#1])]=[OX1]"),
+}
+
+
+def mark_label_on_one_of_multiplied_groups(name: Optional[str], original: Chem.Mol, skeleton_name: Optional[str]) -> None:
+    """Record ``name`` as no PIN (``record_non_pin_fragment``) when the unmodified name ``skeleton_name`` cites a
+    group with a multiplied suffix ('benzene-1,4-dicarboxamide') and the groups of ``original`` carry different labels:
+     (heading 'Isotopically modified compounds', the Blue Book) makes the group with the
+    greater number of modifications the suffix and the other a prefix ('1-carboxycyclohexane-1-(13C,2H)carboxylic acid
+    (PIN)',:43776), so '(15N)benzene-1,4-dicarboxamide' is a right structure but not the PIN spelling. The name still
+    ships, below the PIN."""
+    if not name:
+        return
+    # the suffix word is the same in the labelled name; the skeleton is recorded only by some strategies
+    found = _MULTIPLIED_GROUP_SUFFIX.search(skeleton_name or name)
+    pattern = _SUFFIX_GROUP.get(found.group(1)) if found else None
+    if pattern is None:
+        return
+    signatures = []
+    for match in original.GetSubstructMatches(pattern):
+        atoms = _group_atoms(original, match) if found.group(1) == "carboxylic acid" else set(match) | {
+            n.GetIdx() for i in match for n in original.GetAtomWithIdx(i).GetNeighbors() if n.GetAtomicNum() == 1}
+        signatures.append(tuple(sorted((original.GetAtomWithIdx(i).GetIsotope(), original.GetAtomWithIdx(i).GetSymbol())
+                                       for i in atoms if original.GetAtomWithIdx(i).GetIsotope())))
+    if len(signatures) >= 2 and len(set(signatures)) > 1:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)

@@ -47,6 +47,7 @@ from ..perception.rings import (
 )
 from ..perception.stereo import assign_stereochemistry
 from .fused_amide_suffix import fused_heterocycle_n_amide
+from .fused_ring_branch import acyclic_branch_record
 from .stereochemistry import (
     collect_ring_junction_stereo,
     determine_simple_cis_trans,
@@ -97,8 +98,7 @@ def _compute_general_indicated_h(mol, ring_atom_set: Set[int],
         if symbol not in ('N', 'C', 'O', 'S'):
             continue
 
-        # Only consider atoms that are NOT aromatic in the molecule
-        # but are ring atoms (potential tautomeric sites)
+        # Only consider atoms that are NOT aromatic in the molecule but are ring atoms (potential tautomeric sites)
         if atom.GetIsAromatic():
             continue
 
@@ -3697,7 +3697,7 @@ def _identify_fused_substituent(
                     'atoms': sorted(_frag2),
                 }
 
-    return None
+    return acyclic_branch_record(mol, start_idx, excluded)   # an acyclic branch no branch above knows
 
 
 def _bfs_collect_all(mol, start_idx: int, excluded: Set[int]) -> Set[int]:

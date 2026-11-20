@@ -4226,14 +4226,12 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
     """The strategies of the decorator on ``original``: the name the first one that reads back builds.
     ``finish`` completes that name inside the ambient scopes (None declines it); ``composer`` False leaves
     out the scope composer."""
-    # (``:44180``). Everything below names the isotope-STRIPPED molecule,
-    # so no structural test further down can see that a label exists -- measured: at
-    # the substituent licences every ``GetIsotope`` in scope reads 0 even
-    # for a 13C input. Declare it ambiently instead, UNCONDITIONALLY, so a licence
-    # about to empty a scope of all its locants can decline. This is deliberately
-    # weaker than ``forced_locant_scope`` (entered further down only once a locant is
-    # known to be REQUIRED): the weaker flag must not gag the omissions that stay
-    # correct under, i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
+    # (``:44180``). Everything below names the isotope-STRIPPED molecule, so no structural test further down
+    # can see that a label exists -- measured: at the substituent licences every ``GetIsotope`` in scope reads 0
+    # even for a 13C input. Declare it ambiently instead, UNCONDITIONALLY, so a licence about to empty a scope of all its
+    # locants can decline. This is deliberately weaker than ``forced_locant_scope`` (entered further down only once a
+    # locant is known to be REQUIRED): the weaker flag must not gag the omissions that stay correct under,
+    # i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
     #
     # (``:44190``, "Locants are omitted when there is only one atom of a
     # given element"): when EVERY labelled nuclide is the only atom of its element in
@@ -4300,6 +4298,8 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
                 # ``rules.isotope_suffix_split``); best-effort tier only, below the PIN
                 from .isotope_suffix_split import decorate_with_one_suffix
                 result = decorate_with_one_suffix(namer, original, sink.get("skeleton"))
+            from .isotope_suffix_split import mark_label_on_one_of_multiplied_groups   #, label only
+            mark_label_on_one_of_multiplied_groups(result, original, sink.get("skeleton"))
             if result is not None and finish is not None:
                 result = finish(result)
         if (result and _BOND_SHIFT_PARSE_REFUSED.get()
