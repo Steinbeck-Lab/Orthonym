@@ -4473,13 +4473,14 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
     prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, set())
     if prefix is None:
         return ''
-    stem = _p74_bare_ring_stem(mol, ring_system, center_idx)
+    from .ring_ion_stereo import ring_stereo_front     # the bare ring's block is not the ion's
+    stem, front = ring_stereo_front(mol, _p74_bare_ring_stem(mol, ring_system, center_idx), locants)
     if not stem:
         return ''
     if suffix == 'uide' and not _uide_parent_cites_hydrogen(
             mol, ring_system, center_idx, stem):
         return ''
-    return f"{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{center_locant}-{suffix}"
+    return f"{front}{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{center_locant}-{suffix}"
 
 
 def _collect_substituent_atoms(mol, center_idx, start_idx, ring_system):

@@ -33,10 +33,11 @@ def ring_ium_with_prefixes(mol, ring_mol, ring_system, center_idx: int) -> str:
     prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, set())
     if not prefix:
         return ''
-    stem = _p74_bare_ring_stem(mol, ring_system, center_idx)
+    from .ring_ion_stereo import ring_stereo_front     # the bare ring's block is not the ion's
+    stem, front = ring_stereo_front(mol, _p74_bare_ring_stem(mol, ring_system, center_idx), locants)
     if not stem or re.match(r'^\d+[Hh]-', stem):
         return ''
-    return f"{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{locants[center_idx]}-ium"
+    return f"{front}{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{locants[center_idx]}-ium"
 
 
 def _tautomer_competes(mol, ring_system, center_idx: int) -> bool:

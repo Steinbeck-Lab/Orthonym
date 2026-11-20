@@ -1234,7 +1234,32 @@ def inject_stereo_reanchored_rt_gated(
     # pre-injection constitution name by the caller's ``needs_stereo_injection``
     # contract; ``strip_stereo`` is applied belt-and-suspenders so any leading
     # descriptor that did survive on it is also dropped.
+    # At the best-effort request only (user decision 2026-11-19, D1: a name whose stereo OPSIN cannot read ships
+    # below the PIN, never with its label), candidate A keeps its block where OPSIN cannot read A at all (the stereo
+    # layer, not a misread: '(1R,3r,5S)-3-{[(2S)-3-hydroxy-2-phenylpropanoyl]oxy}-8-methyl-8-azabicyclo[3.2.1]octan-
+    # 8-ium') and the descriptor check places every descriptor of A on the input's CIP labels. The best-effort gate
+    # then holds it like any such name, and assembly.stereo_unread_offer offers it when the second CIP labeller
+    # agrees. A name OPSIN reads as another molecule is still flattened, and the PIN tiers are unchanged.
+    from ..metrics.provenance import best_effort_request_ctx
+    if (best_effort_request_ctx.get() is True and candidate_a != base_name
+            and _unread_stereo_layer_verified(candidate_a, input_smiles)):
+        return candidate_a
     return strip_stereo(base_name)
+
+
+def _unread_stereo_layer_verified(name: str, smiles: str) -> bool:
+    """True when OPSIN reads ``name`` only without its stereo blocks and the descriptor check
+    (``validation.stereo_descriptors.stereo_descriptors_verified``) places every descriptor on the input's CIP
+    labels. Any failure to decide is False (the caller flattens the name, as before)."""
+    try:
+        from ..validation.opsin_roundtrip import _extended_smiles
+        from ..validation.stereo_descriptors import stereo_descriptors_verified
+        reduced = strip_stereo(name)
+        if reduced == name or _extended_smiles(name) or not _extended_smiles(reduced):
+            return False
+        return stereo_descriptors_verified(name, smiles, reduced)
+    except Exception:   # noqa: BLE001 -- undecided is not verified
+        return False
 
 
 def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, int]:

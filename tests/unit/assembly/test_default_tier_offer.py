@@ -125,17 +125,24 @@ def test_every_public_entry_point_agrees(smiles):
 
 def test_a_chapter_p10_name_the_default_tier_withholds_ships_at_best_effort_below_the_pin():
     # INTRODUCTION (the Blue Book), NPL 2026-11-01: the default tier declines '(1R,3s,5S)-tropan-3-ol' for the
-    # rule alone; best-effort gives it with the lowest label, its constitution read back and its descriptors checked
+    # rule alone ("Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"); best-effort
+    # gives a name with the lowest label, its constitution read back and its descriptors checked. Since lane/c4
+    # (2026-11-19) that is the systematic name the general engine keeps its stereo on at the best-effort request
+    # (rules.stereochemistry.inject_stereo_reanchored_rt_gated), as the book's own tropane example cites it first:
+    # '(1R,5S)-3,3-bis(ethylsulfanyl)-8-methyl-8-azabicyclo[3.2.1]octane' (:52568). Independent checks: OPSIN reads
+    # '8-methyl-8-azabicyclo[3.2.1]octan-3-ol' to tropine's constitution; RDKit's rdCIPLabeler alone labels the
+    # centres R, s, S (C1, C3, C5; R the lower locant, (j)).
     from orthonym import name_compound
     default = default_tier_row(TROPINE)
     assert default["tier"] == "abstain" and default["limit_code"] == "NO_VERIFIED_PIN", default
     assert {f["rule"] for f in default["spelling_failures"]} == {"P-100"}, default
+    systematic = "(1R,3s,5S)-8-methyl-8-azabicyclo[3.2.1]octan-3-ol"
     row = name_best_effort(TROPINE)
-    assert (row["name"], row["tier"], row["is_pin"]) == ("(1R,3s,5S)-tropan-3-ol", "best_effort", False), row
+    assert (row["name"], row["tier"], row["is_pin"]) == (systematic, "best_effort", False), row
     assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY, row
-    assert name_compound(TROPINE, **BE_FLAGS) == "(1R,3s,5S)-tropan-3-ol"
+    assert name_compound(TROPINE, **BE_FLAGS) == systematic
     engine = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    assert engine.name(TROPINE) == engine.name_tiered(TROPINE)["name"] == "(1R,3s,5S)-tropan-3-ol"
+    assert engine.name(TROPINE) == engine.name_tiered(TROPINE)["name"] == systematic
 
 
 def test_the_confidence_record_of_the_offered_name_is_the_default_tier_s():

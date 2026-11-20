@@ -1954,8 +1954,8 @@ def _build_ester_acid_word(
     from .stereochemistry import format_stereodescriptor_string
     acid_stereo = []
     if not re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', acylate_name):
-        acid_stereo = _collect_ester_fragment_stereo(mol, acid_atoms, ester_match)
-        # Only keep R/S descriptors (E/Z is handled by the unsaturation path)
+        acid_stereo = _collect_ester_fragment_stereo(mol, acid_atoms, ester_match,
+                                                     ring_locant_for_suffix and oriented_ring, acid_prefix_str)
         acid_stereo = [(loc, cip) for loc, cip in acid_stereo if cip in ('R', 'S')]
 
     # Prepend R/S stereo prefix to the acylate word
@@ -1966,9 +1966,22 @@ def _build_ester_acid_word(
     return acylate_name
 
 
+def _prefixes_cite_side_chain_centres(mol, acid_atoms, ring, ester_match, cited_prefixes: str) -> bool:
+    """True when the R/S descriptors in ``cited_prefixes`` (the acid word's substituent prefixes) are at least as many as
+    the R/S centres of the acid fragment outside its ring and outside the ester group."""
+    skip = set(ring) | set(ester_match)
+    centres = sum(1 for a in acid_atoms if a not in skip
+                  and mol.GetAtomWithIdx(a).GetPropsAsDict().get('_CIPCode') in ('R', 'S'))
+    cited = sum(1 for block in re.findall(r"\(([^()]*)\)-", cited_prefixes) for unit in block.split(',')
+                if re.fullmatch(r"\d*'*[RS]", unit.strip()))
+    return cited >= centres
+
+
 def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
-                                   ester_match: tuple) -> list:
-    """Collect R/S stereodescriptors for the acid fragment of an ester.
+                                   ester_match: tuple, oriented_ring: Optional[list] = None,
+                                   cited_prefixes: str = "") -> list:
+    """Collect stereodescriptors for the acid fragment of an ester (the caller keeps R/S only: E/Z comes from the
+    unsaturation path).
 
     Builds an atom_to_locant mapping for the acid chain (carbonyl C = 1,
     then chain outward) and collects R/S descriptors for stereocenters
@@ -1984,6 +1997,15 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
     """
     from .stereochemistry import collect_stereodescriptors
 
+    if oriented_ring and _prefixes_cite_side_chain_centres(mol, acid_atoms, oriented_ring, ester_match, cited_prefixes):
+        # A ring acid cites its ring centres at the ring locants of its word (``oriented_ring``, the ring as
+        # _build_ester_acid_word numbers it, passed only when it found the ring atom on the C=O carbon); a centre
+        # outside the ring belongs to a substituent and is cited in that prefix's own block. The bond count
+        # below gave neither: 'methyl (6R)-4-[(2R)-...heptan-2-yl]-3-hydroxybenzoate' (the side-chain centre again, at
+        # a count of 6), '(2S,3R)-...-2,2-dimethylcyclopropane-1-carboxylate' (ring C1 counted as 2). Where the
+        # prefixes do not cite every side-chain centre, the bond count stays: the name then lacks a descriptor and
+        # the gate withdraws it, as before (review row r0106).
+        return collect_stereodescriptors(mol, {a: i + 1 for i, a in enumerate(oriented_ring)})
     acid_set = set(acid_atoms)
 
     # Find the carbonyl carbon (C with =O in acid fragment)

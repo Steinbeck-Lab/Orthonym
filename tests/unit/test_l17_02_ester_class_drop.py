@@ -170,7 +170,11 @@ _CLASS_PIN = "CC(=O)O[C@H]1C(=C)C=C(C=C1OC)OC"
 # and the diester of a phenol and an allylic alcohol: the book's own pattern '2-[2-(acetyloxy)ethyl]phenyl acetate (PIN)'
 # (``test_the_pin_tier_names_a_phenyl_acetate_with_an_acetyloxy_chain``)
 _CLASS_PIN_DIESTER = "CC(=O)OC/C=C/c1ccc(OC(C)=O)cc1"
-_CLASS_PINS = (_CLASS_PIN, _CLASS_PIN_DIESTER)
+# and the benzoate with a stereo side chain: the acid word cited the side chain's centre a second time at a bond count
+# ('methyl (6R)-4-[(2R)-...]'), so the gate refused it; with the ring's own locants the PIN tier builds it
+# (``tests/unit/rules/test_ring_acid_ester_stereo.py``)
+_CLASS_PIN_STEREO_SIDE_CHAIN = "COC(=O)c1ccc([C@](C)(O)CCCC(C)(C)O)c(O)c1"
+_CLASS_PINS = (_CLASS_PIN, _CLASS_PIN_DIESTER, _CLASS_PIN_STEREO_SIDE_CHAIN)
 
 
 @pytest.mark.parametrize("smiles,name", _CLASS)

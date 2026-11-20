@@ -65,9 +65,19 @@ def test_a_bridged_cation_with_letter_locants_is_named():
     # the bare ring's numbering mixes 4 and '4a': its substituent locants are sorted as ring locants
     # (ions._p74_ring_substituent_prefix raised TypeError and the salt lost its name)
     from tests.support.pin_tiers import tier_row
-    row = tier_row("C[N@@+]1(CC[C@]23C4C(=C)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O)CC6CC6.[Br-]", "valid")
-    assert row["name"] == ("(1S,4R)-4-(cyclopropylmethyl)-10,17-dihydroxy-4-methyl-14-methylidene-12-oxa-4-azapentacyclo"
-                           "[9.6.1.0^1,13.0^5,17.0^7,18]octadeca-7(18),8,10-trien-4-ium bromide"), row
+    # Since lane/c4 (2026-11-19) the fused name of the cation cites its own block at the front (rules.ring_ion_stereo);
+    # before, the bare ring's block sat mid-name, the fused name failed and the von Baeyer name
+    # '(1S,4R)-...-4-azapentacyclo[9.6.1.0^1,13.0^5,17.0^7,18]octadeca-7(18),8,10-trien-4-ium bromide' was given.
+    # (the Blue Book): fusion nomenclature gives the PIN for at least two rings of five or more members,
+    # von Baeyer names "when fusion names are not allowed". Independent check: OPSIN reads the name back to the input's
+    # full InChIKey (assert_full_rt); end check CT3 on the code before the change gave the von Baeyer name.
+    from tests.support.rt_assert import assert_full_rt
+    smiles = "C[N@@+]1(CC[C@]23C4C(=C)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O)CC6CC6.[Br-]"
+    name = ("(3R,12bS)-3-(cyclopropylmethyl)-4a,9-dihydroxy-3-methyl-7-methylidene-2,3,4,4a,5,6,7,7a-octahydro-1H-4,12-"
+            "methano[1]benzofuro[3,2-e]isoquinolin-3-ium bromide")
+    row = tier_row(smiles, "valid")
+    assert row["name"] == name, row
+    assert_full_rt(name, smiles)
 
 
 @pytest.mark.opsin_gate
