@@ -46,7 +46,7 @@ from ..perception.rings import (
     is_heterocyclic,
 )
 from ..perception.stereo import assign_stereochemistry
-from .fused_amide_suffix import fused_heterocycle_n_amide
+from .fused_amide_suffix import fused_heterocycle_n_amide, fused_n_sources
 from .fused_ring_branch import acyclic_branch_record
 from .stereochemistry import (
     collect_ring_junction_stereo,
@@ -3195,6 +3195,7 @@ def get_fused_heterocycle_substituents(
                 result['suffix_groups'][suffix_name].append(locant)
                 for _nm in sub_info.get('n_substituents') or ():   # an N-substituted carboxamide
                     result['n_substituents'][_nm] += 1
+                result.setdefault('n_by_locant', {})[locant] = list(sub_info.get('n_substituents') or ())
             elif sub_type == 'functionalized':
                 # Functionalized chain substituents (cyanomethyl, etc.)
                 result['c_substituents'][sub_name].append(locant)
@@ -4685,14 +4686,14 @@ def _assemble_fused_heterocycle_name(
 
     prefix_parts = []
 
-    # Each source's groups, in the order they were cited: the N-substituents of the amine suffix ('N' per
-    # substituent), the ring C-substituents and the other (halogen etc.) ring substituents.
+    # Each source's groups in citation order: the N-substituents, the ring C-substituents, the other ring substituents.
     other_groups = defaultdict(list)
     for sub in substituents['other']:
         other_groups[sub['name']].append(sub['locant'])
     _sources = []
-    for name, count in substituents['n_substituents'].items():
-        _sources.append(('n', name, ["N"] * count))
+    if (_n_sources := fused_n_sources(mol, substituents, atom_mapping)) is None:
+        return None     # a diamide whose nitrogens a symmetry would number lower
+    _sources += _n_sources
     for name, locants in substituents['c_substituents'].items():
         _sources.append(('c', name, list(locants)))
     for name, locants in other_groups.items():
@@ -4724,7 +4725,7 @@ def _assemble_fused_heterocycle_name(
         # (``identical_prefixes_cited_apart``): each source's groups on
         # their own.
         for kind, name, locs in _sources:
-            if kind == 'n':
+            if kind == 'n' and set(locs) == {'N'}:     # N-locants of a diamide ('N3,N6') as ring locants
                 prefix_parts.append((_format_n_prefix(name, len(locs)), name))
             else:
                 prefix_parts.append((_format_c_prefix(name, locs, len(locs)), name))
@@ -4733,7 +4734,7 @@ def _assemble_fused_heterocycle_name(
             if identical_prefixes_grouped() else ()):
         if name in _single:
             kind, locs = _single[name]
-            if kind == 'n':
+            if kind == 'n' and set(locs) == {'N'}:
                 prefix = _format_n_prefix(name, len(locs))
             else:
                 prefix = _format_c_prefix(name, locs, len(locs))
@@ -4744,7 +4745,6 @@ def _assemble_fused_heterocycle_name(
     # Sort alphabetically by base name; R before S whatever the locants,:22603;,:45465)
     prefix_parts.sort(key=lambda x: alpha_sort_key_rs(x[1]))
 
-    # Join prefixes
     prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
 
     # Handle suffix-forming groups

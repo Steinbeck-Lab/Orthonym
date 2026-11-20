@@ -1,7 +1,7 @@
 """Prefix forms and principal-group rules of the benzene-ring writer (``rules.benzene``) that do not
 come from the groups of the ring alone: they depend on the molecule's principal group or are
 spelled by a retained prefix of the Blue Book."""
-from typing import Optional
+from typing import Dict, Optional
 
 
 def hydroxy_is_principal(principal_group: Optional[str]) -> bool:
@@ -51,3 +51,26 @@ def dichalcoganyl_prefix(mol, start_idx: int, ring_atoms) -> Optional[dict]:
             and nb[0].GetTotalNumHs() == 1):
         return {'name': {'Se': 'diselanyl', 'Te': 'ditellanyl'}[symbol], 'atoms': [start_idx, nb[0].GetIdx()]}
     return None
+
+
+_HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+
+def halosulfur_oxide_prefix(mol, s_idx: int, neighbors) -> Optional[Dict]:
+    """The prefix record of a ring -SO2-X or -SO-X (X a halogen) cited beside a senior group: 'Acyl halides and
+    pseudohalides as substituent groups', method (2) (the Blue Book), "a compound prefix composed of a halo or
+    halogeno prefix and an appropriate divalent acyl group, such as 'sulfonyl'"; '-SO2-Cl chlorosulfonyl (preselected
+    prefix)' (:36472), '-S(=O)-Cl chlorosulfinyl (preselected prefix)' (:36482). ``neighbors`` are the sulfur's atoms
+    off the ring; None for any other sulfur, and when no group senior to the sulfur acid halide is present (the
+    molecule's principal group is the sulfur acid halide: 'benzene-1-sulfonyl chloride', not a sulfonamide parent)."""
+    halo = [n for n in neighbors if n.GetSymbol() in _HALO_PREFIX and not n.GetIsotope()]
+    oxo = [n for n in neighbors if n.GetSymbol() == 'O'
+           and mol.GetBondBetweenAtoms(s_idx, n.GetIdx()).GetBondTypeAsDouble() == 2.0]
+    if len(halo) != 1 or len(oxo) not in (1, 2) or len(neighbors) != len(oxo) + 1 \
+            or mol.GetAtomWithIdx(s_idx).GetFormalCharge():
+        return None
+    from ..assembly.strict_ring_prefix import principal_group
+    if principal_group(mol)[0] in ('sulfonyl_halide', 'sulfinyl_halide'):
+        return None     # the sulfur acid halide is itself the principal group: its suffix, never a prefix
+    return {'name': _HALO_PREFIX[halo[0].GetSymbol()] + ('sulfonyl' if len(oxo) == 2 else 'sulfinyl'),
+            'atoms': [s_idx, halo[0].GetIdx()] + [n.GetIdx() for n in oxo]}

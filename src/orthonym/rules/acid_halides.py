@@ -24,6 +24,7 @@ from typing import Dict, List, Optional
 
 from rdkit import Chem
 
+from .acyl_halide_from_acid import acyl_halide_from_acid
 from ..assembly.naming_utils import get_multiplier_prefix
 from ..data.chain_names import get_chain_prefix
 from ..data.locant_text import render_locants
@@ -594,8 +595,8 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
 
     if is_ring_attached:
         _scope('ring')
-        return _name_ring_attached_acid_halide(mol, features, acid_halide_matches,
-                                                halide_word, ring_name, consumed_atoms)
+        return acyl_halide_from_acid(mol, _combined) or _name_ring_attached_acid_halide(   # '4-methylbenzoyl chloride'
+            mol, features, acid_halide_matches, halide_word, ring_name, consumed_atoms)
 
     # Acyclic acid halide: determine chain length
     # Find the principal chain (the carbon chain ending at the carbonyl C)

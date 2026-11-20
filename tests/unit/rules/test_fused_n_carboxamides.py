@@ -40,10 +40,13 @@ def test_fused_n_carboxamide_pins(smiles, name):
     assert_full_rt(row["name"], smiles)
 
 
-def test_two_n_substituted_carboxamides_decline_here():
-    """Two N-substituted carboxamides on one core would need N and N' locants; the fused producers decline, so no name
-    binds the N prefixes to the wrong amide."""
-    assert tier_row("O=C(NC)c1ccc2ccccc2c1C(=O)NC", "pin")["tier"] == "abstain"
+def test_two_n_substituted_carboxamides_take_n_locants():
+    """Two N-substituted carboxamides on one core need N-locants, the Blue Book), never a bare
+    'N' that does not say which nitrogen carries the group."""
+    row = tier_row("O=C(NC)c1ccc2ccccc2c1C(=O)NC", "pin")
+    assert (row["name"], row["tier"]) == ("N1,N2-dimethylnaphthalene-1,2-dicarboxamide", "pin_verified"), row
+    row = tier_row("CNC(=O)c1cnc2ccc(C(=O)NC)cc2c1", "pin")
+    assert (row["name"], row["tier"]) == ("N3,N6-dimethylquinoline-3,6-dicarboxamide", "pin_verified"), row
 
 
 @pytest.mark.parametrize("acid_smiles,second", [
@@ -62,16 +65,16 @@ def test_the_amide_parent_guard_counts_only_a_second_amide(acid_smiles, second):
     assert second_amide_on_acid_ring(acid_smiles) is second
 
 
-@pytest.mark.parametrize("smiles", ["CNC(=O)c1ccc2cc(C(N)=O)ccc2c1", "CNC(=O)c1cnc2ccc(C(N)=O)cc2c1"])
-def test_a_carbamoyl_prefix_beside_the_carboxamide_suffix_is_no_pin(smiles):
+@pytest.mark.parametrize("smiles,name", [
+    ("CNC(=O)c1ccc2cc(C(N)=O)ccc2c1", "N2-methylnaphthalene-2,6-dicarboxamide"),
+    ("CNC(=O)c1cnc2ccc(C(N)=O)cc2c1", "N3-methylquinoline-3,6-dicarboxamide"),
+])
+def test_both_carboxamides_are_the_suffix(smiles, name):
     """Two carboxamides on one ring parent are both the suffix;, the Blue Book, N locants
-    for diamides; 'benzene-1,4-dicarboxamide (PIN)':32718): '6-(methylcarbamoyl)naphthalene-2-carboxamide' is a
-    correct structure but not the PIN spelling (rules.pin_vocabulary), so the PIN tier declines and the wider tier
-    keeps a name below the PIN."""
-    assert tier_row(smiles, "pin")["tier"] == "abstain"
-    row = tier_row(smiles, "best-effort")
-    assert row["tier"] != "pin_verified" and row["is_pin"] is False, row
-    assert_full_rt(row["name"], smiles)
+    for diamides; 'benzene-1,4-dicarboxamide (PIN)':32718), never '6-(methylcarbamoyl)naphthalene-2-carboxamide' (a
+    correct structure, not the PIN spelling: rules.pin_vocabulary keeps it below the PIN, next test)."""
+    row = tier_row(smiles, "pin")
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
 @pytest.mark.parametrize("name,flagged", [

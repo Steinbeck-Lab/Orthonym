@@ -36,7 +36,8 @@ from ..assembly.naming_utils import (
     should_omit_locant_one,
     suffix_takes_derived_multiplier,
 )
-from .benzene_prefix_forms import dichalcoganyl_prefix, hydroxy_is_principal, pnictogen_oxoacid_prefix
+from .benzene_prefix_forms import (dichalcoganyl_prefix, halosulfur_oxide_prefix, hydroxy_is_principal,
+                                   pnictogen_oxoacid_prefix)
 from .benzene_polyamide import name_benzene_polyamide as _name_benzene_polyamide, note_n_substituents as _note_n_substituents
 from .benzene_acid_suffixes import ACID_SUFFIX_FGS, ACID_SUFFIX_SMARTS
 from .benzene_amine_cation import amine_takes_suffix, demote_suffixes_below_amine
@@ -2985,6 +2986,8 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
     # Simple thiol (-SH): IUPAC prefix = "sulfanyl"
     if h_count >= 1 and len(neighbors) == 0:
         return {'name': 'sulfanyl', 'atoms': [s_idx]}
+    if (_halo := halosulfur_oxide_prefix(mol, s_idx, neighbors)) is not None:
+        return _halo                                     # 'chlorosulfonyl' method (2))
 
     # Classify sulfur oxidation state by counting =O neighbors (non-ring)
     # Sulfoxide: S with 1 =O; Sulfone: S with 2 =O; Thioether: S with 0 =O
@@ -4897,10 +4900,7 @@ def _name_substituted_benzenediamine(
         IUPAC name, e.g. 'N-methylbenzene-1,4-diamine',
         'N,N-dimethylbenzene-1,4-diamine', 'N-phenylbenzene-1,2-diamine'.
     """
-    from ..assembly.naming_utils import (
-        _join_multiplied_suffix,
-        _wrap_n_substituent,
-    )
+    from ..assembly.naming_utils import _join_multiplied_suffix
 
     amine_set = set(amine_locants)
 
@@ -4944,52 +4944,15 @@ def _name_substituted_benzenediamine(
     # substituted N of a benzene poly-amine carries its ring locant, e.g.
     # 'N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine (PIN)' (:26404),
     # 'N4-(7-chloroquinolin-4-yl)-N1,N1-diethylpentane-1,4-diamine' (:4675).
-    # The producer used to cite the lowest substituted N with a bare 'N'
-    # ('N,N-dimethylbenzene-1,4-diamine', 'N-methyl-N4-methyl...'). Identical
-    # substituent names are multiplied across the N atoms:
-    # 'N1,N4-dimethyl', 'N1,N1-dimethyl'. A compound substituent takes its own
-    # enclosing marks first, as in the aniline producer above.
-    from ..assembly.identical_prefixes import shared_prefix_groups
-    from ..assembly.naming_utils import enclose_if_compound
-    n_locs_by_name: Dict[str, List[int]] = {}
-    for n_loc in sorted(new_n_map):
-        for nm in new_n_map[n_loc]:
-            n_locs_by_name.setdefault(nm, []).append(n_loc)
-    # (the Blue Book): a substituent the ring and a nitrogen both carry is one
-    # multiplied prefix, the italic N locants first,:3195): 'N1,N4,2-trimethyl'.
-    new_ring, n_locs_by_name, shared_entries = shared_prefix_groups(
-        new_ring, n_locs_by_name, lambda loc: f"N{loc}")
-    n_prefix_entries: List[Tuple[str, str]] = []
-    for nm, locs in n_locs_by_name.items():
-        locs = sorted(locs)
-        tags = render_locants(f"N{loc}" for loc in locs)
-        body = _wrap_n_substituent(enclose_if_compound(nm))
-        from ..assembly.naming_utils import multiplied_component as _mc
-        n_prefix_entries.append((alpha_sort_key(nm), f"{tags}-{_mc(len(locs), nm, body)}"))
-
-    # --- Ring-substituent prefix entries ---
-    ring_prefix_entries: List[Tuple[str, str]] = []
-    for name in new_ring:
-        locants = sorted(new_ring[name])
-        rendered = format_substituent_prefix(name, locants, len(locants))
-        ring_prefix_entries.append((alpha_sort_key(name), rendered))
-
+    # Identical names are multiplied across the N atoms: 'N1,N4-dimethyl', 'N1,N1-dimethyl'; a compound
+    # substituent takes its own enclosing marks first: benzene_polyamide.n_locant_prefix_part.
     # --- Parent suffix: benzene-<locants>-<mult>amine ---
     mult = multiplying_prefix(len(new_amines))
     loc_str = ",".join(str(l) for l in sorted(new_amines))
     suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, suffix)}"
 
-    all_entries = n_prefix_entries + ring_prefix_entries + shared_entries
-    if not all_entries:
-        return suffix_part
-    # `e[1]` is an already-RENDERED prefix string, so its leading locants are
-    # PARENT locants -> parent_locants=True compares a prefix's OWN
-    # locants, and a parent locant is assigned BY this very order). `[1:]` keeps
-    # the total-order tier so an exact tie cannot fall through to list order.
-    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(
-        e[1], parent_locants=True)[1:]))
-    prefix_part = "-".join(rendered for _k, rendered in all_entries)
-    return f"{prefix_part}{suffix_part}"
+    from .benzene_polyamide import n_locant_prefix_part
+    return f"{n_locant_prefix_part(dict(new_ring), new_n_map)}{suffix_part}"
 
 
 def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):

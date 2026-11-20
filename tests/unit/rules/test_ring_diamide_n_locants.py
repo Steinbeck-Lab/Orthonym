@@ -30,6 +30,24 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
     ("CNS(=O)(=O)c1cccc(S(=O)(=O)NCC)c1", "N1-ethyl-N3-methylbenzene-1,3-disulfonamide"),
     ("CNC(=O)c1ccc(Cl)c(C(N)=O)c1", "4-chloro-N1-methylbenzene-1,3-dicarboxamide"),
     ("CNC(=O)c1cc(C(=O)NC)cc(C(=O)NC)c1", "N1,N3,N5-trimethylbenzene-1,3,5-tricarboxamide"),
+    # polycyclic hydrocarbons (rules.benzene_polyamide.polycyclic_polyamide_prefixes)
+    ("CNC(=O)c1ccc2cc(C(N)=O)ccc2c1", "N2-methylnaphthalene-2,6-dicarboxamide"),
+    ("NC(=O)c1ccc2cc(C(=O)NC)ccc2c1", "N2-methylnaphthalene-2,6-dicarboxamide"),
+    ("CNC(=O)c1ccc2cc(C(=O)NC)ccc2c1", "N2,N6-dimethylnaphthalene-2,6-dicarboxamide"),
+    ("CNC(=O)c1cccc2cccc(C(=O)NC)c12", "N1,N8-dimethylnaphthalene-1,8-dicarboxamide"),
+    ("CCNC(=O)c1ccc2cc(C(=O)NC)ccc2c1", "N2-ethyl-N6-methylnaphthalene-2,6-dicarboxamide"),
+    ("CN(C)C(=O)c1ccc2cc(C(=O)NC)ccc2c1", "N2,N2,N6-trimethylnaphthalene-2,6-dicarboxamide"),
+    ("CNC(=O)c1ccc2cc(C(=O)NC)c(C)cc2c1", "N2,N6,3-trimethylnaphthalene-2,6-dicarboxamide"),
+    ("CNC(=O)c1ccc2cc3cc(C(=O)NC)ccc3cc2c1", "N2,N6-dimethylanthracene-2,6-dicarboxamide"),
+    ("CNC(=O)c1ccc2cc(C(N)=O)c(Cl)cc2c1", "3-chloro-N6-methylnaphthalene-2,6-dicarboxamide"),
+    # fused heterocycles (rules.fused_amide_suffix.fused_n_sources)
+    ("CNC(=O)c1cnc2ccc(C(=O)NC)cc2c1", "N3,N6-dimethylquinoline-3,6-dicarboxamide"),
+    ("CNC(=O)c1cnc2ccc(C(N)=O)cc2c1", "N3-methylquinoline-3,6-dicarboxamide"),
+    ("NC(=O)c1cnc2ccc(C(=O)NC)cc2c1", "N6-methylquinoline-3,6-dicarboxamide"),
+    ("CNC(=O)c1ccc2[nH]c(C(=O)NCC)cc2c1", "N2-ethyl-N5-methyl-1H-indole-2,5-dicarboxamide"),
+    ("Cn1cc(C(=O)NC)c2cc(C(=O)NC)ccc21", "N3,N5,1-trimethyl-1H-indole-3,5-dicarboxamide"),
+    ("CNC(=O)c1ccc2oc3ccc(C(N)=O)cc3c2c1", "N2-methyldibenzo[b,d]furan-2,8-dicarboxamide"),
+    ("CN(C)C(=O)c1cnc2ccc(C(=O)N(C)C)cc2c1", "N3,N3,N6,N6-tetramethylquinoline-3,6-dicarboxamide"),
     # (f) before the N-locants: 'N4,2-dimethylpentane-2,4-diamine (PIN)' (the Blue Book)
     ("CNC(=O)c1cc(C(N)=O)ccc1Cl", "4-chloro-N3-methylbenzene-1,3-dicarboxamide"),
     ("CNS(=O)(=O)c1cc(S(N)(=O)=O)ccc1Cl", "4-chloro-N3-methylbenzene-1,3-disulfonamide"),
@@ -46,6 +64,8 @@ def test_ring_diamide_n_locants(smiles, name):
     ("Cc1nc(C(N)=O)cc(C(N)=O)c1", "6-methylpyridine-2,4-dicarboxamide"),
     ("NC(=O)c1ccc(C(N)=O)cc1", "benzene-1,4-dicarboxamide"),
     ("CN(C)C(=O)c1ccccc1", "N,N-dimethylbenzamide"),
+    ("CNC(=O)c1ccc2ccccc2c1", "N-methylnaphthalene-2-carboxamide"),
+    ("NC(=O)c1ccc2cc(C(N)=O)ccc2c1", "naphthalene-2,6-dicarboxamide"),
     # an acylamino N or a lactam on the ring is a prefix, not a second suffix group (c) vs (f),:3256)
     ("CC(=O)Nc1cc(C(N)=O)cs1", "5-acetamidothiophene-3-carboxamide"),
     ("O=C(Nc1cc(C(N)=O)cs1)c1ccccc1", "5-benzamidothiophene-3-carboxamide"),

@@ -101,7 +101,6 @@ CONTROLS = [
     ("CC[18OH]", "ethan(18O)ol"),
     ("CC(=O)O[2H]", "(O-2H)acetic acid"),
     ("Cl[12CH](Cl)Cl", "trichloro(12C)methane"),
-    ("[2H]OCCO", "(O-2H)ethane-1,2-diol"),                 # 3b must not touch the multiplied-suffix record
     ("[2H]Oc1ccccc1", "(O-2H)phenol"),
     ("[2H]OC=O", "(O-2H)formic acid"),
 ]
@@ -141,6 +140,15 @@ def test_best_effort_is_unchanged(smiles, name):
 def test_controls_that_opsin_reads_do_not_use_the_twin(smiles, name):
     row = default_tier_row(smiles)
     assert row["name"] == name and row["verified"] == "opsin" and row["tier"] == "pin_verified", row
+
+
+def test_label_on_one_of_two_hydroxy_groups_reads_without_the_twin_below_the_pin():
+    # 3b must not touch the multiplied-suffix record; (:43770) cites the two groups apart once one carries a
+    # label ('(2R)-2-(2H)hydroxy-3-hydroxy(1-2H)propanal (PIN)',:44219), so the name ships below the PIN
+    assert default_tier_row("[2H]OCCO")["tier"] == "abstain"
+    row = name_best_effort("[2H]OCCO")
+    assert row["name"] == "(O-2H)ethane-1,2-diol" and row["tier"] == "systematic_verified", row
+    assert _canon(_independent_parse(row["name"], "[2H]OCCO")) == _canon("[2H]OCCO")
 
 
 def test_label_on_the_hydroxyl_hydrogen_keeps_the_locant_free_skeleton():

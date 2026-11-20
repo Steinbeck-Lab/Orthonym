@@ -30,7 +30,7 @@ def _best_effort():
 
 def test_labelled_mixture_is_named_from_its_parts_at_best_effort():
     row = _best_effort().name_tiered(_TRITIATED)
-    assert row["name"] == "trichloroacetic acid—(2R,5S)-2-ethyl-3-[fluoro(oxo)methyl](5-3H1)oxolane (1/1)"
+    assert row["name"] == "trichloroacetic acid—(2R,5S)-2-ethyl(5-3H1)oxolane-3-carbonyl fluoride (1/1)"   #
     assert row["tier"] not in ("pin_verified", "pin_unverified")
 
 

@@ -62,6 +62,7 @@ from .hydrocarbon_series import (
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .fused_amide_suffix import cites_n_prefixes, n_substituted_carboxamide
+from .benzene_polyamide import polycyclic_polyamide_prefixes as _polyamide_prefixes
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from ..data.locant_text import render_locants
 
@@ -985,7 +986,7 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             if _ni not in _visited and _ni not in core_atoms:
                 _visited.add(_ni)
                 _queue.append(_ni)
-    if (_n_amide := n_substituted_carboxamide(mol, start_idx, core_atoms, _frag_atoms)) is not None:
+    if (_n_amide := n_substituted_carboxamide(mol, start_idx, core_atoms, _frag_atoms, several=True)) is not None:
         return _n_amide                     # an N-aryl carboxamide too ('N-phenylnaphthalene-2-carboxamide')
     _ring_info = mol.GetRingInfo()
     if any(_ring_info.NumAtomRings(a) > 0 for a in _frag_atoms):
@@ -1413,7 +1414,7 @@ def _identify_pah_functionalized_chain(
             if match[0] == start_idx:
                 return {'name': 'carboxamide', 'atoms': chain_atoms,
                         'is_suffix': True, 'suffix_type': 'primary_amide'}
-    _n_amide = n_substituted_carboxamide(mol, start_idx, core_atoms, chain_atoms)   # 'N-methyl...-carboxamide'
+    _n_amide = n_substituted_carboxamide(mol, start_idx, core_atoms, chain_atoms, several=True)   # 'N-methyl...'
     if _n_amide is not None:
         return _n_amide
 
@@ -1767,8 +1768,8 @@ def name_substituted_polycyclic(
         prefixes = [p for _k, p in sorted(_n_parts + _keyed_prefixes,
                                           key=lambda kp: kp[0])]
 
-    # Join prefixes with proper hyphenation
-    prefix_part = _join_pah_prefixes(prefixes)
+    prefix_part = _polyamide_prefixes(mol, substituents, atom_to_locant, prefix_substituent_groups,  # 'N2,N6-dimethyl'
+                                      bool(stereo_descriptors)) or _join_pah_prefixes(prefixes)
 
     # Handle suffix-type functional groups
     if suffix_groups:

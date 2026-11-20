@@ -19,8 +19,16 @@ pytestmark = pytest.mark.opsin_gate
     ("CN([2H])NC(=O)O", "2-methyl(2-2H)hydrazine-1-carboxylic acid"),
     # unchanged: the amide and the diamine
     ("CC(=O)N[2H]", "(N-2H1)acetamide"),
-    ("NCCN[2H]", "(N1-2H1)ethane-1,2-diamine"),
 ])
 def test_hydrazine_nitrogens_take_the_parents_locants(smiles, name):
     row = Orthonym().name_tiered(smiles)
     assert (row["name"], row["tier"]) == (name, "pin_verified")
+
+
+def test_diamine_label_on_one_nitrogen_keeps_its_letter_below_the_pin():
+    # (the Blue Book): the two amino groups are modified differently, so the multiplied suffix is not
+    # the PIN spelling; the letter and its number stay as they were
+    from tests.support.pin_tiers import tier_row
+    assert tier_row("NCCN[2H]", "pin")["tier"] == "abstain"
+    row = tier_row("NCCN[2H]", "best-effort")
+    assert row["name"] == "(N1-2H1)ethane-1,2-diamine" and row["tier"] != "pin_verified", row

@@ -15,11 +15,14 @@ from ..perception.smarts_cache import compiled as _compiled_smarts
 _N_AMIDE_SMARTS = ('[CX3](=O)[NX3;H1;+0][#6]', '[CX3](=O)[NX3;H0;+0]([#6])[#6]')
 
 
-def n_substituted_carboxamide(mol, start_idx: int, core_atoms: Set[int], chain_atoms: List[int]) -> Optional[Dict]:
+def n_substituted_carboxamide(mol, start_idx: int, core_atoms: Set[int], chain_atoms: List[int],
+                               several: bool = False) -> Optional[Dict]:
     """The suffix record of an N-substituted carboxamide whose carbon ``start_idx`` is joined to the fused core
     ``core_atoms``: ``{'name': 'carboxamide',..., 'n_substituents': [...]}``, or None (another shape, or a nitrogen
-    branch the namer cannot name: the whole record declines rather than drop a substituent)."""
-    if not _one_n_group_owner(mol, core_atoms):
+    branch the namer cannot name: the whole record declines rather than drop a substituent). ``several``: the caller
+    cites each amide's N groups with its own N-locant (``rules.benzene_polyamide.polycyclic_polyamide_prefixes``), so
+    two or more carboxamides of the core may carry N groups."""
+    if not _one_n_group_owner(mol, core_atoms, several):
         return None
     for smarts in _N_AMIDE_SMARTS:
         pattern = _compiled_smarts(smarts)
@@ -50,10 +53,11 @@ def cites_n_prefixes(suffix_groups: Dict[str, List[int]]) -> bool:
     return bool(suffix_groups.get('amine')) or len(suffix_groups.get('carboxamide') or ()) == 1
 
 
-def _one_n_group_owner(mol, core_atoms: Set[int]) -> bool:
+def _one_n_group_owner(mol, core_atoms: Set[int], several: bool = False) -> bool:
     """True when exactly one N-substituted carboxamide sits on the core and no other exocyclic nitrogen of the core
     carries a carbon group: the italic-N prefixes then belong to that amide alone (with two, N and N' locants or a
-    multiplicative name would be needed)."""
+    multiplicative name would be needed). With ``several``, every acyl group of the molecule is a carboxamide on the
+    core and at least one carries N groups: each amide's N groups take its N-locant."""
     core = set(core_atoms)
     rings = [set(r) for r in mol.GetRingInfo().AtomRings() if set(r) <= core]
     if not any(len(a & b) >= 2 for i, a in enumerate(rings) for b in rings[i + 1:]):
@@ -61,10 +65,13 @@ def _one_n_group_owner(mol, core_atoms: Set[int]) -> bool:
     if any(a.GetFormalCharge() for a in mol.GetAtoms()):
         return False               # an ion or a salt: an anion is senior and the ion producers name it
     from ..assembly.strict_ring_prefix import principal_group
-    if principal_group(mol)[0] not in ('secondary_amide', 'tertiary_amide'):
+    if principal_group(mol)[0] not in ('secondary_amide', 'tertiary_amide') + (('primary_amide',) if several else ()):
         return False               # a senior group (a sulfonic acid of a neutralised salt, an acid, an ester) holds the suffix
     acyl = _compiled_smarts('[CX3](=[O,S])[O,N,S,F,Cl,Br,I]')
-    if acyl is not None and len({m[0] for m in mol.GetSubstructMatches(acyl)}) != 1:
+    acyl_carbons = {m[0] for m in mol.GetSubstructMatches(acyl)} if acyl is not None else set()
+    if several and len(acyl_carbons) >= 2:
+        return _all_acyls_are_core_carboxamides(mol, core, acyl_carbons)
+    if len(acyl_carbons) != 1:
         return False               # another acid, ester, amide, anhydride or acyl halide: the core may not be the parent
     owners = 0
     for smarts in _N_AMIDE_SMARTS:
@@ -83,12 +90,29 @@ def _one_n_group_owner(mol, core_atoms: Set[int]) -> bool:
     return owners == 1
 
 
+def _all_acyls_are_core_carboxamides(mol, core: Set[int], acyl_carbons: Set[int]) -> bool:
+    """True when two or more acyl carbons exist, each a carboxamide carbon (C(=O)N, the N not in a ring, not joined to
+    N or O) bonded to the core, and at least one amide N carries a group; no other exocyclic N of the core carries
+    carbon (its N prefixes would mix with the amides')."""
+    amide = _compiled_smarts('[CX3](=[OX1])[NX3;!R;!$(N[N,O])]')
+    amide_carbons = {m[0]: m[2] for m in mol.GetSubstructMatches(amide)} if amide is not None else {}
+    if len(acyl_carbons) < 2 or not acyl_carbons <= set(amide_carbons):
+        return False
+    if not all(any(nb.GetIdx() in core for nb in mol.GetAtomWithIdx(c).GetNeighbors()) for c in acyl_carbons):
+        return False
+    if not any(nb.GetAtomicNum() > 1 and nb.GetIdx() != c for c in acyl_carbons
+               for nb in mol.GetAtomWithIdx(amide_carbons[c]).GetNeighbors()):
+        return False
+    return not any(nb.GetIdx() not in core and nb.GetSymbol() == 'N' and nb.GetIdx() not in amide_carbons.values()
+                   for idx in core for nb in mol.GetAtomWithIdx(idx).GetNeighbors())
+
+
 def fused_heterocycle_n_amide(mol, start_idx: int, excluded: Set[int], chain_atoms: List[int]) -> Optional[Dict]:
     """:func:`n_substituted_carboxamide` in the record form of ``rules.fused_rings`` (a 'suffix' branch whose N groups
     join the producer's italic-N table)."""
     if _oxo_or_amino_on(mol, excluded):
         return None     # the producer's oxo branch and its amine N table do not take an amide's N groups: as before
-    found = n_substituted_carboxamide(mol, start_idx, excluded, chain_atoms)
+    found = n_substituted_carboxamide(mol, start_idx, excluded, chain_atoms, several=True)
     if found is None:
         return None
     prefix = carbamoyl_prefix(found['n_substituents'])
@@ -97,6 +121,55 @@ def fused_heterocycle_n_amide(mol, start_idx: int, excluded: Set[int], chain_ato
     _ask_pin_tier()     # the wider tiers may name the molecule by another route first; the PIN tier's PIN wins
     return {'name': prefix, 'atoms': chain_atoms, 'functional_group': 'amide', 'type': 'suffix',
             'suffix_name': 'carboxamide', 'n_substituents': found['n_substituents']}
+
+
+def fused_n_sources(mol, substituents: Dict, atom_mapping: Dict) -> Optional[List]:
+    """The italic-N prefix sources ``('n', name, locants)`` of ``rules.fused_rings._assemble_fused_heterocycle_name``:
+    a bare 'N' per group, or, for two or more ring carboxamides of which a nitrogen carries a group, the N-locant of
+    each group's own nitrogen, the Blue Book: 'N1-methylbutanediamide (PIN)'). None (decline)
+    when a symmetry of the ring system that keeps every other locant would give the nitrogens lower locants;
+    the producer does not renumber for them)."""
+    counts = substituents.get('n_substituents') or {}
+    by_locant = {loc: names for loc, names in (substituents.get('n_by_locant') or {}).items() if names}
+    amides = (substituents.get('suffix_groups') or {}).get('carboxamide') or []
+    if len(amides) < 2 or not by_locant:
+        return [('n', name, ['N'] * count) for name, count in counts.items()]
+    if sum(len(v) for v in by_locant.values()) != sum(counts.values()):
+        return None                     # an N group of another nitrogen: not one amide's
+    from .benzene_polyamide import _symmetry_images
+    from ..assembly.naming_utils import alpha_sort_key
+    ring = {a: loc for a, loc in atom_mapping.items() if mol.GetAtomWithIdx(a).IsInRing()}
+    atom_of = {loc: a for a, loc in ring.items()}
+    fixed = [list(v) for v in (substituents.get('suffix_groups') or {}).values()]
+    fixed += [list(v) for v in (substituents.get('c_substituents') or {}).values()]
+    fixed += [[o.get('locant')] for o in substituents.get('other') or ()]
+    fixed += [list(substituents.get('oxo_substituents') or ()), list(substituents.get('amino_substituents') or ())]
+    if any(loc not in atom_of for locs in fixed for loc in locs) or any(loc not in atom_of for loc in by_locant):
+        return None
+
+    def order(loc):
+        text = str(loc)
+        digits = ''.join(ch for ch in text if ch.isdigit())
+        return (int(digits or 0), text)
+
+    def key(image):
+        moved = {image[atom_of[loc]]: names for loc, names in by_locant.items()}
+        all_n = sorted(order(loc) for loc, names in moved.items() for _ in names)
+        first = tuple(tuple(sorted(order(loc) for loc, names in moved.items() if nm in names))
+                      for nm in sorted({n for names in moved.values() for n in names}, key=alpha_sort_key))
+        return (all_n, first)
+
+    here = key(dict(ring))
+    for image in _symmetry_images(mol, ring):
+        keeps = all(sorted(map(order, (image[atom_of[loc]] for loc in locs))) == sorted(map(order, locs))
+                    for locs in fixed)
+        if keeps and key(image) < here:
+            return None
+    sources: Dict[str, List[str]] = {}
+    for loc in sorted(by_locant, key=order):
+        for name in by_locant[loc]:
+            sources.setdefault(name, []).append(f"N{loc}")
+    return [('n', name, locs) for name, locs in sources.items()]
 
 
 def carbamoyl_prefix(n_substituents: List[str]) -> Optional[str]:

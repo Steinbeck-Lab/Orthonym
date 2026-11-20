@@ -28,7 +28,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules import isotope_letters as L
-from tests.support.pin_tiers import assert_pin_at_both_tiers
+from tests.support.pin_tiers import assert_pin_at_both_tiers, tier_row
 from tests.support.rt_assert import name_is_rt_exact
 
 pytestmark = pytest.mark.unit
@@ -70,12 +70,22 @@ def test_a_bare_letter_needs_one_class():
 # -- the decorator, both tiers ----------------------------------------------------------------------------
 
 
+def assert_letter_below_the_pin(smiles, name):
+    """The letter as the rule sets it, on a name that cites one label on one of two groups of a multiplied suffix:
+     (the Blue Book) "Such different groups are expressed separately", so the name ships below the
+    PIN (rules.isotope_suffix_split.mark_label_on_one_of_multiplied_groups)."""
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, "best-effort")
+    assert row["name"] == name and row["tier"] != "pin_verified", row
+    assert name_is_rt_exact(name, smiles)
+
+
 @pytest.mark.opsin_gate
 @pytest.mark.roundtrip
 def test_pentanedioic_acid_cites_the_number_of_its_oxygen():
     smiles = "OC(=O)CC[13CH2]C(=O)[18OH]"
     name = "(2-13C,O1-18O)pentanedioic acid"
-    assert_pin_at_both_tiers(smiles, name)
+    assert_letter_below_the_pin(smiles, name)
     # the other numeral is the other molecule; the bare letter, which OPSIN reads as O1, reads back too and
     # so is not told from the numbered name by the read-back: the rule decides, not the oracle
     assert not name_is_rt_exact("(2-13C,O5-18O)pentanedioic acid", smiles)
@@ -86,10 +96,6 @@ def test_pentanedioic_acid_cites_the_number_of_its_oxygen():
 @pytest.mark.opsin_gate
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("smiles,name", [
-    # one symmetry class of hydroxyl oxygens: the bare letter stays
-    ("OC(=O)CCC(=O)[18OH]", "(O-18O)butanedioic acid"),
-    ("[2H]OC(=O)CCC(=O)O", "(O-2H)butanedioic acid"),
-    ("[2H]OCCO", "(O-2H)ethane-1,2-diol"),
     # the book's own printed bare letters (one atom the letter can denote)
     ("CC(=O)[18OH]", "(O-18O)acetic acid"),
     ("[2H]OC(=O)C", "(O-2H)acetic acid"),
@@ -99,12 +105,24 @@ def test_pentanedioic_acid_cites_the_number_of_its_oxygen():
     ("Cl[13CH2]C(=O)[18OH]", "2-chloro(2-13C,O-18O)acetic acid"),
     ("[2H]C([2H])(Cl)C(=O)[18OH]", "2-chloro(2,2-2H2,O-18O)acetic acid"),
     ("[2H]C([2H])C(=O)N([2H])c1ccccc1", "N-phenyl(N,2,2-2H3)acetamide"),
+])
+def test_bare_or_numbered_letter(smiles, name):
+    assert_pin_at_both_tiers(smiles, name)
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+@pytest.mark.parametrize("smiles,name", [
+    # one symmetry class of hydroxyl oxygens: the bare letter stays
+    ("OC(=O)CCC(=O)[18OH]", "(O-18O)butanedioic acid"),
+    ("[2H]OC(=O)CCC(=O)O", "(O-2H)butanedioic acid"),
+    ("[2H]OCCO", "(O-2H)ethane-1,2-diol"),
     # two classes of hydroxyl oxygens: the number
     ("[2H]OCC(C)O", "(O1-2H)propane-1,2-diol"),
     ("OC(=O)CC[13CH2]C(=O)[18OH]", "(2-13C,O1-18O)pentanedioic acid"),
 ])
-def test_bare_or_numbered_letter(smiles, name):
-    assert_pin_at_both_tiers(smiles, name)
+def test_bare_or_numbered_letter_on_one_of_two_groups(smiles, name):
+    assert_letter_below_the_pin(smiles, name)
 
 
 # -- the composer follows the same predicate -------------------------------------------------------------------

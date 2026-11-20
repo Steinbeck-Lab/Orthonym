@@ -152,7 +152,7 @@ FILES = {
     "src/orthonym/data/opsin_imports/substituent_names_opsin.py": 8496,
     # ION3: +2 lines, the import and the call of the last charged rescue (rules/charged_fallback.py).
     "src/orthonym/namer.py": 10826,
-    "src/orthonym/rules/benzene.py": 6060,
+    "src/orthonym/rules/benzene.py": 6002,
     "src/orthonym/rules/fused_rings.py": 5628,
     "src/orthonym/rules/heterocycles.py": 5770,
     "src/orthonym/rules/ions.py": 7676,

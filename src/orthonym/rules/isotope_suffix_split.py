@@ -123,14 +123,38 @@ def decorate_with_one_suffix(namer, original: Chem.Mol, skeleton_name: str) -> O
 
 #: a multiplied ring or chain suffix and the group it cites (``mark_label_on_one_of_multiplied_groups``)
 _MULTIPLIED_GROUP_SUFFIX = re.compile(
-    r"(?:di|tri|tetra|penta|hexa)(carboxylic acid|carboxamide|carbonitrile|carbaldehyde)(?![a-z])")
-#: the suffix group of each multiplied suffix, its carbon first
+    r"(di|tri|tetra|penta|hexa)(carboxylic acid|carboxamide|carbonitrile|carbaldehyde|oic acid|amide|nitrile|al|"
+    r"sulfonic acid|sulfonamide|ol|thiol|amine|one)(?![a-z])")
+_COUNT = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}
+_PRIMARY_N = "[NX3;$([NH2]),$([NH1][#1]),$([N]([#1])[#1])]"
+_HYDROXY_O = "[OX2;$([OH1]),$([O][#1])]"
+#: per multiplied suffix: the SMARTS of one suffix group and whether its first atom is a skeleton atom (the chain carbon
+#: of '-oic acid', '-amide', '-nitrile', '-al', '-one'; the carbon of '-ol', '-thiol', '-amine'), which a label on it
+#: makes a skeleton label, not a modified group
 _SUFFIX_GROUP = {
-    "carboxylic acid": _CARBOXY,
-    "carboxamide": Chem.MolFromSmarts("[CX3;!R](=[OX1])[NX3;$([NH2]),$([NH1][#1]),$([N]([#1])[#1])]"),
-    "carbonitrile": Chem.MolFromSmarts("[CX2;!R]#[NX1]"),
-    "carbaldehyde": Chem.MolFromSmarts("[CX3;!R;$([CH1]),$([C][#1])]=[OX1]"),
+    "carboxylic acid": (_CARBOXY, False),
+    "carboxamide": (Chem.MolFromSmarts("[CX3;!R](=[OX1])" + _PRIMARY_N), False),
+    "carbonitrile": (Chem.MolFromSmarts("[CX2;!R]#[NX1]"), False),
+    "carbaldehyde": (Chem.MolFromSmarts("[CX3;!R;$([CH1]),$([C][#1])]=[OX1]"), False),
+    "oic acid": (Chem.MolFromSmarts("[CX3](=[OX1])" + _HYDROXY_O), True),
+    "amide": (Chem.MolFromSmarts("[CX3](=[OX1])" + _PRIMARY_N), True),
+    "nitrile": (Chem.MolFromSmarts("[CX2]#[NX1]"), True),
+    "al": (Chem.MolFromSmarts("[CX3;$([CH1]),$([C][#1])]=[OX1]"), True),
+    "one": (Chem.MolFromSmarts("[CX3;$(C([#6])[#6])]=[OX1]"), True),
+    "sulfonic acid": (Chem.MolFromSmarts("[SX4](=[OX1])(=[OX1])" + _HYDROXY_O), False),
+    "sulfonamide": (Chem.MolFromSmarts("[SX4](=[OX1])(=[OX1])" + _PRIMARY_N), False),
+    "ol": (Chem.MolFromSmarts("[#6;!$(C=[O,S,N])]" + _HYDROXY_O), True),
+    "thiol": (Chem.MolFromSmarts("[#6;!$(C=[O,S,N])][SX2;$([SH1]),$([S][#1])]"), True),
+    "amine": (Chem.MolFromSmarts("[#6;!$(C=[O,S,N])]" + _PRIMARY_N), True),
 }
+
+
+def _suffix_group_atoms(mol: Chem.Mol, match, skip_first: bool) -> set:
+    """The atoms of one suffix group: the matched atoms (less a skeleton anchor) and the explicit H atoms on them."""
+    atoms = set(match[1:] if skip_first else match)
+    atoms.update(n.GetIdx() for i in list(atoms) for n in mol.GetAtomWithIdx(i).GetNeighbors()
+                 if n.GetAtomicNum() == 1)
+    return atoms
 
 
 def mark_label_on_one_of_multiplied_groups(name: Optional[str], original: Chem.Mol, skeleton_name: Optional[str]) -> None:
@@ -144,13 +168,17 @@ def mark_label_on_one_of_multiplied_groups(name: Optional[str], original: Chem.M
         return
     # the suffix word is the same in the labelled name; the skeleton is recorded only by some strategies
     found = _MULTIPLIED_GROUP_SUFFIX.search(skeleton_name or name)
-    pattern = _SUFFIX_GROUP.get(found.group(1)) if found else None
-    if pattern is None:
+    entry = _SUFFIX_GROUP.get(found.group(2)) if found else None
+    if entry is None:
+        return
+    pattern, skip_first = entry
+    matches = original.GetSubstructMatches(pattern)
+    if len(matches) != _COUNT[found.group(1)]:     # a like group off the parent: not sure which groups the suffix cites
         return
     signatures = []
-    for match in original.GetSubstructMatches(pattern):
-        atoms = _group_atoms(original, match) if found.group(1) == "carboxylic acid" else set(match) | {
-            n.GetIdx() for i in match for n in original.GetAtomWithIdx(i).GetNeighbors() if n.GetAtomicNum() == 1}
+    for match in matches:
+        atoms = _group_atoms(original, match) if found.group(2) == "carboxylic acid" else _suffix_group_atoms(
+            original, match, skip_first)
         signatures.append(tuple(sorted((original.GetAtomWithIdx(i).GetIsotope(), original.GetAtomWithIdx(i).GetSymbol())
                                        for i in atoms if original.GetAtomWithIdx(i).GetIsotope())))
     if len(signatures) >= 2 and len(set(signatures)) > 1:
