@@ -37,6 +37,7 @@ from ..assembly.naming_utils import (
     suffix_takes_derived_multiplier,
 )
 from .benzene_prefix_forms import dichalcoganyl_prefix, hydroxy_is_principal, pnictogen_oxoacid_prefix
+from .benzene_polyamide import name_benzene_polyamide as _name_benzene_polyamide, note_n_substituents as _note_n_substituents
 from .benzene_acid_suffixes import ACID_SUFFIX_FGS, ACID_SUFFIX_SMARTS
 from .benzene_amine_cation import amine_takes_suffix, demote_suffixes_below_amine
 from .hydroximic_acids import (
@@ -95,44 +96,24 @@ _SUFFIX_PRIORITY = [
     'seleninic acid',
     'telluronic acid',
     'tellurinic acid',
-    'sulfonamide',
-    # Wave-2 P1AM: sulfonimidamide ranks just below sulfonamide.
-    'sulfonimidamide',
-    # Task Y, Table 6.1 item 24): sulfinamide -SO-NH2 ranks
-    # below sulfonimidamide (item 20) and above sulfonohydrazide (item 34).
-    'sulfinamide',
-    # C1: sulfonohydrazide ranks with the sulfonamide family, above
-    # the carbon carboxamide/carbohydrazide (S oxoacid-derivatives are named after
-    # the S parent; here it is the sole principal group in the target set).
-    'sulfonohydrazide',
-    # Wave2 completion, Table 6.1 item 41): -S(=NNH2)-NHNH2
-    # ranks below sulfonohydrazide (item 34).
-    'sulfinohydrazonohydrazide',
+    # (the Blue Book): class 9 acid halides, then class 11 amides "in the order of the
+    # corresponding acids" (:18184;,:33559 "within the amide class, amides rank in the same order as the
+    # corresponding acid"), then class 12 hydrazides in that order; Table 6.1 items 16-24 (carboxamide, carbothioamide,
+    # carboximidamide, carbohydrazonamide, then sulfonamide, sulfonimidamide, sulfinamide). The sulfonamide used to
+    # outrank the carboxamide here: 'N-methyl-4-(methylcarbamoyl)benzene-1-sulfonamide' shipped pin_verified, PIN
+    # 'N-methyl-4-(methylsulfamoyl)benzamide'.
     'carbonyl chloride',
-    'carboxamide',
-    # R7, BB 18762): ring-attached thioamide -C(=S)-NH2 ->
-    # '-carbothioamide'. The S-analogue of carboxamide; junior to the O-amide
-    # chalcogen seniority O > S) so a co-occurring carboxamide/acid stays
-    # principal. Rank among the amide cluster is standalone-independent for the
-    # sole-group target (benzenecarbothioamide).
-    'carbothioamide',
-    # C1: ring-attached -C(=O)NN -> '-carbohydrazide'. Ranks with
-    # the carboxamide (both are added-carbon C-suffixes on the ring); placed after
-    # carboxamide so a co-occurring amide would stay principal.
-    'carbohydrazide',
-    # Wave2: ring-attached hydrazidine -C(=N-NH2)-NH-NH2 ->
-    # '-carbohydrazonohydrazide'. Ranks with the hydrazide family.
-    'carbohydrazonohydrazide',
-    # Wave2: ring-attached thiohydrazide -C(=S)-NH-NH2 ->
-    # '-carbothiohydrazide'.
-    'carbothiohydrazide',
-    # C2 / seniority): amidine ranks below amide and above
-    # nitrile, so '-carboximidamide' sits between 'carboxamide' and
-    # 'carbonitrile'. A co-occurring amide/acid therefore stays principal.
-    'carboximidamide',
-    # Wave2: ring-attached amidrazone -C(=N-NH2)-NH2 ->
-    # '-carbohydrazonamide'. Ranks just below carboximidamide (amidine).
-    'carbohydrazonamide',
+    'carboxamide', 'carbothioamide',   #: the S-analogue follows its O-amide
+    'carboximidamide',                 #: amidine below the amides of the same acid
+    'carbohydrazonamide',              #: amidrazone below the amidine
+    'sulfonamide',
+    'sulfonimidamide',                 #, Table 6.1 item 20
+    'sulfinamide',                     #, Table 6.1 item 24
+    'carbohydrazide',                  #: class 12 hydrazides, below every amide
+    'carbothiohydrazide',              #
+    'carbohydrazonohydrazide',         #
+    'sulfonohydrazide',                #
+    'sulfinohydrazonohydrazide',       #, Table 6.1 item 41
     'carbonitrile',
     'carbaldehyde',
     # C- (V-2): chalcogen analogues of the aldehyde-on-ring suffix
@@ -4125,8 +4106,7 @@ def _name_substituted_benzene(
             if sub_info.get('is_suffix'):
                 suffix_groups[sub_info['suffix_name']].append(locant)
                 # Track N-substituents if present
-                if 'n_substituents' in sub_info and sub_info['n_substituents']:
-                    n_substituents_map[sub_info['suffix_name']] = sub_info['n_substituents']
+                _note_n_substituents(n_substituents_map, sub_info, locant)   # per locant too (benzene_polyamide)
                 # (plan P1AM Task 6): carry a demoted-prefix stem
                 # override (hydrazinecarboximidoyl) if the detector set one.
                 if sub_info.get('demoted_prefix_override'):
@@ -4588,13 +4568,12 @@ def _assemble_benzene_with_suffix(
             n_substituents=n_substituents_map.get('sulfonamide', []),
         )
 
-    # F-B 0-wrong: a MULTI-instance sulfonamide (di/poly) carrying N-substituents
-    # needs the superscripted N^1/N^3 locants of, which are not
-    # built here. The general multi-suffix assembler below cannot cite them and
-    # would silently DROP the N-substituents (benzene-1,4-disulfonamide for an
-    # N,N'-dimethyl input -- a wrong constitution). Fail closed. A PRIMARY
-    # disulfonamide (no N-substituents) is unaffected and still names below.
-    if chosen_suffix == 'sulfonamide' and n_substituents_map.get('sulfonamide'):
+    # A MULTI-instance carboxamide or sulfonamide carrying N-substituents takes the superscripted N^1/N^3 locants of
+    # (rules.benzene_polyamide); the general multi-suffix assembler below would DROP them, so any such
+    # input the writer does not build fails closed.
+    if (_poly := _name_benzene_polyamide(chosen_suffix, chosen_locants, remaining_prefix_groups, n_substituents_map)):
+        return _poly
+    if chosen_suffix in ('sulfonamide', 'carboxamide') and n_substituents_map.get(chosen_suffix) and chosen_count > 1:
         return None
 
     # Task Y): single sulfinamide on benzene ->
@@ -4882,7 +4861,7 @@ def _name_substituted_aniline(
 def _name_substituted_benzenediamine(
     prefix_groups: Dict[str, List[int]],
     amine_locants: List[int],
-    n_by_locant: Dict[int, List[str]],
+    n_by_locant: Dict[int, List[str]], suffix: str = 'amine',
 ) -> str:
     """Name a benzene poly-amine (>=2 -NH2/-NHR/-NR2) as the
     'benzene-<locants>-<mult>amine' PIN, citing N-substituents on any
@@ -4897,9 +4876,9 @@ def _name_substituted_benzenediamine(
     1..6, cyclic): the ring is renumbered over all 12 symmetry operations
     (6 rotations x 2 directions). Selection criteria, in order:
       1. lowest locant set for the amino (parent-suffix) positions,
-      2. lowest locants for the N-substituted nitrogens (so a single
-         N-substituted amine lands on position 1 -> cited as plain 'N-'),
-      3. lowest locants for the detachable ring-substituent prefixes,
+      2. lowest locants for the detachable ring-substituent prefixes,
+      3. lowest locants for the N-substituted nitrogens ('N4,2-dimethylpentane-
+         2,4-diamine (PIN)', the Blue Book: the ring locant decides first),
       4. numeric tie-break.
 
     N-substituent citation: the lowest-locant substituted nitrogen is cited
@@ -4952,7 +4931,7 @@ def _name_substituted_benzenediamine(
                 for loc, names in n_by_locant.items()
             }
             tiebreak = (tuple(new_amines), tuple(new_n_locs), ring_key)
-            key = (tuple(new_amines), tuple(new_n_locs), ring_key, tiebreak)
+            key = (tuple(new_amines), ring_key, tuple(new_n_locs), tiebreak)   # (f): 'N4,2-dimethyl':26371
             if best is None or key < best[0]:
                 best = (key, new_amines, new_ring, new_n_map)
 
@@ -4998,7 +4977,7 @@ def _name_substituted_benzenediamine(
     # --- Parent suffix: benzene-<locants>-<mult>amine ---
     mult = multiplying_prefix(len(new_amines))
     loc_str = ",".join(str(l) for l in sorted(new_amines))
-    suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'amine')}"
+    suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, suffix)}"
 
     all_entries = n_prefix_entries + ring_prefix_entries + shared_entries
     if not all_entries:

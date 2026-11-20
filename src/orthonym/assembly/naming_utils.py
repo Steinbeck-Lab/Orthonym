@@ -482,7 +482,7 @@ _ACYL_PARENT_HYDRIDE_STEMS = (
 # acyl-suffix family expressed as a substituent prefix.
 _ACYL_SUFFIX_FAMILY = frozenset({
     'carbonyl', 'carbothioyl', 'carboselenoyl', 'carbotelluroyl',
-    'carbohydrazonoyl', 'carbohydrazido', 'carboximidoyl', 'carbonimidoyl',
+    'carbohydrazonoyl', 'carbohydrazido', 'carboximidoyl', 'carbonimidoyl', 'carboxamido',
 })
 
 # Wave2 T3b: parent-hydride stems used as roots of the PIN acid-stem

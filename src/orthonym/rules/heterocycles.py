@@ -4733,7 +4733,7 @@ def name_substituted_heterocycle(
     # RING locant as an italic-N superscript (N2-tert-butyl-N4-cyclopropyl-...),
     # so track them per ring locant (not merged under the single 'amine' key,
     # which collapsed them to one bare 'N-...' and dropped the others).
-    amine_n_by_locant: Dict[int, List[str]] = {}
+    n_by_locant_of: Dict[str, Dict[int, List[str]]] = {}   # per suffix; diamides too,:32774
     prefix_substituents: Dict[int, List[Dict]] = {}
 
     for locant, sub_list in substituents.items():
@@ -4753,8 +4753,7 @@ def name_substituted_heterocycle(
                     suffix_n_hydroxy.add(sname)
                 if sub_info.get('amine_n_substituents'):
                     suffix_n_substituents[sname] = sub_info['amine_n_substituents']
-                    if sname == 'amine':
-                        amine_n_by_locant[locant] = sub_info['amine_n_substituents']
+                    n_by_locant_of.setdefault(sname, {})[locant] = sub_info['amine_n_substituents']
             else:
                 if locant not in prefix_substituents:
                     prefix_substituents[locant] = []
@@ -4974,6 +4973,7 @@ def name_substituted_heterocycle(
     # order; an N-substituent with no identical partner keeps its place.
     _chosen_suffix_early = (_choose_ring_suffix(principal_group, suffix_fg)[0]
                             if suffix_fg else None)
+    amine_n_by_locant = n_by_locant_of.get(_chosen_suffix_early, {})
     # (the Blue Book, 'SENIORITY ORDER FOR CLASSES'): the name cites ONE
     # class as its suffix; every other suffix-capable ring group is a substituent
     # prefix ('carbamoyl', 'carboxy', 'cyano', 'formyl',...) cited in the
@@ -5263,7 +5263,7 @@ def name_substituted_heterocycle(
                 and not multiplier
                 and parent_name and parent_name.isalpha()
                 and not _het_loc_prefix
-                and not (amine_n_by_locant and len(suffix_fg.get('amine', [])) > 1)
+                and not (amine_n_by_locant and len(suffix_fg.get(chosen_suffix, [])) > 1)
                 and not stereo_descriptors):
             from ..assembly.locant_omission import (
                 l3_locant_omitted_for_parent_atoms,
@@ -5305,7 +5305,7 @@ def name_substituted_heterocycle(
             # already cited in the prefix series (``_suffix_n_tokens``)
             amine_n_by_locant, suffix_n_substituents = {}, {}
             suffix_n_hydroxy = set()
-        if chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1 \
+        if chosen_suffix in ('amine', 'carboxamide') and len(suffix_fg.get(chosen_suffix, [])) > 1 \
                 and amine_n_by_locant:
             # companion: MULTI-amine ring -> each amine nitrogen's
             # N-substituent(s) carry that nitrogen's RING locant as an italic-N
@@ -5524,7 +5524,7 @@ def _suffix_nitrogen_prefix_entries(chosen_suffix, suffix_fg,
     out = []
     if not chosen_suffix:
         return out
-    if (chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1
+    if (chosen_suffix in ('amine', 'carboxamide') and len(suffix_fg.get(chosen_suffix, [])) > 1
             and amine_n_by_locant):
         for loc in sorted(amine_n_by_locant):
             for sub in amine_n_by_locant[loc]:

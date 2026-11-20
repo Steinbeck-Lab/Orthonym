@@ -44,7 +44,9 @@ PIN_ROWS = [
     ("CCN(C)c1ccc(C)cc1", "N-ethyl-N,4-dimethylaniline"),
     ("CCC1=CC(=CC(=C1NCC)CC)C", "N,2,6-triethyl-4-methylaniline"),
     ("CNc1ccc(NC)cc1C", "N1,N4,2-trimethylbenzene-1,4-diamine"),
-    ("CNc1cc(C)c(N)cc1", "N1,3-dimethylbenzene-1,4-diamine"),
+    # the ring locant decides the numbering before the N-locant: 'N4,2-dimethylpentane-2,4-diamine (PIN)'
+    #, the Blue Book; its other numbering is 'N2,4-dimethyl'), so not 'N1,3-dimethyl'
+    ("CNc1cc(C)c(N)cc1", "N4,2-dimethylbenzene-1,4-diamine"),
     # the amide of two fragments (decomposition)
     ("CNC(=O)C(NC(=O)CC)C(C)(C)C", "N,3,3-trimethyl-2-propanamidobutanamide"),
 ]

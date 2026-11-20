@@ -516,6 +516,16 @@ def senior_ring_and_type(self, features, _principal_ring_system, atom_rings):
                 pass  # fail closed: leave as aromatic (declines)
 
 
+_AMIDE_CLASSES = frozenset({'primary_amide', 'secondary_amide', 'tertiary_amide'})
+
+
+def _both_amides(fg: str, principal_group: str) -> bool:
+    """True when ``fg`` and the principal group are both amide classes: every carboxamide on the ring is cited in one
+    multiplied suffix;, the Blue Book, 'N2-methylpyridine-2,4-dicarboxamide'), so all
+    of them take the lowest locants before the prefixes, (c) (:3256), whatever their nitrogen carries."""
+    return fg in _AMIDE_CLASSES and principal_group in _AMIDE_CLASSES
+
+
 def heterocyclic_ring(self, features):
     """A heterocyclic principal ring: classify, detect substituents, and orient."""
     from .rules.heterocycles import (
@@ -579,7 +589,7 @@ def heterocyclic_ring(self, features):
             # carboxamide (PIN)',:32895).
             if (_fg != features.principal_group
                     or _pg_prefix is not None
-                    or not _pg_has_suffix_form) and (
+                    or not _pg_has_suffix_form) and not _both_amides(_fg, features.principal_group) and (
                     _pg_prefix is None
                     or _pg_get_prefix(_fg) != _pg_prefix):
                 continue
@@ -639,6 +649,8 @@ def heterocyclic_ring(self, features):
                                 pg_ring_atoms.add(nbr.GetIdx())
                                 break
                     continue
+                if _fg != features.principal_group and _both_amides(_fg, features.principal_group):
+                    continue   # another amide class anchors only as a ring carboxamide, not an acetamido N or a lactam
                 for atom_idx in match:
                     if atom_idx not in ring_set:
                         continue

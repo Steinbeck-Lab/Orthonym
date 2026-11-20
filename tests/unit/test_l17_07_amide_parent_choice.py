@@ -453,22 +453,21 @@ def test_the_parent_with_more_carboxamide_groups_outranks_a_senior_ring(smiles, 
     assert_full_rt(row["name"], smiles)
 
 
-@pytest.mark.parametrize("smiles,junior", [
-    ("NC(=O)c1ccncc1NC(=O)c1cc(C(N)=O)ccc1", "3-(3-carbamoylbenzamido)pyridine-4-carboxamide"),
-    ("O=C(Nc1ccncc1C(N)=O)c1cccc(c1)C(N)=O", "4-(3-carbamoylbenzamido)pyridine-3-carboxamide"),
+@pytest.mark.parametrize("smiles,junior,pin", [
+    ("NC(=O)c1ccncc1NC(=O)c1cc(C(N)=O)ccc1", "3-(3-carbamoylbenzamido)pyridine-4-carboxamide",
+     "N1-(4-carbamoylpyridin-3-yl)benzene-1,3-dicarboxamide"),
+    ("O=C(Nc1ccncc1C(N)=O)c1cccc(c1)C(N)=O", "4-(3-carbamoylbenzamido)pyridine-3-carboxamide",
+     "N1-(3-carbamoylpyridin-4-yl)benzene-1,3-dicarboxamide"),
 ])
 @pytest.mark.parametrize("tier", _TIERS)
-def test_a_pyridine_carboxamide_is_never_the_pin_parent_of_a_benzene_dicarboxamide(smiles, junior, tier):
-    """: the benzene-1,3-dicarboxamide is the parent (the PIN is 'N1-(4-carbamoylpyridin-3-yl)benzene-1,3-
-    dicarboxamide',, which the ring diamide producers do not build). No tier names the molecule on the pyridine
-    as a PIN; the best-effort tier names it, read back whole, below the PIN."""
+def test_a_pyridine_carboxamide_is_never_the_pin_parent_of_a_benzene_dicarboxamide(smiles, junior, pin, tier):
+    """: the benzene-1,3-dicarboxamide is the parent, and its N-substituted nitrogen takes the superscript
+    N-locant of (the Blue Book, "In di- and polyamides... N locants with superscripted arabic
+    numbers... are used"; built by rules.benzene_polyamide). No tier names the molecule on the pyridine as a PIN."""
     row = tier_row(smiles, tier)
-    assert row["name"] != junior or row["tier"] != "pin_verified", row
-    if tier == "pin":
-        assert row["tier"] != "pin_verified", row
-    else:
-        assert row["name"] and row["tier"] != "pin_verified", row
-        assert_full_rt(row["name"], smiles)
+    assert row["name"] != junior, row
+    assert (row["name"], row["tier"]) == (pin, "pin_verified"), row
+    assert_full_rt(row["name"], smiles)
 
 
 def test_the_key_counts_the_carboxamide_groups_of_the_ring_system_first():

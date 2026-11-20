@@ -710,7 +710,7 @@ def _unprinted_slot(skel: str, off: int) -> bool:
 #: ``_decorate_multi_position`` emit that split instead of falling through to the
 #: combined ``_decorate_mixed_locant`` form.
 _HETEROATOM_SUFFIX_STEM_RE = re.compile(
-    r"(?:carboxylic|carbonitrile|carbaldehyde|nitrile|thiol|selenol"
+    r"(?:carboxylic|carboxamide|carbonitrile|carbaldehyde|nitrile|thiol|selenol"
     r"|tellurol|one|oic|al|ol)(?![a-z])"
 )
 
@@ -777,7 +777,7 @@ _XH_PREFIX_RE = re.compile(r"(?:hydroxy|sulfanyl|selanyl|tellanyl)")
 #: descriptor there (``benzene(18O)carbaldehyde``) belongs immediately before the
 #: suffix, not floated to the parent front (``(18O)benzene...``).
 _CARBO_AFFIX_SUFFIX_RE = re.compile(
-    r"(?:carboxylic|carbonitrile|carbaldehyde)(?![a-z])"
+    r"(?:carboxylic|carboxamide|carbonitrile|carbaldehyde)(?![a-z])"
 )
 
 #: A locant set as it opens a name part: numerals with an optional letter / primes

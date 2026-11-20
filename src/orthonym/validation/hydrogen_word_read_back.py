@@ -62,6 +62,11 @@ def _components(name: str) -> Optional[List[Tuple[str, int]]]:
 #: a multiplied element word ('dioxygen', 'trioxygen', 'dinitrogen'): no locant, a multiplying prefix and letters
 _MULTIPLIED_WORD = re.compile(r"(di|tri|tetra|penta|hexa|hepta|octa|nona|deca)[a-z]+")
 
+#: a two-word binary name, a nonmetal element word and an '-ide' word ('carbon dioxide', 'hydrogen chloride'); not an
+#: acyl halide or anhydride ('acetyl chloride'), which OPSIN reads as one component
+_BINARY_NAME = re.compile(r"(?:carbon|hydrogen|nitrogen|sulfur|phosphorus|silicon|boron|selenium|tellurium)"
+                          r" (?:mono|di|tri|tetra|penta)?[a-z]+ide")
+
 #: a word OPSIN reads in place of each hydrogen word it does not read, with the same charge and no other part in the
 #: balance of the charges (``StructureBuilder.balanceChargeIfPossible``: a neutral noble gas has no typical charge, a
 #: cation with its charge stated keeps it, the hydride ion is no acid atom), and the atom of the stand-in
@@ -118,7 +123,7 @@ def read_back_with_hydrogen_words(name: str) -> Optional[str]:
     if whole is not None:
         mol = Chem.MolFromSmiles(".".join(pieces + [Chem.MolToSmiles(whole)]))
         return None if mol is None else Chem.MolToSmiles(Chem.AddHs(mol))
-    bare_atom, split_word, acid_anion, alone = False, False, False, []
+    bare_atom, split_word, acid_anion, binary, alone = False, False, False, False, []
     for word, n in comps:
         if word in _UNREAD_WORDS:
             continue
@@ -134,13 +139,16 @@ def read_back_with_hydrogen_words(name: str) -> Optional[str]:
         # an anionic prefix ('oxido', 'sulfinato') or an ion word ('chloride', 'methanide') it leaves
         acid_anion = acid_anion or (Chem.GetFormalCharge(piece) < 0 and word.endswith(("ate", "ite")))
         alone += [smi] * n
+        # a binary name ('carbon dioxide', 'hydrogen chloride'): OPSIN reads its words as ions and balances them with the
+        # rest of a charged mixture ('carbon dioxide—iodide' as a charged carbon, 35 PubChem rows read with OPSIN main)
+        binary = binary or _BINARY_NAME.fullmatch(word) is not None
         bare_atom = bare_atom or (piece.GetNumAtoms() == 1 and "(" not in word
                                   and piece.GetAtomWithIdx(0).GetFormalCharge() == 0)
     mol = Chem.MolFromSmiles(".".join(pieces + alone))
     if mol is None or split_word:
         return None
     net = Chem.GetFormalCharge(mol)
-    if (bare_atom and net != 0) or (len(comps) > 1 and net < 0 and acid_anion):
+    if ((bare_atom or binary) and net != 0) or (len(comps) > 1 and net < 0 and acid_anion):
         return None  # a reader that balances charges could change the bare element or an acid atom
     return Chem.MolToSmiles(Chem.AddHs(mol))
 
