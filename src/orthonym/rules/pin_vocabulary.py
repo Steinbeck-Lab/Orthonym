@@ -718,6 +718,49 @@ def _unlocanted_ring_suffix(name: str) -> Optional[str]:
     return None
 
 
+# (the parent carries the maximum number of principal characteristic groups) with
+# "N-Substitution" (the Blue Book: "In di- and polyamides... N locants with superscripted arabic numbers...
+# are used to differentiate the nitrogen atoms"): two carboxamide groups on one ring parent are both the suffix
+# ('benzene-1,4-dicarboxamide (PIN)',:32718), so a ring '-carboxamide' name that cites a numbered 'carbamoyl' prefix
+# on the same parent ('6-(methylcarbamoyl)naphthalene-2-carboxamide', PIN 'N2-methylnaphthalene-2,6-dicarboxamide')
+# is not the PIN spelling. An italic-N prefix ('N-carbamoylbenzamide') sits on the amide nitrogen and is not matched.
+_NUMBERED_PREFIX_END = re.compile(r"(?:^|-)\d+[a-z]?'*(?:,\d+[a-z]?'*)*-(?:bis|tris|tetrakis|di|tri|tetra)?$")
+
+
+# (same section): "Superscript arabic numbers are now used to differentiate the nitrogen atoms of
+# diamides" ('N1-methylbutanediamide (PIN)', 'N1,N5-dimethylpentanediamide (PIN)'): a bare italic 'N-' or 'N,N-' on a
+# di- or polyamide parent ('N-methylpyridine-2,4-dicarboxamide') does not say which nitrogen carries the group.
+_POLYAMIDE_END = re.compile(r"(?:di|tri|tetra)(?:carbox|sulfon)?amide$")
+_BARE_N_PREFIX = re.compile(r"(?:^|-)N(?:,N)*-")
+
+
+def _carbamoyl_beside_ring_carboxamide(name: str) -> Optional[str]:
+    """Each word on its own (an adduct 'trifluoroacetic acid—6-(methylcarbamoyl)naphthalene-2-carboxamide (1/1)')."""
+    for word in re.split(r"[\s\u2014]+", name):
+        top = _top_level(word)
+        if _POLYAMIDE_END.search(top) and _BARE_N_PREFIX.search(top):
+            return _BARE_N_PREFIX.search(top).group(0)
+        hit = _carbamoyl_in_ring_carboxamide_word(word)
+        if hit:
+            return hit
+    return None
+
+
+def _carbamoyl_in_ring_carboxamide_word(name: str) -> Optional[str]:
+    if not _top_level(name).endswith(("carboxamide", "benzamide")):
+        return None
+    depth, start = 0, 0
+    for i, ch in enumerate(name):
+        if ch in "([{":
+            depth, start = depth + 1, (i if depth == 0 else start)
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0 and name[start + 1:i].endswith("carbamoyl") and _NUMBERED_PREFIX_END.search(name[:start]):
+                return name[start:i + 1]
+    m = re.search(r"(?:^|-)\d+[a-z]?'*(?:,\d+[a-z]?'*)*-(?:di|tri|tetra)?carbamoyl", _top_level(name))
+    return m.group(0) if m else None
+
+
 def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Optional[str]:
     """The first token of ``name`` that no PIN contains, or ``None``.
 
@@ -740,7 +783,7 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
         if m:
             return m.group(0)
     _uls = (_unlocanted_ring_suffix(name) or _suffix_group_on_parent_hydride(name)
-            or _bare_ih_ring_one(name) or _di_compound(name))
+            or _bare_ih_ring_one(name) or _di_compound(name) or _carbamoyl_beside_ring_carboxamide(name))
     if not _uls:
         _m = _CARBOXYMETHYL_ON_ACETIC.search(name)
         _uls = "carboxymethyl" if _m else None

@@ -164,6 +164,15 @@ def _whole_name_stereo_ok(mol, name: str) -> bool:
         return False
 
 
+def _takes_enclosing_marks(prefix: str) -> bool:
+    """: enclosing marks around a compound or complex prefix. The shared rule
+    (``naming_utils.needs_brackets``) also knows the compound prefixes with no digit or hyphen, such as
+    '(nitrosooxy)': '-O-NO nitrosooxy (preselected prefix', the Blue Book);
+    '2-(tert-butylimino)-3-methyl-3-(nitrooxy)butanoic acid (PIN)',:25963)."""
+    from ..assembly.naming_utils import is_complex_substituent, needs_brackets
+    return is_complex_substituent(prefix) or needs_brackets(prefix)
+
+
 def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]:
     """Name an acyclic >=3-group added-carbon multi-suffix molecule, or ``None``
     to fall through to the legacy path when the structure is outside the clean
@@ -256,7 +265,6 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     from ..assembly.naming_utils import (
         alpha_sort_key,
         get_multiplier_prefix,
-        is_complex_substituent,
     )
 
     # Name every substituent (fail closed if any is un-nameable OR mis-named) BEFORE
@@ -384,7 +392,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         parts = []
         for nm in sorted(by_name, key=alpha_sort_key):
             locs = sorted(by_name[nm])
-            complex_ = is_complex_substituent(nm)
+            complex_ = _takes_enclosing_marks(nm)
             disp = f"({nm})" if complex_ and not (nm.startswith("(") and nm.endswith(")")) else nm
             from ..assembly.naming_utils import multiplied_component as _mc
             if omit_locants:

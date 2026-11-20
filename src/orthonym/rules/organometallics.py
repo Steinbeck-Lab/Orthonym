@@ -699,7 +699,7 @@ def _sigma_additive_ligands_certified(metal_complex: Any, mol: Any,
         idxs = list(lg.ligand_atom_indices)
         for i in idxs:                                        # neutral, no radical
             a = mol.GetAtomWithIdx(i)
-            if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+            if a.GetNumRadicalElectrons() != 0 or (a.GetFormalCharge() != 0 and not _in_nitro_group(a)):
                 return False
         m_bonds = sum(                                       # monodentate: 1 M–L bond
             1 for i in idxs
@@ -1939,6 +1939,23 @@ def _group_ligand_counts(ligand_names: List[Optional[str]]) -> List[Tuple[int, s
     from collections import Counter
     counter = Counter(n for n in ligand_names if n is not None)
     return [(count, name) for name, count in counter.items()]
+
+
+def _in_nitro_group(atom: Any) -> bool:
+    """True for an atom of a charge-separated nitro group N+(=O)O- (the drawing RDKit gives every nitro and nitrate
+    group): the N+ with one =O and one O- neighbour, or that O-. Such a ligand is neutral and its prefix ('nitro',
+    'nitrooxy') names the group as drawn, so the neutral-ligand rule above does not refuse it ('(nitrooxy)(phenyl)
+    mercury', ChEBI phenylmercury nitrate, 2026-11-20)."""
+    from rdkit import Chem
+    n = atom if atom.GetSymbol() == 'N' else next(
+        (nb for nb in atom.GetNeighbors() if nb.GetSymbol() == 'N'), None)
+    if (n is None or n.GetFormalCharge() != 1 or n.GetDegree() != 3
+            or (atom is not n and (atom.GetSymbol() != 'O' or atom.GetFormalCharge() != -1 or atom.GetDegree() != 1))):
+        return False
+    oxygens = [(b.GetBondType(), b.GetOtherAtom(n)) for b in n.GetBonds() if b.GetOtherAtom(n).GetSymbol() == 'O']
+    return (sum(1 for bt, o in oxygens if bt == Chem.BondType.DOUBLE and o.GetFormalCharge() == 0) == 1
+            and sum(1 for bt, o in oxygens if bt == Chem.BondType.SINGLE and o.GetFormalCharge() == -1
+                    and o.GetDegree() == 1) == 1)
 
 
 def _alphabetize_simple_ligands(

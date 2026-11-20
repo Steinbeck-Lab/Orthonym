@@ -61,6 +61,7 @@ from .hydrocarbon_series import (
     series_ring_system_atoms as _series_ring_system_atoms,
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
+from .fused_amide_suffix import cites_n_prefixes, n_substituted_carboxamide
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from ..data.locant_text import render_locants
 
@@ -984,6 +985,8 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             if _ni not in _visited and _ni not in core_atoms:
                 _visited.add(_ni)
                 _queue.append(_ni)
+    if (_n_amide := n_substituted_carboxamide(mol, start_idx, core_atoms, _frag_atoms)) is not None:
+        return _n_amide                     # an N-aryl carboxamide too ('N-phenylnaphthalene-2-carboxamide')
     _ring_info = mol.GetRingInfo()
     if any(_ring_info.NumAtomRings(a) > 0 for a in _frag_atoms):
         _frag_set = set(_frag_atoms)
@@ -1410,6 +1413,9 @@ def _identify_pah_functionalized_chain(
             if match[0] == start_idx:
                 return {'name': 'carboxamide', 'atoms': chain_atoms,
                         'is_suffix': True, 'suffix_type': 'primary_amide'}
+    _n_amide = n_substituted_carboxamide(mol, start_idx, core_atoms, chain_atoms)   # 'N-methyl...-carboxamide'
+    if _n_amide is not None:
+        return _n_amide
 
     # Check for nitrile (-C≡N)
     nitrile_pattern = _compiled_smarts('[CX2]#[NX1]')
@@ -1571,6 +1577,7 @@ def name_substituted_polycyclic(
         for sub_info in sub_list:
             if sub_info.get('is_suffix'):
                 suffix_groups[sub_info['name']].append(position)
+                amine_n_substituents.extend(sub_info.get('n_substituents') or ())   # an N-substituted carboxamide
             else:
                 prefix_substituent_groups[sub_info['name']].append(position)
                 _atoms = sub_info.get('atoms') or ()
@@ -1702,7 +1709,7 @@ def name_substituted_polycyclic(
     # amine'. (The L3 licence above never fires with an N-substituent present.)
     _merged_n_counts = {}
     from ..assembly.composition_primitives import identical_prefixes_grouped
-    if (amine_n_substituents and suffix_groups.get('amine')
+    if (amine_n_substituents and cites_n_prefixes(suffix_groups)
             and identical_prefixes_grouped()):
         from collections import Counter as _MCounter
         for _nm, _ct in _MCounter(amine_n_substituents).items():
@@ -1729,7 +1736,7 @@ def name_substituted_polycyclic(
     # promotion's own record, so an amine left as a prefix by a senior group
     # never reaches here.: the amine nitrogen has no numeric locant, so
     # italic N is correct here (unlike a RING nitrogen, which takes its number).
-    if amine_n_substituents and suffix_groups.get('amine'):
+    if amine_n_substituents and cites_n_prefixes(suffix_groups):
         # Aliased on import: a later function-local `from... import
         # get_multiplier_prefix` in this same function makes the module-level
         # binding a local, so referring to the bare name here raises

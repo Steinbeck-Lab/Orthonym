@@ -1954,9 +1954,9 @@ def _build_ester_acid_word(
     from .stereochemistry import format_stereodescriptor_string
     acid_stereo = []
     if not re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', acylate_name):
-        acid_stereo = _collect_ester_fragment_stereo(mol, acid_atoms, ester_match,
-                                                     ring_locant_for_suffix and oriented_ring, acid_prefix_str)
-        acid_stereo = [(loc, cip) for loc, cip in acid_stereo if cip in ('R', 'S')]
+        ring = ring_locant_for_suffix and oriented_ring
+        acid_stereo = _collect_ester_fragment_stereo(mol, acid_atoms, ester_match, ring, acid_prefix_str)
+        acid_stereo = [(loc, cip) for loc, cip in acid_stereo if cip in (('R', 'S', 'r', 's') if ring else ('R', 'S'))]
 
     # Prepend R/S stereo prefix to the acylate word
     if acid_stereo:
@@ -1980,8 +1980,8 @@ def _prefixes_cite_side_chain_centres(mol, acid_atoms, ring, ester_match, cited_
 def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
                                    ester_match: tuple, oriented_ring: Optional[list] = None,
                                    cited_prefixes: str = "") -> list:
-    """Collect stereodescriptors for the acid fragment of an ester (the caller keeps R/S only: E/Z comes from the
-    unsaturation path).
+    """Collect stereodescriptors for the acid fragment of an ester (the caller keeps R/S, and r/s of a ring acid at its
+    ring locants: 'methyl (1r,4r)-4-methylcyclohexane-1-carboxylate'; E/Z comes from the unsaturation path).
 
     Builds an atom_to_locant mapping for the acid chain (carbonyl C = 1,
     then chain outward) and collects R/S descriptors for stereocenters

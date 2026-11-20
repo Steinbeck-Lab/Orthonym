@@ -164,7 +164,11 @@ def consume_sulfur_acid_oxy(mol, sub_set, consumed, add_prefix) -> bool:
 
 def sulfur_acid_branch_prefix(mol, frag_atoms, attach_idx: int) -> Optional[str]:
     """The prefix of the branch ``frag_atoms`` joined to its parent by ``attach_idx`` when it is the ester of a sulfonic
-    or sulfinic acid: the ester O ('(methanesulfonyl)oxy') or the S ('(methoxysulfonyl)') bonded to one parent atom."""
+    or sulfinic acid: the ester O ('(methanesulfonyl)oxy') or the S ('(methoxysulfonyl)') bonded to one parent atom; and
+    of nitric or nitrous acid ('nitrooxy', 'nitrosooxy'::func:`nitrogen_acid_oxy_prefix`)."""
+    nitrogen_ester = nitrogen_acid_oxy_prefix(mol, frag_atoms, attach_idx)
+    if nitrogen_ester is not None:
+        return nitrogen_ester
     frag = set(frag_atoms)
     if attach_idx is None or attach_idx not in frag:
         return None
@@ -203,3 +207,32 @@ def is_sulfur_acid_ester_centre(mol, idx: int) -> bool:
                            for b in x.GetBonds())) for x in n.GetNeighbors())
                    else "?" for n in a.GetNeighbors())
     return kinds in (["-O", "=O", "=O", "C"], ["-O", "=O", "C"])
+
+
+def nitrogen_acid_oxy_prefix(mol, frag_atoms, attach_idx: int) -> Optional[str]:
+    """'nitrooxy' for a branch that is exactly -O-NO2 (drawn N+(=O)O-), 'nitrosooxy' for exactly -O-N=O, joined to one
+    parent atom by its O; None for any other shape. Substituent groups derived from esters of nitric acid and
+    nitrous acid (the Blue Book): they "are named by concatenation by adding the acyl groups 'nitro' for -NO2 and
+    'nitroso' for -NO to the prefix 'oxy'"; '-O-NO2 nitrooxy (preselected prefix)' (:36405)."""
+    frag = set(frag_atoms)
+    if attach_idx is None or attach_idx not in frag:
+        return None
+    root = mol.GetAtomWithIdx(attach_idx)
+    if root.GetSymbol() != "O" or root.GetFormalCharge() or root.GetDegree() != 2 or root.GetIsotope():
+        return None
+    inner = [n for n in root.GetNeighbors() if n.GetIdx() in frag]
+    if len(inner) != 1 or inner[0].GetSymbol() != "N" or inner[0].GetIsotope() or len(frag) not in (3, 4):
+        return None
+    n_atom = inner[0]
+    others = [nb for nb in n_atom.GetNeighbors() if nb.GetIdx() != attach_idx]
+    if (any(nb.GetSymbol() != "O" or nb.GetDegree() != 1 or nb.GetIsotope() or nb.GetIdx() not in frag for nb in others)
+            or len(others) != len(frag) - 2):
+        return None
+    orders = sorted((mol.GetBondBetweenAtoms(n_atom.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble(), nb.GetFormalCharge())
+                    for nb in others)
+    if n_atom.GetFormalCharge() == 1 and orders == [(1.0, -1), (2.0, 0)]:
+        return "nitrooxy"
+    if n_atom.GetFormalCharge() == 0 and orders == [(2.0, 0)]:
+        return "nitrosooxy"
+    return None
+

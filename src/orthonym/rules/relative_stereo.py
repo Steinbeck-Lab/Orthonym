@@ -72,8 +72,9 @@ def _holds_pseudoasymmetric_code(text: str) -> bool:
 
 
 def holds_pseudoasymmetric_block(name: str) -> bool:
-    """Does ``name`` carry a descriptor block with a lowercase ``r`` or ``s``?"""
-    return any(_holds_pseudoasymmetric_code(text) for _s, _e, text in locate_stereo_blocks(name))
+    """Does ``name`` carry a descriptor block with a lowercase ``r`` or ``s``, a block that starts a later word of an
+    ester included ('ethyl (1r,4r)-4-hydroxycyclohexane-1-carboxylate')?"""
+    return any(_holds_pseudoasymmetric_code(text) for _s, _e, text in locate_stereo_blocks(name, words=True))
 
 
 # --- skeletal replacement chains -----------------------------------------------------------------
@@ -324,6 +325,12 @@ def append_relative_stereo_offer(offers: list, mol, smiles: str, primary_name: s
                 continue
             records = stereo_block_units(
                 strict_name, smiles, strip_stereo_blocks(strict_name)[0])
+            if records is None and strip_stereo_blocks(strict_name, words=True)[0] != strip_stereo_blocks(strict_name)[0]:
+                # a block that starts a later word ('ethyl (1r,4r)-4-hydroxycyclohexane-1-carboxylate'): read in word
+                # mode. The block's word is the producer's: OPSIN reads a relative word in the wrong word to the same key
+                # ('trans-phenyl 4-methyl...carboxylate'), so the read-back below checks the pair, not the word (2026-11-20)
+                records = stereo_block_units(
+                    strict_name, smiles, strip_stereo_blocks(strict_name, words=True)[0], (), True)
             if records is None:
                 continue
             for candidate in convert_pair_blocks(strict_name, mol, records):

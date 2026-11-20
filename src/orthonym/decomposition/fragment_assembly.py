@@ -15,6 +15,7 @@ Each assembler handles name transformations:
 """
 
 import re as _re
+from .amide_parent_guard import second_amide_on_acid_ring
 from .ester_in_alcohol import label_ester_with_acid_ester_alcohol as _label_ester_with_acid_ester_alcohol
 from collections import Counter as _Counter
 from typing import Dict, List, Optional, Tuple
@@ -1265,7 +1266,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     # CHEBI:139249); 'butanediamide' makes the free acid an amide. The same guard
     # as the ester assembler's: the free acid is the senior class,
     #:18158, class 7 acids above amides), so neither amide form is the name.
-    if _is_poly_acid_name(acid_name):
+    if _is_poly_acid_name(acid_name) or second_amide_on_acid_ring((fragment_smiles or {}).get("acid")):
         return None
 
     result = None

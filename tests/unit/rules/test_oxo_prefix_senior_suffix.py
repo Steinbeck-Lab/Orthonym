@@ -57,7 +57,6 @@ from tests.support.default_tier import (  # noqa: E402
 DEFAULT_TIER_DECLINES = frozenset({
     "CC(C)(C)NC(=O)C1=CC2=C(C(=CC=C2)OC)OC1=O",
     "CNC(=O)c1cc(=O)c2ccccc2o1",
-    "CNC(=O)c1cnc2ccccc2c1",
     "CNS(=O)(=O)Cc1ccc2[nH]cc(CCN(C)C)c2c1",
 })
 
@@ -215,7 +214,8 @@ def test_catalog_acridone_and_xanthone_locants():
 #,:18162;, so it ships below pin_verified. Each row: the
 # SMILES and the name that was labelled pin_verified.
 SENIOR_PREFIX_ROWS = [
-    ("CNC(=O)c1cnc2ccccc2c1", "3-methylcarbamoylquinoline"),
+    # 'CNC(=O)c1cnc2ccccc2c1' left this list: the amide is now the suffix, 'N-methylquinoline-3-carboxamide'
+    # (pin_verified, tests/unit/rules/test_fused_n_carboxamides.py)
     ("CNC(=O)c1cc(=O)c2ccccc2o1", "2-methylcarbamoylbenzo[b]pyran-4-one"),
     ("CC(C)(C)NC(=O)C1=CC2=C(C(=CC=C2)OC)OC1=O",
      "8-methoxy-3-(oxo(tert-butylamino)methyl)-2H-1-benzopyran-2-one"),

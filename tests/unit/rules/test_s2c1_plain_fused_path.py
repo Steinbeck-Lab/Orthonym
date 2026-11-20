@@ -140,7 +140,6 @@ OLDER_PATH = [
     ('N1=CS=CC2=C1C=CC=N2', 'lambda-convention: a pyridothiazine'),
     ('c1ccc2c(c1)O[SH2]O2', 'lambda-convention: a benzodioxathiole'),
     ('S1S2C(=CC1)C=CS2', 'lambda-convention: the dithiolodithiole of :14545'),
-    ('CC(C)(C)N(C(C)(C)C)C(=O)c1ccc2OCOc2c1', 'a ring amide the fused reader writes as a prefix'),
     ('CC(=O)c1ccc2OCOc2c1', 'a ring ketone the fused reader writes as a prefix'),
     # a ring C=O beside a senior suffix group: the shared hydrogen rule does not write it; the
     # older path cites 'oxo' after the indicated hydrogen of its position,
@@ -235,6 +234,13 @@ def test_the_suffix_position_is_the_accommodating_one():
     assert mol.GetAtomWithIdx(atom).GetSymbol() == "C"
     assert any(b.GetOtherAtom(mol.GetAtomWithIdx(atom)).GetSymbol() == "O"
                and b.GetBondTypeAsDouble() == 2.0 for b in mol.GetAtomWithIdx(atom).GetBonds())
+
+
+def test_the_certified_route_writes_an_n_substituted_ring_amide_as_the_suffix():
+    # (the Blue Book) and (:32774): the suffix 'carboxamide', the N groups as
+    # prefixes (rules.fused_amide_suffix); the row was on the older path while the fused reader wrote it as a prefix
+    mol, ring = _system('CC(C)(C)N(C(C)(C)C)C(=O)c1ccc2OCOc2c1')
+    assert fused_rings._certified_fusion_name(mol, ring, True) == 'N,N-di-tert-butyl-2H-1,3-benzodioxole-5-carboxamide'
 
 
 @pytest.mark.parametrize("smiles,why", OLDER_PATH)

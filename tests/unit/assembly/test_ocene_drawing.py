@@ -71,8 +71,10 @@ def test_rewrite_cites_the_ocene_in_its_place(surrogate_name, name):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles, name", [
+    # the amine is the suffix on the heterocycle, the Blue Book 'N-phenylpyridin-3-amine (PIN)
+    #... [not N-(pyridin-3-yl)aniline]'); was '3-(2,6-dimethylanilino)-...imidazo[1,2-a]pyridine' (lane/fa)
     ("[CH-]1C=CC=C1.Cc1ccc2nc(C3=CC=C[CH-]3)c(Nc3c(C)cccc3C)n2c1.[Fe+2]",
-     "3-(2,6-dimethylanilino)-2-(ferrocen-1-yl)-6-methylimidazo[1,2-a]pyridine"),
+     "N-(2,6-dimethylphenyl)-2-(ferrocen-1-yl)-6-methylimidazo[1,2-a]pyridin-3-amine"),
     ("[CH-]1C=CC=C1.C1COCCN1C1=CC=C[CH-]1.[Fe+2]", "4-(ferrocen-1-yl)morpholine"),
 ], ids=lambda v: v)
 def test_ocenes_named_after_the_new_order(smiles, name):

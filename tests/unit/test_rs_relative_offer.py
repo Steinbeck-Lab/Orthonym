@@ -26,6 +26,13 @@ pytestmark = pytest.mark.opsin_gate
     ("C[C@H]1CC[C@H](O)CC1", "trans-4-methylcyclohexan-1-ol"),
     ("C[C@H]1CC[C@H](OC(C)=O)CC1", "trans-4-methylcyclohexyl acetate"),
     ("C[C@H](O)CC[C@H]1CC[C@H](O)CC1", "trans-4-[(3S)-3-hydroxybutyl]cyclohexan-1-ol"),   # a true stereocentre beside the pair
+    # the pair in the acid word of an ester, the second word of the name (C4 lead, 2026-11-20): it was the floor's
+    # 'trans-1-(ethoxycarbonyl)-4-hydroxycyclohexane'
+    ("CCOC(=O)[C@H]1CC[C@H](O)CC1", "ethyl trans-4-hydroxycyclohexane-1-carboxylate"),
+    ("CCOC(=O)[C@H]1CC[C@@H](O)CC1", "ethyl cis-4-hydroxycyclohexane-1-carboxylate"),
+    # the ester namer's own acid word keeps the ring pair's r/s (rules.esters._build_ester_acid_word), so its name is
+    # withdrawn and converted too
+    ("COC(=O)[C@H]1CC[C@H](C)CC1", "methyl trans-4-methylcyclohexane-1-carboxylate"),
 ])
 def test_relative_name_replaces_the_floor_name(smiles, name):
     # (:48155,:48163); (:48103)

@@ -46,6 +46,7 @@ from ..perception.rings import (
     is_heterocyclic,
 )
 from ..perception.stereo import assign_stereochemistry
+from .fused_amide_suffix import fused_heterocycle_n_amide
 from .stereochemistry import (
     collect_ring_junction_stereo,
     determine_simple_cis_trans,
@@ -3192,6 +3193,8 @@ def get_fused_heterocycle_substituents(
                 # Suffix-forming groups directly on ring (carboxylic acid, carbaldehyde, etc.)
                 suffix_name = sub_info.get('suffix_name', sub_name)
                 result['suffix_groups'][suffix_name].append(locant)
+                for _nm in sub_info.get('n_substituents') or ():   # an N-substituted carboxamide
+                    result['n_substituents'][_nm] += 1
             elif sub_type == 'functionalized':
                 # Functionalized chain substituents (cyanomethyl, etc.)
                 result['c_substituents'][sub_name].append(locant)
@@ -4003,18 +4006,16 @@ def _identify_functionalized_substituent(
     carbon_count = sum(1 for idx in chain_atoms
                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
 
-    # A -C(=O)NH2 or -C#N bonded directly to the ring is a SUFFIX group, like
-    # the -COOH / -CHO below: (the Blue Book) "The suffix
-    # 'carboxamide' is always used to name amides with the -CO-NH2 group
-    # attached to a ring, ring system, or to a heteroacyclic parent", and
-    # (:34720) "The suffix 'carbonitrile' is always used to name
-    # nitriles having the -CN group attached to a ring or ring system". Both
-    # used to reach the general substituent namer
-    # and ship as the 'carbamoyl' / 'cyano' PREFIX with no suffix at all:
-    # '3-cyanoquinoline' (PIN 'quinoline-3-carbonitrile'), '5-carbamoyl-1H-
-    # indole' (PIN '1H-indole-5-carboxamide'), at pin_verified.
-    # (:18162) ranks amides (11) and nitriles (14) above ketones (16), so they
-    # also take the suffix over a ring -one.
+    # A -C(=O)NH2 or -C#N bonded directly to the ring is a SUFFIX group, like the -COOH / -CHO below:
+    # (the Blue Book) "The suffix 'carboxamide' is always used to name amides with the -CO-NH2 group attached to
+    # a ring, ring system, or to a heteroacyclic parent", and (:34720) "The suffix 'carbonitrile' is
+    # always used to name nitriles having the -CN group attached to a ring or ring system". Both used to reach the
+    # general substituent namer and ship as the 'carbamoyl' / 'cyano' PREFIX with no suffix at all: '3-cyanoquinoline'
+    # (PIN 'quinoline-3-carbonitrile'), '5-carbamoyl-1H- indole' (PIN '1H-indole-5-carboxamide'), at pin_verified.
+    # (:18162) ranks amides (11) and nitriles (14) above ketones (16), so they also take the suffix
+    # over a ring -one.
+    if (_n_amide := fused_heterocycle_n_amide(mol, start_idx, excluded, chain_atoms)) is not None:
+        return _n_amide                     # 'N-methylquinoline-2-carboxamide' (rules.fused_amide_suffix)
     if carbon_count == 1 and len(chain_atoms) in (2, 3):
         c_atom = mol.GetAtomWithIdx(start_idx)
         others = [mol.GetAtomWithIdx(i) for i in chain_atoms if i != start_idx]
@@ -4684,9 +4685,8 @@ def _assemble_fused_heterocycle_name(
 
     prefix_parts = []
 
-    # Each source's groups, in the order they were cited: the N-substituents of
-    # the amine suffix ('N' per substituent), the ring C-substituents and the
-    # other (halogen etc.) ring substituents.
+    # Each source's groups, in the order they were cited: the N-substituents of the amine suffix ('N' per
+    # substituent), the ring C-substituents and the other (halogen etc.) ring substituents.
     other_groups = defaultdict(list)
     for sub in substituents['other']:
         other_groups[sub['name']].append(sub['locant'])
@@ -5091,9 +5091,9 @@ def _apply_suffix_to_core(core_name: str, suffix: str) -> str:
 
 
 def _format_n_prefix(name: str, count: int) -> str:
-    """Format an N-substituent prefix (N-methyl, N,N-dimethyl)."""
-    from ..assembly.naming_utils import _wrap_n_substituent
-    wrapped = _wrap_n_substituent(name)
+    """Format an N-substituent prefix (N-methyl, N,N-dimethyl; a compound one enclosed,: 'N-(propan-2-yl)')."""
+    from ..assembly.naming_utils import _wrap_n_substituent, enclose_if_compound
+    wrapped = _wrap_n_substituent(enclose_if_compound(name))
     if count == 1:
         return f"N-{wrapped}-"
     else:

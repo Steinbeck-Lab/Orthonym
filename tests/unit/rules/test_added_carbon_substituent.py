@@ -74,10 +74,14 @@ def test_added_carbon_substituent_path_declines_complex_substituents():
 def test_review_b1_isomer_constitution_guard():
     """BLOCKER 1: name_substituent's symbols-only fallback mis-named a nitrite
     -O-N=O as 'nitro' (same {N,O,O} count). The gate-independent constitution
-    re-anchor must reject it -> the added-carbon path does NOT emit a nitro name."""
-    for smi in ("OC(=O)CC(ON=O)(CC(=O)O)C(=O)O", "OC(=O)CC(N(O)O)(CC(=O)O)C(=O)O"):
-        n = _pin().name(smi) or ""
-        assert "nitropropane" not in n and "tricarboxylic" not in n, n
+    re-anchor must reject it -> the added-carbon path does NOT emit a nitro name. The nitrite now gets its own
+    prefix, enclosed: "Substituent groups derived from esters of nitric acid and nitrous acid"
+    (the Blue Book), '-O-NO nitrosooxy (preselected prefix' (:36409); marks around a compound
+    prefix, as in '2-(tert-butylimino)-3-methyl-3-(nitrooxy)butanoic acid (PIN)',:25963)."""
+    n = _pin().name("OC(=O)CC(ON=O)(CC(=O)O)C(=O)O") or ""
+    assert n == "2-(nitrosooxy)propane-1,2,3-tricarboxylic acid", n
+    n = _pin().name("OC(=O)CC(N(O)O)(CC(=O)O)C(=O)O") or ""
+    assert "nitropropane" not in n and "tricarboxylic" not in n, n
 
 
 def test_review_b2_p14_4_g_tiebreak_deterministic():
