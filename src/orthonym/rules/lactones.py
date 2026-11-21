@@ -545,7 +545,7 @@ def _ring_system_seniority_key(mol, system, rings):
     g_counts = tuple(hetero.count(x) for x in _P44_2_1_G_ORDER)
     return (bool(hetero),                                   # (a) heterocycle
             'N' in hetero,                                  # (b) nitrogen
-            -c_rank,                                        # (c) earlier heteroatom
+            0 if 'N' in hetero else -c_rank,                # (c) earlier heteroatom "(in the absence of nitrogen)"
             sum(1 for r in rings if r <= system),           # (d) more rings
             len(system),                                    # (e) more skeletal atoms
             len(hetero),                                    # (f) more heteroatoms
