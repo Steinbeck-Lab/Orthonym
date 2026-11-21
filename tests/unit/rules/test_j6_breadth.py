@@ -304,7 +304,15 @@ def _perm(n, seed):
     return order
 
 
-_NAMED_AT_THE_PIN = {"NC1CCc2ccc(O)cc2C1": "7-amino-5,6,7,8-tetrahydronaphthalen-2-ol"}
+_NAMED_AT_THE_PIN = {
+    "NC1CCc2ccc(O)cc2C1": "7-amino-5,6,7,8-tetrahydronaphthalen-2-ol",
+    # The partly saturated producer now declines a principal group it cannot write as a suffix,
+    # the Blue Book), so the suffix producer names these with the PINs listed below; the suffix takes the
+    # lowest locant before the hydro prefixes,:24890).
+    "NC(=O)C1CCc2cc(O)ccc2C1": "6-hydroxy-1,2,3,4-tetrahydronaphthalene-2-carboxamide",
+    "NC(=O)C1CCc2ccccc2C1": "1,2,3,4-tetrahydronaphthalene-2-carboxamide",
+    "N#CC1CCc2ccccc2C1": "1,2,3,4-tetrahydronaphthalene-2-carbonitrile",
+}
 
 
 @pytest.mark.parametrize("smiles", [

@@ -215,21 +215,11 @@ class TestErrataCarbonochloridoyl:
                 f"_SUFFIX_TO_PREFIX['{key}'] still has 'chlorocarbonyl' -- must be updated"
             )
 
-    def test_acid_bromide_unchanged(self):
-        """PREFIX_FORMS['acid_bromide'] must remain 'bromocarbonyl' (NOT changed by errata)."""
+    def test_acid_bromide_and_fluoride_take_the_acid_prefix(self):
+        """ (1): '3-(carbonobromidoyloxy)-3-oxopropanoic acid (PIN)' (the Blue Book)."""
         from orthonym.rules.seniority import PREFIX_FORMS
 
-        assert PREFIX_FORMS["acid_bromide"] == "bromocarbonyl", (
-            f"acid_bromide should remain 'bromocarbonyl', got '{PREFIX_FORMS['acid_bromide']}'"
-        )
-
-    def test_acid_fluoride_unchanged(self):
-        """PREFIX_FORMS['acid_fluoride'] must remain 'fluorocarbonyl' (NOT changed by errata)."""
-        from orthonym.rules.seniority import PREFIX_FORMS
-
-        assert PREFIX_FORMS["acid_fluoride"] == "fluorocarbonyl", (
-            f"acid_fluoride should remain 'fluorocarbonyl', got '{PREFIX_FORMS['acid_fluoride']}'"
-        )
+        assert (PREFIX_FORMS["acid_bromide"], PREFIX_FORMS["acid_fluoride"]) == ("carbonobromidoyl", "carbonofluoridoyl")
 
 
 # ============================================================================

@@ -25,20 +25,20 @@ _ACID = re.compile(r"\bcarboxy\b|carboxylic acid|oic acid|ic acid$")
 
 def acyl_halide_from_acid(mol, combined: List[Tuple[tuple, str]]) -> Optional[str]:
     """'4-methylbenzoyl chloride' for ``mol`` whose acyl halide groups ``combined`` (``((C, O, X), symbol)`` each) carry
-    one halogen and sit on rings; None for any other case (mixed halogens, a group off a ring, a carboxy group of the
-    input's own, an acid name whose suffix does not count every group)."""
+    one halogen; the groups on ring carbons are the suffix, any others are prefixes ('3-chloro-3-oxopropyl') when no
+    branch holds more of them than the ring. None for any other case (mixed halogens, a carboxy group of the input's
+    own, an acid name whose suffix does not count every ring group)."""
     if not combined or len({sym for _m, sym in combined}) != 1 or len(combined) > 4:
         return None
     if any(mol.GetAtomWithIdx(m[2]).GetIsotope() for m, _s in combined):
         return None                                  # a labelled halogen: the acid would lose the label
     if mol.HasSubstructMatch(_CARBOXY):
         return None                                  # an acid is senior; another producer names it
-    for match, _sym in combined:
-        carbons = [nb for nb in mol.GetAtomWithIdx(match[0]).GetNeighbors()
-                   if nb.GetIdx() not in match and nb.GetAtomicNum() == 6]
-        if len(carbons) != 1 or not carbons[0].IsInRing():
-            return None
-    acid = _acid_smiles(mol, [m[2] for m, _s in combined])
+    ring_groups = [m for m, _s in combined if _on_ring_atom(mol, m)]
+    if not ring_groups or _most_groups_on_one_branch(mol, [m for m, _s in combined if m not in ring_groups]) > len(
+            ring_groups):
+        return None                                  # a chain with more groups is the parent
+    acid = _acid_smiles(mol, [m[2] for m in ring_groups])
     if acid is None:
         return None
     from .lipids import _acid_to_acyl, _name_fragment
@@ -47,7 +47,7 @@ def acyl_halide_from_acid(mol, combined: List[Tuple[tuple, str]]) -> Optional[st
         return None
     found = _MULTIPLIED_ACID.search(acid_name)
     count = {"di": 2, "tri": 3, "tetra": 4}[found.group(1)] if found else 1
-    if count != len(combined) or len(_ACID.findall(acid_name)) != 1:
+    if count != len(ring_groups) or len(_ACID.findall(acid_name)) != 1:
         return None                                  # a 'carboxy' prefix or another acid word is a group not converted
     acyl = _acid_to_acyl(acid_name)
     if not acyl:
@@ -58,6 +58,37 @@ def acyl_halide_from_acid(mol, combined: List[Tuple[tuple, str]]) -> Optional[st
 
 
 _CARBOXY = Chem.MolFromSmarts("[CX3](=O)[OX2H1,OX1-]")
+
+
+def _on_ring_atom(mol, match) -> bool:
+    """True when the acyl carbon of ``match`` is joined to exactly one other atom, a ring carbon or ring nitrogen:
+    'Carboxy groups attached to cyclic parent hydrides... are always named by using the suffix 'carboxylic acid''
+    , the Blue Book), 'pyrrolidine-1-carboxylic acid (PIN)' (:29892)."""
+    others = [nb for nb in mol.GetAtomWithIdx(match[0]).GetNeighbors() if nb.GetIdx() not in match]
+    return len(others) == 1 and others[0].IsInRing() and others[0].GetSymbol() in ("C", "N")
+
+
+def _most_groups_on_one_branch(mol, matches) -> int:
+    """The largest number of acyl halide groups ``matches`` on one acyclic branch (ring atoms removed), 0 for none.
+    Within one class the parent has the most principal groups, and a ring wins a tie: 'for the same number of
+    characteristic groups cited as the principal characteristic group, a ring is always selected as the parent
+    hydride', the Blue Book); '4-(3-chloro-3-oxopropyl)benzoyl chloride'."""
+    if any(mol.GetAtomWithIdx(m[0]).IsInRing() for m in matches):
+        return len(matches) + 1                      # an acyl carbon in a ring: not this producer's shape
+    seen, best = set(), 0
+    for match in matches:
+        if match[0] in seen:
+            continue
+        branch, stack = set(), [match[0]]
+        while stack:
+            x = stack.pop()
+            if x in branch or mol.GetAtomWithIdx(x).IsInRing():
+                continue
+            branch.add(x)
+            stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors())
+        seen |= branch
+        best = max(best, sum(1 for m in matches if m[0] in branch))
+    return best
 
 
 def _acid_smiles(mol, halogen_atoms: List[int]) -> Optional[str]:

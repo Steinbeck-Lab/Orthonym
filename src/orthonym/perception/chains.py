@@ -434,6 +434,9 @@ def _get_non_principal_terminal_carbons(
         # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
         # Skipped automatically when nitrile IS the principal group (suffix path).
         'nitrile': 0,
+        # (3): the cyano carbon of a non-principal acyl cyanide is a prefix, never a chain member
+        # ('4-cyano-4-oxobutanoic acid'); SMARTS [CX3](=O)[CX2]#[NX1] -> index 2.
+        'acyl_cyanide': 2,
         #, BB 34338): amidine is DELIBERATELY NOT in this set.
         # "When the carbon atom of the H2N-C(=NH)- group terminates a chain,
         # -NH2 and =NH are designated amino and imino" — so on a CHAIN parent the
@@ -1182,7 +1185,7 @@ def find_principal_chain(
         # ring_prefixes mode: each branch is named whole (a ring bonded to the
         # chain, or a branch that reaches one, is one prefix: '(3-nitrophenyl)methyl',
         # '3-nitrophenyl'), so only the chain bounds it.
-        bfs_boundary = cset if ring_prefixes else cset | combined_exclude
+        bfs_boundary = cset if ring_prefixes else cset | (combined_exclude - {m[2] for m in (functional_groups or {}).get('acyl_cyanide', ())})  # a branch -CH2-CO-CN is named whole
         pos = {a: i + 1 for i, a in enumerate(oriented)}
         entries = []  # (alpha_key, locant)
         sub_locants = []

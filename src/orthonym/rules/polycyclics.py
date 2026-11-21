@@ -2061,6 +2061,11 @@ def name_partially_saturated_carbocycle_with_locants(
     sat_info = detect_carbocyclic_partial_saturation(mol, ring_atoms)
     if sat_info is None:
         return None
+    # (the Blue Book): a functional suffix represents "the principal characteristic group"; this path writes only the
+    # `_PARTIAL_SAT_PCG_SUFFIX` kinds, so with none found it may not cite a senior group as a prefix
+    # ('6-(chlorosulfonyl)-1,2,3,4-tetrahydronaphthalene' for 5,6,7,8-tetrahydronaphthalene-2-sulfonyl chloride).
+    if not sat_info.get('pcg_kind') and _principal_group_of(mol) is not None:
+        return None
 
     # Atom-conservation veto (R12,: this path names aromatic-ring
     # substituents itself and relies on enrichment for NON-fusion sp3-ring
@@ -2088,6 +2093,14 @@ def name_partially_saturated_carbocycle_with_locants(
     if not name:
         return None
     return PartialSatName(name, sat_info.get('atom_to_locant') or {}, spelled)
+
+
+def _principal_group_of(mol) -> Optional[str]:
+    """The principal characteristic group of ``mol`` as the polyfunctional producer perceives it, or None."""
+    from ..perception.functional_groups import detect_functional_groups
+    from .polyfunctional import get_principal_group
+    found = get_principal_group(mol, detect_functional_groups(mol))
+    return found[0] if isinstance(found, tuple) else found
 
 
 def _assemble_partially_saturated_carbocycle_name(

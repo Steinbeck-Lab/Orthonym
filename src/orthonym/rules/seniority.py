@@ -1014,10 +1014,9 @@ PREFIX_FORMS = {
     "azido": "azido",
     # Acid halides as non-principal group prefix (IUPAC
     "acid_chloride": "carbonochloridoyl",
-    "acid_bromide": "bromocarbonyl",
-    "acid_fluoride": "fluorocarbonyl",
-    # Wave2 T6c: acyl-pseudohalide prefixes, parallel to
-    # bromocarbonyl/fluorocarbonyl above)
+    # (1) (the Blue Book) for every halide: '3-(carbonobromidoyloxy)-3-oxopropanoic acid (PIN)' (:31547)
+    "acid_bromide": "carbonobromidoyl",
+    "acid_fluoride": "carbonofluoridoyl",
     # W3-P11: demoted sulfonyl/sulfinyl halide prefix fails closed (None) — the
     # -SO2-X substituent prefix ('{halide}sulfonyl') is halide-dependent and the
     # target compounds are mono-functional (always the principal group).
@@ -1039,7 +1038,7 @@ PREFIX_FORMS = {
     "carbothioyl_halide": None,
     "carboselenoyl_halide": None,
     "acyl_azide": "azidocarbonyl",
-    "acyl_cyanide": "cyanocarbonyl",
+    "acyl_cyanide": "carbonocyanidoyl",  # (1), '2-carbonocyanidoyl-5-methylbenzoyl chloride (PIN)':31543
     "acyl_isocyanate": "isocyanatocarbonyl",
     "acyl_isothiocyanate": "isothiocyanatocarbonyl",
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
@@ -1166,7 +1165,7 @@ PREFIX_FORMS = {
     "selenoester": None,
     "telluroester": None,
     # a phase: 6 new FG classes
-    "acid_iodide": "iodocarbonyl",     # IUPAC
+    "acid_iodide": "carbonoiodidoyl",  # (1), as acid_bromide
     "amidine": "carbamimidoyl",         # IUPAC (was "amidino" — wrong per BB
     "sulfenic_acid": "sulfeno",        # IUPAC
     "diazo": "diazo",                  #

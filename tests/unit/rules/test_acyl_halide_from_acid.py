@@ -34,8 +34,21 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
     # the sulfonyl chloride outranks a sulfonamide: its suffix, never 'chlorosulfonyl' on a sulfonamide parent
     ("O=S(=O)(Cl)c1ccc(S(=O)(=O)Nc2cccc3c(Cl)c[nH]c23)cc1",
      "4-[(3-chloro-1H-indol-7-yl)sulfamoyl]benzene-1-sulfonyl chloride"),
+    # a ring and a chain group: the ring is the parent for the same number of groups, the Blue Book)
+    ("O=C(Cl)c1ccc(CCC(Cl)=O)cc1", "4-(3-chloro-3-oxopropyl)benzoyl chloride"),
+    ("O=C(Cl)CCC1CCC(C(Cl)=O)CC1", "4-(3-chloro-3-oxopropyl)cyclohexane-1-carbonyl chloride"),
+    ("O=C(Cl)c1ccc(C(Cl)=O)cc1CC(Cl)=O", "2-(2-chloro-2-oxoethyl)benzene-1,4-dicarbonyl dichloride"),
+    ("Cc1cc(C(Cl)=O)ccc1C(Cl)=O", "2-methylbenzene-1,4-dicarbonyl dichloride"),
+    # on a ring nitrogen: a ring suffix too, the Blue Book, 'pyrrolidine-1-carboxylic acid (PIN)')
+    ("O=C(Cl)N1CCc2cc(C(=O)Cl)ccc21", "2,3-dihydro-1H-indole-1,5-dicarbonyl dichloride"),
+    ("O=C(Cl)n1ccc2cc(C(=O)Cl)ccc21", "1H-indole-1,5-dicarbonyl dichloride"),
+    ("O=C(Cl)N1CCc2ccccc2C1C(=O)Cl", "1,2,3,4-tetrahydroisoquinoline-1,2-dicarbonyl dichloride"),
+    ("O=C(Cl)N1CCCCC1", "piperidine-1-carbonyl chloride"),
+    ("O=C(Cl)N1CCOCC1", "morpholine-4-carbonyl chloride"),
+    ("O=C(Cl)N1CCC(C(Cl)=O)CC1", "piperidine-1,4-dicarbonyl dichloride"),
     # unchanged
     ("ClS(=O)(=O)c1ccc(S(=O)(=O)Cl)cc1", "benzene-1,4-disulfonyl dichloride"),
+    ("CN(C)C(Cl)=O", "dimethylcarbamoyl chloride"),
     ("O=C(Cl)c1ccccc1", "benzoyl chloride"),
     ("O=C(Cl)C1CCCCC1", "cyclohexanecarbonyl chloride"),
     ("O=C(Cl)c1ccc(C(Cl)=O)cc1", "benzene-1,4-dicarbonyl dichloride"),
@@ -48,7 +61,7 @@ def test_ring_acyl_halide_pins(smiles, name):
 
 @pytest.mark.parametrize("smiles", [
     "O=C(Cl)c1ccc(C(=O)Br)cc1",          # two halogens: not built here
-    "O=C(Cl)c1ccc(CCC(Cl)=O)cc1",        # a second acyl halide off the ring: the acid suffix does not count it
+    "O=C(Cl)CC(CC(Cl)=O)c1ccc(C(Cl)=O)cc1",  # a chain with two groups is the parent
 ])
 def test_other_shapes_are_not_built_here(smiles):
     from rdkit import Chem

@@ -18,6 +18,8 @@ locants are omitted for parent compounds when all substitutable hydrogen atoms h
 """
 from typing import Dict, List, Optional
 
+from .acyl_halide_prefix import carbono_acyl_prefix
+
 
 def is_acyl_prefix(name: str) -> bool:
     """True when ``name`` is an acyl name ``acyl_prefix_text`` spells ('2-oxopropanoyl', 'chloroacetyl'),
@@ -234,6 +236,8 @@ def one_carbon_acyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
     ,:32922-:32928). The book's prefix (``book_prefixes.acyl_group_prefix``), or None."""
     from .book_prefixes import acyl_group_prefix, book_forms_enabled
     from .substituent_naming import name_substituent_fragment
+    if (carbono := carbono_acyl_prefix(mol, sub_set, attach_idx)) is not None:
+        return carbono                               # 'carbonocyanidoyl', (1)
     if not book_forms_enabled():
         return None
     parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors() if nb.GetIdx() not in sub_set]

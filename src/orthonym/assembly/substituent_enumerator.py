@@ -2772,10 +2772,8 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
 
     # ---- Tier 1.93b (W3-P10, /: arsanyl (As-rooted) ----
     # An arsenic-rooted substituent (-As(OH)2 -> dihydroxyarsanyl) cited as a
-    # prefix under a senior organic group (-COOH). MUST precede the Tier-5
-    # descriptive fallback, which returns the 'inorganic compound (not supported)'
-    # sentinel for a lone As and fails the whole molecule closed. Fail-closed
-    # (falls through) for any non-As / decorated-As shape.
+    # prefix under a senior organic group (-COOH). MUST precede the Tier-5 descriptive fallback (the
+    # 'inorganic compound (not supported)' sentinel for a lone As fails the molecule closed); falls through otherwise.
     if attach_idx is not None and attach_idx in frag_atoms_set:
         if mol.GetAtomWithIdx(attach_idx).GetSymbol() in ('As', 'Sb', 'Bi'):
             try:

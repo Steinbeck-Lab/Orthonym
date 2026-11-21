@@ -80,11 +80,8 @@ def test_offer_needs_exactly_one_acid_group():
 
 # Rows whose PIN the default tier cannot build yet: the producer of the organyl prefix is a
 # separate namer (assembly/substituent_*), listed in the report of lane L4.
-@pytest.mark.xfail(strict=True, reason=(
-    "assembly.substituent_enumerator.name_substituent refuses the 4-(dimethylsulfamoyl)phenyl "
-    "branch (recursion_depth_fallback on the sulfamoyl group, token 'substituent'), so the "
-    "functional-parent name cannot be built at the default tier; the best-effort tier names it"))
 def test_sulfamoylphenyl_phosphonic_acid_at_default_tier():
+    # the shared namer spells the sulfamoyl branch (assembly.sulfur_acid_group_prefix); acids outrank amides
     assert_pin_at_both_tiers("OP(O)(=O)c1ccc(cc1)S(=O)(=O)N(C)C",
                              "[4-(dimethylsulfamoyl)phenyl]phosphonic acid")
 

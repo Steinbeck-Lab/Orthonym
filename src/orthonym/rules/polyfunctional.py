@@ -2190,12 +2190,12 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # "3-chloro-3-oxopropanoic acid" (PIN, line 31531). The
         # 'carbonochloridoyl' prefix is the PIN only on a RING parent (the
         # carbon cannot join the ring, e.g. "2-carbonochloridoylbenzoic acid",
-        # line 31533) — handled elsewhere; here we fall through to it only when
-        # the acyl-halide carbon is NOT a member of the principal chain.
+        # line 31533) — handled elsewhere; reached only for a carbon off the principal chain.
         _ACYL_HALIDE_HALO = {
             'acid_fluoride': 'fluoro', 'acid_chloride': 'chloro',
             'acid_bromide': 'bromo', 'acid_iodide': 'iodo',
-        }
+            'acyl_cyanide': 'cyano', 'acyl_azide': 'azido', 'acyl_isocyanate': 'isocyanato',  # (3) pseudohalides
+            'acyl_isothiocyanate': 'isothiocyanato'}
         if _group_acyl_halide(_ACYL_HALIDE_HALO, all_prefixes, atom_to_locant, chain_set, fg_name, matches):
             continue
 
@@ -3622,7 +3622,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
             # (amine, ketone, secondary_amide, etc.) must NOT trigger this guard.
             _POLY_GUARD_FG_TYPES = {
                 'primary_amide', 'carboxylic_acid',
-                'acid_chloride', 'acid_bromide', 'acid_fluoride',
+                'acid_chloride', 'acid_bromide', 'acid_fluoride', 'acyl_cyanide', 'acyl_azide', 'acyl_isocyanate', 'acyl_isothiocyanate',
                 # a phase follow-on (F3 ureido): a urea substituent
                 # -NH-C(=O)-NH2 is emitted as the 'carbamoylamino' FG prefix by
                 # the FG loop above (its carbon is in the prefix). Without this

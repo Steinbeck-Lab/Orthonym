@@ -1698,11 +1698,8 @@ def _ring_bears_senior_suffix(
     Gates the Wave2 acyl-prefix demotion so a lone aryl ketone (the PCG
     case, acetophenone class) never routes here.
 
-    Scoped to C-ATTACHED suffix branches (carboxylic acid / carboxamide /
-    carbonitrile / carbaldehyde...): the S-suffix assembly currently drops
-    ring locants when combined with an acyl prefix ('acetylbenzenesulfonic
-    acid', wrong constitution), so acetyl+sulfonic stays on its HEAD path
-    (fail-closed) until that assembly is fixed — documented deferral.
+    C- and S-attached suffix branches: '4-acetylbenzoic acid', '4-acetylbenzene-1-sulfonyl chloride' (the sulfur
+    suffix writer now cites every ring locant; it once wrote 'acetylbenzenesulfonic acid').
 
     Also True where the principal group is a hydroxy or thiol group (``benzene_prefix_forms.hydroxy_is_principal``)."""
     if hydroxy_is_principal(principal_group):
@@ -1714,7 +1711,7 @@ def _ring_bears_senior_suffix(
                 continue
             if ni == exclude_branch_start:
                 continue
-            if nbr.GetSymbol() != 'C':
+            if nbr.GetSymbol() not in ('C', 'S'):
                 continue
             sub_atoms = _bfs_substituent_atoms(mol, ni, ring_atoms)
             if _identify_suffix_fg_on_benzene(mol, ni, sub_atoms, ring_atoms):

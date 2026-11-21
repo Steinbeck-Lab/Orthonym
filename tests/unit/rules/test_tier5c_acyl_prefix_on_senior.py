@@ -43,17 +43,12 @@ def test_tier5c_acyl_prefix_on_senior_parent(smiles, expected):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    "smiles,why",
-    [
-        ("CC(=O)c1ccc(S(=O)(=O)O)cc1",
-         "S-suffix gate excluded: the sulfo assembly drops locants with an "
-         "acyl prefix — stays on the HEAD fail-closed path"),
-    ],
-)
-def test_tier5c_fail_closed(opsin_gate, smiles, why):
-    # production (validity gate ON) must not emit a name for these shapes
-    assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin"), why
+def test_tier5c_sulfonic_acid_with_acetyl(opsin_gate):
+    # change-asserted-value: this row pinned a fail-closed deferral ("the sulfo assembly drops locants with an acyl
+    # prefix"). The sulfur suffix writer now cites every ring locant, so the acetyl prefix is admitted beside it
+    # (rules.benzene._ring_bears_senior_suffix); (the Blue Book) acids (7a) above ketones (16).
+    # The ortho/meta/para rows and their read-back are in tests/unit/rules/test_ring_sulfur_acid_with_ketone.py.
+    assert name_compound("CC(=O)c1ccc(S(=O)(=O)O)cc1", emit_tier="pin") == "4-acetylbenzene-1-sulfonic acid"
 
 
 @pytest.mark.unit

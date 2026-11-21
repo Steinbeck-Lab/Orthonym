@@ -86,8 +86,8 @@ class TestAcidIodide:
         assert SUFFIX_FORMS["acid_iodide"] == ("oyl iodide", "carbonyl iodide")
 
     def test_acid_iodide_prefix(self):
-        """Acid iodide prefix: iodocarbonyl."""
-        assert PREFIX_FORMS["acid_iodide"] == "iodocarbonyl"
+        """Acid iodide prefix: carbonoiodidoyl (1), rule text; no worked example)."""
+        assert PREFIX_FORMS["acid_iodide"] == "carbonoiodidoyl"
 
 
 # ---------------------------------------------------------------------------

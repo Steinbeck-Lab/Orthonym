@@ -144,13 +144,11 @@ class TestAcidHalidePrefixForms:
 
     @pytest.mark.unit
     def test_acid_bromide_prefix(self):
-        assert PREFIX_FORMS.get('acid_bromide') == 'bromocarbonyl', \
-            f"Expected 'bromocarbonyl', got '{PREFIX_FORMS.get('acid_bromide')}'"
+        assert PREFIX_FORMS.get('acid_bromide') == 'carbonobromidoyl'   # (1), the Blue Book
 
     @pytest.mark.unit
     def test_acid_fluoride_prefix(self):
-        assert PREFIX_FORMS.get('acid_fluoride') == 'fluorocarbonyl', \
-            f"Expected 'fluorocarbonyl', got '{PREFIX_FORMS.get('acid_fluoride')}'"
+        assert PREFIX_FORMS.get('acid_fluoride') == 'carbonofluoridoyl'  # (1), rule text
 
 
 # ============================================================================

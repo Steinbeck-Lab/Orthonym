@@ -31,6 +31,8 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from .pseudohalide_prefix import pseudohalide_prefix
+from .acyl_halide_prefix import carbono_acyl_prefix
+from .sulfur_acid_group_prefix import sulfur_acid_group_prefix
 from .chain_carboxamide import is_chain_carboxamide as _is_chain_carboxamide, pin_amide_prefix
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
@@ -2141,6 +2143,8 @@ def _name_polyfunctional_acyclic_substituent(
     ``located`` triple ``_add_substituent_stereo`` accepts.
     """
     global _POLYFUNC_MEMO_MOL, _POLYFUNC_MEMO_CACHE
+    if (_group := carbono_acyl_prefix(mol, sub_atoms, attach_idx) or sulfur_acid_group_prefix(mol, sub_atoms, attach_idx)):
+        return _group                                # 'carbonochloridoyl' (1)), 'sulfamoyl'; never 'chloro(oxo)methyl'
     if _POLYFUNC_MEMO_MOL is not mol:
         _POLYFUNC_MEMO_CACHE = {}
         _POLYFUNC_MEMO_MOL = mol

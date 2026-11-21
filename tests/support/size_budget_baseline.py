@@ -145,7 +145,7 @@ FUNCTIONS = {
 FILES = {
     "src/orthonym/assembly/composer.py": 12676,
     "src/orthonym/assembly/substituent_enumerator.py": 6531,
-    "src/orthonym/assembly/substituent_naming.py": 9450,
+    "src/orthonym/assembly/substituent_naming.py": 9417,
     "src/orthonym/data/opsin_imports/aryl_groups.py": 7782,
     "src/orthonym/data/opsin_imports/carboxylic_acids_opsin.py": 5346,
     "src/orthonym/data/opsin_imports/simple_groups.py": 8895,

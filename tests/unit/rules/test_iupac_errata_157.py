@@ -30,12 +30,9 @@ Per internal notes / / / (mutual-exclusion contracts): this
 test module ONLY IMPORTS from a phase / 155.C / 151 / 137-02 deliverables;
 it MUST NOT modify any of them.
 
-Per internal notes Pitfall 7: regression-lock does NOT invoke OPSIN
-round-trip (OPSIN v2.9.0 does not parse `carbonochloridoyl`).
-
-Per internal notes Pitfall 3: test_carbonochloridoyl_locked_157 asserts BOTH the
-chlorocarbonyl -> carbonochloridoyl change AND the bromocarbonyl /
-fluorocarbonyl intentional non-change (BBerrors says only -COCl renamed).
+test_carbonochloridoyl_locked_157 asserts the (1) prefix of every acid
+halide ('carbonochloridoyl', 'carbonobromidoyl', 'carbonofluoridoyl'); OPSIN 2.9.0
+reads each of them.
 """
 
 import subprocess
@@ -193,7 +190,7 @@ class TestCarbonochloridoylLock157:
     """
 
     def test_carbonochloridoyl_locked_157(self) -> None:
-        """acid_chloride -> carbonochloridoyl; bromo/fluoro intentionally unchanged."""
+        """acid halides -> carbono...idoyl (1))."""
         from orthonym.rules.seniority import PREFIX_FORMS
 
         # The Nov 2020 errata renamed -COCl prefix:
@@ -202,22 +199,12 @@ class TestCarbonochloridoylLock157:
             f"{PREFIX_FORMS.get('acid_chloride')!r} != 'carbonochloridoyl'. "
             f"Phase 137 ERRATA-09 silently reverted. AUDIT REQUIRED."
         )
-        # Per internal notes Pitfall 3: the bromine analog is INTENTIONALLY unchanged.
-        # If this assertion fires, an over-eager edit applied carbonochloridoyl-
-        # style renaming to ALL acid halides --- which is WRONG per BBerrors.
-        assert PREFIX_FORMS.get("acid_bromide") == "bromocarbonyl", (
-            f"P-29.1.2 regression: PREFIX_FORMS['acid_bromide'] = "
-            f"{PREFIX_FORMS.get('acid_bromide')!r} != 'bromocarbonyl'. "
-            f"BBerrors.html P-29.1.2 Nov 2020 errata applies ONLY to -COCl. "
-            f"The -COBr form was INTENTIONALLY unchanged. AUDIT REQUIRED."
-        )
-        # Per internal notes Pitfall 3: the fluorine analog is also INTENTIONALLY unchanged.
-        assert PREFIX_FORMS.get("acid_fluoride") == "fluorocarbonyl", (
-            f"P-29.1.2 regression: PREFIX_FORMS['acid_fluoride'] = "
-            f"{PREFIX_FORMS.get('acid_fluoride')!r} != 'fluorocarbonyl'. "
-            f"BBerrors.html P-29.1.2 Nov 2020 errata applies ONLY to -COCl. "
-            f"The -COF form was INTENTIONALLY unchanged. AUDIT REQUIRED."
-        )
+        # (1) (the Blue Book) is the same for every halide: the book's own PIN
+        # '3-(carbonobromidoyloxy)-3-oxopropanoic acid (PIN)' (:31547), and the table
+        # ('carbonobromidothioyl (preferred prefix) bromocarbonothioyl',:30879). No correction on the
+        # online changes page keeps 'bromocarbonyl'. F and I follow the rule text (no worked example).
+        assert PREFIX_FORMS.get("acid_bromide") == "carbonobromidoyl"
+        assert PREFIX_FORMS.get("acid_fluoride") == "carbonofluoridoyl"
 
 
 class TestBracketNestingSubsectionsLock157:

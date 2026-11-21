@@ -569,7 +569,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
     # dichloride). Uses the combined cross-type list; same-halide only (mixed ring
     # halides fail closed -> fall through). Checked before the single-ring path,
     # which returns only 'benzoyl {halide}' (dropping the 2nd acyl).
-    _bpc = _name_benzene_polycarbonyl_halide(mol, _combined)
+    _bpc = acyl_halide_from_acid(mol, _combined) or _name_benzene_polycarbonyl_halide(mol, _combined)
     if _bpc:
         _scope('ring')
         return _bpc
