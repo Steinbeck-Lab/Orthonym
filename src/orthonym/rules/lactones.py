@@ -529,7 +529,7 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     return name
 
 
-# (c) and (g) element orders (the Blue Book,:19417)
+# (c) and (g) element orders (the Blue Book,:19418)
 _P44_2_1_C_ORDER = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'P', 'As', 'Sb', 'Bi',
                     'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl')
 _P44_2_1_G_ORDER = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb',
@@ -537,7 +537,7 @@ _P44_2_1_G_ORDER = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As', 
 
 
 def _ring_system_seniority_key(mol, system, rings):
-    """ (a)-(g) (the Blue Book-19417) as a key: larger is senior."""
+    """ (a)-(g) (the Blue Book-19418) as a key: larger is senior."""
     syms = [mol.GetAtomWithIdx(a).GetSymbol() for a in system]
     hetero = [x for x in syms if x != 'C']
     c_rank = min((_P44_2_1_C_ORDER.index(x) for x in hetero if x in _P44_2_1_C_ORDER),
@@ -835,6 +835,27 @@ def lactone_parent_checked(features, name):
     rings; '6-(4-oxocyclohexyl)-5,6-dihydro-2H-pyran-2-one' keeps its label, a heterocycle outranks a carbocycle
     (a),:19412)."""
     if name and lactone_outranked(features, getattr(features, 'principal_ring', None) or ()):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name)
+    return name
+
+
+def ring_carbonyl_core_checked(mol, core_atoms, name):
+    """Return ``name``, a fused-ring name built on ``core_atoms`` with a ketone or pseudoketone suffix ('-one'),
+    recorded below the PIN when another ring system with a ring carbonyl outranks the core's system
+    (:func:`another_ring_ketone_system_is_senior`;, the Blue Book, "no seniority order difference
+    between ketones and pseudoketones"; (d) more rings,:19415). The fused-core match takes the first
+    catalog core it finds: '3-(4-oxo-4H-naphtho[1,2-b]pyran-2-yl)-2H-1-benzopyran-2-one' is not the PIN, the
+    naphthopyran has more rings than the 1-benzopyran."""
+    core = {a for a in (core_atoms or ()) if mol.GetAtomWithIdx(a).IsInRing()}   # the map also holds the =O atoms
+    if not name or not core or not name.endswith('one'):
+        return name
+    if not any(mol.GetAtomWithIdx(a).GetSymbol() == 'C' and any(
+            b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(mol.GetAtomWithIdx(a)).GetSymbol() == 'O'
+            and not b.GetOtherAtom(mol.GetAtomWithIdx(a)).IsInRing() for b in mol.GetAtomWithIdx(a).GetBonds())
+            for a in core):
+        return name                                  # the suffix is not on a ring carbonyl of the core
+    if another_ring_ketone_system_is_senior(mol, core):
         from ..metrics.provenance import record_non_pin_label
         record_non_pin_label(name)
     return name

@@ -2912,13 +2912,11 @@ def name_fused_heterocycle(mol):
 
     core_name, atom_mapping, _core_smiles = core_result
 
-    # b: a 2-component catalog core (e.g. furo[3,2-b]pyridine)
-    # can match as a SUBSTRUCTURE of a larger polycomponent fused system (e.g.
-    # difuropyridine); its leftover fused ring would be mis-named as a phantom
-    # acyclic substituent (the G0 '7-ethoxyfuro[3,2-b]pyridine' defect). When the
-    # matched core does NOT cover the whole fused ring system, try the
-    # polycomponent constructor first; None -> the downstream G0 coverage veto
-    # still fails closed on the phantom name.
+    # b: a 2-component catalog core (e.g. furo[3,2-b]pyridine) can match as a SUBSTRUCTURE
+    # of a larger polycomponent fused system (e.g. difuropyridine); its leftover fused ring would be mis-named
+    # as a phantom acyclic substituent (the G0 '7-ethoxyfuro[3,2-b]pyridine' defect). When the matched core
+    # does NOT cover the whole fused ring system, try the polycomponent constructor first; None -> the
+    # downstream G0 coverage veto still fails closed on the phantom name.
     if not _core_covers_ring_system(mol, atom_mapping):
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
@@ -2985,7 +2983,9 @@ def name_fused_heterocycle(mol):
 
     # Build the substituted name (None: the principal characteristic group could
     # not be expressed correctly on this core -- decline)
-    name = _assemble_fused_heterocycle_name(mol, core_name, substituents, atom_mapping)
+    from .lactones import ring_carbonyl_core_checked
+    name = ring_carbonyl_core_checked(mol, atom_mapping, _assemble_fused_heterocycle_name(
+        mol, core_name, substituents, atom_mapping))
     if name is None:
         return None
     # A core drawn in the bond-shift alternation that numbers its substituents
