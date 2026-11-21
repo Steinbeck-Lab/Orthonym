@@ -227,10 +227,11 @@ SENIORITY_ORDER = [
     #. Functional-class only ('alkyl alkanesulfonate' / '-sulfinate').
     "sulfonic_ester",
     "sulfinic_ester",
+    # class 10 (the Blue Book): acid halides "in the order of the halogen atoms (-F > -Cl > -Br > -I)"
+    "acid_fluoride",
     "acid_chloride",
     "acid_bromide",
-    "acid_fluoride",
-    "acid_iodide",    # IUPAC: parallel to other acid halides
+    "acid_iodide",
     # Wave2 T6c: acyl pseudohalides. class 10 orders
     # halides before pseudohalides, pseudohalogens as N3 > CN > NC > NCO.
     "acyl_azide",

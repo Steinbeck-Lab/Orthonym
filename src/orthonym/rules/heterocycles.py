@@ -3518,9 +3518,8 @@ def _ring_n_acyl_prefix_under_ring_acid(mol, ring_n_idx: int, carbonyl_c: int,
     (general nomenclature only,:30430) and never an 'N-acyl' float.
 
     Scope (deny by default): the molecule's principal group is a carboxylic acid
-    and a ring atom of this ring system bears the neutral -C(=O)OH (the suffix the
-    ring parent takes); the ring N is neutral; the acyl is a closed carbon-rooted
-    group named by ``substituent_naming.acyl_prefix_from_branch``.
+    and a ring atom of this ring system bears the neutral -C(=O)OH; the ring N is neutral; the acyl is
+    named by ``carbono_acyl_prefix`` (-COX, or ``acyl_prefix_from_branch``.
     """
     if principal_group != 'carboxylic_acid':
         return None
@@ -3549,7 +3548,8 @@ def _ring_n_acyl_prefix_under_ring_acid(mol, ring_n_idx: int, carbonyl_c: int,
     if not _acid_on_ring:
         return None
     from ..assembly.substituent_naming import acyl_prefix_from_branch
-    acyl = acyl_prefix_from_branch(mol, carbonyl_c, ring_n_idx, sub_atoms)
+    from ..assembly.acyl_halide_prefix import carbono_acyl_prefix  # (1): '1-carbonochloridoylpiperidine-...'
+    acyl = carbono_acyl_prefix(mol, sub_atoms, carbonyl_c) or acyl_prefix_from_branch(mol, carbonyl_c, ring_n_idx, sub_atoms)
     if acyl and acyl != 'acetyl' and acyl.endswith('acetyl') \
             and not acyl.startswith(('(', '[', '{')):
         # A SUBSTITUTED acetyl ('aminoacetyl', 'chloroacetyl') is a compound

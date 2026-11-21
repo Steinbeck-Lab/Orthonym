@@ -46,6 +46,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
     ("O=C(Cl)N1CCCCC1", "piperidine-1-carbonyl chloride"),
     ("O=C(Cl)N1CCOCC1", "morpholine-4-carbonyl chloride"),
     ("O=C(Cl)N1CCC(C(Cl)=O)CC1", "piperidine-1,4-dicarbonyl dichloride"),
+    # two halogens: the senior halide is the suffix, "-F > -Cl > -Br > -I" class 10, the Blue Book), and the
+    # other is the 'carbono...idoyl' prefix method (1),:31521; '2-carbonochloridoylbenzoic acid (PIN)')
+    ("O=C(Cl)c1ccc(C(=O)Br)cc1", "4-carbonobromidoylbenzoyl chloride"),
+    ("O=C(F)c1cccc(C(=O)Cl)c1", "3-carbonochloridoylbenzoyl fluoride"),
+    ("O=C(Cl)c1ccccc1C(=O)F", "2-carbonochloridoylbenzoyl fluoride"),
+    ("O=C(F)C1CCC(C(=O)Cl)CC1", "4-carbonochloridoylcyclohexane-1-carbonyl fluoride"),
+    ("O=C(Br)c1cc(C(=O)Cl)cc(C(=O)Cl)c1", "5-carbonobromidoylbenzene-1,3-dicarbonyl dichloride"),
+    ("O=C(Cl)c1ccc(CC(=O)Br)cc1", "4-(2-bromo-2-oxoethyl)benzoyl chloride"),
+    ("O=C(F)CCCC(=O)Cl", "pentanedioyl chloride fluoride"),
     # unchanged
     ("ClS(=O)(=O)c1ccc(S(=O)(=O)Cl)cc1", "benzene-1,4-disulfonyl dichloride"),
     ("CN(C)C(Cl)=O", "dimethylcarbamoyl chloride"),
@@ -60,7 +69,6 @@ def test_ring_acyl_halide_pins(smiles, name):
 
 
 @pytest.mark.parametrize("smiles", [
-    "O=C(Cl)c1ccc(C(=O)Br)cc1",          # two halogens: not built here
     "O=C(Cl)CC(CC(Cl)=O)c1ccc(C(Cl)=O)cc1",  # a chain with two groups is the parent
 ])
 def test_other_shapes_are_not_built_here(smiles):
@@ -75,3 +83,15 @@ def test_other_shapes_are_not_built_here(smiles):
 def test_no_chlorosulfonyl_prefix_on_a_junior_parent_at_any_tier():
     row = tier_row("O=S(=O)(Cl)c1ccc(S(=O)(=O)Nc2cccc3c(Cl)c[nH]c23)cc1", "best-effort")
     assert "sulfonamide" not in row["name"].split("-")[-1], row
+
+
+@pytest.mark.parametrize("smiles,name", [
+    # a label on the halogen of the class word ('benzoyl (18F)fluoride') is not read by OPSIN 2.9.0: the decorator's
+    # second skeleton names the group as a prefix (rules.isotope_alternative), below the PIN
+    ("[18F]C(=O)c1ccc(C(=O)Cl)cc1", "1-carbonochloridoyl-4-[(18F)fluoro(oxo)methyl]benzene"),
+    ("[37Cl]C(=O)c1ccc(C(=O)Br)cc1", "1-carbonobromidoyl-4-[(37Cl)chloro(oxo)methyl]benzene"),
+    ("[37Cl]C(=O)c1ccc(C)cc1", "1-[(37Cl)chloro(oxo)methyl]-4-methylbenzene"),
+])
+def test_label_on_the_class_word_halogen_keeps_a_name(smiles, name):
+    row = tier_row(smiles, "best-effort")
+    assert row["name"] == name and row["tier"] != "pin_verified", row

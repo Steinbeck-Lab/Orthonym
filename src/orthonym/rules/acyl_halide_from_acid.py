@@ -25,10 +25,17 @@ _ACID = re.compile(r"\bcarboxy\b|carboxylic acid|oic acid|ic acid$")
 
 def acyl_halide_from_acid(mol, combined: List[Tuple[tuple, str]]) -> Optional[str]:
     """'4-methylbenzoyl chloride' for ``mol`` whose acyl halide groups ``combined`` (``((C, O, X), symbol)`` each) carry
-    one halogen; the groups on ring carbons are the suffix, any others are prefixes ('3-chloro-3-oxopropyl') when no
-    branch holds more of them than the ring. None for any other case (mixed halogens, a carboxy group of the input's
-    own, an acid name whose suffix does not count every ring group)."""
-    if not combined or len({sym for _m, sym in combined}) != 1 or len(combined) > 4:
+    halogen each; the groups of the senior halogen on ring carbons are the suffix, any others are prefixes
+    ('3-chloro-3-oxopropyl', '4-carbonobromidoylbenzoyl chloride') when no branch holds more of them than the ring.
+    None for any other case (a carboxy group of the input's own, an acid name whose suffix does not count every ring
+    group)."""
+    from .isotope_alternative import alternative_skeleton_active
+    if not combined or alternative_skeleton_active():
+        return None                                  # the second skeleton of a labelled molecule (isotope_alternative)
+    # class 10 (the Blue Book): acid halides "in the order of the halogen atoms (-F > -Cl > -Br > -I)"
+    senior = min((sym for _m, sym in combined), key=list(_WORD).index)
+    combined = [(m, sym) for m, sym in combined if sym == senior]
+    if len(combined) > 4:
         return None
     if any(mol.GetAtomWithIdx(m[2]).GetIsotope() for m, _s in combined):
         return None                                  # a labelled halogen: the acid would lose the label

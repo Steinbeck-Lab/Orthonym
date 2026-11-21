@@ -49,8 +49,8 @@ def n_substituted_carboxamide(mol, start_idx: int, core_atoms: Set[int], chain_a
 
 def cites_n_prefixes(suffix_groups: Dict[str, List[int]]) -> bool:
     """True when the italic-N prefixes of the name belong to its suffix: a promoted amine, or exactly one carboxamide
-    (two carboxamides with N groups would need N and N' locants, which this producer does not write)."""
-    return bool(suffix_groups.get('amine')) or len(suffix_groups.get('carboxamide') or ()) == 1
+    or sulfonamide (two with N groups would need N and N' locants, which this producer does not write)."""
+    return bool(suffix_groups.get('amine')) or any(len(suffix_groups.get(k) or ()) == 1 for k in ('carboxamide', 'sulfonamide'))
 
 
 def _one_n_group_owner(mol, core_atoms: Set[int], several: bool = False) -> bool:

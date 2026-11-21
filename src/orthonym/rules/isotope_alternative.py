@@ -21,7 +21,10 @@ skeleton names that no candidate can pass, although another producer names the s
   diacetate',: one labelled anion among the others makes them unlike, and the Blue Book then cites the
   anions apart (method (1) of, 'ethane-1,2-diyl 1-acetate 2-propanoate'), a form OPSIN 2.9.0 does not
   read, so no candidate of it can be checked. The next producer names the groups as acyloxy prefixes (method (2),
-  "acceptable in general nomenclature"), which the decorator labels.
+  "acceptable in general nomenclature"), which the decorator labels;
+- an acyl halide on a ring named from its acid ('4-carbonochloridoylbenzoyl fluoride', ``rules.acyl_halide_from_acid``):
+  a label on the halogen of the class word ('benzoyl (18F)fluoride') is a form OPSIN 2.9.0 does not read, so the next
+  producer names the group as a prefix ('1-(18F)carbonofluoridoyl-4-[chloro(oxo)methyl]benzene').
 
 The namer then runs the decorator once more inside ``alternative_skeleton``, where those producers make no
 offer and the skeleton gets the name the next producer gives. Outside that block nothing changes.
@@ -35,8 +38,8 @@ _ACTIVE: "contextvars.ContextVar[bool]" = contextvars.ContextVar("orthonym_isoto
 
 @contextlib.contextmanager
 def alternative_skeleton():
-    """Name the skeleton without the series, senior-hub, multiplicative and multiplied-anion ester producers while this
-    block runs."""
+    """Name the skeleton without the series, senior-hub, multiplicative, multiplied-anion ester and ring acyl halide
+    producers while this block runs."""
     token = _ACTIVE.set(True)
     try:
         yield
@@ -53,10 +56,12 @@ def has_alternative(mol) -> bool:
     from .mononuclear_hydrides import _BELOW_HUB, _scan_senior_hubs
     from .multiplicative import name_multiplicative
     from .multiplicative_general import polyester_organyl_group_named
+    from rdkit import Chem
     try:
         return (identify_series(mol) is not None or bool(_scan_senior_hubs(mol, _BELOW_HUB))
                 or polyester_organyl_group_named(mol) or has_identical_acyloxy_groups(mol)
-                or name_multiplicative(mol) is not None)
+                or name_multiplicative(mol) is not None
+                or mol.HasSubstructMatch(Chem.MolFromSmarts("[CX3;!R](=O)([F,Cl,Br,I])[R]")))
     except Exception:  # noqa: BLE001 -- a skeleton these readers refuse has no alternative here
         return False
 

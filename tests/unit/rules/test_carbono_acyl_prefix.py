@@ -29,6 +29,14 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
     ("OC(=O)c1ccccc1C(Br)=S", "2-carbonobromidothioylbenzoic acid"),
     ("OC(=O)c1ccc(C(Cl)=O)cn1", "5-carbonochloridoylpyridine-2-carboxylic acid"),
     ("OC(=O)CCOC(Cl)=O", "3-(carbonochloridoyloxy)propanoic acid"),
+    # on a ring nitrogen under a ring acid: the acid 'piperidine-1-carboxylic acid' takes the suffix
+    # '-carboxylic acid', the Blue Book), so method (1) applies
+    ("O=C(O)C1CCN(C(=O)Cl)CC1", "1-carbonochloridoylpiperidine-4-carboxylic acid"),
+    ("O=C(O)C1CCCN1C(=O)Br", "1-carbonobromidoylpyrrolidine-2-carboxylic acid"),
+    ("O=C(O)C1CCN(C(=O)C#N)CC1", "1-carbonocyanidoylpiperidine-4-carboxylic acid"),
+    ("O=C(O)C1CCN(C(=S)Cl)CC1", "1-carbonochloridothioylpiperidine-4-carboxylic acid"),
+    ("COC(=O)C1CCN(C(=O)Cl)CC1", "methyl 1-carbonochloridoylpiperidine-4-carboxylate"),
+    ("CC(=O)N1CCCC1C(=O)O", "1-acetylpyrrolidine-2-carboxylic acid"),
     # on a chain: method (3), unchanged
     ("COC(=O)CCC(Cl)=O", "methyl 4-chloro-4-oxobutanoate"),
     ("OC(=O)C(C)C(Cl)=O", "3-chloro-2-methyl-3-oxopropanoic acid"),

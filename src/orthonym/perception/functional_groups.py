@@ -1212,6 +1212,15 @@ def _reclassify_classes(mol, results) -> None:
     _hydroxamic_acids_beside_amides(mol, results)
 
 
+#: classes ranks below a carboxamide (class 11 "in the order of the corresponding acids", the Blue Book:
+#: carbothioic and sulfonic acids after carboxylic; class 12 hydrazides) that the perception order puts above the
+#: hydroxamic acid; beside one of them the N-hydroxy amide is the principal group ('N-hydroxy-3-sulfamoylpropanamide')
+_BELOW_CARBOXAMIDE = ("thioamide", "selenoamide", "telluroamide", "primary_sulfonamide", "secondary_sulfonamide",
+                      "tertiary_sulfonamide", "sulfonimidamide", "selenonimidamide", "primary_sulfinamide",
+                      "secondary_sulfinamide", "tertiary_sulfinamide", "sulfinimidamide", "seleninimidamide",
+                      "sulfonohydrazide", "sulfinohydrazonohydrazide", "hydrazidine", "hydrazide", "thiohydrazide")
+
+
 def _hydroxamic_acids_beside_amides(mol, results) -> None:
     """``## ****...`` (the Blue Book): "Hydroxamic acids have the generic structure R-CO-NH-OH
     and are named as *N*-hydroxy amides". Beside another amide the hydroxamic acid is one more amide group of the
@@ -1224,7 +1233,8 @@ def _hydroxamic_acids_beside_amides(mol, results) -> None:
     hydroxamic = results.get("hydroxamic_acid") or []
     amides = [m for k in ("primary_amide", "secondary_amide", "tertiary_amide") for m in (results.get(k) or [])]
     acyl = {m[0] for m in hydroxamic} | {m[0] for m in amides}
-    joined = [m for m in hydroxamic if (_carbon_reach(mol, m[0]) & acyl) - {m[0]}]
+    joined = [m for m in hydroxamic if (_carbon_reach(mol, m[0]) & acyl) - {m[0]}
+              or any(results.get(k) for k in _BELOW_CARBOXAMIDE)]
     if joined:
         results["secondary_amide"] = sorted(set(results.get("secondary_amide") or []) | set(joined))
         results["hydroxamic_acid"] = [m for m in hydroxamic if m not in joined]

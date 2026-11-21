@@ -345,7 +345,8 @@ def _promoted_amine_anchor(mol, core_atoms: Set[int], principal_group: Optional[
 #: The suffix-type substituents of a polycyclic parent, senior first "Classes", the order
 #: of ``_SUFFIX_PRIORITY`` in:func:`name_substituted_polycyclic`, whose first five entries these
 #: are): acid, sulfonic acid, amide, nitrile, aldehyde.
-_PAH_SUFFIX_KINDS = ('carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde')
+_PAH_SUFFIX_KINDS = ('carboxylic acid', 'sulfonic acid', 'sulfinic acid', 'carboxamide', 'sulfonamide', 'carbonitrile',
+                     'carbaldehyde')
 
 
 def _senior_suffix_anchors(suffix_atoms: Set[int], suffix_kinds: Dict[int, Set[str]]) -> Set[int]:
@@ -988,6 +989,9 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
                 _queue.append(_ni)
     if (_n_amide := n_substituted_carboxamide(mol, start_idx, core_atoms, _frag_atoms, several=True)) is not None:
         return _n_amide                     # an N-aryl carboxamide too ('N-phenylnaphthalene-2-carboxamide')
+    from .pah_sulfur_groups import pah_sulfur_group     # sulfinic acid, sulfonamide ('N-phenyl...'); their prefixes
+    if symbol == 'S' and (_group := pah_sulfur_group(mol, start_idx, core_atoms, _frag_atoms)):
+        return _group
     _ring_info = mol.GetRingInfo()
     if any(_ring_info.NumAtomRings(a) > 0 for a in _frag_atoms):
         _frag_set = set(_frag_atoms)
@@ -1776,7 +1780,7 @@ def name_substituted_polycyclic(
         # Pick the highest-priority suffix: carboxylic acid > S-oxoacid >
         # amide > nitrile > aldehyde...).
         _SUFFIX_PRIORITY = [
-            'carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile',
+            'carboxylic acid', 'sulfonic acid', 'sulfinic acid', 'carboxamide', 'sulfonamide', 'carbonitrile',
             'carbaldehyde',
             # Phase C Task 10: `-ol` sits between the aldehyde and the amine in the
             # seniority order.
