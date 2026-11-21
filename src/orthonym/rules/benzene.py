@@ -46,6 +46,7 @@ from .hydroximic_acids import (
     name_imidic_on_benzene,
 )
 from ..assembly.straight_alkyl import straight_alkyl_name
+from ..assembly.sulfur_acid_group_prefix import ring_n_sulfonyl_group
 from ..assembly.strict_ring_prefix import acid_is_principal as _below_acid, chalcogen_rooted_acyl as _chalcogen_rooted, ketone_or_book_acyl_group as _thioacyl  # -C(=S)-R, then any -C(=O)-R
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
@@ -983,8 +984,8 @@ def _identify_suffix_fg_on_benzene(
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['n_sub_sulfonamide']):
             if match[0] == start_idx:
                 n_subs = _detect_sulfonamide_n_substituents(mol, start_idx, ring_atoms)
-                if n_subs is None:
-                    return {
+                if n_subs is None:              # a ring N under a senior group: '4-(pyrrolidine-1-sulfonyl)benzoic acid'
+                    return ring_n_sulfonyl_group(mol, start_idx, ring_atoms) or {
                         'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
                         'is_suffix': True, 'atoms': sub_atoms, 'unnameable': True,
                     }

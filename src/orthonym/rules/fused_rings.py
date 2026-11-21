@@ -3252,6 +3252,8 @@ def _identify_fused_substituent(
     halogen_names = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     if symbol == 'S' and (_s_suffix := fused_sulfur_suffix(mol, start_idx, excluded)) is not None:
         return _s_suffix                     # 'quinoline-8-sulfonyl chloride' (rules.fused_sulfur_suffix)
+    if symbol == 'S' and (_s_ring_n := ring_n_sulfonyl_group(mol, start_idx, excluded, 'functional')) is not None:
+        return _s_ring_n                     # '6-(pyrrolidine-1-sulfonyl)quinoline-2-carboxylic acid'
     if symbol in halogen_names:
         return {
             'name': halogen_names[symbol],
@@ -4318,6 +4320,7 @@ def _has_group_senior_to_hydroxy(mol) -> bool:
 # > "14 Nitriles" (:18187) > "15 Aldehydes" (:18188). (The list had the aldehyde
 # second; that never mattered while amides and nitriles were never suffixes.)
 from .fused_sulfur_suffix import FUSED_SUFFIX_PRIORITY as _FUSED_SUFFIX_PRIORITY, SULFUR_SUFFIX_CLASS, SULFUR_SUFFIX_PREFIX, fused_sulfur_suffix  # noqa: E402,E501
+from ..assembly.sulfur_acid_group_prefix import ring_n_sulfonamide, ring_n_sulfonyl_group  # noqa: E402
 
 
 def _fused_principal_locants(mol, substituents: Dict) -> List:
@@ -4466,7 +4469,7 @@ def _senior_group_outside_ring(mol, ring_atoms: Set[int]) -> Optional[str]:
             continue
         for inst in fgs.get(fg) or ():
             atoms = set(inst) if isinstance(inst, (tuple, list, set, frozenset)) else {inst}
-            if any(a not in inside and not _plain_carbon(a) for a in atoms):
+            if any(a not in inside and not _plain_carbon(a) for a in atoms) and not ring_n_sulfonamide(mol, fg, atoms):
                 return fg
     return None
 
