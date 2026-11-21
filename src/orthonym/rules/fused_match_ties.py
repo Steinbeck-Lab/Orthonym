@@ -6,11 +6,33 @@ together, at their locants (``:3346``; ``1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]
 from typing import Dict, List, Tuple
 
 
-def _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants, real: bool = False) -> List[Tuple[float, str]]:
+def _suffix_like(mol, frag, core_idx) -> bool:
+    """True when the fragment on core atom ``core_idx`` starts with an atom a suffix group starts with: a carbon with a
+    double bond to O, S, Se or N or a triple bond to N (carboxamide, acid, ester, aldehyde, nitrile; their (g) is read
+    from the prefixes on them, which the proxy has always stood in for), or an S, Se or P with a double bond to O."""
+    from rdkit import Chem
+    first = next((a for a in frag if mol.GetBondBetweenAtoms(a, core_idx) is not None), None)
+    if first is None:
+        return False
+    atom = mol.GetAtomWithIdx(first)
+    for b in atom.GetBonds():
+        o = b.GetOtherAtom(atom)
+        if o.GetIdx() == core_idx:
+            continue
+        if atom.GetSymbol() == 'C' and ((b.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() in ('O', 'S', 'Se', 'N'))
+                                        or (b.GetBondType() == Chem.BondType.TRIPLE and o.GetSymbol() == 'N')):
+            return True
+        if atom.GetSymbol() in ('S', 'Se', 'P') and b.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == 'O':
+            return True
+    return False
+
+
+def _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants, real=False) -> List[Tuple[float, str]]:
     """``(locant, name)`` of the exocyclic prefix on each substituent-bearing core atom under this match's
     numbering; an unnameable fragment falls back to a carbon-count / element-symbol proxy. The name of a
     fragment without a ring is that proxy (``ethyl`` for a 1-chloroethyl) unless ``real``: then every fragment is
-    named as it is cited, with its stereodescriptors, which (j) reads."""
+    named as it is cited, with its stereodescriptors, which (j) reads. ``real`` None: every fragment named except one
+    that starts like a suffix group (:func:`_suffix_like`), which keeps the proxy."""
     from ..assembly.naming_utils import get_alkyl_name
     from ..data.fused_heterocycles import _coerce_locant_for_compare, _loc_to_float
 
@@ -36,7 +58,8 @@ def _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants, real: bool =
                 if nb.GetIdx() not in seen:
                     stack.append(nb.GetIdx())
         name = None
-        if frag and (real or any(mol.GetAtomWithIdx(a).IsInRing() for a in frag)):
+        if frag and (real or any(mol.GetAtomWithIdx(a).IsInRing() for a in frag)
+                     or (real is None and not _suffix_like(mol, frag, mol_idx))):
             try:
                 attach = next(
                     (a for a in frag
@@ -45,8 +68,8 @@ def _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants, real: bool =
                     None,
                 )
                 if attach is not None:
-                    from ..assembly.substituent_enumerator import name_substituent
-                    name = name_substituent(mol, list(frag), attach)
+                    from ..assembly.substituent_enumerator import name_substituent_for_ordering
+                    name = name_substituent_for_ordering(mol, list(frag), attach)   # a sort key: no trace
             except Exception:
                 name = None
         if not name:
@@ -67,7 +90,10 @@ def match_tiers(mol, match, core_atoms, sub_atoms, iupac_locants) -> Dict[str, t
     from ..assembly.locant_omission import isotope_locant_key
     from ..assembly.naming_utils import alpha_sort_key, numbering_cip_key
     from ..data.fused_heterocycles import _coerce_locant_for_compare, _loc_to_float
-    prefixes = _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants)
+    # (g) reads the prefixes as cited: a carbon-count proxy sorted '3-oxobutyl' as 'butyl', before 'ethyl'
+    # ('8-ethyl-1-(3-oxobutyl)-9H-xanthen-9-one' for '1-ethyl-8-(3-oxobutyl)-...'); (:3477) alphabetizes the
+    # complete prefix name, and alpha_sort_key leaves out the stereodescriptors,:3446)
+    prefixes = _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants, real=None)
     alpha = sorted((alpha_sort_key(name), loc) for loc, name in prefixes)
     at = {}
     for pattern_idx, mol_idx in enumerate(match):
@@ -78,7 +104,6 @@ def match_tiers(mol, match, core_atoms, sub_atoms, iupac_locants) -> Dict[str, t
     from rdkit import Chem
     if (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
             or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds())):
-        prefixes = _prefix_names(mol, match, core_atoms, sub_atoms, iupac_locants, real=True)
         try:
             from ..perception.stereo import assign_stereochemistry
             assign_stereochemistry(mol)

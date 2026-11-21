@@ -1038,7 +1038,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # both benzo rings reflected (the atoms next to C9 labelled 4a/10a, those
     # next to N10 labelled 9a/8a), so a C4 substituent read as C1.
     'O=c1c2ccccc2[nH]c2ccccc12': {
-        'name': 'acridone',
+        'name': 'acridin-9(10H)-one',
         'tautomer_locant': 10,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,
@@ -1161,7 +1161,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # xanthone
     'O=c1c2ccccc2oc2ccccc12': {
-        'name': 'xanthone',
+        'name': '9H-xanthen-9-one',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,
@@ -1173,7 +1173,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # thioxanthone
     'O=c1c2ccccc2sc2ccccc12': {
-        'name': 'thioxanthone',
+        'name': '9H-thioxanthen-9-one',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,

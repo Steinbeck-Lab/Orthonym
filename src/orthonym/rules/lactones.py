@@ -552,6 +552,40 @@ def _ring_system_seniority_key(mol, system, rings):
             g_counts)                                       # (g) earlier heteroatoms
 
 
+def _skeleton_and_multiple_bonds(mol, system):
+    """The skeleton of ring system ``system`` (canonical SMILES of its atoms with every bond single and no aromatic
+    flag) and its number of ring multiple bonds, a mancude ring counted as noncumulative double bonds."""
+    em = Chem.RWMol(mol)
+    Chem.Kekulize(em, clearAromaticFlags=True)
+    multiple = sum(1 for b in em.GetBonds() if b.GetBeginAtomIdx() in system and b.GetEndAtomIdx() in system
+                   and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE))
+    for b in em.GetBonds():
+        b.SetBondType(Chem.BondType.SINGLE)
+    for a in em.GetAtoms():
+        a.SetNoImplicit(False)
+        a.SetNumExplicitHs(0)
+        a.SetFormalCharge(0)
+        a.SetIsotope(0)                              # isotopes come later
+    fragment = Chem.MolFragmentToSmiles(em, atomsToUse=sorted(system), canonical=True)
+    # re-read: the fragment's atom ranks come from the whole molecule, so one ring prints two ways (C1CCCO1, C1CCOC1)
+    skeleton = Chem.MolToSmiles(Chem.MolFromSmiles(fragment, sanitize=False))
+    return skeleton, multiple
+
+
+def _more_multiple_bonds_on_same_skeleton(mol, system, other) -> bool:
+    """True when ring systems ``system`` and ``other`` have one skeleton (so cannot tell them apart) and
+    ``system`` has more multiple bonds: (the Blue Book) "The senior ring, ring system or principal
+    chain has the greater number of multiple bonds; for the purpose of this criterion, mancude rings or ring systems
+    are considered as consisting of noncumulative double bonds" (a 4H-1-benzopyran-4-one outranks a
+    2,3-dihydro-4H-1-benzopyran-4-one)."""
+    try:
+        sk_a, mb_a = _skeleton_and_multiple_bonds(mol, set(system))
+        sk_b, mb_b = _skeleton_and_multiple_bonds(mol, set(other))
+    except Exception:  # noqa: BLE001 -- undecidable: no tie-break
+        return False
+    return sk_a == sk_b and mb_a > mb_b
+
+
 def another_ring_ketone_system_is_senior(mol, lactone_ring, only=None) -> bool:
     """True when another ring system of ``mol`` carrying a ring carbonyl (a ketone or
     a pseudoketone: an exocyclic =O on a ring carbon) outranks the lactone's ring as
@@ -601,6 +635,8 @@ def another_ring_ketone_system_is_senior(mol, lactone_ring, only=None) -> bool:
             if n > n_home:
                 return True
             if n == n_home and _ring_system_seniority_key(mol, sy, rings) > key_home:
+                return True
+            if n == n_home and _more_multiple_bonds_on_same_skeleton(mol, sy, home):
                 return True
         return False
     except Exception:  # noqa: BLE001 -- undecidable: leave the label as it is

@@ -862,11 +862,12 @@ class TestPhase101NewEntries:
 
     @pytest.mark.unit
     def test_xanthone_exact_match(self):
-        """Xanthone should return correct retained name."""
+        """Xanthone gets its systematic name: retains no 'xanthone', so the PIN is the ketone of the
+        retained parent xanthene."""
         mol = Chem.MolFromSmiles('O=c1c2ccccc2oc2ccccc12')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == 'xanthone'
+        assert result[0] == '9H-xanthen-9-one'
 
     @pytest.mark.unit
     def test_xanthone_canonical_smiles_in_dict(self):
@@ -899,11 +900,11 @@ class TestPhase101NewEntries:
 
     @pytest.mark.unit
     def test_thioxanthone_exact_match(self):
-        """Thioxanthone should return correct retained name."""
+        """Thioxanthone gets its systematic name (as xanthone above)."""
         mol = Chem.MolFromSmiles('O=c1c2ccccc2sc2ccccc12')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == 'thioxanthone'
+        assert result[0] == '9H-thioxanthen-9-one'
 
     @pytest.mark.unit
     def test_thioxanthone_canonical_smiles_in_dict(self):

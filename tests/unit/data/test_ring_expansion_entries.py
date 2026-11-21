@@ -98,7 +98,7 @@ class TestAcridoneEntry:
 
     def test_name(self):
         can = _canonical('O=c1c2ccccc2[nH]c2ccccc12')
-        assert FUSED_HETEROCYCLE_DATA[can]['name'] == 'acridone'
+        assert FUSED_HETEROCYCLE_DATA[can]['name'] == 'acridin-9(10H)-one'  # retains no 'acridone'
 
     def test_parent_atoms(self):
         can = _canonical('O=c1c2ccccc2[nH]c2ccccc12')
