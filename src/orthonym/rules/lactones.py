@@ -552,7 +552,7 @@ def _ring_system_seniority_key(mol, system, rings):
             g_counts)                                       # (g) earlier heteroatoms
 
 
-def another_ring_ketone_system_is_senior(mol, lactone_ring) -> bool:
+def another_ring_ketone_system_is_senior(mol, lactone_ring, only=None) -> bool:
     """True when another ring system of ``mol`` carrying a ring carbonyl (a ketone or
     a pseudoketone: an exocyclic =O on a ring carbon) outranks the lactone's ring as
     the parent: more such carbonyl groups, or as many and senior by.
@@ -593,8 +593,8 @@ def another_ring_ketone_system_is_senior(mol, lactone_ring) -> bool:
         n_home = _carbonyls(home)
         key_home = _ring_system_seniority_key(mol, home, rings)
         for sy in systems:
-            if sy is home:
-                continue
+            if sy is home or (only is not None and sy != only):
+                continue                             # ``only``: the one system the caller would make the parent
             n = _carbonyls(sy)
             if not n:
                 continue
@@ -803,3 +803,24 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     if stereo_descriptors:
         name = f"{format_stereodescriptor_string(stereo_descriptors)}{name}"
     return name
+
+
+def lactone_outranked(features, ring_system, senior_system=()) -> bool:
+    """True when the principal group of ``features`` is an ester whose every match is a lactone of ``ring_system``
+    (ring carbon and ring oxygen) and another ring system with a ring carbonyl outranks it
+    (:func:`another_ring_ketone_system_is_senior`): lactones are named as heterocycles, pseudoketones of class 16 like
+    ketones, the Blue Book;,:29628), so the ring choice is, not the ester class
+    ('3-(2-oxomorpholin-3-yl)azepan-4-one', not '3-(4-oxoazepan-3-yl)morpholin-2-one')."""
+    if features.principal_group != 'ester' or not features.principal_group_atoms:
+        return False
+    system = set(ring_system)
+    mol = features.mol
+    if not any(set(r) == set(senior_system) for r in mol.GetRingInfo().AtomRings()):
+        return False                                 # a fused senior system is left to the ketone producers ('...xanthen-9-one')
+    for match in features.principal_group_atoms:
+        atoms = set(match) if isinstance(match, (tuple, list, set, frozenset)) else {match}
+        ring_atoms = {a for a in atoms if mol.GetAtomWithIdx(a).IsInRing()}
+        if not any(mol.GetAtomWithIdx(a).GetSymbol() == 'O' for a in ring_atoms & system) or not any(
+                mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms & system):
+            return False
+    return another_ring_ketone_system_is_senior(mol, system, only=set(senior_system))

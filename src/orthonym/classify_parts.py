@@ -2,6 +2,7 @@
 cyclic classification with its ring assembly, PAH, senior ring, heterocyclic and carbocyclic steps, and the chain
 parent. Each takes the namer (``self``) and the features it fills in; a phase that ends the classification returns
 True. ``_classify`` calls them in its order."""
+from .rules.lactones import lactone_outranked
 from .namer import (Chem, _build_ring_info_for_parent_selection, _demote_offring_principal_group_matches,
                     build_atom_to_locant, classify_ring, find_principal_chain, get_ring_info, get_ring_systems,
                     orient_chain, suffix_heteroatoms)
@@ -411,7 +412,7 @@ def senior_ring_and_type(self, features, _principal_ring_system, atom_rings):
                 features.mol, senior_set,
                 features.principal_group_atoms,
                 features.principal_group,
-            )
+            ) or (pg_on_default and lactone_outranked(features, default_system, senior_set))
 
         # Guard (b) Phase-171 / CHEBI:59269: when the CHAIN is the
         # parent, both rings are mere substituents; reassigning
