@@ -788,6 +788,17 @@ def record_non_pin_label(fragment: str, rule: Optional[str] = None,
         _touch("non_pin_label_rules")
 
 
+def record_derived_non_pin_label(source: Optional[str], derived: Optional[str]) -> Optional[str]:
+    """Record ``derived`` as a label-only non-PIN part (see ``_NON_PIN_LABELS``) when ``source`` contains a recorded
+    one, and return ``derived``: the input's stereodescriptors placed on ``source`` keep its label, since the recorded
+    substring does not survive the splice ('6-[(1S)-1-(4-oxo-...-benzopyran-2-yl)ethyl]-...pyran-2-one')."""
+    if source and derived:
+        _log_non_pin(PROVENANCE_READ)
+        if any(f in source for f in _NON_PIN_LABELS.get()):
+            record_non_pin_label(derived)
+    return derived
+
+
 #: The rule and the reason of the label-only record of a name whose parent prefixes are cited out of the
 #: order (:func:`record_prefix_order_name`).
 PREFIX_ORDER_RULE = "P-14.5"

@@ -680,7 +680,7 @@ def name_tier_a_ring(
             # Lactone safety net.
             from ...rules.lactones import (
                 is_monocyclic_lactone,
-                name_monocyclic_lactone,
+                lactone_parent_checked, name_monocyclic_lactone,
             )
             from .lactone import _has_separate_senior_group
             lactone_info = is_monocyclic_lactone(features.mol)
@@ -706,7 +706,7 @@ def name_tier_a_ring(
                         atom_to_locant_hint=None,
                     )
             # Heterocycle candidate push.
-            hetero_name = _assemble_heterocycle_name(features, style)
+            hetero_name = lactone_parent_checked(features, _assemble_heterocycle_name(features, style))
             if hetero_name:
                 _tier_a_pool.add(
                     hetero_name, 'heterocycle', features,

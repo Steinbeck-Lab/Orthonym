@@ -805,17 +805,18 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     return name
 
 
-def lactone_outranked(features, ring_system, senior_system=()) -> bool:
+def lactone_outranked(features, ring_system, senior_system=None) -> bool:
     """True when the principal group of ``features`` is an ester whose every match is a lactone of ``ring_system``
     (ring carbon and ring oxygen) and another ring system with a ring carbonyl outranks it
     (:func:`another_ring_ketone_system_is_senior`): lactones are named as heterocycles, pseudoketones of class 16 like
     ketones, the Blue Book;,:29628), so the ring choice is, not the ester class
-    ('3-(2-oxomorpholin-3-yl)azepan-4-one', not '3-(4-oxoazepan-3-yl)morpholin-2-one')."""
+    ('3-(2-oxomorpholin-3-yl)azepan-4-one', not '3-(4-oxoazepan-3-yl)morpholin-2-one'). ``senior_system`` is the one
+    ring the caller would make the parent; None asks about any ring system."""
     if features.principal_group != 'ester' or not features.principal_group_atoms:
         return False
     system = set(ring_system)
     mol = features.mol
-    if not any(set(r) == set(senior_system) for r in mol.GetRingInfo().AtomRings()):
+    if senior_system is not None and not any(set(r) == set(senior_system) for r in mol.GetRingInfo().AtomRings()):
         return False                                 # a fused senior system is left to the ketone producers ('...xanthen-9-one')
     for match in features.principal_group_atoms:
         atoms = set(match) if isinstance(match, (tuple, list, set, frozenset)) else {match}
@@ -823,4 +824,17 @@ def lactone_outranked(features, ring_system, senior_system=()) -> bool:
         if not any(mol.GetAtomWithIdx(a).GetSymbol() == 'O' for a in ring_atoms & system) or not any(
                 mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms & system):
             return False
-    return another_ring_ketone_system_is_senior(mol, system, only=set(senior_system))
+    return another_ring_ketone_system_is_senior(mol, system, only=None if senior_system is None else set(senior_system))
+
+
+def lactone_parent_checked(features, name):
+    """Return ``name``, recorded below the PIN when its parent ring (``features.principal_ring``) holds the lactone and
+    another ring system with a ring carbonyl outranks it, the Blue Book; (d),:19415).
+    The unsaturated lactone rings that:func:`is_monocyclic_lactone` leaves to the heterocycle producer come here:
+    '6-(4-oxo-3,4-dihydro-2H-1-benzopyran-2-yl)-5,6-dihydro-2H-pyran-2-one' is not the PIN, the 1-benzopyran has more
+    rings; '6-(4-oxocyclohexyl)-5,6-dihydro-2H-pyran-2-one' keeps its label, a heterocycle outranks a carbocycle
+    (a),:19412)."""
+    if name and lactone_outranked(features, getattr(features, 'principal_ring', None) or ()):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name)
+    return name

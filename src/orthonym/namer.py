@@ -1991,8 +1991,7 @@ def _try_compose_input_stereo(
     is exactly the numbering the composed name is read back with.
 
     Returns the composed name ONLY when it recomputes to ``in_key`` (the input's full
-    InChIKey) — the identical 0-wrong bar this gate applies to every other RT-verified
-    emission. A genuine stereo-CONFLICT (wrong stereo) never composes to ``in_key``,
+    InChIKey), the 0-wrong bar this gate applies to every other RT-verified emission. A genuine stereo-CONFLICT (wrong stereo) never composes to ``in_key``,
     so it returns None and the caller suppresses as before. Returns None (never
     raises) on any OPSIN/RDKit unavailability -> the caller suppresses (fail-closed).
 
@@ -2008,6 +2007,7 @@ def _try_compose_input_stereo(
             return None
         from .rules.prefix_stereo import composed_reads_back, place_stereo_by_scope, scoped_over_front
         from .rules.stereochemistry import inject_stereo_reanchored_rt_gated
+        from .metrics.provenance import record_derived_non_pin_label
         composed = scoped_over_front(inject_stereo_reanchored_rt_gated(    # a substituent's descriptor: its prefix
             flat_name, mol, None, input_smiles=smiles), flat_name, smiles, in_key)
         if not composed or composed == flat_name or not composed_reads_back(composed, smiles, in_key):
@@ -2016,7 +2016,7 @@ def _try_compose_input_stereo(
             composed = place_stereo_by_scope(flat_name, smiles) if place_by_scope else None
             if not composed or not composed_reads_back(composed, smiles, in_key):
                 return None  # nothing composed (conflict / no OPSIN locant map)
-        return composed  # stereo composed AND full-key-verified == input
+        return record_derived_non_pin_label(flat_name, composed)  # full-key-verified == input
     except Exception as _exc:
         # Fail-closed (0-wrong): any OPSIN/RDKit unavailability -> the caller
         # suppresses. Log it (a review -P2 M3) so a silent self-disable from a
