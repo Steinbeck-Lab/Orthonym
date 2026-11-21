@@ -3249,12 +3249,9 @@ def _identify_fused_substituent(
     symbol = start_atom.GetSymbol()
 
     # Halogens
-    halogen_names = {
-        'F': 'fluoro',
-        'Cl': 'chloro',
-        'Br': 'bromo',
-        'I': 'iodo',
-    }
+    halogen_names = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    if symbol == 'S' and (_s_suffix := fused_sulfur_suffix(mol, start_idx, excluded)) is not None:
+        return _s_suffix                     # 'quinoline-8-sulfonyl chloride' (rules.fused_sulfur_suffix)
     if symbol in halogen_names:
         return {
             'name': halogen_names[symbol],
@@ -4320,7 +4317,7 @@ def _has_group_senior_to_hydroxy(mol) -> bool:
 # (the Blue Book) "7 Acids" (:18172) > "11 Amides" (:18184)
 # > "14 Nitriles" (:18187) > "15 Aldehydes" (:18188). (The list had the aldehyde
 # second; that never mattered while amides and nitriles were never suffixes.)
-_FUSED_SUFFIX_PRIORITY = ['carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde']
+from .fused_sulfur_suffix import FUSED_SUFFIX_PRIORITY as _FUSED_SUFFIX_PRIORITY, SULFUR_SUFFIX_CLASS, SULFUR_SUFFIX_PREFIX, fused_sulfur_suffix  # noqa: E402,E501
 
 
 def _fused_principal_locants(mol, substituents: Dict) -> List:
@@ -4429,7 +4426,7 @@ _SUFFIX_EXPRESSED_CLASS = {
     'carbaldehyde': 'aldehyde',
     'one': 'ketone',
     'ol': 'primary_alcohol',
-    'amine': 'hydroxylamine',
+    'amine': 'hydroxylamine', **SULFUR_SUFFIX_CLASS,
 }
 
 
@@ -4759,7 +4756,7 @@ def _assemble_fused_heterocycle_name(
             'carboxylic acid': 'carboxy',
             'carbaldehyde': 'formyl',
             'carboxamide': 'carbamoyl',
-            'carbonitrile': 'cyano',
+            'carbonitrile': 'cyano', **SULFUR_SUFFIX_PREFIX,
         }
 
         chosen_suffix = None

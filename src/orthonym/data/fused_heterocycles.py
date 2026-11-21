@@ -1023,9 +1023,11 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 14,
         'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '10a', 4: '6a', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4, 10: 3, 11: 2, 12: 1, 13: '10b'},
     },
-    # 9H-beta-carboline
+    # 9H-pyrido[3,4-b]indole (beta-carboline): 'beta-carboline' is no retained name in
+    # (the Blue Book-11718, 0 hits for 'carboline'), so the PIN is the fusion name; its numbering is the
+    # carbazole-like one of beta-carboline ('7-methoxy-1-methyl-9H-pyrido[3,4-b]indole', harmine)
     'c1ccc2c(c1)[nH]c1cnccc12': {
-        'name': '9H-beta-carboline',
+        'name': '9H-pyrido[3,4-b]indole',
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,

@@ -121,8 +121,8 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
     # with anthracene/phenanthrene at (a) as fixed) and carbazole (entry
     # 6, "special numbering"); both number all skeletal atoms without the
     # systematic peripheral walk's choice (purine: fusion C at 4,5 not 4a/9a;
-    # carbazole: NH at 9, fusion 4a/4b/8a/9a). beta-carboline (the retained
-    # name for 9H-pyrido[3,4-b]indole) uses carbazole's exact numbering pattern.
+    # carbazole: NH at 9, fusion 4a/4b/8a/9a). 9H-pyrido[3,4-b]indole (beta-carboline,
+    # no retained name in Table 2.8) uses carbazole's exact numbering pattern.
     # SMILES + locants are OPSIN ``-o extendedsmi $_AV`` (authoritative).
     (
         '7H-purine',
@@ -135,7 +135,7 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
         ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9', '9a'),
     ),
     (
-        '9H-beta-carboline',
+        '9H-pyrido[3,4-b]indole',
         'C1=NC=CC=2C3=CC=CC=C3NC12',
         ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9', '9a'),
     ),

@@ -525,6 +525,8 @@ _RING_OOH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2;+0][OX2H1;+0]')
 # only when no multiplying prefix intervenes (a)): the Blue Book prints
 # BOTH `naphthalen-4a(2H)-ol (PIN)` and `naphthalene-4a,8a-diol (PIN)`
 # (the Blue Book).
+from .partial_sat_group_suffix import GROUP_SUFFIX, group_pcg_atoms  # noqa: E402
+
 _PARTIAL_SAT_PCG_SUFFIX = {
     'carboxylic_acid': ('carboxylic acid', False),
     'ol': ('ol', True),
@@ -533,10 +535,21 @@ _PARTIAL_SAT_PCG_SUFFIX = {
     # A vowel-initial suffix, so it elides the parent's terminal 'e'
     # (`naphthalen-1-amine`); a multiplied form keeps it (`naphthalene-1,5-diamine`).
     'amine': ('amine', True),
+    **{kind: (word, False) for kind, word in GROUP_SUFFIX.items()},
 }
 
 
-def _partial_sat_pcg(
+def _partial_sat_pcg(mol, fused_ring_atoms: Set[int]) -> Tuple[Optional[str], Set[int]]:
+    """The scoped suffixes below, else the principal group as a ring suffix ('-carbonitrile', '-sulfonyl chloride';
+    ``partial_sat_group_suffix.group_pcg``)."""
+    found = _partial_sat_pcg_scoped(mol, fused_ring_atoms)
+    if found[0]:
+        return found
+    from .partial_sat_group_suffix import group_pcg
+    return group_pcg(mol, fused_ring_atoms)
+
+
+def _partial_sat_pcg_scoped(
     mol, fused_ring_atoms: Set[int]
 ) -> Tuple[Optional[str], Set[int]]:
     """The SENIOR ring principal-characteristic-group of a partially-saturated
@@ -664,6 +677,8 @@ def _partial_sat_pcg_exocyclic_atoms(
     out: Set[int] = set()
     if not pcg_kind or not pcg_ring_atoms:
         return out
+    if pcg_kind in GROUP_SUFFIX:
+        return group_pcg_atoms(mol, pcg_ring_atoms)
     for rc in pcg_ring_atoms:
         for n in mol.GetAtomWithIdx(rc).GetNeighbors():
             if n.GetIdx() in ring_set:

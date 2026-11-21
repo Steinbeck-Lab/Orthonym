@@ -17,10 +17,14 @@ pytestmark = pytest.mark.opsin_gate
 # (smiles, best-effort name) -- each read back by a fresh OPSIN call to the full InChIKey.
 # The 'a' chain each had before is in the comment.
 NAMED = [
+    # change-asserted-value (lane/ps): the sulfonic acid is now the suffix of the fused parent (rules.fused_sulfur_suffix):
+    # (the Blue Book) suffix mode for sulfonic acids, (:18162) acids (7a) above ketones (16),
+    # so the ring C=O is 'oxo'; it was '1-amino-2,4-dihydroxy-9,10-dioxo-3-sulfo-9,10-dihydroanthracene', a name citing the
+    # principal group as a prefix. Read back below by ``assert_full_rt``; mutation: fails on lane/ah (no fused sulfur suffix).
     ("Nc1c(O)c(S(=O)(=O)O)c(O)c2c1C(=O)c1ccccc1C2=O",
-     "1-amino-2,4-dihydroxy-9,10-dioxo-3-sulfo-9,10-dihydroanthracene"),   # 3-(1,1-dioxo-2-oxa-1λ6-thiaethyl)
+     "4-amino-1,3-dihydroxy-9,10-dioxo-9,10-dihydroanthracene-2-sulfonic acid"),
     ("Nc1c(O)c(S(=O)(=O)[O-])c(O)c2c1C(=O)c1ccccc1C2=O",
-     "1-amino-2,4-dihydroxy-9,10-dioxo-3-sulfonato-9,10-dihydroanthracene"),  # 3-(1-oxido-1-oxo-2-oxa-1-thiaeth-1-en-1-yl)
+     "4-amino-1,3-dihydroxy-9,10-dioxo-9,10-dihydroanthracene-2-sulfonate"),
     # change-asserted-value (lane/l17 fix a performance pass; it already failed at c302d83df4, from item 12): the old name was
     # 'N-[2-(sulfooxy)ethyl]acetamide' (before that N-(4,4-dioxo-3,5-dioxa-4λ6-thiapentyl)). (the Blue Book):
     # "9 Esters" (:18182) above "11 Amides" (:18184); (:35916) 'methyl hydrogen sulfate (PIN)' (:35968); the amide is

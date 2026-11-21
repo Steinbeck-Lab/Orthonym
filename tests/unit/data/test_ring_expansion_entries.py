@@ -66,10 +66,11 @@ class TestBetaCarbolineEntry:
         can = _canonical('c1ccc2c(c1)[nH]c1cnccc12')
         assert can in FUSED_HETEROCYCLE_DATA
 
-    def test_name_contains_carboline(self):
+    def test_name_is_the_fusion_name(self):
+        # 'beta-carboline' is no retained name in (the Blue Book-11718): the fusion name is
+        # the PIN
         can = _canonical('c1ccc2c(c1)[nH]c1cnccc12')
-        name = FUSED_HETEROCYCLE_DATA[can]['name']
-        assert 'carboline' in name.lower()
+        assert FUSED_HETEROCYCLE_DATA[can]['name'] == '9H-pyrido[3,4-b]indole'
 
     def test_parent_atoms(self):
         can = _canonical('c1ccc2c(c1)[nH]c1cnccc12')

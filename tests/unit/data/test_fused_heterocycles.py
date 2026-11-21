@@ -1165,7 +1165,7 @@ class TestPhase101EndToEndNaming:
             pytest.param("c1ccc2c(c1)COc1ccccc1-2", "6H-dibenzo[b,d]pyran", None, id="c1ccc2c(c1)COc1ccccc1-2"),
             pytest.param("c1ccc2c(c1)NCCN2", "1,2,3,4-tetrahydroquinoxaline", None, id="c1ccc2c(c1)NCCN2"),
             pytest.param("c1ccc2c(c1)OCCO2", "2,3-dihydro-1,4-benzodioxine", None, id="c1ccc2c(c1)OCCO2"),
-            pytest.param("c1ccc2c(c1)[nH]c1cnccc12", "9H-beta-carboline", None, id="c1ccc2c(c1)[nH]c1cnccc12"),
+            pytest.param("c1ccc2c(c1)[nH]c1cnccc12", "9H-pyrido[3,4-b]indole", None, id="c1ccc2c(c1)[nH]c1cnccc12"),
             pytest.param("c1ccc2c(c1)c1ccccc1c1ccccc21", "triphenylene", None, id="c1ccc2c(c1)c1ccccc1c1ccccc21"),
             pytest.param("c1ccc2c(c1)ccc1sccc12", "naphtho[2,1-b]thiophene", None, id="c1ccc2c(c1)ccc1sccc12"),
             pytest.param("c1ccc2c(c1)oc1ccccc12", "dibenzo[b,d]furan", None, id="c1ccc2c(c1)oc1ccccc12"),

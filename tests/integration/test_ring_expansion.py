@@ -60,8 +60,10 @@ class TestFusedHeterocycleNaming:
         assert not _has_vb_notation(name)
 
     def test_beta_carboline(self):
+        # 'beta-carboline' is no retained name in (the Blue Book-11718): the PIN is the
+        # fusion name (data/fused_heterocycles.py marks the catalog name non_pin)
         name = name_compound("c1ccc2c(c1)[nH]c1cnccc12")
-        assert "carboline" in name.lower()
+        assert name == "9H-pyrido[3,4-b]indole"
         assert not _has_vb_notation(name)
 
     def test_acridone(self):
