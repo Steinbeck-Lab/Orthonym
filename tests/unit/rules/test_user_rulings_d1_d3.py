@@ -181,7 +181,7 @@ D3_CONTROL_ROWS = [
     ("CS(N)(=O)=O", "methanesulfonamide"),                           #:32752
     ("CS(=O)(=O)NO", "N-hydroxymethanesulfonamide"),                 #:38338
     ("CS(=O)(=O)Nc1ccccc1", "N-phenylmethanesulfonamide"),
-    ("CS(=O)(=O)NC(C)=O", "N-acetylmethanesulfonamide"),
+    ("CS(=O)(=O)NCC", "N-ethylmethanesulfonamide"),
     ("ClCN", "1-chloromethanamine"),
 ]
 # The decomposition paths assemble an N-substituted sulfonamide from a fragment name,
@@ -191,6 +191,11 @@ D3_NOT_PIN_ROWS = [
     ("FC(F)(F)S(N)(=O)=O", "trifluoromethanesulfonamide"),
     ("FC(F)(F)S(=O)(=O)Nc1ccccc1", "N-phenyltrifluoromethanesulfonamide"),
     ("ClCS(=O)(=O)NC(C)=O", "N-acetylchloromethanesulfonamide"),
+    # rule-derived, no Blue Book example of an acyl sulfonamide (change-asserted-value, unverified):
+    # (the Blue Book) names R-CO-NH-SO2-R' as an N-acyl derivative of the senior primary amide, and amides
+    # rank "in the order of the corresponding acids" (:18184), so the carboxamide is the parent
+    # ('N-(methanesulfonyl)acetamide'); it was the control row 'N-acetylmethanesulfonamide' labelled PIN
+    ("CS(=O)(=O)NC(C)=O", "N-acetylmethanesulfonamide"),
     ("ClCS(=O)(=O)NO", "N-hydroxychloromethanesulfonamide"),
     ("ClCS(=O)(=O)Nc1ccccc1", "N-phenylchloromethanesulfonamide"),
 ]

@@ -1347,6 +1347,21 @@ def _pg_free_unit_multiplicative_expected(mol) -> bool:
         return False
 
 
+def acyl_sulfonamide_named_as_sulfonamide(mol, name: str) -> bool:
+    """True when ``name`` ends in 'sulfonamide' for a molecule with an acyclic R-CO-N-SO2 group, R a carbon or H ('N-acetyl-4-
+    aminobenzene-1-sulfonamide'). 'Secondary and tertiary amides' (the Blue Book): "(R-CO)2NH,
+    (R-SO2)2NH, etc.... are named as N-acyl derivatives of the senior primary amide" ('N-acetylbenzamide (PIN)',
+    :33111), and amides rank "in the order of the corresponding acids",:18184), carboxylic before
+    sulfonic (:18172): the carboxamide is the parent ('N-(4-aminobenzene-1-sulfonyl)acetamide'), so a sulfonamide-
+    suffixed name is not the PIN. Carbamoyl and alkoxycarbonyl groups on the nitrogen (sulfonylureas, carbamates) derive
+    from carbonic acid (class 7b, below the sulfonic acids) and are not read here."""
+    from rdkit import Chem
+    if not name or not name.rstrip(" )]}").endswith("sulfonamide"):
+        return False
+    # the acyl group of a carboxylic acid: R a carbon, or H (formic acid, 'formamide (PIN)':32703)
+    return mol.HasSubstructMatch(Chem.MolFromSmarts("[CX3;!R;$([CH1]),$(C[#6])](=O)[NX3][SX4](=O)=O"))
+
+
 def multiplicative_pin_expected(mol) -> bool:
     """True when the molecule's PIN is a multiplicative name (or an 'a' or phane name
     that takes its place,, the Blue Book), so no substitutive name built

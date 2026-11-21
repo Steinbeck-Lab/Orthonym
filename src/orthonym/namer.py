@@ -6063,16 +6063,16 @@ class Orthonym:
         # correct systematic name that is not the PIN, on every route that built it
         # (the first run included): systematic_verified, is_pin False. The default
         # tier then declines it; the wider tiers keep it.
-        # The routes (carbohydrates, natural products, peptides, lipids) name
-        # by their own nomenclature, not by parent selection; their labels are
-        # the natural-product decision's (plan Task 32), so they are not read here.
+        # The routes name by their own nomenclature (labels: plan Task 32), not read here.
         if tier == PIN_VERIFIED and name and not is_failure_name(name):
             _mult_cls = getattr(self, "_last_dispatch_class", None)
-            if getattr(_mult_cls, "name", None) not in (
+            from .rules.pin_vocabulary import multiplicative_pin_expected, acyl_sulfonamide_named_as_sulfonamide
+            if acyl_sulfonamide_named_as_sulfonamide(Chem.MolFromSmiles(smiles), name):
+                tier, is_pin = SYSTEMATIC_VERIFIED, False     #: the carboxamide is the parent
+            elif getattr(_mult_cls, "name", None) not in (
                     "MULTIPLICATIVE", "CARBOHYDRATE_LOOKUP", "NATURAL_PRODUCT",
                     "PEPTIDE", "LIPID", "SKELETAL_REPLACEMENT", "INORGANIC_ACID",
                     "RETAINED_NAME", "AMINO_ACID"):
-                from .rules.pin_vocabulary import multiplicative_pin_expected
                 _mol_mult = Chem.MolFromSmiles(smiles)
                 if _mol_mult is not None and multiplicative_pin_expected(_mol_mult):
                     tier = SYSTEMATIC_VERIFIED
