@@ -115,6 +115,33 @@ def _plain(atom) -> bool:
     return not _oxo_like(atom) and not any(_oxo_like(n) for n in atom.GetNeighbors())
 
 
+#: a carboxylic acid, its ester, acid halide or anhydride: a group senior to an amide,:18162), so
+#: no amide group is the principal characteristic group
+_SENIOR_TO_AMIDE = Chem.MolFromSmarts("[CX3;$(C[#6])](=O)[OX2,F,Cl,Br,I]")
+
+
+def _amide_nitrogen(atom) -> bool:
+    """The nitrogen of a plain amide: neutral, acyclic, every bond single, every neighbour a
+    carbon, and exactly one of them a C=O carbon whose other heavy neighbour is one carbon (no urea, carbamate,
+    imide, hydrazide or hydroxamic acid)."""
+    if (atom.GetSymbol() != "N" or atom.GetFormalCharge() or atom.GetIsAromatic() or atom.IsInRing()
+            or atom.GetNumRadicalElectrons() or any(b.GetBondType() != _SINGLE for b in atom.GetBonds())
+            or any(n.GetSymbol() != "C" for n in atom.GetNeighbors())):
+        return False
+    acyl = []
+    for n in atom.GetNeighbors():
+        oxo = [b for b in n.GetBonds() if b.GetBondType() == _DOUBLE and b.GetOtherAtom(n).GetSymbol() == "O"]
+        if oxo:
+            others = [x for x in n.GetNeighbors() if x.GetIdx() != atom.GetIdx()
+                      and x.GetIdx() != oxo[0].GetOtherAtom(n).GetIdx()]
+            if len(others) != 1 or others[0].GetSymbol() != "C" or n.GetDegree() != 3:
+                return False
+            acyl.append(n)
+        elif _oxo_like(n):
+            return False
+    return len(acyl) == 1
+
+
 def _run_units(run) -> Optional[int]:
     """The heterounits of a run of consecutive heteroatoms (the element symbols), or None for a run that is not
     read: one atom is one unit; two are one when they are the same element ('disulfanediyl') and two when not;
@@ -200,7 +227,7 @@ def _acyl_group(mol, comp) -> bool:
     return len(near) <= 2 and all(a.GetIdx() in near for a in atoms if a.GetSymbol() in ("N", "O"))
 
 
-def _kind(mol, path, host, root):
+def _kind(mol, path, host, root, amides_skeletal: bool = False):
     """What hangs from the path atom ``host`` at ``root`` (the neighbour that is not on the path): one of
     'halogen', 'OH', '=O', 'SH', 'NH2', 'alkyl' (carbon and halogen atoms only), 'NHR' (an NHR or NR2 amine with
     saturated carbon parts), 'acyl', or None for anything else. The leaves stand on a path carbon, an acyl group on an end atom of the path."""
@@ -234,6 +261,9 @@ def _kind(mol, path, host, root):
         return "NHR"
     if host in (path[0], path[-1]) and _acyl_group(mol, comp):
         return "acyl"
+    # an acylamino group on a path carbon when an amide is no principal group ('7,14,21,28-tetraacetamido',:23428)
+    if amides_skeletal and on_carbon and _amide_nitrogen(first) and _acyl_group(mol, comp - {root}):
+        return "acylamino"
     return None
 
 
@@ -254,7 +284,26 @@ def _n_policy_ok(mol, path, hung) -> bool:
             and all(mol.GetAtomWithIdx(i).GetDegree() == 2 for i in nitrogens))
 
 
-def _is_a_chain(mol, path) -> bool:
+def _senior_groups_at_ends(mol, path, senior) -> bool:
+    """Every group senior to amides (the carbonyl carbons ``senior``) stands at an end of ``path``, one at most per
+    end: on the end atom itself or in an acyl group hanging from it. A second one at an end, or one elsewhere, makes
+    a parent with more principal groups senior, the Blue Book, 'The senior parent structure has the
+    maximum number of substituents corresponding to the principal characteristic group (suffix)'): the diacid of an
+    N-acyl aspartic acid, whose junction nitrogen or oxygen is no chain atom:23430)."""
+    covered = 0
+    path_set = set(path)
+    for end in {path[0], path[-1]}:
+        here = 1 if end in senior else 0
+        for nb in mol.GetAtomWithIdx(end).GetNeighbors():
+            if nb.GetIdx() not in path_set:
+                here += len(_component(mol, nb.GetIdx(), path_set) & senior)
+        if here > 1:
+            return False
+        covered += here
+    return covered == len(senior)
+
+
+def _is_a_chain(mol, path, amides_skeletal: bool = False, senior=frozenset()) -> bool:
     units = _heterounits(mol, path)
     if units is None or units < 4:
         return False
@@ -264,11 +313,11 @@ def _is_a_chain(mol, path) -> bool:
         for nb in mol.GetAtomWithIdx(host).GetNeighbors():
             if nb.GetIdx() in path_set:
                 continue
-            kind = _kind(mol, path, host, nb.GetIdx())
+            kind = _kind(mol, path, host, nb.GetIdx(), amides_skeletal)
             if kind is None:
                 return False
             hung.append((host, kind))
-    return _n_policy_ok(mol, path, hung)
+    return _senior_groups_at_ends(mol, path, senior) and _n_policy_ok(mol, path, hung)
 
 
 def a_chain_applies(mol) -> bool:
@@ -280,14 +329,19 @@ def a_chain_applies(mol) -> bool:
         return False
     if len(Chem.GetMolFrags(mol)) != 1 or mol.GetNumBonds() != mol.GetNumAtoms() - 1:    # one fragment, no ring
         return False
-    plain = {a.GetIdx() for a in mol.GetAtoms() if _plain(a)}
+    # (:23405): with a group senior to amides present, an amide nitrogen of the chain is a skeletal atom
+    # and its C=O an 'oxo' prefix: 'methyl 7,14,21,28-tetraacetamido-2,9,16,23-tetraoxo-3,10,17,24-
+    # tetraazatriacontan-30-oate (PIN; an ester is senior to an amide or a ketone)' (:23428)
+    senior = frozenset(m[0] for m in mol.GetSubstructMatches(_SENIOR_TO_AMIDE))
+    amides_skeletal = bool(senior)
+    plain = {a.GetIdx() for a in mol.GetAtoms() if _plain(a) or (amides_skeletal and _amide_nitrogen(a))}
     if len(plain) < 4:
         return False
     carbons = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "C" and a.GetFormalCharge() == 0}
     allowed = carbons | plain
     ends = sorted(i for i in allowed
                   if i in carbons or mol.GetAtomWithIdx(i).GetSymbol() in _END_HETERO)
-    return any(_is_a_chain(mol, path) for path in _paths(mol, allowed, ends))
+    return any(_is_a_chain(mol, path, amides_skeletal, senior) for path in _paths(mol, allowed, ends))
 
 
 def _hanging_path(mol, ring_atoms, root):

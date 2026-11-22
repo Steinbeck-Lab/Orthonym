@@ -413,21 +413,36 @@ _PEPTIDE_CHAIN_CASES = [
      "methylheptanamido]propanamido}-3-hydroxy-5-phenylpentanoic acid"),
 ]
 
+# The first two chains hold four amide nitrogens under the acid: (the Blue Book) gives them a skeletal
+# replacement ('a') PIN, as for 'methyl 7,14,21,28-tetraacetamido-2,9,16,23-tetraoxo-3,10,17,24-tetraazatriacontan-30-
+# oate (PIN)',:23428). Orthonym builds no such name, so the '...amido' name (method (1) of
+# stands below the PIN (validation/spelling/checks_skeletal_chain.py). The third chain has four amide nitrogens too, but
+# the reader does not read a molecule with a ring (its benzyl branch), so its label stands: a known miss, not a PIN
+# claim of this test.
+_A_CHAIN_PEPTIDES = {smiles for smiles, _name in _PEPTIDE_CHAIN_CASES[:2]}
+
+
+def _peptide_tier(smiles):
+    return "systematic_verified" if smiles in _A_CHAIN_PEPTIDES else "pin_verified"
+
 
 @pytest.mark.parametrize("tier", ["valid", "complete", "best-effort"])
 @pytest.mark.parametrize("smiles,pin_name", _PEPTIDE_CHAIN_CASES)
 def test_inner_amides_take_the_amido_prefix(smiles, pin_name, tier):
     """ (:32995,:32998): every inner amide of the chain is cited as '...amido' (method (1))."""
     row = tier_row(smiles, tier)
-    assert (row["name"], row["tier"]) == (pin_name, "pin_verified"), row
+    assert (row["name"], row["tier"]) == (pin_name, _peptide_tier(smiles)), row
     assert_full_rt(row["name"], smiles)
 
 
 @pytest.mark.parametrize("smiles,pin_name", _PEPTIDE_CHAIN_CASES)
 def test_the_pin_tier_rows_are_unchanged_by_the_peptide_acyl_route(smiles, pin_name):
-    """The route acts on the wider tiers only: the PIN tier's own rows stand."""
+    """The route acts on the wider tiers only: the PIN tier's own rows stand (an 'a'-chain row has none)."""
     row = tier_row(smiles, "pin")
-    assert (row["name"], row["tier"]) == (pin_name, "pin_verified"), row
+    if smiles in _A_CHAIN_PEPTIDES:
+        assert row["tier"] == "abstain", row
+    else:
+        assert (row["name"], row["tier"]) == (pin_name, "pin_verified"), row
 
 
 @pytest.mark.parametrize("smiles,pin_name", _PEPTIDE_CHAIN_CASES)
@@ -438,7 +453,7 @@ def test_every_entry_point_gives_the_same_peptide_chain_name(smiles, pin_name):
     namer = _tiered_namer("pin", "best-effort")
     assert name_compound(smiles) == pin_name
     record = namer.name_with_confidence(smiles)
-    assert (record["name"], record["tier"]) == (pin_name, "pin_verified"), record
+    assert (record["name"], record["tier"]) == (pin_name, _peptide_tier(smiles)), record
     assert namer.name_tiered(smiles)["name"] == pin_name
 
 
