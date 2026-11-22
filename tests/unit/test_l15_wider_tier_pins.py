@@ -419,10 +419,21 @@ _PEPTIDE_CHAIN_CASES = [
 # phosphatetradecan-8-ium iodide (PIN)',:41789). Orthonym builds no such name, so the '...amido' name (method (1) of
 # stands below the PIN (validation/spelling/checks_skeletal_chain.py).
 _A_CHAIN_PEPTIDES = {smiles for smiles, _name in _PEPTIDE_CHAIN_CASES}
+#: the chains whose prefixes the 'a' writer names have their 'a' PIN built (rules/skeletal_chain.name_acyl_a_chain): its name is that
+_A_NAMES = {_PEPTIDE_CHAIN_CASES[0][0]: "2,5,8,11-tetraoxo-3,6,9,12-tetraazapentadecan-15-oic acid",
+           _PEPTIDE_CHAIN_CASES[1][0]: "(4S,7S)-2,5,8,11-tetraoxo-4,7-di(propan-2-yl)-3,6,9,12-tetraazapentadecan-15-oic acid",
+           _PEPTIDE_CHAIN_CASES[2][0]: ("(4S,7S,10S,11S,15S,18S,19S)-18-benzyl-11,19-dihydroxy-15-methyl-10-(2-methylpropyl)-"
+                                        "2,5,8,13,16-pentaoxo-4,7-di(propan-2-yl)-3,6,9,14,17-pentaazahenicosan-21-oic acid")}
 
 
 def _peptide_tier(smiles):
+    if smiles in _A_NAMES:
+        return "pin_verified"
     return "systematic_verified" if smiles in _A_CHAIN_PEPTIDES else "pin_verified"
+
+
+def _peptide_name(smiles, name):
+    return _A_NAMES.get(smiles, name)
 
 
 @pytest.mark.parametrize("tier", ["valid", "complete", "best-effort"])
@@ -430,7 +441,7 @@ def _peptide_tier(smiles):
 def test_inner_amides_take_the_amido_prefix(smiles, pin_name, tier):
     """ (:32995,:32998): every inner amide of the chain is cited as '...amido' (method (1))."""
     row = tier_row(smiles, tier)
-    assert (row["name"], row["tier"]) == (pin_name, _peptide_tier(smiles)), row
+    assert (row["name"], row["tier"]) == (_peptide_name(smiles, pin_name), _peptide_tier(smiles)), row
     assert_full_rt(row["name"], smiles)
 
 
@@ -438,7 +449,9 @@ def test_inner_amides_take_the_amido_prefix(smiles, pin_name, tier):
 def test_the_pin_tier_rows_are_unchanged_by_the_peptide_acyl_route(smiles, pin_name):
     """The route acts on the wider tiers only: the PIN tier's own rows stand (an 'a'-chain row has none)."""
     row = tier_row(smiles, "pin")
-    if smiles in _A_CHAIN_PEPTIDES:
+    if smiles in _A_NAMES:
+        assert (row["name"], row["tier"]) == (_A_NAMES[smiles], "pin_verified"), row
+    elif smiles in _A_CHAIN_PEPTIDES:
         assert row["tier"] == "abstain", row
     else:
         assert (row["name"], row["tier"]) == (pin_name, "pin_verified"), row
@@ -450,6 +463,7 @@ def test_every_entry_point_gives_the_same_peptide_chain_name(smiles, pin_name):
     from orthonym import name_compound
 
     namer = _tiered_namer("pin", "best-effort")
+    pin_name = _peptide_name(smiles, pin_name)
     assert name_compound(smiles) == pin_name
     record = namer.name_with_confidence(smiles)
     assert (record["name"], record["tier"]) == (pin_name, _peptide_tier(smiles)), record

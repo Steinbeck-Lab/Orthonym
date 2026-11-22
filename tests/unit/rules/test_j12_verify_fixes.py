@@ -22,8 +22,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CCCC[Li]",
     "CC[Zn]CC",
     "C[Mg]Br",
-    # a pentapeptide: four amide nitrogens in one chain under the acid, the Blue Book, 'a' PIN)
-    "N[C@H](C1CC1)C(=O)NCC(=O)N[C@@H](C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O",
 })
 
 
@@ -280,14 +278,12 @@ def test_enclosing_mark_continues_the_order_after_an_escalation(content, wrapped
 def test_pentapeptide_marks_follow_p16_5_4():
     smiles = ("N[C@H](C1CC1)C(=O)NCC(=O)N[C@@H](C)C(=O)N[C@@H](C(C)C)C(=O)"
               "N[C@@H](CC(C)C)C(=O)O")
-    expected = ("(2S)-2-{(2S)-2-[(2S)-2-{2-[(2R)-2-amino-2-cyclopropylacetamido]"
-                "acetamido}propanamido]-3-methylbutanamido}-4-methylpentanoic acid")
-    # (the Blue Book): four or more amide nitrogens in one chain under the acid call for a skeletal
-    # replacement ('a') PIN example:23428); user decision 2026-11-22 ('Blue Book wins' over the reading of
-    # decision A): the substitutive name stands below the PIN until the 'a' name is built.
+    # (the Blue Book): four amide nitrogens in one chain under the acid; the 'a' PIN is built
+    # (rules/skeletal_chain.name_acyl_a_chain; user decision 2026-11-22: such a peptide's 'a' name is its PIN).
+    expected = ("(2S,5S,8S,14R)-14-amino-14-cyclopropyl-8-methyl-2-(2-methylpropyl)-4,7,10,13-tetraoxo-5-(propan-2-yl"
+                ")-3,6,9,12-tetraazatetradecan-1-oic acid")
     r = _dt_row(smiles)
-    assert r["name"] == expected, r
-    assert r["tier"] == "systematic_verified", r
+    assert (r["name"], r["tier"]) == (expected, "pin_verified"), r
     assert name_is_rt_exact(expected, smiles), expected
 
 

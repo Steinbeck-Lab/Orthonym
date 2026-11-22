@@ -58,8 +58,9 @@ def test_n_acyl_aspartic_acid_keeps_the_pin():
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", [
-    BOOK_ESTER,
-    "CC(C)[C@@H](C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](C(C)C)C(=O)OC)NC(=O)C",
+    # a side chain outside the vocabulary of the 'a' writer (butan-2-yl): no PIN is built (the rows it builds are in
+    # tests/unit/rules/test_oligoamide_a_name.py)
+    "CC(=O)N[C@@H]([C@@H](C)CC)C(=O)N[C@@H]([C@@H](C)CC)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](C(C)C)C(=O)OC",
 ])
 def test_oligoamide_substitutive_name_is_below_the_pin(smiles):
     assert tier_row(smiles, "pin")["tier"] == "abstain"
@@ -107,8 +108,10 @@ def test_lactone_or_ring_acid_is_not_read(smiles):
     # no name of these is the PIN; (:50943) leaves the choice between the two others open. A chain
     # of retained residues takes the peptide name,:54698), a capped or non-standard one the substitutive
     # name,:54251) -- the Blue Book reading the user asked for, 2026-11-22
-    ("NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)O", "glycylglycylglycylglycylglycine"),
-    ("CC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)O", "{2-[2-(2-acetamidoacetamido)acetamido]acetamido}acetic acid"),
+    # (side chains outside the vocabulary of the 'a' writer, so no PIN is built: a butan-2-yl and a carbamoylethyl)
+    ("CC[C@H](C)[C@@H](C(=O)N[C@@H](C)C(=O)NCC(=O)N[C@@H](CCC(=O)N)C(=O)O)NC(=O)CN", "glycylisoleucylalanylglycylglutamine"),
+    ("CC(=O)N[C@@H]([C@@H](C)CC)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "(2-{2-[(2S,3S)-2-acetamido-3-methylpentanamido]acetamido}acetamido)acetic acid"),
 ])
 def test_which_non_pin_name_a_long_peptide_takes(smiles, name):
     row = tier_row(smiles, "best-effort")

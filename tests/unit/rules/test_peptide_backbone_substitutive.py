@@ -108,20 +108,15 @@ class TestBackboneSubstitutiveConverts:
         # (the Blue Book): four or more amide nitrogens in one chain under the acid call for a skeletal
         # replacement ('a') PIN example:23428); user decision 2026-11-22 ('Blue Book wins' over the reading of
         # decision A): the substitutive name stands below the PIN until the 'a' name is built.
-        result = declined_pin_row(smi)["name"]
-        assert not is_failure_name(result), result
-        # j7 (TRIAGE g3 C05): the whole chain is now named substitutively (nested amido
-        # prefixes, method (1) the Blue Book); OPSIN full-InChIKey exact.
-        # j12 (findings 2/4/7/8): the N-terminal acyl is the retained 'acetamido' with
-        # its locants:29725;:7304 "Locants are required
-        #... for example acetamide"), not '...ethanamido'; and the enclosing marks
-        # continue the "{[({})]}" order:7446) from the escalated
-        # '[(2S)-2-{...}propanamido]':7509): '{' around it, not '['.
-        assert result == (
-            "(2S)-2-{(2S)-2-[(2S)-2-{2-[(2R)-2-amino-2-cyclopropylacetamido]acetamido}"
-            "propanamido]-3-methylbutanamido}-4-methylpentanoic acid"
-        ), result
-        assert same_key(smi, result), result
+        # (the Blue Book): four amide nitrogens in one chain under the acid; the 'a' PIN is built
+        # (rules/skeletal_chain.name_acyl_a_chain; user decision 2026-11-22: such a peptide's 'a' name is its PIN).
+        # the substitutive name this producer builds stands below that PIN and no longer ships
+        from tests.support.pin_tiers import tier_row
+        row = tier_row(smi, "pin")
+        assert (row["name"], row["tier"]) == (
+            "(2S,5S,8S,14R)-14-amino-14-cyclopropyl-8-methyl-2-(2-methylpropyl)-4,7,10,13-tetraoxo-5-(p"
+            "ropan-2-yl)-3,6,9,12-tetraazatetradecan-1-oic acid", "pin_verified"), row
+        assert same_key(smi, row["name"]), row
 
 
 @pytest.mark.unit

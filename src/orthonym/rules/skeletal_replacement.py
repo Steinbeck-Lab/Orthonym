@@ -473,8 +473,14 @@ def _format_substituent_prefix(placed: List[Tuple[int, str]]) -> str:
 
 def _large_ring_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     """Gate 1 of ``try_skeletal_replacement_name`` for a molecule with rings:
-    the name of a large heteromonocycle by cyclic replacement, or ``None``.
+    the 'a' PIN of an acid chain of skeletal amide nitrogens whose rings are prefixes
+    (``skeletal_chain.name_acyl_a_chain``), else the name of a large heteromonocycle by
+    cyclic replacement, or ``None``.
     """
+    from .skeletal_chain import name_acyl_a_chain
+    acyl = name_acyl_a_chain(mol)
+    if acyl is not None:
+        return acyl
     # ----------------------------------------------------------------
     # Gate 1: Rings gate (IUPAC /
     # Chain replacement requires no rings, EXCEPT for large heterocyclic
