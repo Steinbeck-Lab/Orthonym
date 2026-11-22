@@ -491,7 +491,8 @@ def note_onium_a_chain(mol: Optional[Chem.Mol]) -> bool:
             return False
     if not words or any(b.GetBondType() != _SINGLE and not _carbon_bond(b) for b in mol.GetBonds()):
         return False
-    ends = [a.GetIdx() for a in mol.GetAtoms() if a.GetDegree() == 1 and a.GetSymbol() in {"C"} | _END_HETERO]
+    # a chain may end at any carbon (or end heteroatom): '-CH2-OH' ends at the carbon, the OH is a substituent
+    ends = [a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() in {"C"} | _END_HETERO]
     for i, start in enumerate(ends):
         for end in ends[i + 1:]:
             path = Chem.GetShortestPath(mol, start, end)

@@ -27,8 +27,9 @@ def _azo_bonds(mol) -> int:
 
 
 def _prefix_only(mol) -> bool:
-    """No atom that could carry a suffix group: carbon, the azo nitrogens, halogens and ether oxygen or sulfur
-    (bonded to two carbons) only."""
+    """No atom that could carry a suffix group: carbon, the azo nitrogens, halogens, ether oxygen or sulfur (bonded to
+    two carbons) and the skeletal heteroatoms of a ring ('2-{[4-(phenyldiazenyl)phenyl]diazenyl}pyridine': a ring
+    nitrogen is no characteristic group) only."""
     for atom in mol.GetAtoms():
         sym = atom.GetSymbol()
         if atom.GetFormalCharge() or atom.GetNumRadicalElectrons() or atom.GetIsotope():
@@ -41,6 +42,8 @@ def _prefix_only(mol) -> bool:
             continue
         if sym in ("O", "S") and atom.GetDegree() == 2 and all(nb.GetSymbol() == "C" for nb in atom.GetNeighbors()):
             continue
+        if sym in ("N", "O", "S") and atom.IsInRing() and all(nb.IsInRing() for nb in atom.GetNeighbors()):
+            continue                            # a skeletal ring atom without an exocyclic group on it
         return False
     return True
 

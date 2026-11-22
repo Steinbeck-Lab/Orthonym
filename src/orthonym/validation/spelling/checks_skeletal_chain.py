@@ -115,9 +115,10 @@ def _plain(atom) -> bool:
     return not _oxo_like(atom) and not any(_oxo_like(n) for n in atom.GetNeighbors())
 
 
-#: a carboxylic acid, its ester, acid halide or anhydride: a group senior to an amide,:18162), so
-#: no amide group is the principal characteristic group
-_SENIOR_TO_AMIDE = Chem.MolFromSmarts("[CX3;$(C[#6])](=O)[OX2,F,Cl,Br,I]")
+#: a carboxylic acid, its noncyclic ester, acid halide or anhydride: a group senior to an amide,
+#::18162), so no amide group is the principal characteristic group; a lactone or cyclic anhydride is a pseudoketone,
+#: below the amides (class 9 "lactones and other cyclic esters are named as heterocycles; see 16 below",:18186)
+_SENIOR_TO_AMIDE = Chem.MolFromSmarts("[CX3;!R;$(C[#6])](=O)!@[OX2,F,Cl,Br,I]")
 
 
 def _amide_nitrogen(atom) -> bool:
@@ -176,7 +177,7 @@ def _heterounits(mol, path) -> Optional[int]:
 
 def _paths(mol, allowed, ends):
     """Every simple path of the acyclic molecule between two of ``ends`` through ``allowed`` atoms, as lists of
-    atom indices (the molecule is a tree: one path per pair)."""
+    atom indices (the acyclic atoms form a forest: one path per pair)."""
     for start in ends:
         parent = {start: None}
         stack = [start]
@@ -264,6 +265,12 @@ def _kind(mol, path, host, root, amides_skeletal: bool = False):
     # an acylamino group on a path carbon when an amide is no principal group ('7,14,21,28-tetraacetamido',:23428)
     if amides_skeletal and on_carbon and _amide_nitrogen(first) and _acyl_group(mol, comp - {root}):
         return "acylamino"
+    if amides_skeletal:
+        # any other branch of a chain whose amide nitrogens are skeletal (a side chain of a peptide, a ring): it
+        # holds no group senior to an amide (``_senior_groups_at_ends``), so it is a prefix of the chain, and a
+        # ring as a prefix leaves the 'a' PIN of the chain ('4-cyclohexyl-8-methyl-4-oxo-3,5-dioxa-8-thia-
+        # 4λ5-phosphatetradecan-8-ium iodide (PIN)',, the Blue Book)
+        return "other"
     return None
 
 
@@ -296,7 +303,11 @@ def _senior_groups_at_ends(mol, path, senior) -> bool:
         here = 1 if end in senior else 0
         for nb in mol.GetAtomWithIdx(end).GetNeighbors():
             if nb.GetIdx() not in path_set:
-                here += len(_component(mol, nb.GetIdx(), path_set) & senior)
+                comp = _component(mol, nb.GetIdx(), path_set)
+                if comp & senior:
+                    if not _acyl_group(mol, comp) or any(mol.GetAtomWithIdx(i).IsInRing() for i in comp):
+                        return False    # a senior group deeper in a branch (on a ring): not read
+                    here += len(comp & senior)
         if here > 1:
             return False
         covered += here
@@ -317,6 +328,8 @@ def _is_a_chain(mol, path, amides_skeletal: bool = False, senior=frozenset()) ->
             if kind is None:
                 return False
             hung.append((host, kind))
+    if any(kind == "other" for _host, kind in hung) and not any(_amide_nitrogen(mol.GetAtomWithIdx(i)) for i in path):
+        return False            # an unread branch is read only on a chain of skeletal amide nitrogens
     return _senior_groups_at_ends(mol, path, senior) and _n_policy_ok(mol, path, hung)
 
 
@@ -327,17 +340,22 @@ def a_chain_applies(mol) -> bool:
     the principal characteristic group."""
     if mol is None or mol.GetNumHeavyAtoms() > _MAX_HEAVY_ATOMS:
         return False
-    if len(Chem.GetMolFrags(mol)) != 1 or mol.GetNumBonds() != mol.GetNumAtoms() - 1:    # one fragment, no ring
+    if len(Chem.GetMolFrags(mol)) != 1:
         return False
     # (:23405): with a group senior to amides present, an amide nitrogen of the chain is a skeletal atom
     # and its C=O an 'oxo' prefix: 'methyl 7,14,21,28-tetraacetamido-2,9,16,23-tetraoxo-3,10,17,24-
     # tetraazatriacontan-30-oate (PIN; an ester is senior to an amide or a ketone)' (:23428)
     senior = frozenset(m[0] for m in mol.GetSubstructMatches(_SENIOR_TO_AMIDE))
     amides_skeletal = bool(senior)
-    plain = {a.GetIdx() for a in mol.GetAtoms() if _plain(a) or (amides_skeletal and _amide_nitrogen(a))}
-    if len(plain) < 4:
+    cyclic = mol.GetNumBonds() != mol.GetNumAtoms() - 1
+    if cyclic and not amides_skeletal:
+        return False            # a ring is read only beside a chain of skeletal amide nitrogens (below)
+    plain = {a.GetIdx() for a in mol.GetAtoms() if not a.IsInRing()
+             and (_plain(a) or (amides_skeletal and _amide_nitrogen(a)))}
+    if len(plain) < 4 or (cyclic and not any(_amide_nitrogen(mol.GetAtomWithIdx(i)) for i in plain)):
         return False
-    carbons = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "C" and a.GetFormalCharge() == 0}
+    carbons = {a.GetIdx() for a in mol.GetAtoms()
+               if a.GetSymbol() == "C" and a.GetFormalCharge() == 0 and not a.IsInRing()}
     allowed = carbons | plain
     ends = sorted(i for i in allowed
                   if i in carbons or mol.GetAtomWithIdx(i).GetSymbol() in _END_HETERO)
@@ -465,3 +483,60 @@ def a_chain_amine_parent_check(mol, name) -> Optional[SpellingFailure]:
         return None
     return SpellingFailure(
         RULE, "the parent of a principal amine with an 'a' chain on its nitrogen is that 'a' chain (P-51.4.1.1)")
+
+
+# --- cations ------------------------------------------------------------------------------------------
+
+#: an onium centre that counts as one skeletal heteroatom: element -> its number of carbon neighbours,:41752)
+_ONIUM_CENTRES = {"S": 3, "Se": 3, "Te": 3, "P": 4, "As": 4}
+_ONIUM_ATOMS = frozenset({"C", "O", "S", "Se", "Te", "P", "As", "Si", "Ge", "B"})
+
+
+def _onium_centre(atom) -> bool:
+    return (atom.GetFormalCharge() == 1 and _ONIUM_CENTRES.get(atom.GetSymbol()) == atom.GetDegree()
+            and all(n.GetSymbol() == "C" for n in atom.GetNeighbors()))
+
+
+def onium_a_chain_applies(mol) -> bool:
+    """True when the cation of ``mol`` (the whole molecule, or the one carbon part of a salt whose other parts are
+    carbon-free anions) has an 'a' PIN by method (1) (``### **** SKELETAL REPLACEMENT ('a') NOMENCLATURE
+    FOR CATIONS``, the Blue Book): an acyclic cation without nitrogen (an aminium nitrogen is the principal
+    group,:41775), every atom of this reading, single bonds at the heteroatoms, and a path between two chain ends
+    (carbon, or B, Si, P, Ge) with four heteroatoms, no two adjacent, an onium centre among them
+    ('3,12-dimethyl-6,9-dioxa-3,12-dithiatetradecane-3,12-diium (PIN)',:41785)."""
+    if mol is None:
+        return False
+    parts = Chem.GetMolFrags(mol, asMols=True)
+    organic = [p for p in parts if any(a.GetSymbol() == "C" for a in p.GetAtoms())]
+    if len(organic) != 1 or any(Chem.GetFormalCharge(p) >= 0 for p in parts if p is not organic[0]):
+        return False
+    cation = organic[0]
+    if cation.GetNumHeavyAtoms() > 60 or cation.GetNumBonds() != cation.GetNumAtoms() - 1:
+        return False
+    centres = [a for a in cation.GetAtoms() if _onium_centre(a)]
+    if not centres or any(
+            (a.GetFormalCharge() and not _onium_centre(a)) or a.GetSymbol() not in _ONIUM_ATOMS
+            or a.GetNumRadicalElectrons() or (a.GetSymbol() != "C" and any(b.GetBondType() != _SINGLE
+                                                                              for b in a.GetBonds()))
+            for a in cation.GetAtoms()):
+        return False
+    ends = [a.GetIdx() for a in cation.GetAtoms() if a.GetSymbol() in {"C"} | _END_HETERO]
+    for i, start in enumerate(ends):
+        for end in ends[i + 1:]:
+            path = Chem.GetShortestPath(cation, start, end)
+            hetero = [k for k, idx in enumerate(path) if cation.GetAtomWithIdx(idx).GetSymbol() != "C"]
+            if (len(hetero) >= 4 and all(b - a > 1 for a, b in zip(hetero, hetero[1:]))
+                    and any(_onium_centre(cation.GetAtomWithIdx(path[k])) for k in hetero)):
+                return True
+    return False
+
+
+@register("P-73.4")
+def onium_a_chain_name_check(mol, name) -> Optional[SpellingFailure]:
+    """A failure when the cation of ``mol`` has an 'a' PIN (:func:`onium_a_chain_applies`) and ``name`` has no 'a'
+    block: the substitutive '{2-[2-(2-methoxyethoxy)ethoxy]ethyl}di(methyl)sulfanium iodide' is not the PIN."""
+    if not name or names_an_a_chain(name) or not onium_a_chain_applies(mol):
+        return None
+    return SpellingFailure(
+        "P-73.4", "skeletal replacement 'a' name required: the cation has four heteroatoms on a chain with an onium "
+                  "centre among them (P-73.4 method (1)), and the name has no 'a' prefix block")

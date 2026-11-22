@@ -343,6 +343,15 @@ GIANT_PEPTIDES = [
 # 4/4) and the pre-fix tree fails these assertions (it names the retained form).
 
 
+#: the peptide names of the giant peptides whose every residue has a retained name,:54698)
+_GIANT_PEPTIDE_NAMES = {
+    GIANT_PEPTIDES[1][0]: "alanylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanylphenylalanine",
+    GIANT_PEPTIDES[2][0]: ("alanylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanyl"
+                           "phenylalanylglycine"),
+    GIANT_PEPTIDES[3][0]: "valylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanylphenylalanine",
+}
+
+
 @pytest.mark.opsin_gate
 @pytest.mark.slow  # 12- and 13-residue peptides, 31 s in all: nightly run only
 @pytest.mark.parametrize("smiles,expected", GIANT_PEPTIDES,
@@ -350,8 +359,14 @@ GIANT_PEPTIDES = [
 def test_giant_peptide_names_inside_the_budget(smiles, expected):
     res = _be(smiles)
     assert_full_rt(res["name"], smiles)
-    assert res["tier"] == "pin_verified"  # decision A: the substitutive name is the peptide's PIN
-    assert res["name"] == expected
+    # (the Blue Book): four or more amide nitrogens in one chain under the acid call for a skeletal
+    # replacement ('a') PIN example:23428); user decision 2026-11-22 ('Blue Book wins' over the reading of
+    # decision A): no name of these peptides is the PIN until the 'a' name is built. Of the two names left,
+    # (:50943) leaves the choice open; a chain of retained residues takes the peptide name,:54698,
+    # 'alanylleucyltryptophan'), any other the substitutive name,:54251; the Ile 12-mer, whose residue
+    # lookup declines) -- the Blue Book reading the user asked for (2026-11-22).
+    assert res["tier"] == "systematic_verified", res
+    assert res["name"] == _GIANT_PEPTIDE_NAMES.get(smiles, expected), res
 
 
 def test_nested_memo_hit_without_budget_replay():

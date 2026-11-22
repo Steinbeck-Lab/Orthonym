@@ -44,3 +44,17 @@ def test_a_chain_amine_is_no_heterounit():
     from orthonym.rules.skeletal_chain import note_onium_a_chain
     assert not note_onium_a_chain(Chem.MolFromSmiles("C[S+](C)CCNCCOCCOC"))
     assert note_onium_a_chain(Chem.MolFromSmiles("C[S+](C)CCSCCOCCOC"))
+
+
+@pytest.mark.parametrize("smiles", [
+    # the salt of the cation: its name is the cation's (the spelling check reads the cation of a salt)
+    "C[S+](C)CCOCCOCCOC.[I-]",
+    "C[S+](C)CCOCCOCCOC.[Cl-]",
+    # the chain ends at the carbon of a -CH2OH ('-CH2-OH': the OH is a substituent of the chain)
+    "C[S+](C)C(C)OCOCOCO",
+])
+def test_onium_a_chain_salt_and_hydroxy_end_are_below_the_pin(smiles):
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, "best-effort")
+    assert row["tier"] == "systematic_verified", row
+    assert_full_rt(row["name"], smiles)

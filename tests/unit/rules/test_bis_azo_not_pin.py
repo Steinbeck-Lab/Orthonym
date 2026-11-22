@@ -30,3 +30,12 @@ def test_bis_azo_without_suffix_group_is_below_the_pin(smiles):
 def test_monoazo_and_suffix_bearing_bis_azo_keep_the_pin(smiles, name):
     row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+
+
+@pytest.mark.parametrize("smiles", [
+    "c1ccc(N=Nc2ccc(N=Nc3ccccn3)cc2)cc1",       # a ring nitrogen is no characteristic group
+    "c1ccc(N=Nc2ccc(N=Nc3ccc[nH]3)cc2)cc1",
+])
+def test_bis_azo_with_a_ring_heteroatom_is_below_the_pin(smiles):
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    assert tier_row(smiles, "best-effort")["tier"] == "systematic_verified"

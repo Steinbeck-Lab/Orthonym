@@ -181,6 +181,20 @@ def _aa_inchikey1_map() -> Dict[str, str]:
     return _AA_INCHIKEY1_TO_NAME
 
 
+def retained_residue_name_applies(mol) -> bool:
+    """True when ``mol`` is a peptide with a free N-terminus whose every residue has a retained name (Tables 10.4,
+    10.5; 'D' residues included,:54717): the shape the flat acylamino convention names,
+    "Higher peptides are named similarly, e.g. alanylleucyltryptophan" (:54698). A non-standard residue or an acyl
+    cap leaves it out: such a residue takes a systematic substitutive name,:54251)."""
+    try:
+        if mol is None or not _is_valid_peptide(mol):
+            return False
+        residues = _extract_residues(mol)
+        return bool(residues) and len(residues) >= 2 and _identify_residues(residues, strict_stereo=True) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def name_peptide(mol) -> Optional[str]:
     """
     Name a peptide molecule using the acylamino convention.

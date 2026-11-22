@@ -413,13 +413,12 @@ _PEPTIDE_CHAIN_CASES = [
      "methylheptanamido]propanamido}-3-hydroxy-5-phenylpentanoic acid"),
 ]
 
-# The first two chains hold four amide nitrogens under the acid: (the Blue Book) gives them a skeletal
+# Each chain holds four amide nitrogens under the acid: (the Blue Book) gives it a skeletal
 # replacement ('a') PIN, as for 'methyl 7,14,21,28-tetraacetamido-2,9,16,23-tetraoxo-3,10,17,24-tetraazatriacontan-30-
-# oate (PIN)',:23428). Orthonym builds no such name, so the '...amido' name (method (1) of
-# stands below the PIN (validation/spelling/checks_skeletal_chain.py). The third chain has four amide nitrogens too, but
-# the reader does not read a molecule with a ring (its benzyl branch), so its label stands: a known miss, not a PIN
-# claim of this test.
-_A_CHAIN_PEPTIDES = {smiles for smiles, _name in _PEPTIDE_CHAIN_CASES[:2]}
+# oate (PIN)',:23428); a ring as a prefix leaves that PIN ('4-cyclohexyl-...-3,5-dioxa-8-thia-4λ5-
+# phosphatetradecan-8-ium iodide (PIN)',:41789). Orthonym builds no such name, so the '...amido' name (method (1) of
+# stands below the PIN (validation/spelling/checks_skeletal_chain.py).
+_A_CHAIN_PEPTIDES = {smiles for smiles, _name in _PEPTIDE_CHAIN_CASES}
 
 
 def _peptide_tier(smiles):

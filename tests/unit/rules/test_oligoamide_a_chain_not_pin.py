@@ -73,3 +73,44 @@ def test_three_amide_nitrogens_keep_the_pin():
     row = tier_row("NCC(=O)NCC(=O)NCC(=O)NCC(=O)O", "pin")
     assert (row["name"], row["tier"]) == ("{2-[2-(2-aminoacetamido)acetamido]acetamido}acetic acid",
                                           "pin_verified"), row
+
+
+@pytest.mark.parametrize("smiles,applies", [
+    # a ring as a prefix leaves the 'a' PIN of the chain ('4-cyclohexyl-8-methyl-4-oxo-3,5-dioxa-8-thia-
+    # 4λ5-phosphatetradecan-8-ium iodide (PIN)',, the Blue Book); a ring nitrogen (proline) ends a chain
+    ("CC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)Oc1ccccc1", True),
+    ("C[C@H]([C@@H](C(=O)N[C@@H](CO)C(=O)N[C@@H]([C@@H](C)O)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H]([C@@H](C)O)C(=O)O)"
+     "NC(=O)[C@@H]1CCCN1C(=O)[C@H](CC(C)C)N)O", True),
+    ("CC(C)CC(C(=O)O)NC(=O)C(CCCCN)NC(=O)C(CCCCN)NC(=O)C(CCSC)N", True),     # -S- and three amide N: four units
+    # the acid on a ring, or an acid that no chain of four units can end with, leaves the rule out
+    ("O=C(O)c1ccc(NC(=O)CNC(=O)CNC(=O)CNC(=O)C)cc1", False),
+    ("CC(C)C(C(=O)NC(CCSC)C(=O)O)NC(=O)C(CCCCN)NC(=O)C(C)N", False),
+    ("OC(=O)CCOCCOCCOCCOc1ccccc1", False),        # a ring beside a chain without amide nitrogens is not read
+])
+def test_ring_bearing_chain(smiles, applies):
+    assert a_chain_applies(Chem.MolFromSmiles(smiles)) is applies
+
+
+@pytest.mark.parametrize("smiles", [
+    # a lactone is a pseudoketone below the amides class 9, the Blue Book): the amide stays principal
+    "CC(=O)NCCOCCOCCOCC1CCOC1=O",
+    "CC(=O)NCCOCCOCCOCCC1CCC(=O)O1",
+    # an acid on a ring branch is not read as a chain-end group may make the ring the parent)
+    "CC(=O)NCC(=O)NCC(=O)NCC(=O)NCc1ccc(CC(=O)O)cc1",
+])
+def test_lactone_or_ring_acid_is_not_read(smiles):
+    assert not a_chain_applies(Chem.MolFromSmiles(smiles))
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,name", [
+    # no name of these is the PIN; (:50943) leaves the choice between the two others open. A chain
+    # of retained residues takes the peptide name,:54698), a capped or non-standard one the substitutive
+    # name,:54251) -- the Blue Book reading the user asked for, 2026-11-22
+    ("NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)O", "glycylglycylglycylglycylglycine"),
+    ("CC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)O", "{2-[2-(2-acetamidoacetamido)acetamido]acetamido}acetic acid"),
+])
+def test_which_non_pin_name_a_long_peptide_takes(smiles, name):
+    row = tier_row(smiles, "best-effort")
+    assert (row["name"], row["tier"]) == (name, "systematic_verified"), row
+    assert_full_rt(row["name"], smiles)

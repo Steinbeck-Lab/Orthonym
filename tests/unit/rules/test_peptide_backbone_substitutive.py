@@ -105,7 +105,10 @@ class TestBackboneSubstitutiveConverts:
             "N[C@H](C1CC1)C(=O)NCC(=O)N[C@@H](C)C(=O)"
             "N[C@@H](C(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O"
         )
-        result = _dt_name_compound(smi)
+        # (the Blue Book): four or more amide nitrogens in one chain under the acid call for a skeletal
+        # replacement ('a') PIN example:23428); user decision 2026-11-22 ('Blue Book wins' over the reading of
+        # decision A): the substitutive name stands below the PIN until the 'a' name is built.
+        result = declined_pin_row(smi)["name"]
         assert not is_failure_name(result), result
         # j7 (TRIAGE g3 C05): the whole chain is now named substitutively (nested amido
         # prefixes, method (1) the Blue Book); OPSIN full-InChIKey exact.

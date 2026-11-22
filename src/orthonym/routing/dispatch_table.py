@@ -1733,7 +1733,14 @@ def _breaks_pin_spelling(name: str, mol) -> bool:
     another chain of the structure). Fail-open: a check that raises finds no failure."""
     try:
         from orthonym.validation.pin_spelling import check_pin_spelling
-        return any(f.rule != "P-100" for f in check_pin_spelling(mol, name))
+        rules = {f.rule for f in check_pin_spelling(mol, name)} - {"P-100"}
+        if rules == {"P-51.4.1.1"}:
+            # the 'a' PIN of a long chain,:23348) is built by no producer, so neither the substitutive name
+            # nor the peptide name is the PIN; (:50943) leaves that choice open. The peptide name stands for a
+            # chain of retained residues,:54698), the substitutive name for any other,:54251)
+            from orthonym.rules.peptides import retained_residue_name_applies
+            return retained_residue_name_applies(mol)
+        return bool(rules)
     except Exception:
         return False
 
