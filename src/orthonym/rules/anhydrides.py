@@ -1530,6 +1530,26 @@ def _name_cyclic_anhydride_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> 
     return _name_saturated_oxa_dione(mol, c1, c2, bridge_o, ring)
 
 
+def _holds_group_senior_to_ketone(mol, atoms) -> bool:
+    """True when ``atoms`` hold a group the order ranks above ketones and pseudoketones, the class of the dione
+    name Seniority order for classes, the Blue Book): an acid, ester, acid halide or amide carbon
+    (C(=O) single-bonded to O, N, S or a halogen), a nitrile, an aldehyde, or a sulfur or phosphorus acid group."""
+    from rdkit import Chem
+    for i in atoms:
+        a = mol.GetAtomWithIdx(i)
+        dbl = [b.GetOtherAtom(a).GetSymbol() for b in a.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE]
+        single = [b.GetOtherAtom(a).GetSymbol() for b in a.GetBonds() if b.GetBondType() == Chem.BondType.SINGLE]
+        if a.GetSymbol() == "C" and any(b.GetBondType() == Chem.BondType.TRIPLE and b.GetOtherAtom(a).GetSymbol() == "N"
+                                        for b in a.GetBonds()):
+            return True
+        if a.GetSymbol() == "C" and "O" in dbl and (a.GetTotalNumHs() == 1 or any(
+                x in ("O", "N", "S", "F", "Cl", "Br", "I") for x in single)):
+            return True
+        if a.GetSymbol() in ("S", "P") and "O" in dbl and "O" in single:
+            return True
+    return False
+
+
 def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Optional[str]:
     """Name a FULLY-SATURATED monocyclic oxa-heterocycle dione (the anhydride O at
     locant 1; the two ring carbonyls flank it at 2 and n). Substituents become
@@ -1567,7 +1587,7 @@ def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Opt
     if len(o_nbrs) != 2 or set(o_nbrs) != {c1, c2}:
         return None  # carbonyls must flank the bridge O (true for an anhydride)
 
-    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix
+    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
     from ..assembly.substituent_enumerator import name_substituent
 
     best = None
@@ -1586,27 +1606,30 @@ def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Opt
         for a in ring:
             if a in (bridge_o, c1, c2):
                 continue
-            attach = next((nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors()
-                           if nb.GetIdx() not in ring_set), None)
-            if attach is None:
-                continue
-            frag, seen, stack = [], set(ring_set), [attach]
-            while stack:
-                x = stack.pop()
-                if x in seen:
-                    continue
-                seen.add(x)
-                frag.append(x)
-                stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors()
-                             if nb.GetIdx() not in seen)
-            nm = name_substituent(mol, frag, attach)
-            if not nm:
-                ok = False
+            # every substituent of the ring atom ('3,3-dimethyloxolane-2,5-dione')
+            for attach in [nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors() if nb.GetIdx() not in ring_set]:
+                frag, seen, stack = [], set(ring_set), [attach]
+                while stack:
+                    x = stack.pop()
+                    if x in seen:
+                        continue
+                    seen.add(x)
+                    frag.append(x)
+                    stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors()
+                                 if nb.GetIdx() not in seen)
+                if _holds_group_senior_to_ketone(mol, frag):
+                    return None     # an ester or acid on the ring is the suffix ('methyl 2,5-dioxooxolane-3-carboxylate')
+                nm = name_substituent(mol, frag, attach)
+                if not nm:
+                    ok = False
+                    break
+                subs.append((loc[a], nm))
+            if not ok:
                 break
-            subs.append((loc[a], nm))
         if not ok:
             continue
-        key = sorted(l for l, _ in subs)
+        # lowest locants, then the lowest to the prefix cited first (g), the Blue Book)
+        key = (sorted(l for l, _ in subs), [l for _, l in sorted((alpha_sort_key(nm), l) for l, nm in subs)])
         if best is None or key < best[0]:
             best = (key, loc, subs)
     if best is None:
@@ -1622,9 +1645,10 @@ def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Opt
     for nm in sorted(groups, key=alpha_sort_key):
         locs = sorted(groups[nm])
         from ..assembly.naming_utils import multiplied_component as _mc
-        parts.append(f"{render_locants(locs)}-{_mc(len(locs), nm, nm)}")
+        parts.append(f"{render_locants(locs)}-{_mc(len(locs), nm, enclose_if_compound(nm))}")
     # The substituent prefix attaches DIRECTLY to the parent stem (no separating
-    # hyphen): '3-methyloxolane-2,5-dione', not '3-methyl-oxolane-2,5-dione'.
+    # hyphen): '3-methyloxolane-2,5-dione', not '3-methyl-oxolane-2,5-dione'; a
+    # compound prefix is enclosed: '3-(2-methylpropyl)oxolane-2,5-dione'.
     prefix = "-".join(parts)
     return f"{prefix}{stem}-{cl[0]},{cl[1]}-dione"
 

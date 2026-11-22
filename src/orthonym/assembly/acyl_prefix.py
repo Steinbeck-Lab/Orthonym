@@ -236,6 +236,8 @@ def one_carbon_acyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
     ,:32922-:32928). The book's prefix (``book_prefixes.acyl_group_prefix``), or None."""
     from .book_prefixes import acyl_group_prefix, book_forms_enabled
     from .substituent_naming import name_substituent_fragment
+    if (oxamoyl := oxamoyl_prefix(mol, attach_idx, sub_set)) is not None:
+        return oxamoyl                               # -CO-CO-NH2 on a ring
     if (carbono := carbono_acyl_prefix(mol, sub_set, attach_idx)) is not None:
         return carbono                               # 'carbonocyanidoyl', (1)
     if not book_forms_enabled():
@@ -252,6 +254,27 @@ def one_carbon_acyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
             return None
         return None if (not nm or nm == 'substituent') else nm
     return acyl_group_prefix(mol, attach_idx, parents[0], set(sub_set), _part)
+
+
+def oxamoyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
+    """'oxamoyl' for the group -CO-CO-NH2 (``sub_set``, attached at the carbonyl carbon ``attach_idx``) on a ring
+    atom, else None. (the Blue Book) "the group -CO-CO-NH2 is named using the prefixes 'amino' and
+    'oxo' as in method (1)...; by using the name 'oxamoyl' as in method (2)", and (:32928) "method (1)
+    is preferred for chains and method (2) for rings and ring systems, heterogeneous chains, and on nonterminal atoms
+    of carbon chains" (rings only here): '2-oxamoylpyridine-3-carboxylic acid (PIN)'
+    (:32967), not '2-(2-amino-1,2-dioxoethyl)pyridine-3-carboxylic acid'."""
+    from .locant_omission import skeleton_label_on_atoms
+    from .substituent_naming import oxamoyl_branch_name
+    sub = set(sub_set)
+    if len(sub) != 5 or any(mol.GetAtomWithIdx(i).GetFormalCharge() or mol.GetAtomWithIdx(i).GetIsotope()
+                            for i in sub):
+        return None
+    if skeleton_label_on_atoms(mol, sub, any_drawing=True):
+        return None     # a nuclide on the group: 'oxamoyl' numbers none of its atoms, the Blue Book)
+    parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors() if nb.GetIdx() not in sub]
+    if len(parents) != 1 or not mol.GetAtomWithIdx(parents[0]).IsInRing():
+        return None
+    return oxamoyl_branch_name(mol, parents[0], attach_idx)
 
 
 def ring_acyl_branch_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]:

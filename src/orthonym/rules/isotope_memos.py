@@ -1,6 +1,11 @@
 """The memos of the isotope decorator (``rules/isotopes.py``): one read-back per candidate and one skeleton naming per
 engine and state, within one top-level naming (``assembly.memo``, ``assembly.nested_memo``; ``ORTHONYM_MEMO=verify``
 computes again and compares)."""
+import contextlib
+import contextvars
+import re
+from typing import Optional
+
 from rdkit import Chem
 
 
@@ -108,5 +113,73 @@ def skeleton_naming_memoised(naming, smiles: str) -> str:
         key = skeleton_naming_key(naming, smiles)
         hash(key)
     except Exception:  # noqa: BLE001 - a state that cannot be keyed is named afresh
-        return naming.name(smiles)
-    return cached_nested_call("isotope_skeleton", key, lambda: naming.name(smiles), replay_budgets=False)
+        key = None
+    name = (naming.name(smiles) if key is None
+            else cached_nested_call("isotope_skeleton", key, lambda: naming.name(smiles), replay_budgets=False))
+    noted = _NOTED_SKELETONS.get()
+    if noted is not None and name:
+        noted.append(name)
+    return name
+
+
+#: The skeleton names one pass of the decorator built (:func:`skeleton_names_noted`), None outside a pass.
+_NOTED_SKELETONS: "contextvars.ContextVar[Optional[list]]" = contextvars.ContextVar(
+    "noted_isotope_skeletons", default=None)
+
+
+@contextlib.contextmanager
+def skeleton_names_noted():
+    """Note, in the list it yields, every skeleton name:func:`skeleton_naming_memoised` returns inside the block."""
+    token = _NOTED_SKELETONS.set([])
+    try:
+        yield _NOTED_SKELETONS.get()
+    finally:
+        _NOTED_SKELETONS.reset(token)
+
+
+#: An isotopic descriptor of as the decorator splices it ('(13C)', '(2-2H)', '(1,1,2,3,3-2H5)', '(N1,N1-2H2)'),
+#: not after a digit (indicated hydrogen, 'naphthalen-1(2H)-one');:func:`_is_descriptor` checks each nuclide.
+_DESCRIPTOR = re.compile(r"(?<![0-9])\((?:[0-9A-Za-z,'′″]+-)?(\d+[A-Z][a-z]?\d*(?:,\d+[A-Z][a-z]?\d*)*)\)")
+_NUCLIDE = re.compile(r"(\d+)([A-Z][a-z]?)\d*")
+
+
+def _is_descriptor(match) -> bool:
+    """True when every nuclide of ``match`` is a nuclide: a known element whose mass number is not below its atomic
+    number, not protium (so '(2S)', '(2R)', '(1H)' are no descriptors; '(34S)' is)."""
+    if not _ATOMIC_NUMBER:
+        table = Chem.GetPeriodicTable()
+        _ATOMIC_NUMBER.update({table.GetElementSymbol(z): z for z in range(1, 119)})
+    for mass, symbol in _NUCLIDE.findall(match.group(1)):
+        z = _ATOMIC_NUMBER.get(symbol)
+        if z is None or int(mass) < max(z, 2) or int(mass) > 3 * z + 30:
+            return False
+    return True
+
+
+_ATOMIC_NUMBER: dict = {}
+
+
+def _without_descriptors(name: str) -> str:
+    return _DESCRIPTOR.sub(lambda m: "" if _is_descriptor(m) else m.group(0), name)
+
+
+def carry_skeleton_labels(name: Optional[str], skeletons) -> Optional[str]:
+    """Record ``name`` below the PIN when the skeleton name it is built on holds a non-PIN record (a label-only
+    record, a non-PIN fragment or an uncertified PIN-form name, ``metrics.provenance``), and return ``name``.
+    (the Blue Book, "The name of an isotopically substituted compound is formed by adding or inserting the
+    nuclide symbol(s)... before the part of the compound that is isotopically substituted"): the name of the labelled
+    compound is the name of the unlabelled one with the descriptor, so it is the PIN only when that name is; the
+    recorded substring does not survive the descriptor ('2-[(4-oxo-4H-1-benzopyran-2-yl)methyl]-2,3-dihydro(3,3-2H2)-
+    4H-1-benzopyran-4-one'). Only a skeleton that ``name`` reads as once its descriptors are taken out counts (a
+    skeleton the pass named and did not build on carries nothing over); none matching, nothing is recorded."""
+    from ..metrics.provenance import (record_derived_non_pin_fragment, record_derived_non_pin_label,
+                                      record_derived_uncertified_pin_name)
+    if not name:
+        return name
+    bare = _without_descriptors(name)
+    for skeleton in skeletons or ():
+        if skeleton == bare:
+            record_derived_non_pin_label(skeleton, name)
+            record_derived_non_pin_fragment(skeleton, name)
+            record_derived_uncertified_pin_name(skeleton, name)
+    return name

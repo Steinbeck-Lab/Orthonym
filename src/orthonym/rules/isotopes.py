@@ -4251,8 +4251,9 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
     _radical_token = _RADICAL_READING.set(
         any(a.GetNumRadicalElectrons() > 0 for a in original.GetAtoms()))
     from ..validation.thioperoxol_twin import embedded_name   # the skeleton is read by OPSIN, candidate by candidate
+    from .isotope_memos import carry_skeleton_labels, skeleton_names_noted
     try:
-        with _scope, embedded_name(), isotopic_skeleton_scope(original):
+        with _scope, embedded_name(), isotopic_skeleton_scope(original), skeleton_names_noted() as skeletons:
             sink: dict = {}
             result = _decorate_isotopic_name_inner(
                 smiles, style, namer, original, stripped, label_map, sink)
@@ -4302,16 +4303,15 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
             mark_label_on_one_of_multiplied_groups(result, original, sink.get("skeleton"))
             if result is not None and finish is not None:
                 result = finish(result)
+            carry_skeleton_labels(result, skeletons)   # the label of the unlabelled name it is built on
         if (result and _BOND_SHIFT_PARSE_REFUSED.get()
                 and _has_fused_localized_alternation(original)):
-            # A fused mancude parent names no ene locants, so for the drawing
-            # whose lower-locant name reads back as its bond-shift isomer the
-            # name has a higher locant ('(3-2H)pentalene' against '(1-2H)'), and
-            # the PIN of that drawing carries a Delta descriptor,
-            # "Localized double bonds" (the Blue Book,:14597 "this
-            # differentiation is indicated by the use of the Greek letter Delta";
-            # '1,6-dimethyl-Delta1(10a)-heptalene (PIN)':14601), which OPSIN 2.9.0
-            # cannot read. The name is kept and labelled below the PIN.
+            # A fused mancude parent names no ene locants, so for the drawing whose lower-locant name reads back
+            # as its bond-shift isomer the name has a higher locant ('(3-2H)pentalene' against '(1-2H)'), and the
+            # PIN of that drawing carries a Delta descriptor, "Localized double bonds"
+            # (the Blue Book,:14597 "this differentiation is indicated by the use of the Greek letter
+            # Delta"; '1,6-dimethyl-Delta1(10a)-heptalene (PIN)':14601), which OPSIN 2.9.0 cannot read. The name
+            # is kept and labelled below the PIN.
             from ..metrics.provenance import record_non_pin_fragment
             record_non_pin_fragment(result)
         return result

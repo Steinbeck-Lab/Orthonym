@@ -2601,15 +2601,14 @@ def name_monosaccharide_systematic(mol, for_glycosidic_unit: bool = False) -> Op
                 ("sulfoamino",
                  f"{','.join(str(x) for x in n_sulfo_locants)}-(sulfoamino)")
             )
-        # N-ACYL (.2, BB + method (1)): the
-        # N-H replaced by an acyl group is ALSO a deoxy position (same logic
-        # as plain amino/N-sulfo), cited as its own amido term per locant
-        # (e.g. ``2-acetamido``, GlcNAc's own catalogued spelling) -- each
-        # locant keeps its OWN term rather than being grouped/multiplied,
-        # since a mixed-acyl ring (two different acyl groups) is legitimate
-        # here and a single shared multiplier would misdescribe it.
+        # N-ACYL (.2, BB + method (1)): the N-H replaced by an acyl group is ALSO a
+        # deoxy position (same logic as plain amino/N-sulfo), cited as its own amido term per locant (e.g.
+        # ``2-acetamido``, GlcNAc's own catalogued spelling) -- each locant keeps its OWN term rather than being
+        # grouped/multiplied, since a mixed-acyl ring (two different acyl groups) is legitimate here and a single
+        # shared multiplier would misdescribe it. A compound term is enclosed: '2-(2-hydroxyacetamido)'.
+        from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound   #: by the complete name
         for loc, amido_word in n_acyl_mods:
-            prefix_terms.append((amido_word, f"{loc}-{amido_word}"))
+            prefix_terms.append((alpha_sort_key(amido_word), f"{loc}-{enclose_if_compound(amido_word)}"))
         # HALO: group by halogen, cite locants + multiplier, alpha-key = halogen
         # name (fluoro/chloro/bromo/iodo — ordered ignoring the di/tri multiplier).
         _HALO_NAME = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
@@ -3160,10 +3159,14 @@ def _name_sugar_acyl_ester(mol) -> Optional[str]:
         return None
     #: a complex acylate word (carrying a locant/space) takes the
     # bis/tris multiplier and enclosing marks; a simple word (acetate) does not.
-    if n > 1 and any(ch in word for ch in "- ("):
-        _BIS = multiplier_table(6, kind="complex")
-        mult = _BIS[n]
-        ester_term = f"({word})"
+    # The marks nest by ('tris[(4-hydroxyphenyl)acetate]'). One compound word is left to the
+    # systematic ester name, the PIN ('...oxan-4-yl 6-(1-hydroxyethyl)phenazine-1-carboxylate').
+    if any(ch in word for ch in "- ("):
+        from ..assembly.naming_utils import apply_enclosing_marks
+        if n == 1:
+            return None
+        mult = multiplier_table(6, kind="complex")[n]
+        ester_term = apply_enclosing_marks(word, -1)
     else:
         ester_term = word
     locant_str = render_locants(locs)

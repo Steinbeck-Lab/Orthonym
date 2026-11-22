@@ -237,10 +237,31 @@ def _junior_ring_parent_is_not_a_pin(handler):
         result = handler(features, mol, style)
         if result is not None and result.name:
             _note_principal_group_off_every_ring(features)
+            _note_ester_beside_cyclic_anhydride(features)
             from ...rules.ring_selection import record_junior_ring_parent
             record_junior_ring_parent(features, result.name)
         return result
     return wrapped
+
+
+def _note_ester_beside_cyclic_anhydride(features: Any) -> None:
+    """The ring cascade names a cyclic anhydride (the perceived principal group) as a heterocycle dione and an exocyclic
+    ester on it as a prefix. A cyclic anhydride named as a heterocycle is a pseudoketone, class 16 of (Seniority
+    order for classes, the Blue Book, the notes to classes 8 and 16): the ester (class 9) is senior and is named
+    by functional class ('methyl 3-methyl-2,5-dioxooxolane-3-carboxylate'). The name is noted as one that cites the
+    principal ester as a prefix (:func:`_record_ester_cited_as_prefix`), so the split names the ester."""
+    from ..fragment_naming import is_top_level_naming
+    if getattr(features, 'principal_group', None) != 'anhydride' or not is_top_level_naming():
+        return
+    from ...perception.smarts_cache import compiled as _smarts
+    mol = features.mol
+    pg_atoms = getattr(features, 'principal_group_atoms', None) or ()
+    if not pg_atoms or not all(m and mol.GetAtomWithIdx(m[0]).IsInRing() for m in pg_atoms):
+        return                      # an acyclic anhydride (class 8) is senior to the ester
+    if any(not mol.GetBondBetweenAtoms(m[0], m[2]).IsInRing()
+           for m in mol.GetSubstructMatches(_smarts("[CX3](=O)[OX2][#6]"))
+           if not mol.GetAtomWithIdx(m[0]).IsInRing()):
+        _record_ester_cited_as_prefix()
 
 
 def _note_principal_group_off_every_ring(features: Any) -> None:

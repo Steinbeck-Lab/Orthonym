@@ -40,7 +40,7 @@ from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import (
     _free_valence_at_one, acyl_prefix_text, is_acyl_prefix, is_pin_fg_branch,
-    one_carbon_acyl_prefix, tier_fg_engages)
+    one_carbon_acyl_prefix, oxamoyl_prefix, tier_fg_engages)
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import carbon_component, fragment_parent_to_prefix
 from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
@@ -6899,7 +6899,7 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
     k = chain.index(attach_idx) + 1
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
     from .chain_unsaturation import chain_multiple_bonds
-    if chain_len == 1:
+    if chain_len == 1 or (chain_len == 2 and oxamoyl_prefix(mol, attach_idx, sub_set)):
         # Roadmap N5e: a one-carbon chain carrying =O and one more group is an acyl
         # group (2), the Blue Book) -- 'carbamoyl', '(R)carbamoyl', 'benzoyl' --
         # never the hyphen-joined '{[R]amino}-oxomethyl',:32922-:32928); not of a
