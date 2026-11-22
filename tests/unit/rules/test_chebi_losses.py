@@ -343,30 +343,35 @@ GIANT_PEPTIDES = [
 # 4/4) and the pre-fix tree fails these assertions (it names the retained form).
 
 
-#: the peptide names of the giant peptides whose every residue has a retained name,:54698)
-_GIANT_PEPTIDE_NAMES = {
-    GIANT_PEPTIDES[1][0]: "alanylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanylphenylalanine",
-    GIANT_PEPTIDES[2][0]: ("alanylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanyl"
-                           "phenylalanylglycine"),
-    GIANT_PEPTIDES[3][0]: "valylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanylphenylalanine",
+_HEAD = "(6S,12S,15S,18S,21S,24S,27S,30S,33S,36S)-1-amino-6-[(2S)-2-aminopropanamido]-21,33,36-tribenzyl-24-"
+_MID = ("-15,18-bis(hydroxymethyl)-12,27-bis[(4-hydroxyphenyl)methyl]-1-imino-30-[(1H-indol-3-yl)methyl]-7,10,13,16,19,22,"
+        "25,28,31,34-")
+_ARG24 = "[3-(carbamimidoylamino)propyl]"
+#: the skeletal replacement ('a') PINs of the giant peptides that start Ala-Arg: four or more amide nitrogens in one chain
+#: under the acid, the Blue Book; user decision 2026-11-22, over. The principal
+#: chain runs through the Arg side chain (its N beside the C=NH is a chain atom,:23409), as many
+#: heteroatoms as the backbone and one atom longer,:20916). Each reads back to the full InChIKey.
+_GIANT_A_NAMES = {
+    0: _HEAD + "(butan-2-yl)" + _MID + "decaoxo-2,8,11,14,17,20,23,26,29,32,35-undecaazaheptatriacontan-37-oic acid",
+    1: _HEAD + _ARG24 + _MID + "decaoxo-2,8,11,14,17,20,23,26,29,32,35-undecaazaheptatriacontan-37-oic acid",
+    2: _HEAD + _ARG24 + _MID[:-1] + ",37-undecaoxo-2,8,11,14,17,20,23,26,29,32,35,38-dodecaazatetracontan-40-oic acid",
 }
+#: the Val-Arg 12-mer: its backbone and the chain through the Arg side chain tie (as many heteroatoms, as long), and the
+#: 'a' writer declines a tie, so the peptide name of a chain of retained residues stands below the PIN,:54698)
+_VAL_ARG_NAME = "valylarginylglycyltyrosylserylserylphenylalanylarginyltyrosyltryptophylphenylalanylphenylalanine"
 
 
 @pytest.mark.opsin_gate
 @pytest.mark.slow  # 12- and 13-residue peptides, 31 s in all: nightly run only
-@pytest.mark.parametrize("smiles,expected", GIANT_PEPTIDES,
-                         ids=["chebi-ile-12mer", "chebi-12mer", "hand-13mer", "hand-12mer"])
-def test_giant_peptide_names_inside_the_budget(smiles, expected):
+@pytest.mark.parametrize("index", range(4), ids=["chebi-ile-12mer", "chebi-12mer", "hand-13mer", "hand-12mer"])
+def test_giant_peptide_names_inside_the_budget(index):
+    smiles = GIANT_PEPTIDES[index][0]
     res = _be(smiles)
     assert_full_rt(res["name"], smiles)
-    # (the Blue Book): four or more amide nitrogens in one chain under the acid call for a skeletal
-    # replacement ('a') PIN example:23428); user decision 2026-11-22 ('Blue Book wins' over the reading of
-    # decision A): no name of these peptides is the PIN until the 'a' name is built. Of the two names left,
-    # (:50943) leaves the choice open; a chain of retained residues takes the peptide name,:54698,
-    # 'alanylleucyltryptophan'), any other the substitutive name,:54251; the Ile 12-mer, whose residue
-    # lookup declines) -- the Blue Book reading the user asked for (2026-11-22).
-    assert res["tier"] == "systematic_verified", res
-    assert res["name"] == _GIANT_PEPTIDE_NAMES.get(smiles, expected), res
+    if index in _GIANT_A_NAMES:
+        assert (res["name"], res["tier"]) == (_GIANT_A_NAMES[index], "pin_verified"), res
+    else:
+        assert (res["name"], res["tier"]) == (_VAL_ARG_NAME, "systematic_verified"), res
 
 
 def test_nested_memo_hit_without_budget_replay():

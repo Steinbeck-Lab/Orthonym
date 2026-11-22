@@ -228,6 +228,22 @@ def _acyl_group(mol, comp) -> bool:
     return len(near) <= 2 and all(a.GetIdx() in near for a in atoms if a.GetSymbol() in ("N", "O"))
 
 
+def _guanidine_nitrogen(atom) -> bool:
+    """The N of an Arg-like side chain between a carbon and a guanidine carbon (a neutral acyclic carbon with three
+    nitrogen neighbours and one C=N bond), in either tautomer. With a group senior to amides it is a skeletal atom:
+     (the Blue Book) '9-imino-2,8,10,16-tetraazaheptadecanediimidamide (PIN)' puts the nitrogens beside
+    a C=NH carbon in the chain, so a chain through an Arg side chain counts it,:20916)."""
+    if (atom.GetSymbol() != "N" or atom.GetDegree() != 2 or atom.IsInRing() or atom.GetFormalCharge()
+            or atom.GetNumRadicalElectrons()):
+        return False
+    for n in atom.GetNeighbors():
+        if (n.GetSymbol() == "C" and n.GetDegree() == 3 and not n.IsInRing() and not n.GetFormalCharge()
+                and all(x.GetSymbol() == "N" for x in n.GetNeighbors())
+                and any(b.GetBondType() == _DOUBLE for b in n.GetBonds())):
+            return True
+    return False
+
+
 def _kind(mol, path, host, root, amides_skeletal: bool = False):
     """What hangs from the path atom ``host`` at ``root`` (the neighbour that is not on the path): one of
     'halogen', 'OH', '=O', 'SH', 'NH2', 'alkyl' (carbon and halogen atoms only), 'NHR' (an NHR or NR2 amine with
@@ -247,6 +263,8 @@ def _kind(mol, path, host, root, amides_skeletal: bool = False):
             return "SH"
         if symbol == "N" and kind == _SINGLE:
             return "NH2"
+        if symbol == "N" and kind == _DOUBLE and amides_skeletal and host in (path[0], path[-1]):
+            return "=NH"                # the guanidine carbon that ends a chain through an Arg side chain
     if kind != _SINGLE:
         return None
     atoms = [mol.GetAtomWithIdx(i) for i in comp]
@@ -351,7 +369,7 @@ def a_chain_applies(mol) -> bool:
     if cyclic and not amides_skeletal:
         return False            # a ring is read only beside a chain of skeletal amide nitrogens (below)
     plain = {a.GetIdx() for a in mol.GetAtoms() if not a.IsInRing()
-             and (_plain(a) or (amides_skeletal and _amide_nitrogen(a)))}
+             and (_plain(a) or (amides_skeletal and (_amide_nitrogen(a) or _guanidine_nitrogen(a))))}
     if len(plain) < 4 or (cyclic and not any(_amide_nitrogen(mol.GetAtomWithIdx(i)) for i in plain)):
         return False
     carbons = {a.GetIdx() for a in mol.GetAtoms()

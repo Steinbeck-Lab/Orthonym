@@ -75,16 +75,11 @@ def test_a_block_on_a_prefix_is_no_a_parent():
 
 @pytest.mark.parametrize("smiles", [
     "NCC(=O)NC(C(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",           # an amidine on a chain carbon
-    "NCC(=O)NC(CC(=O)NC)C(=O)NCC(=O)NCC(=O)NCC(=O)O",         # a secondary amide in a side chain
-    "NCC(=O)NC(CCCNC(=N)NC)C(=O)NCC(=O)NCC(=O)NCC(=O)O",      # a substituted guanidine
     "CC[C@H](C)OC(=O)CNC(=O)CNC(=O)CNC(=O)CNC(=O)CN",         # a stereocentre in the ester part
-    # an Arg near a chain end: the chain through its side chain to the guanidine carbon (its N beside the C=NH is a
-    # chain atom, '9-imino-2,8,10,16-tetraazaheptadecanediimidamide (PIN)', the Blue Book) is as rich in
-    # heteroatoms and longer or as long,:20916); this writer does not build it, so it declines
-    "CC(=O)N[C@@H](CCCNC(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
-    "NCC(=O)N[C@@H](CCCNC(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
-    "NCC(=O)N[C@@H](CCCN=C(N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+    # a Glu side chain under two residues: the prefix would hold a second amide nitrogen
+    "NCC(=O)NCC(=O)N[C@@H](CCC(=O)O)C(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)O",
 ])
+
 def test_other_c_n_groups_and_amides_in_side_chains_decline(smiles):
     assert name_acyl_a_chain(Chem.MolFromSmiles(smiles)) is None
 
@@ -97,3 +92,58 @@ def test_other_c_n_groups_and_amides_in_side_chains_decline(smiles):
 def test_an_a_alcohol_word_keeps_the_ester_pin(smiles, name):
     row = tier_row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+
+
+@pytest.mark.parametrize("smiles,name", [
+    # an Arg near a chain end: the chain through its side chain to the guanidine carbon (its N beside the C=NH is a
+    # chain atom, '9-imino-2,8,10,16-tetraazaheptadecanediimidamide (PIN)', the Blue Book) holds as
+    # many heteroatoms and is longer,:20916); the heteroatoms take the lowest locants,:6476)
+    ("CC(=O)N[C@@H](CCCNC(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "(6S)-6-acetamido-1-amino-1-imino-7,10,13-trioxo-2,8,11,14-tetraazahexadecan-16-oic acid"),
+    ("NCC(=O)N[C@@H](CCCNC(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "(6S)-1-amino-6-(2-aminoacetamido)-1-imino-7,10,13-trioxo-2,8,11,14-tetraazahexadecan-16-oic acid"),
+    # an Asp side chain: the chain holds both acids,:18875), the N-terminal residue is an acylamino prefix
+    # method (1),:32998)
+    ("NCC(=O)N[C@@H](CC(=O)O)C(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "(14S)-14-(2-aminoacetamido)-4,7,10,13-tetraoxo-3,6,9,12-tetraazahexadecane-1,16-dioic acid"),
+    # a chain through a side-chain amide nitrogen, or through both nitrogens of an N-methyl guanidine (the guanidine
+    # carbon inside the chain, 'imino' on it as in '9-imino-2,8,10,16-tetraaza...':23409), when it is the longer one
+    ("NCC(=O)NC(CC(=O)NC)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "5-(2-aminoacetamido)-3,6,9,12-tetraoxo-2,7,10,13-tetraazapentadecan-15-oic acid"),
+    ("NCC(=O)NC(CCCNC(=N)NC)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "8-(2-aminoacetamido)-3-imino-9,12,15-trioxo-2,4,10,13,16-pentaazaoctadecan-18-oic acid"),
+    # the same Arg drawn -N=C(NH2)2: the N=C bond stands in the chain as an 'ene' ending, numbered after the heteroatoms
+    # and the suffix 'NUMBERING' (e)(i), the Blue Book), so both drawings of one compound take an 'a' PIN
+    ("NCC(=O)N[C@@H](CCCN=C(N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
+     "(6S)-1,1-diamino-6-(2-aminoacetamido)-7,10,13-trioxo-2,8,11,14-tetraazahexadec-1-en-16-oic acid"),
+    ("N[C@@H](CCCN=C(N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)OC",
+     "methyl (6S)-1,1,6-triamino-7,10,13-trioxo-2,8,11,14-tetraazahexadec-1-en-16-oate"),
+    ("N[C@@H](CCCNC(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)OC",
+     "methyl (6S)-1,6-diamino-1-imino-7,10,13-trioxo-2,8,11,14-tetraazahexadecan-16-oate"),
+])
+
+def test_arg_and_asp_chains_take_the_a_pin(smiles, name):
+    row = tier_row(smiles, "pin")
+    assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+    assert_full_rt(row["name"], smiles)
+
+
+@pytest.mark.parametrize("smiles", [
+    # an ester outside the writer's vocabulary: the reader counts the guanidine N too (review finding), so the
+    # substitutive name of such a peptide is no PIN
+    "N[C@@H](CCCNC(=N)N)C(=O)NCC(=O)NCC(=O)NCC(=O)OC1CCCCC1",
+])
+def test_an_arg_chain_the_writer_cannot_build_is_below_the_pin(smiles):
+    assert tier_row(smiles, "pin")["tier"] == "abstain"
+    row = tier_row(smiles, "best-effort")
+    assert row["tier"] == "systematic_verified", row
+    assert_full_rt(row["name"], smiles)
+
+
+def test_the_builder_keeps_an_ene_before_an_acid_suffix():
+    from orthonym.rules.skeletal_replacement import _build_replacement_name
+    hetero = [(2, "N"), (8, "N"), (11, "N"), (14, "N")]
+    assert _build_replacement_name(16, hetero, ("oic acid", 16), ene_locants=[1]) == (
+        "2,8,11,14-tetraazahexadec-1-en-16-oic acid")
+    assert _build_replacement_name(16, hetero, ("dioic acid", [1, 16]), ene_locants=[3]) == (
+        "2,8,11,14-tetraazahexadec-3-ene-1,16-dioic acid")

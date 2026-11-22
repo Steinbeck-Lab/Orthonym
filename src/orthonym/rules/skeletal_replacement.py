@@ -1637,6 +1637,17 @@ def _build_replacement_name(
         # skeletal replacement, as shown in " ('3,6,10,13-tetrathiapentadecane-1,15-dioic acid (PIN)',
         #:29874; '3,6,9,12-tetraoxatetradecane-1,14-dioic acid [PIN',:23212) / "3,6,9,12-tetraoxapentadecan-15-oic
         # acid" — the heteroatoms own the low locants).
+        # an 'ene' ending of the chain stands before the suffix: 'hexadec-1-en-16-oic acid', '...dec-2-ene-1,10-dioic
+        # acid' (the final 'e' of 'ene' is elided before a vowel only,
+        if ene_locants and not yne_locants:
+            multiplier = multiplying_prefix(len(ene_locants)) if len(ene_locants) > 1 else ''
+            unsat = f"{chain_prefix}{'a' if multiplier else ''}-{render_locants(ene_locants)}-{multiplier}en"
+            if suffix_name in ('dioic acid', 'dioyl'):
+                tail = f' {acyl_class}' if suffix_name == 'dioyl' else ''
+                return f'{replacement_prefix}{unsat}e-{render_locants(suffix_locant)}-{suffix_name}{tail}'
+            if suffix_name in ('oic acid', 'oyl'):
+                tail = f' {acyl_class}' if suffix_name == 'oyl' else ''
+                return f'{replacement_prefix}{unsat}-{suffix_locant}-{suffix_name}{tail}'
         if suffix_name == 'dioic acid':
             return f'{replacement_prefix}{chain_prefix}ane-{render_locants(suffix_locant)}-dioic acid'
         if suffix_name == 'oic acid':
