@@ -100,7 +100,10 @@ MACROLIDE_92850 = (
 def test_parent_block_beside_substituent_block():
     res = _be(MACROLIDE_92850)
     name = res["name"]
-    assert name.startswith("(21E,23Z,25E,33Z,35Z,50Z,52Z)-5-{(1E,3E)-8-"), name
+    # the parent's block, then 'pentadecahydroxy' (key 'hydroxy', the Blue Book leaves every multiplying
+    # prefix out) before the compound prefix '5-{(1E,3E)-8-[5-hydroxy-2-...': 'hydroxy' sorts first)
+    assert name.startswith("(21E,23Z,25E,33Z,35Z,50Z,52Z)-1,7,9,17,19,27,31,37,39,41,45,47,49,55,59-pentadecahydroxy-5-"
+                           "{(1E,3E)-8-"), name
     assert_full_rt(name, MACROLIDE_92850)
 
 

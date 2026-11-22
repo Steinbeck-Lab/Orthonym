@@ -263,18 +263,88 @@ def oxamoyl_prefix(mol, attach_idx: int, sub_set) -> Optional[str]:
     is preferred for chains and method (2) for rings and ring systems, heterogeneous chains, and on nonterminal atoms
     of carbon chains" (rings only here): '2-oxamoylpyridine-3-carboxylic acid (PIN)'
     (:32967), not '2-(2-amino-1,2-dioxoethyl)pyridine-3-carboxylic acid'."""
-    from .locant_omission import skeleton_label_on_atoms
     from .substituent_naming import oxamoyl_branch_name
     sub = set(sub_set)
-    if len(sub) != 5 or any(mol.GetAtomWithIdx(i).GetFormalCharge() or mol.GetAtomWithIdx(i).GetIsotope()
-                            for i in sub):
+    if len(sub) < 5 or any(mol.GetAtomWithIdx(i).GetIsotope() for i in sub):
         return None
-    if skeleton_label_on_atoms(mol, sub, any_drawing=True):
-        return None     # a nuclide on the group: 'oxamoyl' numbers none of its atoms, the Blue Book)
     parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors() if nb.GetIdx() not in sub]
     if len(parents) != 1 or not mol.GetAtomWithIdx(parents[0]).IsInRing():
         return None
-    return oxamoyl_branch_name(mol, parents[0], attach_idx)
+    if len(sub) == 5:
+        if _charge_or_label_on(mol, sub):
+            return None
+        return oxamoyl_branch_name(mol, parents[0], attach_idx)
+    return _substituted_oxamoyl(mol, attach_idx, parents[0], sub)
+
+
+def _charge_or_label_on(mol, atoms) -> bool:
+    """A charge, or a nuclide of the labelled molecule being named, on one of the oxamoyl atoms ``atoms``
+    (-CO-CO-N<): 'oxamoyl' numbers none of its atoms, so no descriptor can locate the label,
+    the Blue Book). A label on an N-substituent is that substituent's own ('[(13C)methyl]'), and a charge
+    there is its own ('4-nitrophenyl')."""
+    from .locant_omission import skeleton_label_on_atoms
+    return (any(mol.GetAtomWithIdx(i).GetFormalCharge() for i in atoms)
+            or skeleton_label_on_atoms(mol, atoms, any_drawing=True))
+
+
+def _double_o(mol, c_idx: int, nb) -> bool:
+    return nb.GetSymbol() == 'O' and mol.GetBondBetweenAtoms(c_idx, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+
+
+def _substituted_oxamoyl(mol, c1: int, parent: int, sub: set) -> Optional[str]:
+    """'methyloxamoyl', '[methyl(phenyl)oxamoyl]' for -CO-CO-N(R)R' (``sub``, attached at ``c1``): 'oxamoyl (preferred
+    prefix) (full substitution; see ' (the Blue Book). The -CO-N(R)R' end is named by the book's
+    carbamoyl writer (``book_prefixes.acyl_group_prefix``,, '[methyl(phenyl)carbamoyl]':32957), and the
+    group is that name with 'oxamoyl' for its final 'carbamoyl' (the same substituents on the same nitrogen). Any other
+    end (a ring nitrogen, 'piperidine-1-carbonyl'; a nitrogen bonded to N, O or S) declines."""
+    from .book_prefixes import acyl_group_prefix, book_forms_enabled
+    from .substituent_naming import name_substituent_fragment
+    if not book_forms_enabled():
+        return None
+    a1 = mol.GetAtomWithIdx(c1)
+    nb1 = [nb for nb in a1.GetNeighbors() if nb.GetIdx() != parent]
+    o1 = [nb.GetIdx() for nb in nb1 if _double_o(mol, c1, nb)]
+    c2 = [nb.GetIdx() for nb in nb1 if nb.GetSymbol() == 'C']
+    if len(nb1) != 2 or len(o1) != 1 or len(c2) != 1:
+        return None
+    nb2 = [nb for nb in mol.GetAtomWithIdx(c2[0]).GetNeighbors() if nb.GetIdx() != c1]
+    n2 = [nb for nb in nb2 if nb.GetSymbol() == 'N' and not nb.IsInRing()]
+    if (len(nb2) != 2 or sum(_double_o(mol, c2[0], nb) for nb in nb2) != 1 or len(n2) != 1
+            or any(x.GetSymbol() != 'C' for x in n2[0].GetNeighbors())):
+        return None     # an N-amino or N-hydroxy end ('N-anilino...') is no plain substituted carbamoyl group
+    o2 = [nb.GetIdx() for nb in nb2 if _double_o(mol, c2[0], nb)]
+    if _charge_or_label_on(mol, {c1, o1[0], c2[0], o2[0], n2[0].GetIdx()}):
+        return None
+
+    def _part(atoms, root):
+        # The N-substituents are named as the benzamide writer names its N-substituents (rules.benzene
+        # ``_detect_n_substituents``): the fragment namer, else the amide N-substituent namer for a ring-bearing
+        # branch ('1-methylpiperidin-4-yl', which the fragment namer leaves unnamed on the PIN tier), then the
+        # branch's stereodescriptors,:44643, '[(1S)-1-phenylethyl]'). A branch whose descriptors
+        # are not all written declines.
+        from ..rules.amides import _name_n_substituent
+        from ..rules.stereochemistry import count_expressed_stereo_descriptors
+        from .n_substituent_stereo import _stereo_units, cite_n_substituent_stereo
+        boundary = [nb.GetIdx() for nb in mol.GetAtomWithIdx(root).GetNeighbors() if nb.GetIdx() not in atoms]
+        try:
+            nm = name_substituent_fragment(mol, sorted(atoms), root, boundary)
+            if not nm or nm == 'substituent':
+                ordered = [root] + sorted(set(atoms) - {root})
+                nm = _name_n_substituent(mol, ordered, sum(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in atoms),
+                                         refusal_as_none=True)
+            if not nm or nm == 'substituent' or nm.startswith('substituent'):
+                return None
+            units = _stereo_units(mol, list(atoms))
+            nm = cite_n_substituent_stereo(mol, atoms, root, nm)
+        except Exception:  # noqa: BLE001
+            return None
+        if not nm or (units and count_expressed_stereo_descriptors(nm) < units):
+            return None
+        return nm
+    carbamoyl = acyl_group_prefix(mol, c2[0], c1, sub - {c1, o1[0]}, _part)
+    if not carbamoyl or carbamoyl == 'carbamoyl' or not carbamoyl.endswith('carbamoyl'):
+        return None
+    return carbamoyl[:-len('carbamoyl')] + 'oxamoyl'
 
 
 def ring_acyl_branch_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]:

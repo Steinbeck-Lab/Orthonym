@@ -53,10 +53,11 @@ def n_branch_last_resort_prefix(mol: Any, atom: Any, attach_atom: int, sub_set: 
     return f"({prefix}amino)"
 
 
-def hetero_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int) -> Optional[str]:
+def hetero_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int, parent_chain=()) -> Optional[str]:
     """The prefix of a branch rooted at O, S or N for the functional-group namer of the wider tiers: an
     ``-NH-SO2-R`` branch is the method (1) '{R}sulfonamido' prefix, the Blue Book), as at the PIN
-    tier ('[(1E)-2-phenylethene-1-sulfonamido]acetate', not '{[...sulfonyl]amino}'); any other branch is named by
+    tier ('[(1E)-2-phenylethene-1-sulfonamido]acetate', not '{[...sulfonyl]amino}'); a branch rooted at a hydrazine
+    nitrogen is named as at the PIN tier (:func:`_hydrazine_root_prefix`); any other branch is named by
     ``substituent_naming._located_fg_hetero_root``."""
     from .n_acyl_amido import sulfonamido_prefix
     from .substituent_naming import _located_fg_hetero_root
@@ -74,4 +75,40 @@ def hetero_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int) -> Optio
                 core = chalcogen_rooted_acyl_amino_core(mol, nb.GetIdx(), attach_idx, sub_atoms)
                 if core and core is not ACYL_CHALCOGEN_UNNAMEABLE:
                     return core
+        if any(_hydrazine_partner(mol, atom, nb, sub_atoms) for nb in atom.GetNeighbors()):
+            return _hydrazine_root_prefix(mol, sub_atoms, attach_idx, parent_chain)
     return _located_fg_hetero_root(mol, sub_atoms, attach_idx)
+
+
+def _hydrazine_partner(mol: Any, atom: Any, nb: Any, sub_atoms: List[int]) -> bool:
+    """``nb`` is the second nitrogen of a hydrazine on the attachment nitrogen ``atom``: in the branch, bonded by a single
+    bond, neutral, in no ring, with no oxygen neighbour (not a nitroso, nitro, azo or ring nitrogen)."""
+    bond = mol.GetBondBetweenAtoms(atom.GetIdx(), nb.GetIdx())
+    return (nb.GetSymbol() == 'N' and nb.GetIdx() in sub_atoms and bond.GetBondTypeAsDouble() == 1.0
+            and not nb.GetFormalCharge() and not atom.GetFormalCharge() and not nb.IsInRing()
+            and all(x.GetSymbol() != 'O' for x in nb.GetNeighbors()))
+
+
+def _hydrazine_root_prefix(mol: Any, sub_atoms: List[int], attach_idx: int, parent_chain) -> Optional[str]:
+    """The prefix of a branch whose attachment nitrogen is bonded to another nitrogen of the branch: a substituent of
+    hydrazine. (the Blue Book): '2-[(propan-2-ylidene)hydrazinyl]benzoic acid (PIN)'; the prefixes of
+    hydrazine are 'hydrazinyl', 'hydrazinylidene' and 'hydrazine-1,2-diyl'. The functional-group namer
+    wrote the branch as amino on amino ('{[(propan-2-ylidene)amino]amino}', '(aminoamino)'), which the PIN tier never
+    builds. The branch is named by the PIN tier's route of ``name_substituent_fragment`` (the functional-group namer
+    off); where that route gives no name, the amino form stands, recorded below the PIN."""
+    from ..metrics.provenance import best_effort_ctx, record_non_pin_label
+    from .substituent_naming import _located_fg_hetero_root, name_substituent_fragment
+    if best_effort_ctx.get():
+        token = best_effort_ctx.set(False)
+        try:
+            name = name_substituent_fragment(mol, sub_atoms, attach_idx, list(parent_chain))
+        except Exception:  # noqa: BLE001 - a declining namer is a decline
+            name = None
+        finally:
+            best_effort_ctx.reset(token)
+        if name and 'hydrazin' in name:
+            return name
+    name = _located_fg_hetero_root(mol, sub_atoms, attach_idx)
+    if name and 'hydrazin' not in name:
+        record_non_pin_label(name, rule="P-68.3.1.2", detail="a hydrazine substituent is named on 'hydrazinyl'")
+    return name

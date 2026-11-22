@@ -428,6 +428,8 @@ def _numbered_name(mol: Chem.Mol, cand: _Candidate) -> Optional[str]:
 def name_a_chain(mol: Optional[Chem.Mol]) -> Optional[str]:
     """The 'a' PIN of an acyclic chain,:23348) whose principal group, if any, is -ol, -thiol or -amine,
     or None when the molecule is outside the vocabulary of this module or the chains that tie give two names."""
+    if note_onium_a_chain(mol):
+        return None
     candidates: List[_Candidate] = []
     unnamed: List[_Candidate] = []
     for cand in _chains(mol):
@@ -442,3 +444,62 @@ def name_a_chain(mol: Optional[Chem.Mol]) -> Optional[str]:
         return None
     names = {_numbered_name(mol, cand) for cand, rank in zip(candidates, ranks) if rank == top}
     return names.pop() if len(names) == 1 and None not in names else None
+
+
+# --- cations ------------------------------------------------------------------------------------------
+
+#: an onium centre that may be a skeletal atom of an 'a' chain: (element, number of carbon neighbours) -> the word of
+#: the mononuclear parent cation a substitutive name spells it with
+_ONIUM_WORD = {("S", 3): "sulfanium", ("Se", 3): "selanium", ("Te", 3): "tellanium", ("P", 4): "phosphanium",
+               ("As", 4): "arsanium"}
+_ONIUM_ALLOWED = _ALLOWED_ATOMS | {"As"}
+
+
+def _onium_word(atom: Chem.Atom) -> Optional[str]:
+    if atom.GetFormalCharge() != 1 or atom.GetTotalNumHs() or any(nb.GetSymbol() != "C" for nb in atom.GetNeighbors()):
+        return None
+    return _ONIUM_WORD.get((atom.GetSymbol(), atom.GetDegree()))
+
+
+def note_onium_a_chain(mol: Optional[Chem.Mol]) -> bool:
+    """True, after recording the substitutive names of the molecule below the PIN, when the molecule is a cation whose
+    PIN is a skeletal replacement ('a') name this module does not build.
+
+    ``### **** SKELETAL REPLACEMENT ('a') NOMENCLATURE FOR CATIONS`` (the Blue Book): method (1), "name the
+    compound using neutral skeletal replacement ('a') prefixes and then describe the cationic centers by the appropriate
+    suffix 'ium'": ``3,12-dimethyl-6,9-dioxa-3,12-dithiatetradecane-3,12-diium (PIN)`` (:41785), not the substitutive
+    ``1,2-bis{2-[ethyl(methyl)sulfaniumyl]ethoxy}ethane``. The chain holds four heterounits,:23348) when an
+    onium centre of sulfur, selenium, tellurium, phosphorus or arsenic with carbon neighbours only counts as one. An
+    aminium nitrogen is the principal characteristic group and no skeletal atom (:41775, '2-ethoxy-N-{2-[(2-ethoxyethyl)
+    (methyl)sulfaniumyl]ethyl}-N,N-dimethylethanaminium (PIN)', "does not have four heterounits"), and so is the amine
+    nitrogen of the neutral compound the cation is named from: a molecule with a nitrogen atom is left alone. The scope is the whole molecule named at the top level: one acyclic fragment, the
+    atoms of this module, every other atom neutral, single bonds at every heteroatom; the chain is a path between two
+    end atoms (C, or P, Si, Ge, B,:6465) with no two adjacent heteroatoms, an onium centre on it and four
+    heteroatoms in all."""
+    from ..assembly.fragment_naming import is_top_level_naming
+    if mol is None or mol.GetNumHeavyAtoms() > 60 or not is_top_level_naming():
+        return False
+    if len(Chem.GetMolFrags(mol)) != 1 or mol.GetNumBonds() != mol.GetNumAtoms() - 1:
+        return False
+    words = set()
+    for atom in mol.GetAtoms():
+        word = _onium_word(atom)
+        if word:
+            words.add(word)
+        elif (atom.GetFormalCharge() or atom.GetSymbol() not in _ONIUM_ALLOWED or atom.GetNumRadicalElectrons()
+              or atom.GetIsotope() or atom.GetSymbol() == "N"):
+            return False
+    if not words or any(b.GetBondType() != _SINGLE and not _carbon_bond(b) for b in mol.GetBonds()):
+        return False
+    ends = [a.GetIdx() for a in mol.GetAtoms() if a.GetDegree() == 1 and a.GetSymbol() in {"C"} | _END_HETERO]
+    for i, start in enumerate(ends):
+        for end in ends[i + 1:]:
+            path = Chem.GetShortestPath(mol, start, end)
+            hetero = [k for k, idx in enumerate(path) if mol.GetAtomWithIdx(idx).GetSymbol() != "C"]
+            if (len(hetero) >= _MIN_HETEROATOMS and all(b - a > 1 for a, b in zip(hetero, hetero[1:]))
+                    and any(_onium_word(mol.GetAtomWithIdx(path[k])) for k in hetero)):
+                from ..metrics.provenance import record_non_pin_label
+                for word in sorted(words):
+                    record_non_pin_label(word, rule="P-73.4", detail="the PIN of the cation is an 'a' name")
+                return True
+    return False

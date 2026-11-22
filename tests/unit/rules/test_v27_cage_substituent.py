@@ -109,10 +109,13 @@ def test_bicyclo_cage_substituent():
 def test_bridgehead_ene_cage_substituent():
     """The PIN skeleton: a bridgehead ene must keep its `n(m)` locant,
     the terminal `e` of the parent stem is elided before the `-yl` suffix, and
-    the free-valence locant is cited."""
+    the free-valence locant is cited. The free valence takes the low locant before
+    the 'ene' before: this is the book's own molecule,
+     (the Blue Book) '2-[bicyclo[6.6.1]pentadeca-8(15)-en-1-yl]ethan-1-ol
+    (PIN)' (rules/cage_free_valence.py; was '...pentadec-1(15)-en-8-yl')."""
     sub, attach = _detach("C12(CCCCCCC(CCCCCC1)=C2)CCO")
     name = _universal_cage_substituent_name(sub, attach)
-    assert name == "bicyclo[6.6.1]pentadec-1(15)-en-8-yl"
+    assert name == "bicyclo[6.6.1]pentadec-8(15)-en-1-yl"
     assert name.endswith("-yl") and "-en-" in name  # ene infix + free valence
 
 

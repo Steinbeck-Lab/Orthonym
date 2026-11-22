@@ -1935,9 +1935,9 @@ def is_complex_substituent(name: str) -> bool:
             _ny_head = name_lower[:-len(_n_ylidene)]
             if _ny_head and _ny_head not in ('di', 'tri', 'tetra', 'penta', 'hexa'):
                 return True
-    # An N-substituted carbamoyl / carbamothioyl is a compound prefix:
-    # '2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic acid (PIN)' (:33354).
-    for _carbamoyl in ('carbamoyl', 'carbamothioyl'):
+    # An N-substituted carbamoyl / carbamothioyl / oxamoyl is a compound prefix:
+    # '2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic acid (PIN)' (:33354); '(methyloxamoyl)'.
+    for _carbamoyl in ('carbamoyl', 'carbamothioyl', 'oxamoyl'):
         if name_lower.endswith(_carbamoyl) and name_lower != _carbamoyl:
             return True
     # (R-oxy)alkyl compound substituents per IUPAC / (
@@ -3718,15 +3718,10 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
 # Alphabetization Sort Key
 # ============================================================================
 
-# Prefixes to IGNORE for IUPAC alphabetization
-# These are multiplicative prefixes and sec-/tert- detachable prefixes
-IGNORE_FOR_ALPHA = {
-    "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "nona", "deca",
-    "undeca", "dodeca",
-    "bis", "tris", "tetrakis", "pentakis", "hexakis", "heptakis",
-    "octakis", "nonakis", "decakis",
-    "sec", "tert",
-}
+# Prefixes to IGNORE for IUPAC alphabetization: every multiplying prefix to 100, basic and 'kis',;
+#:3448 ignores them), and sec-/tert-. 'pentacosafluoro' keys at 'f', before '(hexafluoro-2-methylpropan-2-yl)'
+# ('1,1,...-pentacosafluoro-7-(1,1,1,3,3,3-hexafluoro-2-methylpropan-2-yl)dodecane (PIN)',:25799).
+IGNORE_FOR_ALPHA = {multiplying_prefix(n, kind) for n in range(2, 101) for kind in ("simple", "complex")} | {"sec", "tert"}
 
 # Note: iso-, neo-, cyclo- are INCLUDED in alphabetization
 # (they are non-detachable prefixes that affect alphabetical order)
@@ -3756,6 +3751,17 @@ def _numeral_chain_stems() -> frozenset:
 
 
 _NUMERAL_CHAIN_STEMS = _numeral_chain_stems()
+
+
+def _chain_stem_continues(prefix: str, remainder: str) -> bool:
+    """True when ``prefix`` (a multiplying prefix at the head of a name, ``remainder`` the rest) is a chain stem
+    plus its linking 'a' and the name goes on with the stem's own morphology: (b) 'an' (``pentan-``, ``hexane-``)
+    or (c) a multiplied 'en'/'yn' ('docosa' + 'hexaenoyl', 'icosa' + 'tetraenoyl'). A genuine multiplied prefix
+    never continues either way."""
+    if not (prefix.endswith('a') and prefix[:-1] in _NUMERAL_CHAIN_STEMS):
+        return False
+    return remainder.startswith('n') or bool(re.match(
+        r'(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|undeca|dodeca)(?:en|yn)', remainder))
 
 
 def _strip_leading_marks_and_locants(text: str) -> str:
@@ -3961,18 +3967,17 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
                 # multiplied prefix never continues that way.
                 if re.match(r'-\d', remainder):
                     return text
-                if prefix.endswith('a') and prefix[:-1] in _NUMERAL_CHAIN_STEMS \
-                        and text[len(prefix) - 1:].startswith(('an', 'en', 'yn')):
+                if _chain_stem_continues(prefix, remainder):
                     return text
                 # Wave2 T1c: do NOT strip when the "multiplier" is really the
                 # start of a numeric CHAIN STEM — there it is part of the name
                 # and alphabetizes: tridecyl/octadecyl ('tri'/'octa'
                 # + 'dec...'), pentacosyl ('cos...'), triacontyl ('acont...'),
                 # pentanamido/octadecanamido ('penta'/'octa' + 'nam...'),
-                # decanoyloxy ('deca' + 'noyl...'). A genuine multiplied
-                # prefix never continues with these stems.
-                if remainder.startswith(
-                        ('dec', 'cos', 'cont', 'acont', 'nam', 'noyl')):
+                # decanoyloxy ('deca' + 'noyl...'), tritriacontyl ('tri' + 'triacont...'),
+                # hectyl. A genuine multiplied prefix never continues with these stems.
+                if remainder.startswith(('dec', 'cos', 'cont', 'acont', 'nam', 'noyl', 'hect', 'triacont', 'tetracont',
+                                         'hexacont', 'heptacont', 'octacont', 'nonacont')):
                     return text
                 # vs, decided STRUCTURALLY rather than by
                 # whether the caller happened to wrap the string.

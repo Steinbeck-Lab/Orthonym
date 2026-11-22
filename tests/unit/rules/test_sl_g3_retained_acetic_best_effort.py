@@ -36,7 +36,9 @@ ROWS = [
     # 'hydrazinecarbohydrazido'): a non-PIN name; H2N-NH-CO- is 'hydrazinecarbonyl (preferred prefix)'
     #:33990; was '(aminocarbamoyl)', before that '(hydrazinecarboxamidoamino)')
     ("NNC(=O)NNCC(=O)O", "[2-(hydrazinecarbonyl)hydrazin-1-yl]acetic acid"),
-    ("NNC=NNCC(=O)O", "({[(aminoamino)methylidene]amino}amino)acetic acid"),
+    # the H2N-NH- end is 'hydrazinyl' Hydrazine and derivatives, the Blue Book 'H2N-NH–
+    # hydrazinyl (preselected prefix)'; was '(aminoamino)'); the -NH-N= unit keeps its amino spelling (non-PIN)
+    ("NNC=NNCC(=O)O", "{[(hydrazinylmethylidene)amino]amino}acetic acid"),
     ("COS(=O)OS(=O)OS(=O)OCC(=O)O", "{[({[(methoxysulfinyl)oxy]sulfinyl}oxy)sulfinyl]oxy}acetic acid"),
     # dev2000 / rows
     # '(diaminomethylidene)amino (preferred prefix)', (the Blue Book;

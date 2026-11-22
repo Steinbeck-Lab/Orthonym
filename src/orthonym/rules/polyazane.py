@@ -735,6 +735,8 @@ def name_polyazane(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
+    from .bis_azo import note_bis_azo
+    note_bis_azo(mol)                         #: no 'diazene' name of a bis(azo) compound is built
     # W3-P15: azoxy R-N=N(O)-R' is the zwitterionic N-oxide of a
     # diazene ([N+]=N with an [O-]); it must be recognised BEFORE the general
     # neutral-only charge guard below, which would otherwise decline it. Method

@@ -1766,9 +1766,8 @@ def _universal_cage_substituent_name(
     ``attach_sub`` is the free-valence atom index within it. Returns None on any
     refusal (spiro / >40 atoms / kekulize failure / mancude-with-flag-off /
     numbering that does not cover exactly the ring atoms) — fail-closed, never a
-    wrong or coverage-incomplete cage. The free-valence locant is the primary
-     numbering ``analyze_cage_universal`` assigns (a valid numbering ->
-    -safe); free-valence-lowest refinement is Task 5.
+    wrong or coverage-incomplete cage. The free valence then takes the lowest locant
+    the cage's symmetry allows, before the enes (``cage_free_valence``).
     """
     from .polycyclic import _build_parent_with_unsaturation
     from .vonbaeyer_universal import analyze_cage_universal
@@ -1803,10 +1802,11 @@ def _universal_cage_substituent_name(
                 sub, cage, cage_atoms, attach_sub)
             _loc = _numbering.get(attach_sub, loc)
             return f'{_retained}-{_loc}-yl'
-        # (c): the free valence takes the lowest locant the cage's symmetry allows, whatever the atom mapping
+        from .cage_free_valence import free_valence_first_enes  # (c),: the free valence, then enes
         _u = cage.unsaturation or {}
-        loc = _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub, preserve_kekule=bool(
-            _u.get('double_bonds') or _u.get('triple_bonds'))).get(attach_sub, loc)
+        loc, stem = free_valence_first_enes(sub, cage, cage_atoms, attach_sub, stem, allow_mancude) or (
+            _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub, preserve_kekule=bool(
+                _u.get('double_bonds') or _u.get('triple_bonds'))).get(attach_sub, loc), stem)
         return f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
     except Exception:
         return None

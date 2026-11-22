@@ -297,7 +297,9 @@ RECONSTRUCTED = {
     # 80 C chain from the CH2= end, 77 cumulated double bonds; C78 carries the second propan-2-yl
     "123257338": f"79-methyl-78-(propan-2-yl)octaconta-{_locants(1, 78)}-heptaheptacontaene",
     # 42 C, iodine at 15 and 28, fluorine on every other hydrogen position: 3 + 2*12 + 2*12 + 3 = 54
-    "165366016": f"15,28-diiodo-1,1,1,{_pairs(2, 14)},{_pairs(30, 42)},42,42,42-tetrapentacontafluorodotetracontane",
+    # 'fluoro' before 'iodo': (the Blue Book) leaves every multiplying prefix out of the order, as
+    # in '...-pentacosafluoro-7-(...hexafluoro...)dodecane (PIN)' (:25799)
+    "165366016": f"1,1,1,{_pairs(2, 14)},{_pairs(30, 42)},42,42,42-tetrapentacontafluoro-15,28-diiododotetracontane",
     # 29 C, one hydrogen left on C29: 3 + 2*28 = 59 fluorine
     "17970089": f"1,1,1,{_pairs(2, 30)}-nonapentacontafluorononacosane",
 }

@@ -511,6 +511,9 @@ _DEHYDRO_SITES = {
     # the =CH- ring-tie names step quotes "(other than 'hydro/dehydro' prefixes)" in its
     # docstring (P45, 2026-10-24); it compares names already built, it builds no dehydro prefix
     "rules/ring_tie_names.py",
+    # the cage free-valence step quotes "(hydro/dehydro prefixes and 'ene' and 'yne' endings)" in its
+    # docstring (lane/bb, 2026-11-22); it renumbers the free valence of a cage prefix, it builds no dehydro prefix
+    "rules/cage_free_valence.py",
 }
 
 

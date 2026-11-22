@@ -322,16 +322,17 @@ def test_task11_ornithine_still_abstains_safely(namer):
 
 
 def test_task11_e4_fail_closed_fallthrough():
-    """E4: a SYNTHETIC un-nameable arm -- a tertiary (N,N-disubstituted) amino
-    nitrogen on the amidine carbon -- makes the new W3-P02-8 detector decline
-    (>1 amino-N substituent is out of its envelope) and `name_substituent_fragment`
-    returns None for the arm. The FULL molecule then falls through with NO
-    wrong emission (0-wrong preserved)."""
+    """E4: an arm with a tertiary (N,N-disubstituted) amino nitrogen on the amidine
+    carbon. It was out of every detector's envelope (the fragment namer returned
+    None and the molecule fell through with no wrong emission); it is now named
+    'N,N-dimethylcarbamimidoyl' (assembly/amidine_prefix.py), as
+    spells it: '4-(N′-ethyl-N,N-dimethylcarbamimidoyl)benzoic acid (PIN)'
+    (the Blue Book). The whole molecule is checked below."""
     mol = Chem.MolFromSmiles("CCNC(=N)N(C)C")
     sub_atoms = [3, 4, 5, 6, 7]
     attach_idx = 3
     parent_chain = [2, 1, 0]
-    assert name_substituent_fragment(mol, sub_atoms, attach_idx, parent_chain) is None
+    assert name_substituent_fragment(mol, sub_atoms, attach_idx, parent_chain) == "N,N-dimethylcarbamimidoyl"
 
 
 @pytest.mark.opsin_gate

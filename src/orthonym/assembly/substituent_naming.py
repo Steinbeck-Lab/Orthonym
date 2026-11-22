@@ -7270,8 +7270,11 @@ def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
             # One branch: no citation-order ambiguity only governs
             # the SECOND and further substituent of a mononuclear parent), so the
             # lone-item enclosure test (compound -> marks, simple -> bare) is
-            # enough: 'methylamino', '(2-hydroxyethyl)amino'.
-            full = f"{_fg_enclose(subs[0])}amino"
+            # enough: 'methylamino', '(2-hydroxyethyl)amino'; a substituted ylidene is compound,:7232):
+            # '(aminomethylidene)amino', as '(diaminomethylidene)amino (preferred prefix)' (:17838)
+            from .naming_utils import apply_enclosing_marks, needs_brackets
+            full = (f"{apply_enclosing_marks(subs[0], -1)}amino" if subs[0].endswith('idene') and needs_brackets(subs[0])
+                    and not subs[0].startswith(('(', '[', '{')) else f"{_fg_enclose(subs[0])}amino")
         else:
             # properfix a performance pass : (the Blue Book) "For
             # mononuclear parent hydrides with two or more substituents the
@@ -8683,9 +8686,8 @@ def _name_substituent_fragment_uncached(
     # The amino nitrogen's own substituent (if any, beyond attach_idx) is
     # named via the SAME recursive substituent namer used everywhere else in
     # this cascade -- 0 substituents (bare -NH2) gives plain 'carbamimidoyl',
-    # exactly 1 gives 'N-{R}carbamimidoyl'. Fail-closed (returns None, falls
-    # through) for >1 amino-N substituent (a tertiary amino nitrogen -- not a
-    # plain amidine), a charged/ring atom anywhere in the shape, an
+    # 1 gives 'N-{R}carbamimidoyl', 2 'N-{R}-N-{R'}carbamimidoyl' (``amidine_prefix``). Fail-closed (returns None,
+    # falls through) for a charged/ring atom anywhere in the shape, an
     # unaccounted atom (no silent drop), or an amino-N substituent the
     # recursive namer cannot express.
     if attach_idx is not None and len(sub_atoms) >= 2:
@@ -8716,43 +8718,10 @@ def _name_substituent_fragment_uncached(
                             and not _im_n.IsInRing()
                             and _am_n.GetFormalCharge() == 0
                             and not _am_n.IsInRing()):
-                        _am_subs = [
-                            y.GetIdx() for y in _am_n.GetNeighbors()
-                            if y.GetIdx() != attach_idx
-                        ]
-                        if not _am_subs:
-                            return 'carbamimidoyl'
-                        if len(_am_subs) == 1:
-                            _r_seed = _am_subs[0]
-                            _block3 = {_im_n.GetIdx(), _am_n.GetIdx(), attach_idx}
-                            _r_atoms: List[int] = []
-                            _seen_r = set(_block3)
-                            _stack_r = [_r_seed]
-                            while _stack_r:
-                                _cur = _stack_r.pop()
-                                if _cur in _seen_r:
-                                    continue
-                                _seen_r.add(_cur)
-                                _r_atoms.append(_cur)
-                                for _nb in mol.GetAtomWithIdx(_cur).GetNeighbors():
-                                    if (_nb.GetIdx() in _sub_set3
-                                            and _nb.GetIdx() not in _seen_r):
-                                        _stack_r.append(_nb.GetIdx())
-                            # Every fragment atom must be accounted for by the
-                            # amidine core + the R branch -- no silent drop.
-                            if set(_r_atoms) | _block3 == _sub_set3:
-                                _r_name = name_substituent_fragment(
-                                    mol, _r_atoms, _r_seed,
-                                    list(parent_set | {attach_idx, _am_n.GetIdx()}),
-                                )
-                                if _r_name and ' ' not in _r_name:
-                                    from ..rules.benzene import (
-                                        _build_amidine_n_prefix,
-                                    )
-                                    _n_pfx = _build_amidine_n_prefix(
-                                        [('N', _r_name)])
-                                    if _n_pfx:
-                                        return f"{_n_pfx}carbamimidoyl"
+                        from .amidine_prefix import carbamimidoyl_on_n   # none, one or two N-substituents
+                        _cbm = carbamimidoyl_on_n(mol, attach_idx, _im_n.GetIdx(), _am_n, _sub_set3, parent_set)
+                        if _cbm:
+                            return _cbm
 
     # Wave2: aryl-vinyl / styryl — an acyclic UNSATURATED chain
     # bearing a ring substituent (Ar-CH=CH- -> (E)-2-phenylethenyl). MUST precede
@@ -8961,7 +8930,7 @@ def _name_substituent_fragment_uncached(
             _asym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
             if _asym in ('O', 'S', 'N'):
                 from .n_branch_prefixes import hetero_root_prefix   #: '{R}sulfonamido' first
-                _fg_name = hetero_root_prefix(mol, list(sub_atoms), attach_idx)
+                _fg_name = hetero_root_prefix(mol, list(sub_atoms), attach_idx, parent_chain)
             else:
                 # bugfix: request `with_pos=True` in the SAME call that builds `_fg_name`, and
                 # hand the resulting (name, k, pos) triple to `_add_substituent_stereo` as `located`. This chain
