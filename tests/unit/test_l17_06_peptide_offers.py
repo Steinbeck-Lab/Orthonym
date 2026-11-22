@@ -108,12 +108,13 @@ _ILE_TO_LEU_NH2 = (
     "N[C@H](C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C)C(=O)N[C@@H](CCCCN)C(=O)"
     "N[C@@H](CCCCN)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(N)=O)[C@@H](C)CC"
 )
-# what the sub-namer of the handler built for the Leu witness at 5cd9d81c3a: a name that reads back to the input
+# what the sub-namer of the handler builds for the Leu witness: a name that reads back to the input. Since the 'a' writer
+# names Asn side chains and side-chain stereocentres (lane oa-side, 2026-11-22) the N-terminal 13 residues are one 'a'
+# acylamino prefix on the prefix chain); the parent is still one amide of a structure with two
 _LEU_AMIDO_NAME = (
-    "(2S)-2-[(2S)-2-{(2S)-6-amino-2-[(2S)-6-amino-2-{(2S)-2-[(2S)-2-{(2S)-2-[(2S)-2-{(2S,3S)-2-[(2S)-2-{(2S)-6-amino-2-"
-    "[(2S)-2-{(2S)-4-amino-2-[(2S,3S)-2-amino-3-methylpentanamido]-4-oxobutanamido}-4-methylpentanamido]hexanamido}"
-    "propanamido]-3-methylpentanamido}propanamido]propanamido}-3-phenylpropanamido]propanamido}hexanamido]hexanamido}"
-    "-4-methylpentanamido]-4-methylpentanamide"
+    "(2S)-2-{(2S,5S,8S,11S,14S,17S,20S,23S,26S,29S,32S,35S,38S,39S)-38-amino-5,8,29-tris(4-aminobutyl)-35-(2-amino-2-"
+    "oxoethyl)-14-benzyl-23-[(2S)-butan-2-yl]-11,17,20,26,39-pentamethyl-2,32-bis(2-methylpropyl)-4,7,10,13,16,19,22,"
+    "25,28,31,34,37-dodecaoxo-3,6,9,12,15,18,21,24,27,30,33,36-dodecaazahentetracontan-1-amido}-4-methylpentanamide"
 )
 
 

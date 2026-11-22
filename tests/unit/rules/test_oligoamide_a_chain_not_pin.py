@@ -58,9 +58,10 @@ def test_n_acyl_aspartic_acid_keeps_the_pin():
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", [
-    # a side chain outside the vocabulary of the 'a' writer (butan-2-yl): no PIN is built (the rows it builds are in
-    # tests/unit/rules/test_oligoamide_a_name.py)
-    "CC(=O)N[C@@H]([C@@H](C)CC)C(=O)N[C@@H]([C@@H](C)CC)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](C(C)C)C(=O)OC",
+    # an acid beside an ester (an Asp side chain under a methyl ester): outside the vocabulary of the 'a' writer, no PIN
+    # is built (the rows it builds are in tests/unit/rules/test_oligoamide_a_name.py and test_oligoamide_a_side_chains.py;
+    # the Ac-Ile-Ile-Val-Val-OMe row that stood here takes its 'a' PIN now)
+    "NCC(=O)NCC(=O)NCC(=O)N[C@@H](CC(=O)O)C(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)OC",
 ])
 def test_oligoamide_substitutive_name_is_below_the_pin(smiles):
     assert tier_row(smiles, "pin")["tier"] == "abstain"
@@ -108,10 +109,14 @@ def test_lactone_or_ring_acid_is_not_read(smiles):
     # no name of these is the PIN; (:50943) leaves the choice between the two others open. A chain
     # of retained residues takes the peptide name,:54698), a capped or non-standard one the substitutive
     # name,:54251) -- the Blue Book reading the user asked for, 2026-11-22
-    # (side chains outside the vocabulary of the 'a' writer, so no PIN is built: a butan-2-yl and a carbamoylethyl)
-    ("CC[C@H](C)[C@@H](C(=O)N[C@@H](C)C(=O)NCC(=O)N[C@@H](CCC(=O)N)C(=O)O)NC(=O)CN", "glycylisoleucylalanylglycylglutamine"),
-    ("CC(=O)N[C@@H]([C@@H](C)CC)C(=O)NCC(=O)NCC(=O)NCC(=O)O",
-     "(2-{2-[(2S,3S)-2-acetamido-3-methylpentanamido]acetamido}acetamido)acetic acid"),
+    # (an Asp side chain in mid-chain, outside the vocabulary of the 'a' writer: the chain that holds both acids leaves
+    # the N-terminal residues as a prefix with amide nitrogens, which the writer does not build, so no PIN is built.
+    # The Ile and Gln rows that stood here take their 'a' PIN now: tests/unit/rules/test_oligoamide_a_side_chains.py)
+    ("C[C@@H](C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](C(C)C)C(=O)O)NC(=O)[C@H](CC(=O)O)NC(=O)CNC(=O)"
+     "[C@H](CC(C)C)NC(=O)[C@@H]1CCCN1", "prolylleucylglycylaspartylalanyllysylleucylvaline"),
+    ("CC(C)C(C(=O)NCC(=O)O)NC(=O)C(C(C)O)NC(=O)CNC(=O)C(CC(=O)O)NC(=O)CNC(=O)CNC(=O)C(CS)N",
+     "3-{2-[2-(2-amino-3-sulfanylpropanamido)acetamido]acetamido}-4-[(2-{[1-({1-[(carboxymethyl)amino]-3-methyl-"
+     "1-oxobutan-2-yl}amino)-3-hydroxy-1-oxobutan-2-yl]amino}-2-oxoethyl)amino]-4-oxobutanoic acid"),
 ])
 def test_which_non_pin_name_a_long_peptide_takes(smiles, name):
     row = tier_row(smiles, "best-effort")

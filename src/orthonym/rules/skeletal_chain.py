@@ -53,6 +53,7 @@ alphanumerical order. The name is ``<prefixes>-<'a' prefixes><parent>``, the pre
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -576,6 +577,38 @@ def _amide_n(mol: Chem.Mol, idx: int) -> bool:
         b.GetBondType() == _DOUBLE and b.GetOtherAtom(n).GetSymbol() == "O" for b in n.GetBonds())) == 1
 
 
+def _oxo_like(atom) -> bool:
+    """A double bond to N, O, S or Se, or a triple bond to N (an aromatic bond is neither: the indole of Trp)."""
+    return any((b.GetBondType() == _DOUBLE and b.GetOtherAtom(atom).GetSymbol() in ("N", "O", "S", "Se"))
+               or (b.GetBondType() == _TRIPLE and b.GetOtherAtom(atom).GetSymbol() == "N") for b in atom.GetBonds())
+
+
+def _guanidine_n(mol: Chem.Mol, idx: int) -> bool:
+    """The N of an Arg side chain between its carbon and the guanidine carbon. It may stand in a chain:
+    (the Blue Book) '9-imino-2,8,10,16-tetraazaheptadecanediimidamide (PIN)' puts the nitrogens beside a C=NH
+    carbon in the chain. A chain through it ends at the guanidine carbon, whose =NH (or the N=C bond in the chain) this
+    writer does not cite, so such a chain declines when it ranks first,:20916), and never wins unseen."""
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetSymbol() != "N" or atom.GetDegree() != 2 or atom.IsInRing() or atom.GetFormalCharge():
+        return False
+    for nb in atom.GetNeighbors():
+        if (nb.GetSymbol() == "C" and nb.GetDegree() == 3 and all(n.GetSymbol() == "N" for n in nb.GetNeighbors())
+                and any(b.GetBondType() == _DOUBLE for b in nb.GetBonds())):
+            return True
+    return False
+
+
+def _skeletal(mol: Chem.Mol, idx: int) -> bool:
+    """A heteroatom that may stand in the chain: an amide nitrogen, or a saturated atom of which neither it nor a
+    neighbour carries a double bond to N, O, S or Se (the reading of ``checks_skeletal_chain``): no nitrogen of a
+    guanidine or amidine, whose group is a prefix."""
+    if _amide_n(mol, idx) or _guanidine_n(mol, idx):
+        return True
+    atom = mol.GetAtomWithIdx(idx)
+    return (all(b.GetBondType() == _SINGLE for b in atom.GetBonds())
+            and not _oxo_like(atom) and not any(_oxo_like(n) for n in atom.GetNeighbors()))
+
+
 def _acylamino_name(mol: Chem.Mol, root: int, part: List[int]) -> Optional[str]:
     """'formamido', 'acetamido', 'propanamido',... for -NH-CO-R with R an unbranched saturated alkyl
     method (1), the Blue Book "Method (1) generates preferred IUPAC names"); None otherwise. ``part`` is the whole
@@ -629,11 +662,57 @@ def _shared_prefix_name(mol: Chem.Mol, attach: int, root: int, part: List[int], 
     """The prefix of any other part on a chain carbon ('(4-hydroxyphenyl)methyl', 'hydroxymethyl', '4-aminobutyl')
     from the shared substituent namer, when the part holds no acid group or amide (whose principal-group status the
     chain is built on); None otherwise. The ring of such a part is no chain atom (the chain uses acyclic atoms)."""
-    if any(i in acid for i in part) or any(_amide_n(mol, i) for i in part):
+    # a terminal NH2 of an amide (the carbamoyl end of an Asn or Gln side chain, '2-amino-2-oxoethyl') is no
+    # skeletal amide nitrogen: it ends no chain, the chain ends are carbons)
+    if any(i in acid for i in part) or any(_amide_n(mol, i) and mol.GetAtomWithIdx(i).GetDegree() > 1 for i in part):
         return None
+    if any(b.GetBondType() == _DOUBLE and {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()} == {"C", "N"}
+           for i in part for b in mol.GetAtomWithIdx(i).GetBonds()):
+        return _guanidine_alkyl(mol, root, part)     # a C=N group: only the Arg side chain is read
     from ..assembly.substituent_naming import name_substituent_fragment
     named = name_substituent_fragment(mol, sorted(part), root, [attach])
     return named if named and "substituent" not in named else None
+
+
+def _guanidine_alkyl(mol: Chem.Mol, root: int, part: List[int]) -> Optional[str]:
+    """'3-(carbamimidoylamino)propyl' or '3-[(diaminomethylidene)amino]propyl' for an unbranched saturated carbon
+    chain from ``root`` whose last carbon carries the guanidine of an arginine side chain; None for any other part."""
+    carbons, prev, here = [], None, root
+    while True:
+        atom = mol.GetAtomWithIdx(here)
+        if atom.GetSymbol() != "C" or atom.IsInRing() or any(b.GetBondType() != _SINGLE for b in atom.GetBonds()):
+            return None
+        carbons.append(here)
+        nxt = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() != prev and n.GetIdx() in part]
+        if len(nxt) != 1:
+            return None
+        if mol.GetAtomWithIdx(nxt[0]).GetSymbol() == "N":
+            break
+        prev, here = here, nxt[0]
+    nh = mol.GetAtomWithIdx(nxt[0])
+    if nh.GetDegree() != 2 or nh.GetFormalCharge():
+        return None
+    centre = next(n for n in nh.GetNeighbors() if n.GetIdx() != here)
+    if centre.GetSymbol() != "C" or centre.GetDegree() != 3 or centre.GetIdx() not in part or centre.GetFormalCharge():
+        return None
+    # either tautomer of the guanidine: -NH-C(=NH)-NH2 or -N=C(NH2)2 (one structure for the InChI, mobile H)
+    kinds = sorted((mol.GetBondBetweenAtoms(centre.GetIdx(), n.GetIdx()).GetBondType() == _DOUBLE,
+                    n.GetTotalNumHs()) for n in centre.GetNeighbors()
+                   if n.GetSymbol() == "N" and (n.GetDegree() == 1 or n.GetIdx() == nh.GetIdx())
+                   and not n.GetFormalCharge())
+    if len(part) != len(carbons) + 4:
+        return None
+    # (the Blue Book): 'carbamimidoylamino (preferred prefix)' for H2N-C(=NH)-NH- and
+    # '(diaminomethylidene)amino (preferred prefix)' for (H2N)2C=N- ('4-[(diaminomethylidene)amino]butanoic acid
+    # (PIN)',:34282): the tautomer as drawn
+    if kinds == [(False, 1), (False, 2), (True, 1)]:
+        group = "(carbamimidoylamino)"
+    elif kinds == [(False, 2), (False, 2), (True, 0)]:
+        group = "[(diaminomethylidene)amino]"
+    else:
+        return None
+    n = len(carbons)
+    return f"{n}-{group}{get_chain_prefix(n)}yl" if n > 1 else f"{group}methyl"
 
 
 def _acyl_in_scope(mol: Optional[Chem.Mol]) -> bool:
@@ -653,10 +732,13 @@ def _acyl_in_scope(mol: Optional[Chem.Mol]) -> bool:
         kind = bond.GetBondType()
         if kind not in (_SINGLE, _DOUBLE, _TRIPLE):
             return False
-        # a C=O is a suffix or an 'oxo' group; a multiple bond between carbons needs ene/yne terms,
+        # a C=O is a suffix or an 'oxo' group; a C=N stands in a prefix (the guanidine of an Arg side chain,
+        # '3-(carbamimidoylamino)propyl'): its atoms are no chain atoms (``_skeletal``) and a chain carbon that carries
+        # one declines in ``_acyl_pendant``; a multiple bond between carbons needs ene/yne terms,
         #:6502), which this step does not build
         if kind != _SINGLE and not (
-                kind == _DOUBLE and {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()} == {"C", "O"}):
+                kind == _DOUBLE and {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()} in ({"C", "O"},
+                                                                                                        {"C", "N"})):
             return False
     return True
 
@@ -704,7 +786,7 @@ def _name_acyl_a_chain(mol: Optional[Chem.Mol]) -> Optional[str]:
     if stereo is None:
         return None
     allowed = {a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in acid_atoms and not a.IsInRing()
-               and (a.GetSymbol() == "C" or a.GetSymbol() in _E)}
+               and (a.GetSymbol() == "C" or (a.GetSymbol() in _E and _skeletal(mol, a.GetIdx())))}
     chain_ends = [i for i in allowed if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
     scored = []
     for k, start in enumerate(chain_ends):
@@ -723,7 +805,9 @@ def _name_acyl_a_chain(mol: Optional[Chem.Mol]) -> Optional[str]:
             if not _chain_atoms_ok(mol, chain):
                 continue
             members = set(chain)
-            pendants, known = [], True
+            pendants, known, covered = [], True, set(members)
+            if any(mol.GetBondBetweenAtoms(a, b).GetBondType() != _SINGLE for a, b in zip(chain, chain[1:])):
+                known = False                   # a double bond in the chain needs an 'ene' term
             for idx in chain:
                 if idx in ends:
                     continue
@@ -731,12 +815,16 @@ def _name_acyl_a_chain(mol: Optional[Chem.Mol]) -> Optional[str]:
                     if nb.GetIdx() in members:
                         continue
                     name = _acyl_pendant(mol, idx, nb.GetIdx(), members, acid_atoms)
+                    if name is not None:
+                        name = _pendant_with_stereo(mol, nb.GetIdx(), members, name, stereo, covered)
                     if name is None:
                         known = False
                         break
                     pendants.append((idx, name))
                 if not known:
                     break
+            if any(i not in covered for i in stereo):
+                known = False                   # a stereocentre in an ester part or a prefix not read here
             hetero = [mol.GetAtomWithIdx(i).GetSymbol() for i in chain if mol.GetAtomWithIdx(i).GetSymbol() in _E]
             groups = sum(1 for i in chain if i in ends)
             rank = (groups, len(hetero), len(chain)) + tuple(hetero.count(el) for el in _E_ORDER)
@@ -749,8 +837,43 @@ def _name_acyl_a_chain(mol: Optional[Chem.Mol]) -> Optional[str]:
     # vocabulary declines,:23348)
     if top[0] != len(ends) or top[1] < _MIN_HETEROATOMS or not all(known for _, known, _, _ in best):
         return None
-    names = {_acyl_numbered_name(mol, chain, pendants, ends, ester, stereo) for _, _, chain, pendants in best}
+    names = {_acyl_numbered_name(mol, chain, pendants, ends, ester, {i: stereo[i] for i in chain if i in stereo})
+             for _, _, chain, pendants in best}
     return names.pop() if len(names) == 1 and None not in names else None
+
+
+_FREE_VALENCE = re.compile(r"-(\d+)-yl$")
+_CITED = re.compile(r"^\(((?:\d+[RS],)*\d+[RS])\)-")
+
+
+def _pendant_with_stereo(mol, root, members, name, stereo, covered) -> Optional[str]:
+    """``name`` with the CIP descriptor of its stereocentre when the prefix holds one (an Ile or Thr side chain:
+    '(2S)-butan-2-yl', '(1R)-1-hydroxyethyl'), else ``name``; None when the prefix holds a centre this step does not
+    place: more than one, one that is not the attachment atom, or one in a ring. The descriptor is the label of the
+    centre in the whole molecule, cited with the locant of the prefix, the Blue Book;
+    descriptors of a substituent group precede its name inside its enclosing marks). Adds the centre to ``covered``."""
+    part = _part_from(mol, root, members)
+    centres = [i for i in part if i in stereo]
+    if not centres:
+        return name
+    cited = _CITED.match(name)
+    if cited:
+        # the shared substituent namer cites the descriptors itself ('(2S)-butan-2-yl'): one for each centre
+        if len(cited.group(1).split(",")) != len(centres):
+            return None
+        covered.update(centres)
+        return name
+    if centres != [root] or any(mol.GetAtomWithIdx(i).IsInRing() for i in part):
+        return None
+    found = _FREE_VALENCE.search(name)
+    if found:
+        locant = found.group(1)
+    elif name.endswith("yl") and re.match(r"(\d+,)*1(,\d+)*-", name):
+        locant = "1"                            # '1-hydroxyethyl': the free valence of an 'alkyl' name is at 1
+    else:
+        return None
+    covered.add(root)
+    return f"({locant}{stereo[root]})-{name}"
 
 
 def _acyl_numbered_name(mol, chain, pendants, ends, ester, stereo=None) -> Optional[str]:

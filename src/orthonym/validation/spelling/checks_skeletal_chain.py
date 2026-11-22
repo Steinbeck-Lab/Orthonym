@@ -433,11 +433,32 @@ def a_substituent_chain_name_check(mol, name) -> Optional[SpellingFailure]:
               "between its carbon ends (P-51.4.1.1, P-51.4.1.4), and the name has no 'a' prefix block on an acyclic stem")
 
 
+#: the end of the word after an 'a' stem when the 'a' chain is a parent: the suffix of an acid, ester, acyl halide,
+#: anhydride or peroxy acid ('...tetraazatriacontan-30-oate',, the Blue Book; '...pentadec-2-enoic
+#: acid'), or the alcohol word of an ester ('3,6,9,12,15,18,21,24,27-nonaoxahentriacontan-1-yl acetate', '...-1,14-diyl
+#: diacetate',. The word runs to a space or the end without an enclosing mark: a prefix ('...-1-amido}',
+#: '...-1-yl)amino') never matches.
+_ACID_SUFFIX_AFTER_STEM = re.compile(r"[a-z0-9,\-]*?(?:o(?:ic acid|ate|yl |ic anhydride|peroxoic acid)|yl )")
+
+
+def names_an_a_acid_parent(name: str) -> bool:
+    """True when an 'a' block of ``name`` carries the acid (ester, acyl halide) suffix itself, or is the alcohol word of
+    an ester: the 'a' chain is a parent, not a prefix ('...-tetraazapentadecan-1-amido}...propanoic acid' has the block on a prefix only)."""
+    return bool(name) and any(_ACID_SUFFIX_AFTER_STEM.match(name, m.end()) for m in _A_NAME.finditer(name))
+
+
 @register(RULE)
 def a_chain_name_check(mol, name) -> Optional[SpellingFailure]:
     """A failure when ``mol`` is a chain that gives an 'a' PIN and ``name`` has no 'a' block; None when
-    the rule does not apply (or is not read) or the name has the block."""
-    if not name or not a_chain_applies(mol) or names_an_a_chain(name):
+    the rule does not apply (or is not read) or the name has the block. With a group senior to amides (an acid, its
+    ester or acyl halide) the block must carry that group's suffix: (:18875) puts the principal group on the
+    parent, so an 'a' block on a prefix leaves the chain of the structure unnamed as the 'a' parent."""
+    if not name or not a_chain_applies(mol):
+        return None
+    if mol.HasSubstructMatch(_SENIOR_TO_AMIDE):
+        if names_an_a_acid_parent(name):
+            return None
+    elif names_an_a_chain(name):
         return None
     return SpellingFailure(
         RULE, "skeletal replacement 'a' name required: the acyclic chain has four or more heterounits, none "
