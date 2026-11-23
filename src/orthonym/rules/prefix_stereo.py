@@ -183,7 +183,9 @@ def scoped_over_front(composed: Optional[str], flat_name: str, smiles: str, in_k
     if not composed or composed == flat_name or not composed_reads_back(composed, smiles, in_key):
         return composed
     scoped = placed_in_prefixes(flat_name, smiles)
-    return scoped if scoped and composed_reads_back(scoped, smiles, in_key) else composed
+    chosen = scoped if scoped and composed_reads_back(scoped, smiles, in_key) else composed
+    from .ylidene_nitrogen_stereo import ylidene_nitrogen_name  # an '-ylidene' on a parent nitrogen: below the PIN
+    return ylidene_nitrogen_name(chosen, smiles)
 
 
 def placed_in_prefixes(flat_name: str, smiles: str) -> Optional[str]:
@@ -232,7 +234,10 @@ def place_pair_by_scope(flat_name: str, smiles: str, labelled, swapped: frozense
     return found if isinstance(found, tuple) else None
 
 
-def _placed(flat_name: str, smiles: str, labelled=None, swapped: frozenset = frozenset()):
+def _placed(flat_name: str, smiles: str, labelled=None, swapped: frozenset = frozenset(), kept_inside=None):
+    """The placement of:func:`placed_in_prefixes`. The double bond that joins an '-ylidene' prefix to a NITROGEN of the
+    part that holds it keeps its descriptor at the front of the prefix (method (b), ``rules.ylidene_nitrogen_stereo``);
+    with ``kept_inside`` (a set) its bond index is added to the set."""
     from ..namer import (Orthonym, _has_lone_pair_stereocentre, _lone_pair_as_written, _self_consistency_full_key,
                          _validity_gate_name_to_opsin_smiles)
     from ..perception.stereo import assign_stereochemistry
@@ -283,6 +288,11 @@ def _placed(flat_name: str, smiles: str, labelled=None, swapped: frozenset = fro
             host, texts, attached = _attachment_texts(flat_name, hit[0], unit[2])
             if not _is_attachment_bond(mol, unit[1], locants, attached):
                 texts = []          # a double bond inside the '-ylidene' group ('prop-2-en-1-ylidene', C-2=C-3) stays
+            elif host == _word_front(flat_name, hit[0]) and _ylidene_carbon_on_host_nitrogen(
+                    mol, unit[1], locants, attached, flat_name[hit[0]:]):
+                if kept_inside is not None:
+                    kept_inside.add(unit[1])
+                texts = []          # an '-ylidene' on a nitrogen of its host: method (b), user decision 2026-11-23
             for text in texts:
                 readings += 1
                 if readings > _MAX_READINGS:
@@ -319,6 +329,39 @@ def _placed(flat_name: str, smiles: str, labelled=None, swapped: frozenset = fro
     for place in sorted(record, reverse=True):
         first = _with_block(first, place, ",".join(sorted(record[place], key=_descriptor_key)))
     return first, name
+
+
+#: '-ylidene' prefixes whose attachment atom is a nitrogen
+_NITROGEN_YLIDENES = ("hydrazinylidene", "azanylidene", "aminylidene", "iminylidene", "diazenylidene")
+
+
+def _ylidene_carbon_on_host_nitrogen(mol, bond_idx: int, locants: Dict[int, object], attached: str,
+                                     prefix_onward: str = "") -> bool:
+    """Whether the attachment bond joins the CARBON of an '-ylidene' prefix (the one atom of the bond with the prefix's
+    attachment locant ``attached``) to a NITROGEN of the part that holds it ('N'-(propylidene)...hydrazide'), not the
+    nitrogen of a 'hydrazinylidene' prefix to a carbon of its host ('2-[(...)hydrazinylidene]propanoic acid')."""
+    from .stereochemistry import _render_locant_token
+    if attached == "N":
+        return False
+    bond = mol.GetBondWithIdx(bond_idx)
+    atoms = (bond.GetBeginAtom(), bond.GetEndAtom())
+    own = [a for a in atoms if a.GetIdx() in locants and _render_locant_token(locants[a.GetIdx()]) == attached]
+    if len(own) == 2:
+        # both atoms carry the locant ('ethylidenehydrazine': C-1 of the prefix, N-1 of the hydrazine): the prefix's
+        # own word tells which atom is its attachment atom
+        level, end = 0, len(prefix_onward)
+        for i, ch in enumerate(prefix_onward):
+            level += ch in _OPEN
+            level -= ch in ")]}"
+            if level == 0 and i:
+                end = i
+                break
+        nitrogen_prefix = prefix_onward[:end].endswith(_NITROGEN_YLIDENES)
+        own = [a for a in own if a.GetSymbol() == ("N" if nitrogen_prefix else "C")]
+    if len(own) != 1:
+        return False
+    other = atoms[1] if own[0].GetIdx() == atoms[0].GetIdx() else atoms[0]
+    return own[0].GetSymbol() == "C" and other.GetSymbol() == "N"
 
 
 def _descriptor_key(text: str):

@@ -5291,10 +5291,9 @@ class Orthonym:
                         atom_to_locant=_conf.get('atom_to_locant'),
                         is_phenol_benzene=_conf.get('is_phenol_benzene'),
                     ))
-                    # Universal OPSIN-grammar backstop (a phase,).
-                    # Order: stereo-backstop -> grammar-backstop. Stereo
-                    # may have repositioned descriptors that grammar
-                    # then re-validates.
+                    from .rules.ylidene_nitrogen_stereo import ylidene_nitrogen_name  # C=N to a parent N: method (b)
+                    result = _carried(result, ylidene_nitrogen_name(result, smiles))
+                    # OPSIN-grammar backstop (a phase,) after the stereo one, which may move descriptors.
                     result = _carried(result, _final_grammar_check(
                         result, smiles, handler,
                         self._grammar, self._grammar_stats,
