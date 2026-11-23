@@ -27,6 +27,7 @@ name -- and ships only when OPSIN reads the name back to exactly the drawn struc
 Such a name is never a PIN (the Blue Book).
 """
 
+import re
 import contextvars
 import threading
 from typing import Dict, List, Optional, Tuple
@@ -1225,7 +1226,19 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 general_fallback_unverified: bool = False) -> Optional[str]:
     """:func:`_name_adduct_body`; when it names nothing, a drawing of one-atom components with at least one bare atom
     is named as an element set at the best-effort tier (``_element_set_name``: 'iron—nickel (1/1)', 'alumane—iron
-    (1/1)'). After the body, so that no adduct it names changes ('zinc—water (1/1)')."""
+    (1/1)'). After the body, so that no adduct it names changes ('zinc—water (1/1)'). The name ships in the order of
+    its components that OPSIN reads (:func:`readable_component_order`)."""
+    name = _name_adduct_any(mol, canonical_smiles, style, general_fallback=general_fallback,
+                            allow_aromatic_general=allow_aromatic_general,
+                            general_fallback_unverified=general_fallback_unverified)
+    return readable_component_order(name, mol) if name else name
+
+
+def _name_adduct_any(mol, canonical_smiles: Optional[str] = None,
+                     style: str = "pin", *,
+                     general_fallback: bool = False,
+                     allow_aromatic_general: bool = False,
+                     general_fallback_unverified: bool = False) -> Optional[str]:
     name = _name_adduct_body(mol, canonical_smiles, style, general_fallback=general_fallback,
                              allow_aromatic_general=allow_aromatic_general,
                              general_fallback_unverified=general_fallback_unverified)
@@ -1239,6 +1252,53 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         return None
     return (_element_set_name(components, frag_mols, mol)
             or _component_adduct_name(components, frag_mols, mol, style))
+
+
+def readable_component_order(name: str, mol) -> str:
+    """``name``, or the same components in the order OPSIN reads when OPSIN rejects ``name``.
+
+    OPSIN reads a radical component of an adduct name ('-yl', '-ylidene', 'nitroso', and 'dihydrogen' as well) only
+    as the LAST component; anywhere else it reads it as a prefix of the next one ("believes there to be 1 components
+    but 2 ratios were given": 'stannylidene—tin (1/1)' fails, 'tin—stannylidene (1/1)' reads). Such a name passes
+    the gates today through its order twin (``validation.twin_spellings.component_order_twins``) and shipped in the
+    class order no reader reads "Organic adducts", the Blue Book, cites the components "in the order
+    of seniority of classes", radicals first). An adduct name is no PIN "General organic method for
+    naming Lewis adducts",:37556, "these 'adduct names' are not PINs";,:4667), and the order of its
+    components carries no structure, so the name ships with one component moved to the end: the first such move, in
+    component order, that OPSIN reads and that reproduces the drawn structure (``_parse_reproduces_depiction``). The
+    class order (and water cited last,:4665) is kept whenever OPSIN reads it; a name OPSIN reads in another
+    order beats no name at the tiers that ship adducts. Only
+    where the OPSIN in use reads adducts with a radical component (``opsin_capabilities.radical_adduct_enabled``;
+    OPSIN 2.9.0 reads none in any order). The label records of ``name`` carry over to the shipped order."""
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    m = _ADDUCT_ORDER.fullmatch(name)
+    if m is None or not radical_adduct_enabled():
+        return name
+    parts, ratio = m.group("body").split(EM_DASH), m.group("ratio").split("/")
+    if len(parts) != len(ratio) or len(parts) > _MAX_REORDERED:
+        return name
+    from orthonym.namer import Orthonym, _validity_gate_name_to_smiles
+    if _validity_gate_name_to_smiles(name) is not None:
+        return name
+    drawn = Chem.MolToSmiles(mol) if mol is not None else None
+    for k in range(len(parts) - 1):
+        order = [i for i in range(len(parts)) if i != k] + [k]
+        twin = (EM_DASH.join(parts[i] for i in order) + " (" + "/".join(ratio[i] for i in order) + ")")
+        read = _validity_gate_name_to_smiles(twin)
+        # the order ships only where the round-trip compare of the shipped name accepts it (``Orthonym._rt_match``):
+        # it compares SMILES, and '[HH]' drawn is '[H][H]' read, so a dihydrogen component keeps its old order and
+        # the name its old route (no name is lost)
+        if (read is not None and _parse_reproduces_depiction(twin, mol)
+                and (drawn is None or Orthonym._rt_match(drawn, read, False))):
+            from orthonym.metrics.provenance import record_derived_non_pin_label
+            return record_derived_non_pin_label(name, twin) or twin
+    return name
+
+
+#: an adduct name: components joined by em dashes, then the proportions
+_ADDUCT_ORDER = re.compile(r"(?P<body>[^—]+(?:—[^—]+)+) \((?P<ratio>\d+(?:/\d+)+)\)")
+#: the most components whose orders are read (each move is one OPSIN read)
+_MAX_REORDERED = 8
 
 
 def _one_atom_component_word(smi: str, frag, gated: Dict[str, str], style: str = "pin") -> Optional[str]:

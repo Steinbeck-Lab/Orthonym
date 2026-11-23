@@ -30,7 +30,8 @@ _RADICAL = [
     ("CCO.[O]", "ethanol—oxidanylidene (1/1)", "opsin"),
     ("CC(=O)O.C1=CC=C(C=C1)C[Sn](CC2=CC=CC=C2)CC3=CC=CC=C3", "acetic acid—tribenzylstannyl (1/1)", "opsin"),
     ("CCCC=CC(=O)O.[PbH2]", "hex-2-enoic acid—plumbylidene (1/1)", "opsin"),
-    ("O.O.[Ni].[SnH2]", "nickel—stannylidene—water (1/1/2)", "opsin_twin"),
+    # the radical last, after water: the order OPSIN reads (``rules.adducts.readable_component_order``; no PIN)
+    ("O.O.[Ni].[SnH2]", "nickel—water—stannylidene (1/2/1)", "opsin"),
 ]
 
 
