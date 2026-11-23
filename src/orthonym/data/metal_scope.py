@@ -174,7 +174,7 @@ charge plus its number of bonds). The Group 1 elements carry +1 and the Group 2 
 carries +2. The metals of ``BONDED_METAL_VALENCES`` (Al, Hg, Pd, Pt, Ru, Ti, V, W) and of
 ``MORE_BONDED_METAL_VALENCES`` (38 more) are admitted to every mechanism zinc has, with the charges listed there,
 and are not complete; the ions of ``RETAINED_ION_METALS`` that have a retained name keep it. The metals of
-``ELEMENT_ONLY_METALS`` are admitted to ``ELEMENT`` alone.
+``ELEMENT_ONLY_METALS`` are admitted to ``ELEMENT`` and ``ZERO_VALENT`` alone.
 """
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, Iterable
@@ -253,8 +253,9 @@ MORE_BONDED_METAL_VALENCES = {"Zr": (2, 3, 4), "Hf": (4,), "Fe": (2, 3), "Co": (
 RETAINED_ION_METALS = frozenset({"Ag", "Au", "Co", "Cr", "Cu", "Fe", "Mn", "Ni"})
 
 #: the metals no other mechanism admits: the f-block elements, technetium and the superheavy metals. Lane LONE
-#: (2026-11-01) admits them to ``ELEMENT`` alone, measured on the 1,326 lone-atom compounds of PubChem
-#: (`internal notes`) with no wrong name
+#: (2026-11-01) admits them to ``ELEMENT``, measured on the 1,326 lone-atom compounds of PubChem
+#: (`internal notes`) with no wrong name; the PubChem still-unnamed lane (2026-11-23) to
+#: ``ZERO_VALENT`` too ('curium(0)' beside ions, which OPSIN reads as the neutral atom drawn), measured on its panel
 ELEMENT_ONLY_METALS = ("Tc", "Pm", "Th", "Pa", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Md", "No", "Lr",
                        "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn")
 
@@ -280,7 +281,7 @@ METAL_SCOPE: Dict[str, MetalScope] = {
                                 RECONNECT_RADICAL, CONNECT_ANION, BONDED_NAMES, AMMINE}),
                      frozenset({2})),
     **{symbol: MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
-    **{symbol: MetalScope(frozenset({ELEMENT}), frozenset()) for symbol in ELEMENT_ONLY_METALS},
+    **{symbol: MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()) for symbol in ELEMENT_ONLY_METALS},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in BONDED_METAL_VALENCES.items()},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in MORE_BONDED_METAL_VALENCES.items()},
     # the Group 13 metals take the cations of their preselected hydrides too ('acetyl(ethoxy)alumanylium',

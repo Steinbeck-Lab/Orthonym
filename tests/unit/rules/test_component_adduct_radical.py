@@ -9,6 +9,7 @@ names' are not PINs",:37556), and a name no reader reads left these rows unnamed
 (``validation.twin_spellings``) still prove the structure of a name built in the class order.
 """
 import pytest
+from rdkit import Chem
 
 from orthonym import opsin_capabilities as caps
 from orthonym.validation import twin_spellings as T
@@ -129,3 +130,52 @@ def test_readable_order_needs_the_radical_adduct_reader(monkeypatch):
     A = _stub_reader(monkeypatch, {"b—a (2/1)"})
     monkeypatch.setattr(caps, "radical_adduct_enabled", lambda: False)
     assert A.readable_component_order("a—b (1/2)", None) == "a—b (1/2)"
+
+
+def test_readable_spelling_respells_hydrogen_deuteride_without_the_radical_reader(monkeypatch):
+    """The binary names 'hydrogen deuteride' and 'hydrogen tritide', the Blue Book) read on
+    OPSIN 2.9.0 too, so the respelling needs no radical adduct reader; the order moves still do."""
+    A = _stub_reader(monkeypatch, {"ethanol—hydrogen deuteride (1/1)", "hydrogen tritide—water (1/2)"})
+    monkeypatch.setattr(caps, "radical_adduct_enabled", lambda: False)
+    assert A.readable_component_order("ethanol—(2H1)dihydrogen (1/1)", None) == "ethanol—hydrogen deuteride (1/1)"
+    assert A.readable_component_order("(3H1)dihydrogen—water (1/2)", None) == "hydrogen tritide—water (1/2)"
+    assert A.readable_component_order("(2H2)dihydrogen—water (1/2)", None) == "(2H2)dihydrogen—water (1/2)"
+
+
+def test_compare_reading_takes_a_counted_hydrogen_as_an_atom():
+    """RDKit holds a drawn '[HH]' as one atom with a hydrogen count and a read 'dihydrogen' as two atoms: one molecule,
+    so the round-trip compare (``Orthonym._rt_match``) accepts the read; no other hydrogen changes."""
+    from orthonym.namer import Orthonym
+    from orthonym.perception.lone_pair_reading import compare_reading_mol
+    assert Orthonym._rt_match("CCO.[HH]", "[H][H].C(C)O", False)
+    assert Orthonym._rt_match("[2HH].O", "O.[H][2H]", False)
+    assert not Orthonym._rt_match("[2HH].O", "O.[H][H]", False)
+    assert Chem.MolToSmiles(compare_reading_mol("[H-].[Na+]")) == "[H-].[Na+]"
+    assert Chem.MolToSmiles(compare_reading_mol("[3HH]")) == "[H][3H]"
+
+
+@needs_main
+@pytest.mark.parametrize("smiles,name", [
+    ("[HH].O.O.O.O", "water—dihydrogen (4/1)"),
+    ("[HH].O.c1ccncc1", "pyridine—water—dihydrogen (1/1/1)"),
+])
+def test_dihydrogen_ships_last_on_opsin_main(smiles, name):
+    r = name_best_effort(smiles)
+    assert r["name"] == name and r["verified"] == "opsin" and not r["is_pin"], r
+
+
+def test_respelling_needs_no_order_cap(monkeypatch):
+    """The respelling is one read, so a mixture of more components than the order moves try still takes it."""
+    parts = [f"c{i}" for i in range(10)]
+    readable = "—".join(parts + ["hydrogen deuteride"]) + " (" + "/".join("1" * 11) + ")"
+    A = _stub_reader(monkeypatch, {readable})
+    name = "—".join(parts + ["(2H1)dihydrogen"]) + " (" + "/".join("1" * 11) + ")"
+    assert A.readable_component_order(name, None) == readable
+
+
+def test_radical_check_reads_a_counted_hydrogen_as_atoms():
+    """The radical identity check of a shipped name compares graphs; a lone boron beside HD drawn '[2HH]' and read
+    '[H][2H]' is one graph ('...—boron—hydrogen deuteride' lost its name when the check compared the two spellings)."""
+    from orthonym.validation.radical_identity import radical_identity_verdict
+    assert radical_identity_verdict("C.[2HH].[B]", "[H][2H].[B].C") == "ok"
+    assert radical_identity_verdict("C.[2HH].[B]", "[H][H].[B].C") == "mismatch"

@@ -842,6 +842,12 @@ def _zero_metal_name(ordered, named, frag_mols) -> Optional[str]:
     (1/2)' as the neutral atom that is drawn. Tried only after the name without it fails to reproduce the
     drawing, so a name that ships today keeps its spelling. Only the metals that ``data/metal_scope.py``
     admits to ``ZERO_VALENT``."""
+    zeroed = _zero_metal_named(ordered, named, frag_mols)
+    return _assemble_adduct_name(zeroed) if zeroed is not None else None
+
+
+def _zero_metal_named(ordered, named, frag_mols) -> Optional[List[Tuple[str, int]]]:
+    """The components of:func:`_zero_metal_name`, or None when no metal atom takes the zero."""
     if not any(Chem.GetFormalCharge(fm) != 0 for fm in frag_mols.values()):
         return None
     from ..data.metal_scope import ZERO_VALENT, has_mechanism
@@ -852,7 +858,27 @@ def _zero_metal_name(ordered, named, frag_mols) -> Optional[str]:
                 and has_mechanism(fm.GetAtomWithIdx(0).GetSymbol(), ZERO_VALENT)):
             name, changed = f"{name}(0)", True
         zeroed.append((name, count))
-    return _assemble_adduct_name(zeroed) if changed else None
+    return zeroed if changed else None
+
+
+def _zero_metal_drawn_name(ordered, named, frag_mols, mol, style: str, flags: Optional[dict]) -> Optional[str]:
+    """:func:`_zero_metal_name` when OPSIN reads it as drawn (``_parse_reproduces_depiction``); else, at the tiers
+    that respell components (``flags``), the same components with the spellings OPSIN reads beside the zero metal
+    (``_readable_spellings``): OPSIN neutralises an acid anion beside a bare metal ('acetate—cobalt(0) (2/1)' reads
+    as acetic acid) and reads the oxido form as drawn ('1-oxido-1-oxoethane—cobalt(0) (2/1)'); None otherwise."""
+    zeroed = _zero_metal_named(ordered, named, frag_mols)
+    if zeroed is None:
+        return None
+    name = _assemble_adduct_name(zeroed)
+    if _parse_reproduces_depiction(name, mol):
+        return name
+    if flags is None:
+        return None
+    respelled = _readable_spellings(ordered, zeroed, style, flags)
+    if respelled == zeroed:
+        return None
+    name = _assemble_adduct_name(respelled)
+    return name if _parse_reproduces_depiction(name, mol) else None
 
 
 def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
@@ -909,8 +935,11 @@ def _reads_back_as(name: str, expected_smiles: str) -> bool:
             return False
         if _same_canonical_smiles(parsed, expected_smiles):
             return True
-        drawn = Chem.MolFromSmiles(expected_smiles)   # the hydrogen-word reader writes every hydrogen as an atom
-        return drawn is not None and Chem.MolToSmiles(Chem.AddHs(drawn)) == parsed
+        # the hydrogen-word reader writes every hydrogen as an atom, and OPSIN writes dihydrogen '[H][H]' where RDKit
+        # writes '[HH]': the two graphs are compared with every hydrogen an atom (as ``_parse_reproduces_depiction``)
+        drawn, reread = Chem.MolFromSmiles(expected_smiles), Chem.MolFromSmiles(parsed)
+        return (drawn is not None and reread is not None
+                and Chem.MolToSmiles(Chem.AddHs(drawn)) == Chem.MolToSmiles(Chem.AddHs(reread)))
     except Exception:
         return False
 
@@ -1255,39 +1284,47 @@ def _name_adduct_any(mol, canonical_smiles: Optional[str] = None,
 
 
 def readable_component_order(name: str, mol) -> str:
-    """``name``, or the same components in the order OPSIN reads when OPSIN rejects ``name``.
+    """``name``, or a spelling of the same components that OPSIN reads when OPSIN rejects ``name``.
 
-    OPSIN reads a radical component of an adduct name ('-yl', '-ylidene', 'nitroso', and 'dihydrogen' as well) only
-    as the LAST component; anywhere else it reads it as a prefix of the next one ("believes there to be 1 components
-    but 2 ratios were given": 'stannylidene—tin (1/1)' fails, 'tin—stannylidene (1/1)' reads). Such a name passes
-    the gates today through its order twin (``validation.twin_spellings.component_order_twins``) and shipped in the
-    class order no reader reads "Organic adducts", the Blue Book, cites the components "in the order
-    of seniority of classes", radicals first). An adduct name is no PIN "General organic method for
-    naming Lewis adducts",:37556, "these 'adduct names' are not PINs";,:4667), and the order of its
-    components carries no structure, so the name ships with one component moved to the end: the first such move, in
-    component order, that OPSIN reads and that reproduces the drawn structure (``_parse_reproduces_depiction``). The
-    class order (and water cited last,:4665) is kept whenever OPSIN reads it; a name OPSIN reads in another
-    order beats no name at the tiers that ship adducts. Only
-    where the OPSIN in use reads adducts with a radical component (``opsin_capabilities.radical_adduct_enabled``;
-    OPSIN 2.9.0 reads none in any order). The label records of ``name`` carry over to the shipped order."""
+    1. A hydrogen deuteride or tritide component takes its binary name ('hydrogen deuteride', from the anion names
+       'deuteride' and 'tritide' of "Names for hydrogen atoms and ions", Table 8.1, the Blue Book) in
+       place of its nuclide name '(2H1)dihydrogen',:43728), which no OPSIN reads; OPSIN 2.9.0 and main
+       read the binary name in any position. Carbon-free, so no PIN either way.
+    2. OPSIN reads a radical component of an adduct name ('-yl', '-ylidene', 'nitroso', and 'dihydrogen' as well)
+       only as the LAST component; anywhere else it reads it as a prefix of the next one ("believes there to be 1
+       components but 2 ratios were given": 'stannylidene—tin (1/1)' fails, 'tin—stannylidene (1/1)' reads). Such a
+       name passes the gates today through its order twin (``validation.twin_spellings.component_order_twins``) and
+       shipped in the class order no reader reads "Organic adducts",:3765, cites the components "in the
+       order of seniority of classes", radicals first). An adduct name is no PIN "General organic method
+       for naming Lewis adducts",:37556, "these 'adduct names' are not PINs";,:4667), and the order of its
+       components carries no structure, so the name may ship with one component moved to the end: the first such
+       move, in component order. The class order (and water cited last,:4665) is kept whenever OPSIN reads
+       it. Only where the OPSIN in use reads adducts with a radical component
+       (``opsin_capabilities.radical_adduct_enabled``; OPSIN 2.9.0 reads none in any order).
+
+    A spelling ships only when OPSIN reads it, it reproduces the drawn structure (``_parse_reproduces_depiction``)
+    and the round-trip compare of the shipped name accepts it (``Orthonym._rt_match``); else ``name`` ships as
+    before. The label records of ``name`` carry over to the shipped spelling."""
     from orthonym.opsin_capabilities import radical_adduct_enabled
     m = _ADDUCT_ORDER.fullmatch(name)
-    if m is None or not radical_adduct_enabled():
+    if m is None:
         return name
     parts, ratio = m.group("body").split(EM_DASH), m.group("ratio").split("/")
-    if len(parts) != len(ratio) or len(parts) > _MAX_REORDERED:
+    if len(parts) != len(ratio):
+        return name
+    words = [_READABLE_HYDROGEN_WORDS.get(p, p) for p in parts]
+    orders = [list(range(len(parts)))] if words != parts else []
+    if radical_adduct_enabled() and len(parts) <= _MAX_REORDERED:
+        orders += [[i for i in range(len(parts)) if i != k] + [k] for k in range(len(parts) - 1)]
+    if not orders:
         return name
     from orthonym.namer import Orthonym, _validity_gate_name_to_smiles
     if _validity_gate_name_to_smiles(name) is not None:
         return name
     drawn = Chem.MolToSmiles(mol) if mol is not None else None
-    for k in range(len(parts) - 1):
-        order = [i for i in range(len(parts)) if i != k] + [k]
-        twin = (EM_DASH.join(parts[i] for i in order) + " (" + "/".join(ratio[i] for i in order) + ")")
+    for order in orders:
+        twin = (EM_DASH.join(words[i] for i in order) + " (" + "/".join(ratio[i] for i in order) + ")")
         read = _validity_gate_name_to_smiles(twin)
-        # the order ships only where the round-trip compare of the shipped name accepts it (``Orthonym._rt_match``):
-        # it compares SMILES, and '[HH]' drawn is '[H][H]' read, so a dihydrogen component keeps its old order and
-        # the name its old route (no name is lost)
         if (read is not None and _parse_reproduces_depiction(twin, mol)
                 and (drawn is None or Orthonym._rt_match(drawn, read, False))):
             from orthonym.metrics.provenance import record_derived_non_pin_label
@@ -1295,6 +1332,8 @@ def readable_component_order(name: str, mol) -> str:
     return name
 
 
+#: the hydrogen components whose nuclide name no OPSIN reads, with the binary name OPSIN reads in an adduct name
+_READABLE_HYDROGEN_WORDS = {"(2H1)dihydrogen": "hydrogen deuteride", "(3H1)dihydrogen": "hydrogen tritide"}
 #: an adduct name: components joined by em dashes, then the proportions
 _ADDUCT_ORDER = re.compile(r"(?P<body>[^—]+(?:—[^—]+)+) \((?P<ratio>\d+(?:/\d+)+)\)")
 #: the most components whose orders are read (each move is one OPSIN read)
@@ -1430,8 +1469,9 @@ def _component_adduct_words_and_name(components: List[Tuple[str, int]], frag_mol
     if not _parse_reproduces_depiction(name, mol):
         # a bare metal word takes the charge that balances the ions beside it ('ethanol—palladium—hydron' reads Pd2+):
         # the neutral atom drawn is cited with its oxidation number zero, as in the adduct body
-        name = _zero_metal_name(ordered, named, frag_mols)
-        if name is None or not _parse_reproduces_depiction(name, mol):
+        name = _zero_metal_drawn_name(ordered, named, frag_mols, mol, style, dict(
+            general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True))
+        if name is None:
             return None
     from orthonym.metrics.provenance import record_non_pin_label
     record_non_pin_label(name, rule="P-14.8.2",
@@ -1565,8 +1605,11 @@ def _name_adduct_body(mol, canonical_smiles: Optional[str] = None,
     if _widened:
         _name = _assemble_adduct_name(named)
         if not _parse_reproduces_depiction(_name, mol):
-            _name = _zero_metal_name(ordered, named, frag_mols)
-            if _name is None or not _parse_reproduces_depiction(_name, mol):
+            _name = _zero_metal_drawn_name(ordered, named, frag_mols, mol, style, dict(
+                general_fallback=general_fallback, allow_aromatic_general=allow_aromatic_general,
+                general_fallback_unverified=general_fallback_unverified)
+                if general_fallback or general_fallback_unverified else None)
+            if _name is None:
                 return None
         _label_mixed_adduct(_name, ordered)
         return _name

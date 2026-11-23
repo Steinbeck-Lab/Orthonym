@@ -100,7 +100,7 @@ from .perception.lone_pair_reading import (
     raw_reading,
     standard_centres_labels,
     standard_reading_flips,
-    standard_reading_mol,
+    standard_reading_mol, compare_reading_mol,
 )
 from .perception.rings import (
     classify_ring,
@@ -6553,8 +6553,8 @@ class Orthonym:
         carry (if that ever changes this silently un-closes). Enhanced-stereo
         CXSMILES groups (``|&1:..|``) are likewise ignored by ``MolFromSmiles``
         (as they are on the unflagged path). The compare is a strict tightening of
-        the old constitution-only guard (NEW-accepts ⊆ OLD-accepts, verified), so
-        it can never introduce a wrong-acceptance — only reject more. Derivation
+        the old constitution-only guard (NEW-accepts ⊆ OLD-accepts, verified); its one
+        widening: a counted H2 ('[HH]') equals its two-atom reading (compare_reading_mol). Derivation
         and probes: `internal notes` (RISK 3),
         ``a temp dir/risk3_stereo_probe*.py``.
 
@@ -6564,8 +6564,8 @@ class Orthonym:
         """
         try:
             if stereo_flagged:
-                _o = standard_reading_mol(opsin_smiles)
-                _i = standard_reading_mol(input_smiles)
+                _o = compare_reading_mol(opsin_smiles)
+                _i = compare_reading_mol(input_smiles)
                 if _o is None or _i is None:
                     return False
                 # constitution guard on COPIES (RemoveStereochemistry mutates; the
@@ -6595,9 +6595,9 @@ class Orthonym:
             # the call site already DOCUMENTS `_rt_match` as "a FULL-InChIKey
             # compare"; this makes the code match. Fall back to the CanonSmiles match
             # only when InChI is genuinely unavailable for a side (no regression).
-            # Strictly tightening (NEW-accepts subset of OLD-accepts).
-            if (Chem.MolToSmiles(standard_reading_mol(opsin_smiles))
-                    != Chem.MolToSmiles(standard_reading_mol(input_smiles))):
+            # Tightening, but '[HH]' drawn equals '[H][H]' read (same InChIKey).
+            if (Chem.MolToSmiles(compare_reading_mol(opsin_smiles))
+                    != Chem.MolToSmiles(compare_reading_mol(input_smiles))):
                 return False
             _ik_i = _self_consistency_full_key(input_smiles)
             _ik_o = _self_consistency_full_key(opsin_smiles)

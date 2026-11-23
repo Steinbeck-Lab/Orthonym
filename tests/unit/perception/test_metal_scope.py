@@ -294,20 +294,23 @@ def test_tin_and_lead_are_admitted_to_the_parent_hydride_cation_the_connection_a
                    for s in set(METAL_SCOPE) - {"Sn", "Pb", "Al", "Ga", "In", "Tl", "Bi"})
 
 
-def test_the_true_metals_that_only_the_element_name_admits():
+def test_the_true_metals_that_only_the_element_name_and_the_zero_admit():
     """After lane B2 the elements of the veto set without an entry were the actinides without one (Th, Pa, Np, Pu, Am,
     Cm, Bk, Cf, Es, Md, No, Lr), technetium, promethium and the superheavy elements. Lane LONE (2026-11-01) admits every
     metal to ``ELEMENT``, so each of them now has an entry admitting it to ``ELEMENT`` alone (``ELEMENT_ONLY_METALS``):
     no salt, complex or bonded mechanism, so ``is_named_metal`` stays False and the witnesses of the guards that say
-    'a metal that the table does not admit is not moved' are still drawn from them."""
-    from orthonym.data.metal_scope import ELEMENT_ONLY_METALS
+    'a metal that the table does not admit is not moved' are still drawn from them. The PubChem still-unnamed lane
+    (2026-11-23) admits them to ``ZERO_VALENT`` as well (the neutral atom beside ions, 'curium(0)'), which moves no
+    atom."""
+    from orthonym.data.metal_scope import ELEMENT_ONLY_METALS, ZERO_VALENT, ZERO_VALENT_METALS
     from orthonym.perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
     assert sorted(set(_TRUE_METAL_SYMBOLS_FOR_VETO) - set(METAL_SCOPE)) == []          # every metal has an entry
-    element_only = sorted(s for s in _TRUE_METAL_SYMBOLS_FOR_VETO if METAL_SCOPE[s].mechanisms == frozenset({ELEMENT}))
+    element_only = sorted(s for s in set(_TRUE_METAL_SYMBOLS_FOR_VETO) - set(ZERO_VALENT_METALS)
+                          if METAL_SCOPE[s].mechanisms == frozenset({ELEMENT, ZERO_VALENT}))
     assert element_only == ["Am", "Bh", "Bk", "Cf", "Cm", "Cn", "Db", "Ds", "Es", "Hs", "Lr", "Md", "Mt", "No", "Np",
                             "Pa", "Pm", "Pu", "Rg", "Sg", "Tc", "Th"]
     assert element_only == sorted(ELEMENT_ONLY_METALS)
-    assert all(METAL_SCOPE[s] == MetalScope(frozenset({ELEMENT}), frozenset()) for s in element_only)
+    assert all(METAL_SCOPE[s] == MetalScope(frozenset({ELEMENT, ZERO_VALENT}), frozenset()) for s in element_only)
     assert all(is_named_metal(s) is False for s in element_only)
     assert set(NOT_ADMITTED) <= set(element_only)
 

@@ -265,6 +265,23 @@ def standard_reading_mol(smiles: Optional[str]):
     return work.GetMol()
 
 
+def compare_reading_mol(smiles: Optional[str]):
+    """:func:`standard_reading_mol` with each hydrogen molecule that RDKit holds as one hydrogen atom and its hydrogen
+    count ('[HH]', '[2HH]') written as two bonded atoms, as a reader writes it ('[H][H]', '[H][2H]' for 'dihydrogen',
+    'hydrogen deuteride'). Both are one molecule with one standard InChIKey, but their SMILES differ, so a SMILES
+    compare of a drawn '[HH]' and a read name takes this reading on both sides. None when RDKit cannot read
+    ``smiles``."""
+    mol = standard_reading_mol(smiles)
+    return hydrogen_molecules_as_atoms(mol) if mol is not None else None
+
+
+def hydrogen_molecules_as_atoms(mol):
+    """``mol`` with the hydrogen count of each hydrogen atom ('[HH]', '[2HH]') written as atoms ('[H][H]', '[H][2H]');
+    ``mol`` itself when it has none."""
+    counted = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() == 1 and a.GetTotalNumHs()]
+    return Chem.AddHs(mol, onlyOnAtoms=counted) if counted else mol
+
+
 def standard_reading_inchikey(smiles: Optional[str]) -> Optional[str]:
     """The full standard InChIKey of:func:`standard_reading_mol`, or None when ``smiles`` has none."""
     from .molcache import inchikey_of

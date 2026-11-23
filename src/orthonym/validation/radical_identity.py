@@ -164,13 +164,17 @@ def _radical_identity_verdict_impl(input_smiles: str, parsed_smiles: str) -> str
     from .key_blind_hydrogens import key_blind_hydrogen_verdict
     if key_blind_hydrogen_verdict(input_smiles, parsed_smiles) == "mismatch":
         return "mismatch"
+    # a hydrogen molecule drawn '[HH]' and read '[H][H]' is one graph (perception.lone_pair_reading)
+    from ..perception.lone_pair_reading import hydrogen_molecules_as_atoms
     mi = Chem.MolFromSmiles(input_smiles) if input_smiles else None
     if mi is None:
         return "n/a"
+    mi = hydrogen_molecules_as_atoms(mi)
     pi = radical_profile(mi)
     mo = Chem.MolFromSmiles(parsed_smiles) if parsed_smiles else None
     if mo is None:
         return "mismatch" if pi else "n/a"
+    mo = hydrogen_molecules_as_atoms(mo)
     po = radical_profile(mo)
     if not pi and not po:
         return "n/a"
@@ -183,7 +187,10 @@ def _radical_identity_verdict_impl(input_smiles: str, parsed_smiles: str) -> str
             return verdict
         # the key does not see on which carbon the metal sits ('[Li]CC=CC' and '[Li]C(C)C=C' share one): the
         # parts without the metal must be one graph, with the hydrogens of every atom
-        same = _organic_part_smiles(Chem.MolFromSmiles(joined)) == _organic_part_smiles(mo)
+        joined_mol = Chem.MolFromSmiles(joined)
+        if joined_mol is None:
+            return "mismatch"
+        same = _organic_part_smiles(hydrogen_molecules_as_atoms(joined_mol)) == _organic_part_smiles(mo)
         return "ok" if same else "mismatch"
     if pi != po:
         return "mismatch"

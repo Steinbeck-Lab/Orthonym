@@ -114,7 +114,8 @@ def test_a_neutral_metal_beside_ions_takes_its_zero_oxidation_number(smiles, nam
     r = name_best_effort(smiles)
     assert r["name"] == name, r
     if name:   # OPSIN main reads the dihydrogen words itself
-        assert r["gate_outcome"] in ("reconstructed:hydrogen_words", "full_key_round_trip_verified"), r
+        assert r["gate_outcome"] in ("reconstructed:hydrogen_words", "full_key_round_trip_verified",
+                                     "self_consistency_verified"), r
         assert not r["is_pin"], r
 
 

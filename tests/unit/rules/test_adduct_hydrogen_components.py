@@ -65,10 +65,26 @@ def test_zero_oxidation_number_is_for_metals_only():
 
 
 def test_hydrogen_words_opsin_does_not_read_ship_through_the_component_reader():
-    # OPSIN reads no 'hydron' and no isotopic dihydrogen, the Blue Book;: the
-    # component reader reads each component alone and requires the drawn structure exactly
+    # OPSIN reads no 'hydron' and no doubly labelled dihydrogen, the Blue Book;:
+    # the component reader reads each component alone and requires the drawn structure exactly
     for smiles, name in (("[H+].Oc1ccccc1", "phenol—hydron (1/1)"),
-                         ("[2HH].CCO", "ethanol—(2H1)dihydrogen (1/1)")):
+                         ("[2H][2H].CCO", "ethanol—(2H2)dihydrogen (1/1)")):
         res = name_best_effort(smiles)
         assert res["name"] == name and res["gate_outcome"] == "reconstructed:hydrogen_words", res
         assert res["tier"] == "systematic_verified" and not res["is_pin"], res
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("[2HH].CCO", "ethanol—hydrogen deuteride (1/1)"),
+    ("[H][2H].CCO", "ethanol—hydrogen deuteride (1/1)"),
+    ("[3HH].CCO", "ethanol—hydrogen tritide (1/1)"),
+    ("[2HH].C1=CSC=C1Br", "3-bromothiophene—hydrogen deuteride (1/1)"),
+])
+def test_hydrogen_deuteride_and_tritide_take_the_binary_name_opsin_reads(smiles, name):
+    """HD and HT take the binary name from the anion names 'deuteride' and 'tritide' "Names for hydrogen
+    atoms and ions", Table 8.1, the Blue Book), which OPSIN 2.9.0 reads in any position of an adduct name; no
+    OPSIN reads the nuclide name '(2H1)dihydrogen'. Carbon-free, so no PIN either way."""
+    res = name_best_effort(smiles)
+    assert res["name"] == name and res["verified"] == "opsin", res
+    assert res["tier"] == "systematic_verified" and not res["is_pin"], res
+    assert name_is_rt_exact(name, smiles)
