@@ -131,7 +131,10 @@ FAILCLOSED_CASES = [
 # The full complete tier still abstains on this one: a dianion whose two charge sites are
 # both on substituents (the former witness '[SiH3][CH-]c1ccccc1' is named now, see below).
 # Measured with the OPSIN gate on: 'unknown organic compound', never a charge-dropped name.
-COMPLETE_FAILCLOSED_CASES = ["[SiH3][CH-]c1ccccc1[N-]C"]
+# '[SiH3][CH-]c1ccccc1[N-]C' moved to COMPLETE_RT_CASES by decision D-b (below): the best-effort floor names the
+# polyanion '1-(methylazanidyl)-2-(1-silylmethan-1-id-1-yl)benzene' 'azanidyl'), OPSIN 2.9.0 RT exact
+# (full InChIKey and the drawn depiction).
+COMPLETE_FAILCLOSED_CASES = []
 
 # The engine still refuses these three, but the full complete tier now NAMES them
 # through another producer. Pre-existing-failures plan, Task 9 (TRIAGE.csv rows
@@ -148,7 +151,7 @@ COMPLETE_FAILCLOSED_CASES = ["[SiH3][CH-]c1ccccc1[N-]C"]
 # here by the same decision D-b: the complete tier names it '(1-silylmethan-1-id-1-yl)benzene'
 # (OPSIN 2.9.0 full-InChIKey exact; a best-effort spelling, not a PIN -- the anion centre should be
 # the parent, as 'phenyl(silyl)methanide').
-COMPLETE_RT_CASES = ["[CH2+]Cc1ccccc1", "[CH2+]C[CH2]", "[SiH3][CH-]c1ccccc1"]
+COMPLETE_RT_CASES = ["[CH2+]Cc1ccccc1", "[CH2+]C[CH2]", "[SiH3][CH-]c1ccccc1", "[SiH3][CH-]c1ccccc1[N-]C"]
 
 # Round-trip the names the full namer actually ships.
 _RT_NAMES = dict(FULL_NAMER_CASES)

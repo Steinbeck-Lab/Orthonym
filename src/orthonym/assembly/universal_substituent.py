@@ -343,6 +343,11 @@ class _Ctx:
     # turns it on only after all of them have declined, so no earlier floor name changes (the fallbacks
     # that follow the floor can be preceded by it, ``_halane_rung``).
     halane_forms: bool = False
+    # (the Blue Book): an anionic nitrogen is a prefix, 'azanidyl' ('-NH-'), '<R>azanidyl' ('-N(-)-R')
+    # or 'azanidylidene' ('=N-'), never a chain atom. Off in every spelling the floor gave before;
+    # ``name_universal_substitutive`` turns it on only after all of them have declined (``_azanidyl_rung``), and
+    # ``name_universal_substituent_prefix`` never does, so no other name changes.
+    azanidyl_forms: bool = False
 
     def fire(self, kind: str) -> None:
         """A book spelling of ``kind`` ('ring': a single ring's name, 'other': every other
@@ -579,6 +584,11 @@ def name_universal_substitutive(
                 mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                 acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback,
                 book_forms=book_forms, keep_forms=keep_forms)
+        if res is None:
+            res = _azanidyl_rung(
+                mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+                acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback,
+                book_forms=book_forms, keep_forms=keep_forms)
         if res is not None:
             return res
         # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
@@ -669,11 +679,81 @@ def _halane_rung(mol, atom_work_budget: int, **spelling) -> Optional[UniversalRe
         return None
 
 
+def _azanidyl_rung(mol, atom_work_budget: int, **spelling) -> Optional[UniversalResult]:
+    """The rung of the spelling ladder of ``name_universal_substitutive`` after the halane one: the floor with each
+    anionic nitrogen named as an 'azanidyl' prefix (``_Ctx.azanidyl_forms``), in the book's spelling and, when that
+    declines, the mechanical one. It runs only while the best-effort flag is set (the best-effort tier, and the
+    best-effort rescues a valid or complete naming runs inside), for the molecule the caller asked about, a
+    polyanion with an anionic nitrogen that no earlier rung named.
+
+     "Anionic centers in both parent compounds and substituent groups" (the Blue Book): "one anion must be
+    chosen as the parent anion and the other expressed as anionic substituent group(s)"; (:41227) forms them
+    with 'yl'/'ylidene' on the parent anion ('azanidyl', 'azanidylidene'). The floor's name is below the PIN
+    chooses the parent of a PIN). A standard InChIKey does not see which nitrogen of an amide, urea or guanidine
+    carries the charge, so the name ships only when OPSIN reads it back to the drawn constitution with the charges
+    on the drawn atoms (canonical SMILES without stereo; the caller's full-key check covers the stereo)."""
+    from .metal_offer import INSIDE_METAL_REWRITE
+    if INSIDE_METAL_REWRITE.get():
+        return None  # a metal drawn bonded to the nitrogen keeps the name of its drawing ('diisothiocyanatozinc')
+    if not any(a.GetSymbol() == "N" and a.GetFormalCharge() == -1 for a in mol.GetAtoms()):
+        return None
+    # the best-effort tier only, and a polyanion only: an anion of one centre is the anion producers', which the
+    # namer can try after the floor ('cyanoazanide', the azanide of a ring cation)
+    from ..metrics.provenance import best_effort_ctx
+    from ..perception.ions import get_ion_sites
+    if not best_effort_ctx.get() or len(get_ion_sites(mol).get('anions') or []) < 2:
+        return None
+    # the molecule the caller asked about or one of its own fragments (a component of a mixture), not a structure a
+    # nested ``name`` derives from it (a capped fragment, the alcohol of an ester), whose read-back here would be
+    # against the derived structure
+    if not _the_input_or_one_of_its_fragments(mol):
+        return None
+    try:
+        res = _name_universal_substitutive_unsafe(mol, atom_work_budget, azanidyl=True, **spelling)
+        if res is None and spelling["book_forms"]:
+            res = _name_universal_substitutive_unsafe(
+                mol, atom_work_budget, azanidyl=True, **{**spelling, "book_forms": False})
+    except Exception:  # a rung that raises is a decline of this rung
+        return None
+    return res if res is not None and _reads_back_with_drawn_charges(res.name, mol) else None
+
+
+def _the_input_or_one_of_its_fragments(mol) -> bool:
+    """True unless a ``name`` call is running and *mol*'s molecular formula (atoms, hydrogens, charge) is neither
+    the formula of its input nor of one fragment of it (``universal_halane.names_the_input`` for a whole input)."""
+    from rdkit.Chem import rdMolDescriptors
+    from .fragment_naming import outermost_name_input
+    outer = outermost_name_input()
+    if outer is None:
+        return True
+    try:
+        given = Chem.MolFromSmiles(outer)
+        if given is None:
+            return True
+        formula = rdMolDescriptors.CalcMolFormula(mol)
+        return formula == rdMolDescriptors.CalcMolFormula(given) or any(
+            rdMolDescriptors.CalcMolFormula(f) == formula for f in Chem.GetMolFrags(given, asMols=True))
+    except Exception:  # noqa: BLE001 - an unreadable input is no reason to hold the rung back
+        return True
+
+
+def _reads_back_with_drawn_charges(name: str, mol) -> bool:
+    """True iff OPSIN reads ``name`` to ``mol``'s constitution with every charge on its drawn atom."""
+    try:
+        from ..namer import _validity_gate_name_to_smiles
+        parsed = _validity_gate_name_to_smiles(name)
+        read = Chem.MolFromSmiles(parsed) if parsed else None
+        return read is not None and (Chem.MolToSmiles(read, isomericSmiles=False)
+                                     == Chem.MolToSmiles(Chem.RemoveHs(mol), isomericSmiles=False))
+    except Exception:
+        return False
+
+
 def _name_universal_substitutive_unsafe(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, prefix_order_fallback: bool = False,
     book_forms: bool = True, keep_forms: frozenset = frozenset(), no_chain: bool = False,
-    halane: bool = False, poly_radical: bool = False,
+    halane: bool = False, poly_radical: bool = False, azanidyl: bool = False,
 ) -> Optional[UniversalResult]:
     """The real body -- may raise; ``name_universal_substitutive`` and ``name_universal_polyradical`` are the
     only callers and convert every exception to ``None``."""
@@ -694,7 +774,7 @@ def _name_universal_substitutive_unsafe(
                        force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                        acyloxy_leaf=acyloxy_leaf, book_forms=book_forms,
                        keep_forms=keep_forms, no_chain=no_chain, halane=halane,
-                       poly_radical=poly_radical)
+                       poly_radical=poly_radical, azanidyl=azanidyl)
     if built is None:
         return None
     ctx, heavy = built
@@ -1336,7 +1416,7 @@ def _build_ctx(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, book_forms: bool = True, keep_forms: frozenset = frozenset(),
     no_chain: bool = False, halane: bool = False, attach_idx: Optional[int] = None,
-    poly_radical: bool = False,
+    poly_radical: bool = False, azanidyl: bool = False,
 ) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
     """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
     entry points (``name_universal_substitutive`` on the whole graph and
@@ -1491,7 +1571,7 @@ def _build_ctx(
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
                cation_sites=cation_sites, anion_sites=anion_sites, lambda_atoms=lambda_atoms,
                poly_radical_atoms=poly_radical_atoms, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-               acyloxy_leaf=acyloxy_leaf, halane_forms=halane,
+               acyloxy_leaf=acyloxy_leaf, halane_forms=halane, azanidyl_forms=azanidyl,
                book_forms=book_forms and book_forms_enabled(),
                ring_forms=(book_forms or "ring" in keep_forms) and ring_forms_enabled(),
                chain_forms=(not no_chain and (book_forms or "chain" in keep_forms)
@@ -1754,7 +1834,7 @@ def _name_component(
         # This is the coverage-floor's own FG-anion/terminal-cation handler; a
         # SKELETAL (non-terminal) charge is still resolved by
         # ``_resolve_spine_charge`` below.
-        charged_leaf = _charged_leaf_shortcut(mol, component, attach_hint)
+        charged_leaf = _charged_leaf_shortcut(mol, component, attach_hint, ctx.azanidyl_forms)
         if charged_leaf is not None:
             token, atoms, charged_atoms = charged_leaf
             return _prefix_ready(token, atoms, charged=charged_atoms)
@@ -2351,14 +2431,16 @@ def _hetero_root_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
     ammonium = (sym == "N" and root.GetFormalCharge() == 1
                 and root.GetTotalValence() == 4
                 and any(s["atom_idx"] == attach_hint for s in ctx.cation_sites))
-    if root.GetFormalCharge() and not ammonium:
+    # an anionic nitrogen with two single bonds: 'azanidyl' with its prefix, ``_Ctx.azanidyl_forms`` only
+    azanide = ctx.azanidyl_forms and _is_azanide_root(ctx, attach_hint)
+    if root.GetFormalCharge() and not (ammonium or azanide):
         return None
     # a divalent or trivalent radical centre of a mononuclear hydride roots the prefix with its bonding
     # number cited by the lambda convention, 'methyl-λ2-silyl', the Blue Book)
     lam = ctx.lambda_atoms.get(attach_hint)
     if lam is not None and sym not in MONONUCLEAR_HEAD:
         return None
-    if not ammonium and lam is None and root.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:
+    if not (ammonium or azanide) and lam is None and root.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:
         return None
     # an imine nitrogen joined to its one part by a double bond: '(R-ylidene)amino'
     double = [b for b in root.GetBonds() if b.GetBondType() != Chem.BondType.SINGLE]
@@ -2432,10 +2514,10 @@ def _hetero_root_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
         names.append((rendered, False))
         charged |= sub.charged
         internal |= sub.internal_atoms
-    if ammonium:
+    if ammonium or azanide:
         from .composer import _assemble_decorated_amino_prefix
         token = _assemble_decorated_amino_prefix(
-            [(n, False) for n, _ in names], enclose=False, head="azaniumyl")
+            [(n, False) for n, _ in names], enclose=False, head="azaniumyl" if ammonium else "azanidyl")
         charged = charged | {attach_hint}
     elif ylidene_part is not None:
         cited = cite_organyl_in_composed_prefix(names[0][0])
@@ -2816,6 +2898,8 @@ def _tree_neighbors_of(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> Tuple
             # internal charge -> void -- the nitro case, generalised).
         if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
+        if ctx.azanidyl_forms and _is_azanide_root(ctx, j):
+            continue  #: an anionic nitrogen roots an 'azanidyl' prefix, never a chain atom
         if ctx.chain_forms and _is_cyano_root(ctx.mol, j):
             fired = True
             continue  # roadmap item 12a: a nitrile carbon is the anchor of the 'cyano'
@@ -2824,7 +2908,7 @@ def _tree_neighbors_of(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> Tuple
         if ctx.ps_forms and _is_oxoacid_group_root(ctx.mol, j):
             continue  #: a P/S oxoacid group (and its O/NH linker) is always
             # a branch prefix (phosphono, sulfooxy,...), never skeletal 'a' atoms
-        if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
+        if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom, ctx.azanidyl_forms) is not None:
             continue  # terminal charged atom a charged-leaf owns -> branch, not
             # spine (a carbanion / heteroatom-hydride anion this leaf
             # does NOT own stays threadable -> skeletal -ide/-uide)
@@ -4076,7 +4160,7 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int,
 _ANION_LEAF_SINGLE = {"O": "oxido", "S": "sulfido", "Se": "selenido"}
 
 
-def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int, azanidyl: bool = False):
     """A lone, singly-charged TERMINAL atom named directly as its charged
     substituent prefix. Returns ``(token, atom_ids, charged_atom_ids)`` or
     ``None`` (fall through to generic construction).
@@ -4110,9 +4194,18 @@ def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     if len(outside) != 1:
         return None  # not a terminal atom (0 or >=2 heavy neighbours)
     bond = mol.GetBondBetweenAtoms(idx, outside[0])
+    sym = atom.GetSymbol()
+    if (azanidyl and sym == "N" and charge == -1 and bond is not None
+            and mol.GetAtomWithIdx(outside[0]).GetFormalCharge() <= 0):
+        # (the Blue Book): '-NH-' azanidyl, '=N-' azanidylidene (both preselected prefixes)
+        order = round(bond.GetBondTypeAsDouble())
+        if order == 1 and atom.GetTotalNumHs() == 1:
+            return "azanidyl", frozenset(component), frozenset(component)
+        if order == 2 and atom.GetTotalNumHs() == 0:
+            return "azanidylidene", frozenset(component), frozenset(component)
+        return None
     if bond is None or round(bond.GetBondTypeAsDouble()) != 1:
         return None  # only a single-bond attachment carries these prefixes
-    sym = atom.GetSymbol()
     if charge == -1:
         if atom.GetTotalNumHs() != 0:
             return None
@@ -4219,6 +4312,19 @@ def _is_skeletal_spine_element(mol, j: int) -> bool:
     silent-drop mechanism that mis-rendered every non-skeletal terminal atom;
     see ``_SKELETAL_SPINE_ELEMENTS``)."""
     return mol.GetAtomWithIdx(j).GetSymbol() in _SKELETAL_SPINE_ELEMENTS
+
+
+def _is_azanide_root(ctx: "_Ctx", j: int) -> bool:
+    """An acyclic anionic nitrogen with two single bonds that ``ctx`` lists as an anion site, beside no cationic
+    atom (the N- of an ylide, 'S+/N-', 'P+/N-', stays the void of the internal-charge classes): the root of an
+    '<R>azanidyl' prefix (``_hetero_root_leaf``)."""
+    atom = ctx.mol.GetAtomWithIdx(j)
+    if any(nb.GetFormalCharge() > 0 for nb in atom.GetNeighbors()):
+        return False
+    return (atom.GetSymbol() == "N" and atom.GetFormalCharge() == -1 and not atom.IsInRing()
+            and atom.GetDegree() == 2 and atom.GetTotalValence() == 2
+            and all(b.GetBondType() == Chem.BondType.SINGLE for b in atom.GetBonds())
+            and any(s["atom_idx"] == j for s in ctx.anion_sites))
 
 
 def _is_nitro_root(mol, j: int) -> bool:
