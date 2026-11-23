@@ -249,3 +249,32 @@ def hand_on_numbering(pos_out, chain, name):
     if pos_out is not None:
         pos_out.update({idx: i + 1 for i, idx in enumerate(chain)})
     return name
+
+
+def consume_nitrooxy(mol, sub_set, consumed, add_prefix) -> None:
+    """A nitric ester group -O-N+(=O)[O-] on a backbone carbon is the prefix '(nitrooxy)'.
+
+     "-O-NO2 nitrooxy (preselected prefix)" (the Blue Book); '2-(tert-butylimino)-3-methyl-3-
+    (nitrooxy)butanoic acid (PIN)',:25963). Its charge-separated N+/O- pair would otherwise decline the
+    whole fragment. ``consumed`` and ``add_prefix`` are those of ``substituent_naming``'s polyfunctional namer."""
+    for _oidx in list(sub_set - consumed):
+        _oa = mol.GetAtomWithIdx(_oidx)
+        if _oa.GetSymbol() != 'O' or _oa.GetFormalCharge() or _oa.GetDegree() != 2 or _oa.IsInRing():
+            continue
+        _ends = [nb for nb in _oa.GetNeighbors()]
+        _hc = [nb for nb in _ends if nb.GetSymbol() == 'C' and not nb.GetIsAromatic()]
+        _nn = [nb for nb in _ends if nb.GetSymbol() == 'N' and nb.GetFormalCharge() == 1 and nb.GetDegree() == 3]
+        if len(_hc) != 1 or len(_nn) != 1 or _hc[0].GetIdx() in consumed or _nn[0].GetIdx() in consumed:
+            continue
+        _nat = _nn[0]
+        _terminal = [nb for nb in _nat.GetNeighbors() if nb.GetIdx() != _oidx and nb.GetSymbol() == 'O'
+                     and nb.GetDegree() == 1 and nb.GetIdx() in sub_set and not nb.GetIsotope()]
+        _orders = sorted((mol.GetBondBetweenAtoms(_nat.GetIdx(), t.GetIdx()).GetBondType(), t.GetFormalCharge())
+                         for t in _terminal)
+        if (len(_terminal) != 2 or _orders != sorted([(Chem.BondType.SINGLE, -1), (Chem.BondType.DOUBLE, 0)])
+                or _oa.GetIsotope() or _nat.GetIsotope()
+                or any(mol.GetBondBetweenAtoms(_oidx, nb.GetIdx()).GetBondType() != Chem.BondType.SINGLE
+                       for nb in _ends)):
+            continue
+        consumed.update({_oidx, _nat.GetIdx(), *(t.GetIdx() for t in _terminal)})
+        add_prefix(_hc[0].GetIdx(), "(nitrooxy)")

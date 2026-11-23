@@ -238,6 +238,8 @@ def name_carbamate(
             atom_to_locant_hint=None)
 
     carb_name = _enrich_handler_name(features, carb_name, "carbamate")
+    from ...rules.polyol_mixed_anion import record_mixed_anion_polyol_non_pin
+    record_mixed_anion_polyol_non_pin(features.mol, carb_name, ("C",))   # '2-(nitrooxy)ethyl carbamate': method (2), no PIN
 
     pool = get_current_pool()
     cand = pool.add(carb_name, "carbamate", features)

@@ -48,7 +48,8 @@ from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_en
 from .chain_amide_prefixes import consume_acylated_nitrogen, consume_sulfamoyl
 from .ring_acyloxy_prefixes import consume_ring_acyloxy
 from .sulfur_acid_ester_prefixes import consume_sulfur_acid_oxy
-from .chain_decoration_prefixes import (alkoxy_decoration_tokens_are_real, consume_azido, consume_substituted_imino,
+from .chain_decoration_prefixes import (alkoxy_decoration_tokens_are_real, consume_azido, consume_nitrooxy,
+                                       consume_substituted_imino,
                                         hand_on_numbering, unsaturated_chain_plan)
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
 from .prefix_derivation import retained_benzyl
@@ -2873,8 +2874,8 @@ def _name_polyfunctional_acyclic_substituent_impl(
         consumed.add(_neg_o)
         _add_prefix(_host_c, _POLYFUNC_NITRO_PREFIX)
 
-    # ---- Pass 1c3 /: a pendant AZIDO group is the detachable 'azido' prefix, consumed before the
-    # backbone is read (``chain_decoration_prefixes.consume_azido``).
+    # ---- Pass 1c3,: a pendant azido / nitric ester group is 'azido' / '(nitrooxy)'.
+    consume_nitrooxy(mol, sub_set, consumed, _add_prefix)
     consume_azido(mol, sub_set, consumed, _add_prefix, _POLYFUNC_AZIDO_PREFIX)
 
     # ---- Pass 1d (a phase enabler, /: a pendant ONIUM --

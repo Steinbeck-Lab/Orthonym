@@ -52,7 +52,9 @@ def name_noncarbon_ester_handler(
     # the ester of a ring-nitrogen carboxylic acid is senior to a sulfonic or sulfinic ester class 7a, carboxylic
     # first): the name built on the sulfur acid ester is no PIN when the carbamate handler could not spell that one
     from .carbamate import demote_below_carbamate_parent
+    from ...rules.polyol_mixed_anion import record_mixed_anion_polyol_non_pin
     demote_below_carbamate_parent(features, cand.name)
+    record_mixed_anion_polyol_non_pin(features.mol, cand.name, ("S", "Se", "Te", "P", "As", "B", "Si"))   # '2-(nitrooxy)ethyl methanesulfonate': method (2)
     return NamingResult(
         name=cand.name,
         tree=NameTreeNode(

@@ -71,7 +71,7 @@ from .ions import (
 )
 from .azaniumyl_zwitterions import fully_ionised_azaniumyl_zwitterion
 from .retained_alkoxides import retained_alkoxide_or
-from .ester_zwitterions import phosphodiester_zwitterion_name
+from .ester_zwitterions import phosphodiester_zwitterion_name, phosphonate_zwitterion_name
 from .olate_anions import olate_anion_name, olate_on_nitrogen_must_read_back
 from .ring_position_kinds import one_kind_of_substitutable_position
 from ..data.locant_text import render_locants
@@ -706,7 +706,7 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
     central_idx = central.GetIdx()
 
     accounted = {central_idx}
-    ester_oxygens = []
+    ester_oxygens, carbon_on_p = [], []
     dbl_oxo = 0
     for b in central.GetBonds():
         nb = b.GetOtherAtom(central)
@@ -720,8 +720,11 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
             continue
         if bt != Chem.BondType.SINGLE:
             return ''
+        if sym == 'C' and central.GetSymbol() == 'P' and not carbon_on_p:
+            carbon_on_p.append(nb.GetIdx())        # R-P: a phosphonic monoester (``phosphonate_zwitterion_name``)
+            continue
         if sym != 'O':
-            return ''                              # P-N / P-C / S-C -> defer
+            return ''                              # P-N / a second P-C / S-C -> defer
         others = [x for x in nb.GetNeighbors() if x.GetIdx() != central_idx]
         if not others:
             # A terminal O: the counted [O-], a second [O-] (dianion), or a
@@ -737,6 +740,9 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
         else:
             return ''                              # P-O-P bridge / charged owner O -> defer
 
+    if carbon_on_p:
+        return (phosphonate_zwitterion_name(mol, cation_idx, central_idx, ester_oxygens[0], carbon_on_p[0])
+                if len(ester_oxygens) == 1 and dbl_oxo == 1 else '')
     if len(ester_oxygens) == 2:
         return phosphodiester_zwitterion_name(mol, cation_idx, central_idx, ester_oxygens)
     if len(ester_oxygens) != 1:

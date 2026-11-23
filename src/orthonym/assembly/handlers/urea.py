@@ -130,8 +130,8 @@ def _is_urea(features: Any) -> bool:
     hydrazide 'aminoamino'), so such a molecule keeps its handler and the name is
     labelled below the PIN (``urea_parent_expected``, inner_dispatch)."""
     fg = getattr(features, 'functional_groups', None) or {}
-    if not fg.get('urea'):
-        return False
+    if not fg.get('urea') or fg.get('nitrooxy') or fg.get('nitrite'):
+        return False   # an ester of nitric or nitrous acid is senior to urea class 9 before 11): '... nitrate'
     principal = getattr(features, 'principal_group', None)
     if principal is None:
         return True

@@ -407,11 +407,27 @@ def _name_sulfur_mixed_anhydride(mol) -> Optional[str]:
         smi = _extract_fragment_smiles(mol, set(keep), centre, cap_element=8)
         nm = name_fragment_recursively(smi) if smi else None
         if not nm or nm.count(" acid") != 1 or not nm.endswith(" acid") or " " in nm[:-5]:
-            return None
+            # a carboxylic side whose free acid has a retained name without the word 'acid' ('glycine') is cited by
+            # its acid word, as in the carboxylic anhydrides ('acetic aminoacetic anhydride')
+            word = _carboxylic_side_word(mol, centre, bridge_o)
+            if word is None:
+                return None
+            nm = word + " acid"
         names.append(nm[:-5].strip())
     if names[0] == names[1]:      # /: 'bis(2-chloroethane-1-sulfinic) anhydride (PIN)' (:32251)
         return f"{_bis(names[0])} anhydride" if substituted else f"{names[0]} anhydride"
     return " ".join(sorted(names, key=alpha_sort_key_total)) + " anhydride"
+
+
+def _carboxylic_side_word(mol, centre: int, bridge_o: int) -> Optional[str]:
+    """The acid word of the carboxylic acyl side at ``centre`` (:func:`_name_acyl_acid`), or None."""
+    atom = mol.GetAtomWithIdx(centre)
+    oxo = [b.GetOtherAtomIdx(centre) for b in atom.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE
+           and b.GetOtherAtom(atom).GetSymbol() == "O"]
+    if atom.GetSymbol() != "C" or len(oxo) != 1:
+        return None
+    word, _substituted = _name_acyl_acid(mol, centre, bridge_o, oxo[0])
+    return word if word and " " not in word and "acid" not in word else None
 
 
 _CHALCOGEN_CLASS_TERM = {"S": "thioanhydride", "Se": "selenoanhydride",

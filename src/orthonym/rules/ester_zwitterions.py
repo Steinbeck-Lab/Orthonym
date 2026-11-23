@@ -63,3 +63,47 @@ def phosphodiester_zwitterion_name(mol, cation_idx: int, central_idx: int, ester
     from .charged_router import _full_inchikey_rt_ok
     name = f"{_assemble_p_owner_text(tokens)} phosphate"
     return name if _full_inchikey_rt_ok(mol, name) else ''  # the name reads back to the full key, charges included
+
+
+def phosphonate_zwitterion_name(mol, cation_idx: int, central_idx: int, ester_o: int, carbon_idx: int) -> str:
+    """'<group> <R>phosphonate' of a phosphonic monoester R-P(=O)(O-)-O-R' whose cation is in the ester group R', or ''.
+
+    The anion of the monoester is the name of the ester without 'hydrogen' ('ethyl methylphosphonate',
+    "Esters", the Blue Book; the C-substituent of phosphonic acid is a prefix, 'methylphosphonic acid',;
+    the cation is cited as a prefix inside the ester group, as in:func:`phosphodiester_zwitterion_name`,
+    :42462). Below the PIN for the same reason as there."""
+    from ..assembly.naming_utils import enclose_if_compound
+    from ..assembly.substituent_enumerator import name_substituent
+    from .phosphorus import _p_ester_owner_group
+    central = mol.GetAtomWithIdx(central_idx)
+    cation = mol.GetAtomWithIdx(cation_idx)
+    if central.GetSymbol() != 'P' or cation.GetSymbol() != 'N' or cation.GetTotalNumHs():
+        return ''
+    got = _p_ester_owner_group(mol, ester_o, central_idx)
+    if not got or not isinstance(got[0], str) or not got[0] or got[0] == 'substituent' or cation_idx not in got[1]:
+        return ''
+    owner, owner_atoms = got
+    group, stack = set(), [carbon_idx]
+    while stack:
+        a = stack.pop()
+        if a in group:
+            continue
+        group.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() == central_idx:
+                continue
+            if nb.GetIdx() in owner_atoms or nb.GetFormalCharge():
+                return ''          # a ring through the ester group, or a second charge in the C-substituent
+            stack.append(nb.GetIdx())
+    try:
+        token = name_substituent(mol, frozenset(group), carbon_idx)
+    except Exception:  # noqa: BLE001 -- a producer bug must never crash naming
+        return ''
+    if not token or token == 'substituent' or ' ' in token:
+        return ''
+    terminal = {b.GetOtherAtomIdx(central_idx) for b in central.GetBonds()} - {ester_o, carbon_idx}
+    if {central_idx, ester_o} | set(owner_atoms) | group | terminal != set(range(mol.GetNumAtoms())):
+        return ''
+    from .charged_router import _full_inchikey_rt_ok
+    name = f"{owner} {enclose_if_compound(token)}phosphonate"
+    return name if _full_inchikey_rt_ok(mol, name) else ''

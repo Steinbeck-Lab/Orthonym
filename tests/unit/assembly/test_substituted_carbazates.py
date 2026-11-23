@@ -54,7 +54,9 @@ def test_other_nitrogen_groups_keep_their_names(smiles, expected):
 
 def test_a_nitrate_beside_a_carbamate_is_no_pin():
     # nitric acid (class 7d, is junior to carbamic acid (class 7b,: '2-[(tert-butoxycarbonyl)amino]ethyl
-    # nitrate' is no PIN; best-effort names the carbamate parent
+    # nitrate' is no PIN; every tier names the carbamate parent, with the nitric ester group as the prefix 'nitrooxy'
+    #, the Blue Book), and the PIN tier certifies it (``chain_decoration_prefixes.consume_nitrooxy``)
     smiles = "CC(C)(C)OC(=O)NCCO[N+](=O)[O-]"
-    assert tier_row(smiles, "pin")["tier"] != "pin_verified"
-    assert tier_row(smiles, "best-effort")["name"] == "tert-butyl [2-(nitrooxy)ethyl]carbamate"
+    for tier in ("pin", "best-effort"):
+        row = tier_row(smiles, tier)
+        assert (row["name"], row["tier"]) == ("tert-butyl [2-(nitrooxy)ethyl]carbamate", "pin_verified"), row
