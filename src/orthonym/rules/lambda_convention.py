@@ -52,9 +52,8 @@ LAMBDA = "λ"
 # "lambda4". Elements absent from this table are treated as standard (no lambda)
 # — fail-closed, never a spurious lambda.
 #
-# Table 1.5 has 25 rows; this table deliberately carries 23. **C and At are
-# omitted on purpose.** Neither is emittable as a ring 'a' prefix (both are in
-# ``ring_replacement.VB_INADMISSIBLE``) so an entry would buy nothing, while
+# Table 1.5 has 25 rows; this table carries 24. **C is omitted on purpose**: it is
+# not emittable as a ring 'a' prefix (``ring_replacement.VB_INADMISSIBLE``), and
 # adding ``'C': 4`` would let every neutral carbon this helper is ever handed --
 # a radical carbon has total valence 3 -- acquire a spurious ``lambda3``. Adding
 # a row here is therefore NOT a documentation change; it changes emitted names.
@@ -64,6 +63,7 @@ STANDARD_BONDING_NUMBER = {
     'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
     'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
     'F': 1, 'Cl': 1, 'Br': 1, 'I': 1,
+    'At': 1,  # the astatane parent (2026-11-23) names its halides 'trifluoro-λ3-astatane', as 'trifluoro-λ3-iodane'
 }
 
 

@@ -125,6 +125,9 @@ def test_a_bicyclic_substituent_of_a_piperidine_carboxamide_cites_the_descriptor
     monkeypatch.setattr(monocycle_ring_amide, "is_lone_ring", lambda mol, system: True)
     row = tier_row(_CIP_SMILES, "best-effort")
     assert row["name"] and "(1E,5E,7E)" not in row["name"], row
-    assert row["name"].startswith("1-[(1Z,5E,7E)-"), row
+    # the substituent's own block carries the molecule's 'Z' (its fusion name since the E/Z locant of a lettered
+    # ring atom no longer raises: '1-[(4aZ,8E,10E)-...cycloocta[d]pyrimidin-5-yl]', before '1-[(1Z,5E,7E)-...bicyclo')
+    import re
+    assert re.match(r"1-\[\([^)]*Z[^)]*\)-", row["name"]), row
     assert row["name"].endswith("-N-(pyridin-3-yl)piperidine-4-carboxamide"), row
     assert_full_rt(row["name"], _CIP_SMILES)

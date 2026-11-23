@@ -278,8 +278,8 @@ def collect_stereodescriptors(
             # below, and an endocyclic bond of another ring by _is_true_exocyclic.
             if begin_idx in atom_to_locant and end_idx in atom_to_locant:
                 # Both in parent -- standard behaviour
-                locant = min(atom_to_locant[begin_idx],
-                             atom_to_locant[end_idx])
+                locant = min(atom_to_locant[begin_idx], atom_to_locant[end_idx],
+                             key=lambda loc: _composite_locant_sort_key((loc, '')))  # int beside '4a'
             elif begin_idx in atom_to_locant and end_idx not in atom_to_locant:
                 # Only an exocyclic / '-ylidene' bond (the other end acyclic),
                 # never an endocyclic bond of another ring (_is_true_exocyclic)

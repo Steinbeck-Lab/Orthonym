@@ -398,14 +398,15 @@ def test_lambda_table_agrees_with_table_1_5_on_every_shared_element():
 
 
 @pytest.mark.unit
-def test_lambda_table_omits_carbon_and_astatine_on_purpose():
+def test_lambda_table_omits_carbon_on_purpose():
     """Adding a row here changes emitted NAMES, so the omission is deliberate.
 
     ``'C': 4`` would let any neutral carbon this helper is handed acquire a
-    spurious lambda -- a radical carbon has total valence 3. Neither C nor At is
-    emittable as a ring 'a' prefix, so an entry would buy nothing.
+    spurious lambda -- a radical carbon has total valence 3. Astatine is in the
+    table since the astatane parent names its halides ('trifluoro-λ3-astatane',
+    as 'trifluoro-λ3-iodane';, OPSIN reads it as drawn).
     """
-    assert set(TABLE_1_5) - set(STANDARD_BONDING_NUMBER) == {'C', 'At'}
+    assert set(TABLE_1_5) - set(STANDARD_BONDING_NUMBER) == {'C'}
 
 
 @pytest.mark.unit

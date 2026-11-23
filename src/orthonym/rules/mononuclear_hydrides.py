@@ -77,11 +77,13 @@ _HUB_STEMS = {
     'S': 'sulfane',
     'Se': 'selane',
     'Te': 'tellane',
+    'Po': 'polane',  #, the polonium hydride ('polane')
     'P': 'phosphane',
     'As': 'arsane',
     'Sb': 'stibane',
     'Bi': 'bismuthane',
     'I': 'iodane',
+    'At': 'astatane',  # gives 'astane', which OPSIN reads not; 'astatane' it reads
     # a phase: Group-14 Si/Ge for the ALL-HALOGEN regime only +
     #: "halides of silicic acid are substitutive names") — SiF4 ->
     # tetrafluorosilane, GeCl4 -> tetrachlorogermane. Kept OUT of _ORGANYL_HUBS so

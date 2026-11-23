@@ -101,24 +101,29 @@ class TestPhospholipids:
 # Section 3: Performance guard tests
 # ---------------------------------------------------------------------------
 
+#: The guard catches a combinatorial hang (minutes), not a few seconds of load: the hexaester takes about 2 s alone and
+#: 3.4 s on the same code beside a parallel suite, so a 2 s limit failed on load alone (program 23 lead).
+_HANG_LIMIT_S = 10.0
+
+
 class TestPerformanceGuard:
-    """Verify that molecules with many cleavable bonds complete quickly."""
+    """Verify that molecules with many cleavable bonds complete without a hang."""
 
     @pytest.mark.integration
-    def test_hexaester_completes_within_2s(self):
+    def test_hexaester_completes_without_a_hang(self):
         """Hexaacetyl sorbitol (6 ester bonds): name_compound must complete
-        within 2 seconds without hang or timeout."""
+        without a hang or timeout."""
         smi = "CC(=O)OCC(OC(C)=O)C(OC(C)=O)C(OC(C)=O)C(OC(C)=O)COC(C)=O"
         t0 = time.time()
         name = name_compound(smi)
         elapsed = time.time() - t0
-        assert elapsed < 2.0, (
-            f"Hexaester took {elapsed:.2f}s (limit: 2.0s)"
+        assert elapsed < _HANG_LIMIT_S, (
+            f"Hexaester took {elapsed:.2f}s (limit: {_HANG_LIMIT_S}s)"
         )
         assert name is not None, "Hexaester should produce a name"
 
     @pytest.mark.integration
-    def test_over_max_bonds_completes_within_2s(self):
+    def test_over_max_bonds_completes_without_a_hang(self):
         """Nonaester (9 ester bonds, exceeds MAX_CLEAVABLE_BONDS=8):
         performance guard should trigger, producing a name quickly."""
         smi = (
@@ -128,8 +133,8 @@ class TestPerformanceGuard:
         t0 = time.time()
         name = name_compound(smi)
         elapsed = time.time() - t0
-        assert elapsed < 2.0, (
-            f"Nonaester took {elapsed:.2f}s (limit: 2.0s)"
+        assert elapsed < _HANG_LIMIT_S, (
+            f"Nonaester took {elapsed:.2f}s (limit: {_HANG_LIMIT_S}s)"
         )
         assert name is not None, "Nonaester should produce a name"
 
