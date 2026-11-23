@@ -33,6 +33,10 @@ from ..errors import OrthonymLimitError, is_failure_name
 #::func:`record_metal_rewrite_non_pin`.
 METAL_REWRITE_RUN = contextvars.ContextVar("orthonym_metal_rewrite_run", default=False)
 
+#: Set while:func:`name_with_metal_offer` names another drawing, and kept through every naming nested in that run
+#: (a component named as an input of its own resets:data:`METAL_REWRITE_RUN`); read by ``rules.ylidene_azanide``.
+INSIDE_METAL_REWRITE = contextvars.ContextVar("orthonym_inside_metal_rewrite", default=False)
+
 #: Set for the whole of:func:`name_with_metal_offer`, so that the calls it makes name the strings
 #: they are given and offer nothing of their own.
 METAL_OFFER_OWNED = contextvars.ContextVar("orthonym_metal_offer_owned", default=False)
@@ -505,6 +509,7 @@ def name_with_metal_offer(namer, fn, offer, args, kwargs) -> str:
         # memoised is not served to the next run of another string
         box = _memo_push_sandbox()
         rewrite_token = METAL_REWRITE_RUN.set(rewritten)
+        inside_token = INSIDE_METAL_REWRITE.set(rewritten or INSIDE_METAL_REWRITE.get())
         split_token = METAL_DATIVE_SPLIT_RUN.set(rewritten and offer.keyless)
         try:
             out = fn(namer, string, *rest, **extra)
@@ -512,6 +517,7 @@ def name_with_metal_offer(namer, fn, offer, args, kwargs) -> str:
             out = exc
         finally:
             METAL_DATIVE_SPLIT_RUN.reset(split_token)
+            INSIDE_METAL_REWRITE.reset(inside_token)
             METAL_REWRITE_RUN.reset(rewrite_token)
             _memo_pop_sandbox(box)
         return out

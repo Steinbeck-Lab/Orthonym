@@ -867,18 +867,49 @@ def _zero_metal_drawn_name(ordered, named, frag_mols, mol, style: str, flags: Op
     (``_readable_spellings``): OPSIN neutralises an acid anion beside a bare metal ('acetate—cobalt(0) (2/1)' reads
     as acetic acid) and reads the oxido form as drawn ('1-oxido-1-oxoethane—cobalt(0) (2/1)'); None otherwise."""
     zeroed = _zero_metal_named(ordered, named, frag_mols)
-    if zeroed is None:
+    if zeroed is not None:
+        name = _drawn_or_respelled(ordered, zeroed, mol, style, flags)
+        if name is not None:
+            return name
+    if flags is None:
         return None
-    name = _assemble_adduct_name(zeroed)
+    # at the respelling tiers: a component of a covalently bonded metal cited with its oxidation number, which OPSIN
+    # keeps uncharged ('oxomolybdenum(II)', ``rules.adduct_stock_number``)
+    from .adduct_stock_number import stock_numbered
+    stocked = stock_numbered(ordered, zeroed or named, frag_mols)
+    return _drawn_or_respelled(ordered, stocked, mol, style, flags) if stocked is not None else None
+
+
+def _drawn_or_respelled(ordered, named, mol, style: str, flags: Optional[dict]) -> Optional[str]:
+    """The adduct name of ``named`` when OPSIN reads it as drawn; else, with ``flags``, the same components with the
+    spellings OPSIN reads beside one another (``_readable_spellings``) when that name reads as drawn; else None."""
+    name = _assemble_adduct_name(named)
     if _parse_reproduces_depiction(name, mol):
         return name
     if flags is None:
         return None
-    respelled = _readable_spellings(ordered, zeroed, style, flags)
-    if respelled == zeroed:
+    respelled = _readable_spellings(ordered, named, style, flags)
+    if respelled == named:
         return None
     name = _assemble_adduct_name(respelled)
     return name if _parse_reproduces_depiction(name, mol) else None
+
+
+def _stock_numbered_when_misread(ordered, named, frag_mols, mol, style: str, flags: dict) -> Optional[str]:
+    """The adduct name with the oxidation numbers of its covalently bonded metals (``rules.adduct_stock_number``) when
+    OPSIN reads the name without them as another compound (another full InChIKey: a charged metal) and the numbered
+    name reads as drawn; else None. A name that reads back to the drawing's full key ships as before."""
+    from .adduct_stock_number import stock_numbered
+    stocked = stock_numbered(ordered, named, frag_mols)
+    if stocked is None:
+        return None
+    try:
+        parsed = _adduct_opsin_read(_assemble_adduct_name(named))
+    except Exception:
+        return None
+    if parsed is not None and _full_key(parsed) == _full_key(Chem.MolToSmiles(mol)):
+        return None
+    return _drawn_or_respelled(ordered, stocked, mol, style, flags)
 
 
 def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
@@ -1613,6 +1644,13 @@ def _name_adduct_body(mol, canonical_smiles: Optional[str] = None,
                 return None
         _label_mixed_adduct(_name, ordered)
         return _name
+    if _ions_ok and general_fallback_unverified:
+        stocked = _stock_numbered_when_misread(ordered, named, frag_mols, mol, style, dict(
+            general_fallback=general_fallback, allow_aromatic_general=allow_aromatic_general,
+            general_fallback_unverified=general_fallback_unverified))
+        if stocked is not None:
+            _label_mixed_adduct(stocked, ordered)
+            return stocked
     if style == "general":
         water_indices = [i for i, (smi, _c) in enumerate(ordered)
                          if smi == "O"]

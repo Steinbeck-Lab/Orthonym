@@ -121,11 +121,14 @@ def test_a_charge_form_the_name_does_not_draw_is_refused():
 
 def test_opsin_charge_balancing_is_not_shipped():
     """OPSIN balances an adduct's charges itself: next to [Fe+2] it reads
-    'oxovanadium' as [V+3]=O. The engine's name for this drawing would read back as a
-    different structure, so the row abstains rather than ship it."""
+    'oxovanadium' as [V+3]=O, a different structure, so that name never ships. The
+    component that cites the oxidation number of its covalently bonded metal,
+    'oxovanadium(II)', reads back (OPSIN 2.9.0 and main) as the drawn O=[V]
+    (``rules.adduct_stock_number``); an adduct name is no PIN."""
     smiles = "OCCN(CCO)CCO.O=[V].[Fe+2]"
     row = _best_effort_row(smiles)
-    assert row["tier"] == "abstain", (row.get("name"), row["tier"])
+    assert row["name"] == "2,2',2''-nitrilotri(ethan-1-ol)—oxovanadium(II)—iron(2+) (1/1/1)", row
+    assert row["tier"] == "systematic_verified", row
 
 
 class TestComponentTables:

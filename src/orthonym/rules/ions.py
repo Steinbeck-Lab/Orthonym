@@ -250,13 +250,13 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         return 'alkoxide'
 
     elif element == 'N':
-        #: an amide-type anion (N- on an acyl carbon, R-CO-NH-) is
-        # named on the preselected azanide parent with the acyl group as a prefix
-        # (acetylazanide, BB 41079), NOT the amine 'aminide' suffix,
-        # which is for an amine N- whose carbon is NOT acyl). Fires only for an N-
-        # with exactly one heavy neighbour that is an acyl carbon (C=O/C=S/C=Se).
+        #: an amide-type anion (N- on an acyl carbon, R-CO-NH-) is named on the preselected azanide
+        # parent with the acyl group as a prefix (acetylazanide, BB 41079), NOT the amine 'aminide' suffix
+        #, for an amine N- whose carbon is NOT acyl). Only an N- with ONE heavy neighbour, an acyl
+        # carbon (C=O/C=S/C=Se) on a SINGLE bond: X=C=[N-] is the azanide of its ylidene group ('ylidene_azanide').
         heavy_n = [nb for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H']
-        if len(heavy_n) == 1 and heavy_n[0].GetSymbol() == 'C' and any(
+        if len(heavy_n) == 1 and heavy_n[0].GetSymbol() == 'C' and mol.GetBondBetweenAtoms(
+                atom_idx, heavy_n[0].GetIdx()).GetBondType() == Chem.BondType.SINGLE and any(
                 b.GetBondType() == Chem.BondType.DOUBLE
                 and b.GetOtherAtom(heavy_n[0]).GetSymbol() in ('O', 'S', 'Se')
                 for b in heavy_n[0].GetBonds()):

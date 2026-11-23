@@ -794,14 +794,21 @@ def name_in_fresh_frame(fn):
     slots are restored on exit, as a naming in a new thread would leave them. The hang-budget trips counted inside
     are added to the outer count (:func:`hang_budget_trips` is never reset). What ``fn`` names arms the hang budgets
     of one compound, as a compound named alone does. Used for an adduct component that the nested naming refused only
-    because it is a part of the caller's input (``rules.adducts._name_component``)."""
+    because it is a part of the caller's input (``rules.adducts._name_component``). The one flag the frame keeps is
+    whether the caller's input is being named in another drawing (``metal_offer.INSIDE_METAL_REWRITE``), a fact of
+    the whole call that the producers of a component read."""
     import contextvars
+    from .metal_offer import INSIDE_METAL_REWRITE
+    inside = INSIDE_METAL_REWRITE.get()
     slots = _thread_naming_state()
     saved = [dict(vars(slot)) for slot in slots]
     for slot in slots:
         vars(slot).clear()
     try:
-        return contextvars.Context().run(fn)
+        fresh = contextvars.Context()
+        if inside:
+            fresh.run(INSIDE_METAL_REWRITE.set, True)
+        return fresh.run(fn)
     finally:
         inner_trips = hang_budget_trips()
         for slot, state in zip(slots, saved):
