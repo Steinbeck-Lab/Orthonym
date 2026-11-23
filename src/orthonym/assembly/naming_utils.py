@@ -2765,6 +2765,8 @@ _CATIONIC_HYDRIDE_YLS: frozenset = frozenset({
     'azaniumyl', 'phosphaniumyl', 'arsaniumyl', 'stibaniumyl', 'bismuthaniumyl',
     'oxidaniumyl', 'sulfaniumyl', 'selaniumyl', 'tellaniumyl', 'boranyl',
 })
+# the anionic hydride -yl groups:41227) as a split tail: '(tert-butylazanidyl)' like '(tert-butylazaniumyl)'
+_ANIONIC_HYDRIDE_YLS = frozenset({'azanidyl', 'phosphanidyl', 'arsanidyl', 'methanidyl', 'silanidyl', 'boranuidyl'})
 
 
 # The retained acyl groups 'acetyl', 'benzoyl' and 'formyl' "Definitions and name formation", the Blue Book). As the TAIL of a split
@@ -2800,7 +2802,7 @@ def _is_recognised_prefix_component(token: str) -> bool:
     # (`:33087`).
     if len(token) > 5 and token.endswith('amido'):
         return True
-    if token in _CATIONIC_HYDRIDE_YLS or token in _RETAINED_ACYL_GROUPS:
+    if token in _CATIONIC_HYDRIDE_YLS or token in _ANIONIC_HYDRIDE_YLS or token in _RETAINED_ACYL_GROUPS:
         return True
     return _is_replacement_named_hydride_yl(token)
 

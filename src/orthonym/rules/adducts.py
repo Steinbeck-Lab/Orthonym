@@ -156,8 +156,8 @@ def _metal_halide_oxide_component_name(frag_mol) -> Optional[str]:
     its multiplier, then the element name. Only for a true metal (the Groups 1-12
     metals and the f-block, perception.metals._TRUE_METAL_SYMBOLS_FOR_VETO: a
     Group 13-16 element has a parent hydride and is named substitutively,
-    with no charge and no hydrogen, whose every other atom is an uncharged,
-    hydrogen-free terminal halogen (single bond) or oxygen (double bond) on it.
+    with no charge and at most two hydrogens (cited as 'hydrido' beside the other ligands), whose every other atom
+    is an uncharged, hydrogen-free terminal halogen (single bond) or oxygen (double bond) on it.
     """
     from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
     metals = [a for a in frag_mol.GetAtoms() if a.GetSymbol() in _METAL_ELEMENT_NAMES]
@@ -165,10 +165,14 @@ def _metal_halide_oxide_component_name(frag_mol) -> Optional[str]:
         return None
     metal = metals[0]
     if (metal.GetSymbol() not in _TRUE_METAL_SYMBOLS_FOR_VETO
-            or metal.GetFormalCharge() != 0 or metal.GetTotalNumHs() != 0
+            or metal.GetFormalCharge() != 0 or metal.GetTotalNumHs() > 2
             or metal.GetIsotope()):
         return None
     counts: Dict[str, int] = {}
+    if metal.GetTotalNumHs():
+        # a hydrogen on the metal is the 'hydrido' ligand ('chlorohydridoruthenium' for [Cl][RuH], which OPSIN reads
+        # as drawn); only beside a halogen ligand, never as a metal hydride alone or an oxo hydride
+        counts['hydrido'] = metal.GetTotalNumHs()
     for atom in frag_mol.GetAtoms():
         if atom.GetIdx() == metal.GetIdx():
             continue
@@ -184,8 +188,10 @@ def _metal_halide_oxide_component_name(frag_mol) -> Optional[str]:
         if prefix is None:
             return None
         counts[prefix] = counts.get(prefix, 0) + 1
-    if any(n not in _LIGAND_MULTIPLIERS for n in counts.values()):
-        return None
+    if any(n not in _LIGAND_MULTIPLIERS for n in counts.values()) or (
+            'hydrido' in counts and not set(counts) & {'fluoro', 'chloro', 'bromo', 'iodo'}):
+        return None  # a hydrido ligand only beside a halide one: an oxo hydride keeps the pipeline's 'dihydrido(oxo)'
+
     ligands = "".join(_LIGAND_MULTIPLIERS[counts[p]] + p for p in sorted(counts))
     return ligands + _METAL_ELEMENT_NAMES[metal.GetSymbol()]
 
@@ -990,21 +996,38 @@ def _component_spellings(frag_smi: str, primary: str, style: str, flags: dict):
 
 def _component_spellings_once(frag_smi: str, primary: str, style: str, flags: dict):
     """The other spellings of one adduct component, best first, as (rank, name):
+    1 -- the λ-convention name of a divalent or trivalent radical component (``rules.lambda_component``),
     1 -- the engine's late general-engine recovery name
     (``Orthonym._engine_recovery_spelling``), 2 -- the universal floor's verified
     spelling (``t4_coverage._verified_universal_floor``). Each reads back by
     itself to the component's full InChIKey (``verify_or_none``) and differs from
-    ``primary`` and from the other. A one-atom component has no other spelling.
+    ``primary`` and from the other. A one-atom component has no other spelling but its λ name.
     Best-effort tier only (the caller gates). Never raises: a spelling that runs its hang
     budgets out is left out."""
-    frag = Chem.MolFromSmiles(frag_smi)
-    if frag is None or frag.GetNumHeavyAtoms() < 2:
-        return []
-    from orthonym.assembly.fragment_naming import PerfBudgetExceeded, own_hang_budgets
-    from orthonym.namer import Orthonym
     from orthonym.validation.reconstruct import verify_or_none
     out: List[Tuple[int, str]] = []
     seen = {primary}
+    # a divalent or trivalent radical component, one atom ('λ2-stannane') or more: its λ-convention name
+    # ('dimethyl-λ2-silane',, which OPSIN reads as an adduct component in any position where it reads no
+    # radical one (``rules.lambda_component``): the first other spelling where the OPSIN in use reads no radical
+    # adduct component (2.9.0), the last one otherwise, so it never displaces a spelling that ships there
+    from .lambda_component import lambda_component_name
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    lam_spelling = None
+    try:
+        lam = lambda_component_name(frag_smi)
+        if lam and lam not in seen and verify_or_none(lam, frag_smi) is not None:
+            seen.add(lam)
+            lam_spelling = (2, lam) if radical_adduct_enabled() else (1, lam)
+    except Exception:
+        pass
+    if lam_spelling is not None and lam_spelling[0] == 1:
+        out.append(lam_spelling)
+    frag = Chem.MolFromSmiles(frag_smi)
+    if frag is None or frag.GetNumHeavyAtoms() < 2:
+        return out + ([lam_spelling] if lam_spelling is not None and lam_spelling[0] == 2 else [])
+    from orthonym.assembly.fragment_naming import PerfBudgetExceeded, own_hang_budgets
+    from orthonym.namer import Orthonym
     # Another spelling is an optional offer, and each one is built with the hang budgets of one
     # compound: a spelling whose analysis runs them out is no spelling (the component keeps its
     # first name), where the trip would end the whole adduct.
@@ -1027,6 +1050,8 @@ def _component_spellings_once(frag_smi: str, primary: str, style: str, flags: di
         floor = None
     if floor and floor not in seen:
         out.append((2, floor))
+    if lam_spelling is not None and lam_spelling[0] == 2:
+        out.append(lam_spelling)
     return out
 
 
@@ -1054,6 +1079,21 @@ def _readable_spellings(ordered: List[Tuple[str, int]],
         lambda: tuple(_readable_spellings_once(ordered, named, style, flags)),
         replay_budgets=False))
     return named if out == list(named) else out  # "unchanged" is the list the caller passed
+
+
+def _lambda_spellings_allowed(ordered: List[Tuple[str, int]]) -> bool:
+    """Whether a radical component may take its λ name in ``_readable_spellings_once``: always where the OPSIN in use
+    reads no radical adduct component (2.9.0); with OPSIN main only beside a second radical component, as one radical
+    component is read last (``readable_component_order``) and keeps the name it ships today."""
+    from orthonym.opsin_capabilities import radical_adduct_enabled
+    if not radical_adduct_enabled():
+        return True
+    radicals = 0
+    for smi, _count in ordered:
+        frag = Chem.MolFromSmiles(smi)
+        if frag is not None and frag.GetNumAtoms() > 1 and any(a.GetNumRadicalElectrons() for a in frag.GetAtoms()):
+            radicals += 1
+    return radicals >= 2
 
 
 def _readable_spellings_once(ordered: List[Tuple[str, int]],
@@ -1103,12 +1143,18 @@ def _readable_spellings_once(ordered: List[Tuple[str, int]],
     from orthonym.assembly.fragment_naming import own_hang_budgets
     pools: Dict[int, List[Tuple[int, str]]] = {}
 
+    lambda_ok = _lambda_spellings_allowed(ordered)
+
     def pool(i: int) -> List[Tuple[int, str]]:
         """[(rank, spelling)] of component i, its first name (rank 0) first."""
         if i not in pools:
             with own_hang_budgets():
-                pools[i] = [(0, named[i][0])] + _component_spellings(
-                    ordered[i][0], named[i][0], style, flags)
+                spellings = _component_spellings(ordered[i][0], named[i][0], style, flags)
+                if not lambda_ok:
+                    from .lambda_component import lambda_component_name
+                    lam = lambda_component_name(ordered[i][0])
+                    spellings = [sp for sp in spellings if sp[1] != lam]
+                pools[i] = [(0, named[i][0])] + spellings
         return pools[i]
 
     heavy = [Chem.MolFromSmiles(smi).GetNumHeavyAtoms() for smi, _c in ordered]
@@ -1407,8 +1453,8 @@ def _closed_ion_word(smi: str, frag, style: str) -> Optional[str]:
 
 def _radical_hydride_word(smi: str, frag, style: str) -> Optional[str]:
     """The word of a neutral one-atom component with radical electrons ('[PbH2]' -> 'plumbylidene',
-    "Specific method and retained names", the Blue Book), only when the OPSIN in use reads adducts with a
-    radical component (``opsin_capabilities.radical_adduct_enabled``): the name a fresh best-effort instance gives the
+    "Specific method and retained names", the Blue Book) when the OPSIN in use reads adducts with a radical
+    component (``opsin_capabilities.radical_adduct_enabled``), else its λ name ('λ2-plumbane'): the name a fresh best-effort instance gives the
     piece alone, through the component gate.:func:`_name_component` cannot give it: a neutral one-atom part takes
     only the table word there."""
     if frag.GetNumAtoms() != 1:
@@ -1418,7 +1464,11 @@ def _radical_hydride_word(smi: str, frag, style: str) -> Optional[str]:
         return None
     from orthonym.opsin_capabilities import radical_adduct_enabled
     if not radical_adduct_enabled():
-        return None
+        # OPSIN 2.9.0 reads no radical component; it reads the λ-convention name of the atom ('λ2-plumbane',,
+        # ``rules.lambda_component``) as an ordinary one
+        from .lambda_component import lambda_component_name
+        lam = lambda_component_name(smi)
+        return _passes_component_gate(smi, lam) if lam else None
     from orthonym.namer import Orthonym  # lazy: avoid import cycle
     from orthonym.validation.thioperoxol_twin import embedded_name
     try:
@@ -1446,13 +1496,28 @@ def _component_adduct_name(components: List[Tuple[str, int]], frag_mols, mol, st
         return None
     from ..validation.radical_identity import radical_profile
     from orthonym.opsin_capabilities import radical_adduct_enabled
-    if radical_profile(mol) and not radical_adduct_enabled():
-        return None             # OPSIN 2.9.0 reads no adduct with a radical component, even with -r
+    if radical_profile(mol) and not radical_adduct_enabled() and not _radicals_have_lambda_names(components):
+        return None             # OPSIN 2.9.0 reads no adduct with a radical component, even with -r, but the λ name
     from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
     key = (Chem.MolToSmiles(mol), style, _naming_context(), renaming_state())
     return cached_nested_call("component_adduct", key,
                               lambda: _component_adduct_name_once(components, frag_mols, mol, style),
                               replay_budgets=False)
+
+
+def _radicals_have_lambda_names(components: List[Tuple[str, int]]) -> bool:
+    """True when every component with an unpaired electron has a λ-convention name (``rules.lambda_component``); a
+    bare atom ('[Pb]', the element 'lead') is named by its element name."""
+    from .lambda_component import lambda_component_name
+    for smi, _count in components:
+        frag = Chem.MolFromSmiles(smi)
+        if frag is None:
+            return False
+        if frag.GetNumAtoms() == 1 and not frag.GetAtomWithIdx(0).GetTotalNumHs():
+            continue
+        if any(a.GetNumRadicalElectrons() for a in frag.GetAtoms()) and not lambda_component_name(smi):
+            return False
+    return True
 
 
 def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:

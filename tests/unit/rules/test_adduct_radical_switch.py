@@ -44,10 +44,23 @@ def test_radical_component_named_when_opsin_reads_it(smiles, expected, verified)
     assert _tiered_namer("pin", "pin").name_tiered(smiles)["tier"] == "abstain"
 
 
+#: without the capability, a one-atom radical component takes its λ-convention name, which OPSIN 2.9.0 reads as an
+#: ordinary component "The λ-convention", the Blue Book, ``rules.lambda_component``); a monovalent
+#: radical (iodanyl, tribenzylstannyl) and a bare atom radical have none, and the mixture stays unnamed
+_LAMBDA_WITHOUT_CAPABILITY = {
+    "CCCC=CC(=O)O.[PbH2]": "hex-2-enoic acid—λ2-plumbane (1/1)",
+    "O.O.[Ni].[SnH2]": "nickel—λ2-stannane—water (1/1/2)",
+}
+
+
 @pytest.mark.parametrize("smiles", [s for s, _n, _v in _RADICAL])
 def test_no_radical_component_without_the_capability(monkeypatch, smiles):
     monkeypatch.setattr(caps, "radical_adduct_enabled", lambda: False)
-    assert name_best_effort(smiles)["name"] is None
+    expected = _LAMBDA_WITHOUT_CAPABILITY.get(smiles)
+    res = name_best_effort(smiles)
+    assert res["name"] == expected, res
+    if expected:
+        assert not res["is_pin"] and name_is_rt_exact(expected, smiles)
 
 
 @pytest.mark.parametrize("capability", [True, False])
