@@ -1047,13 +1047,11 @@ def _validity_gate_name_to_opsin_smiles(name: str) -> Optional[str]:
 
 def _same_canonical_smiles(smiles_a: str, smiles_b: str) -> bool:
     """True iff both SMILES parse and have the same RDKit canonical isomeric SMILES
-    (the same molecular graph). False when either does not parse."""
+    (the same molecular graph). False when either does not parse. Each canonical form comes from
+    ``molcache.canon_smiles``, a process-wide LRU that is exact for a pure function of the string."""
+    from .perception.molcache import canon_smiles
     try:
-        ma = Chem.MolFromSmiles(smiles_a)
-        mb = Chem.MolFromSmiles(smiles_b)
-        if ma is None or mb is None:
-            return False
-        return Chem.MolToSmiles(ma) == Chem.MolToSmiles(mb)
+        return canon_smiles(smiles_a) == canon_smiles(smiles_b)
     except Exception:
         return False
 

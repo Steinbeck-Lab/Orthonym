@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _FLEXIBLE_PATTERNS: Dict[str, Chem.Mol] = {}
 _PATTERNS_INITIALIZED = False
+# The ring core of each query (the query with its acyclic atoms removed) and the core each scaffold uses: a core that
+# does not match proves its full query cannot match (a match of the query restricts to a match of any subgraph of it),
+# so one core test screens out every scaffold that shares it (speed audit 2026-11-24, lever K2).
+_RING_CORES: Dict[str, Chem.Mol] = {}
+_CORE_OF: Dict[str, str] = {}
 
 
 def _init_flexible_patterns() -> None:
@@ -70,8 +75,30 @@ def _init_flexible_patterns() -> None:
         query = Chem.AdjustQueryProperties(mol_copy, params)
         if query is not None:
             _FLEXIBLE_PATTERNS[smiles] = query
+            core = _ring_core(query)
+            if core is not None:
+                key = Chem.MolToSmarts(core)
+                _RING_CORES.setdefault(key, core)
+                _CORE_OF[smiles] = key
 
     _PATTERNS_INITIALIZED = True
+
+
+def _ring_core(query) -> Optional[Chem.Mol]:
+    """``query`` without its acyclic atoms, or None when it has no ring atom or the removal fails (no screen then)."""
+    try:
+        ringed = Chem.Mol(query)
+        Chem.FastFindRings(ringed)
+        info = ringed.GetRingInfo()
+        acyclic = [a.GetIdx() for a in ringed.GetAtoms() if not info.NumAtomRings(a.GetIdx())]
+        if len(acyclic) == query.GetNumAtoms():
+            return None
+        core = Chem.RWMol(query)
+        for idx in sorted(acyclic, reverse=True):
+            core.RemoveAtom(idx)
+        return core.GetMol()
+    except Exception:
+        return None
 
 
 def _get_flexible_patterns() -> Dict[str, Chem.Mol]:
@@ -221,7 +248,14 @@ def _detect_natural_product_impl(mol) -> Optional[Dict]:
     best_smiles = None
     best_class_priority = 99
 
+    core_matches: Dict[str, bool] = {}
     for smiles, query_mol in patterns.items():
+        core_key = _CORE_OF.get(smiles)
+        if core_key is not None:
+            if core_key not in core_matches:
+                core_matches[core_key] = mol.HasSubstructMatch(_RING_CORES[core_key])
+            if not core_matches[core_key]:
+                continue
         if mol.HasSubstructMatch(query_mol):
             match = mol.GetSubstructMatch(query_mol)
             scaffold_info = NATURAL_PRODUCT_SCAFFOLDS[smiles]

@@ -332,6 +332,8 @@ class _Ctx:
     # chain walks ask the same atom of the same component hundreds of thousands of times in a large
     # molecule); each with whether it fired the 'chain' spelling, which a hit fires again
     tree_neighbor_memo: Dict = field(default_factory=dict)
+    # ``_spine_step`` answers, keyed by the atom, the neighbour and the flags it reads
+    spine_step_memo: Dict = field(default_factory=dict)
     # Roadmap N5c: while True, a chain spine walks carbon atoms only
     # (``_tree_neighbors``); set by ``_name_chain_spine`` for one spine choice.
     carbon_walk: bool = False
@@ -2852,68 +2854,83 @@ def _tree_neighbors_of(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> Tuple
     fired = False           # the 'chain' spelling fired (a nitrile carbon left to the 'cyano' branch)
     for nb in ctx.mol.GetAtomWithIdx(atom).GetNeighbors():
         j = nb.GetIdx()
-        if nb.GetAtomicNum() <= 1 or j not in component:
+        if j not in component:
             continue
-        if ctx.ring_system_of.get(j) is not None:
-            continue
-        if ctx.carbon_walk and nb.GetAtomicNum() != 6:
-            continue  # roadmap N5c: a substitutive spine is a carbon chain
-        if nb.GetAtomicNum() == 6 and nb.GetDegree() == 1 and j in ctx.lambda_atoms:
-            continue  # a carbon end that is a radical centre is the branch 'λ2-methyl', not a chain atom:
-            # the chain spine cites no lambda on a carbon atom
-        if not _is_skeletal_spine_element(ctx.mol, j):
-            continue  # ALLOW-LIST (M1): only carbon + a REPLACEMENT_TERMS-
-            # spellable heteroatom MAY thread the chain spine. Every
-            # other element (halogen, metal, noble gas, Al/Ga/In/Tl,
-            # an exotic-valence centre,...) is COUNTED in the chain
-            # length but SILENTLY SKIPPED by _build_hetero_prefix
-            # (phantom carbon + dropped atom -> wrong constitution:
-            # CHF2 -> "1-fluoroethan-1-yl", commit d3590326 for the
-            # halogen instance). Sent instead to _discover_branches ->
-            # _leaf_shortcut (a monovalent halogen renders fluoro/
-            # chloro/bromo/iodo; an unspellable element fails closed).
-            # Generalizes the terminal-halogen exclusion to the whole
-            # non-skeletal class -- see _SKELETAL_SPINE_ELEMENTS.
-        if _is_nitro_root(ctx.mol, j):
-            continue
-        if _is_azide_root(ctx.mol, j):
-            continue  # M2: azide N_alpha is always the ``azido`` branch leaf,
-            # never threaded into the chain (its +1/-1 internal
-            # charge carries no trace as a plain ``aza`` -- nitro
-            # case, generalised). Ring path already branches it.
-        if _is_diazo_root(ctx.mol, j):
-            continue  # M2: diazo N_beta likewise -- always the ``diazo`` leaf.
-        if _is_diazonium_root(ctx.mol, j):
-            continue  # the diazonium N is always the ``diazonio`` leaf (its charge is genuine)
-        if _is_isocyano_root(ctx.mol, j):
-            continue  # M2 inc3: the isocyanide N (R-[N+]#[C-]) is always the
-            # ``isocyano`` branch leaf, never threaded into the chain
-            # (its N+ would drop the internal charge as a plain aza).
-        if _is_nitrooxy_root(ctx.mol, j):
-            continue  # M2 inc2: the ester O of a nitrate ester -O-NO2 is always
-            # the anchor of the ``nitrooxy`` branch leaf (which carries
-            # the whole -O-N(+)(=O)[O-] group + its internal charges),
-            # never threaded into the chain as a plain skeletal ``oxa``
-            # (which would strand the nitro N+/O- as an unconsumed
-            # internal charge -> void -- the nitro case, generalised).
-        if _is_phosphinate_oxide_root(ctx.mol, j):
-            continue
-        if ctx.azanidyl_forms and _is_azanide_root(ctx, j):
-            continue  #: an anionic nitrogen roots an 'azanidyl' prefix, never a chain atom
-        if ctx.chain_forms and _is_cyano_root(ctx.mol, j):
-            fired = True
-            continue  # roadmap item 12a: a nitrile carbon is the anchor of the 'cyano'
-            # prefix the Blue Book), never a chain member
-            # with its nitrogen threaded as '1-azamethan-1-ylidyne'
-        if ctx.ps_forms and _is_oxoacid_group_root(ctx.mol, j):
-            continue  #: a P/S oxoacid group (and its O/NH linker) is always
-            # a branch prefix (phosphono, sulfooxy,...), never skeletal 'a' atoms
-        if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom, ctx.azanidyl_forms) is not None:
-            continue  # terminal charged atom a charged-leaf owns -> branch, not
-            # spine (a carbanion / heteroatom-hydride anion this leaf
-            # does NOT own stays threadable -> skeletal -ide/-uide)
-        out.append(j)
+        key = (atom, j, ctx.carbon_walk, ctx.chain_forms, ctx.ps_forms, ctx.azanidyl_forms, j in ctx.lambda_atoms)
+        step = ctx.spine_step_memo.get(key)
+        if step is None:
+            step = ctx.spine_step_memo[key] = _spine_step(ctx, atom, nb)
+        if step[0]:
+            out.append(j)
+        fired = fired or step[1]
     return tuple(out), fired
+
+
+def _spine_step(ctx: _Ctx, atom: int, nb) -> Tuple[bool, bool]:
+    """Whether the chain spine may step from *atom* to its neighbour *nb* (see:func:`_tree_neighbors_of`), and
+    whether the 'chain' spelling fired. Reads only the two atoms and the flags in the caller's key, not the component,
+    so one answer serves every component (speed audit 2026-11-24, lever K4)."""
+    j = nb.GetIdx()
+    if nb.GetAtomicNum() <= 1:
+        return False, False
+    if ctx.ring_system_of.get(j) is not None:
+        return False, False
+    if ctx.carbon_walk and nb.GetAtomicNum() != 6:
+        return False, False  # roadmap N5c: a substitutive spine is a carbon chain
+    if nb.GetAtomicNum() == 6 and nb.GetDegree() == 1 and j in ctx.lambda_atoms:
+        return False, False  # a carbon end that is a radical centre is the branch 'λ2-methyl', not a chain atom:
+        # the chain spine cites no lambda on a carbon atom
+    if not _is_skeletal_spine_element(ctx.mol, j):
+        return False, False  # ALLOW-LIST (M1): only carbon + a REPLACEMENT_TERMS-
+        # spellable heteroatom MAY thread the chain spine. Every
+        # other element (halogen, metal, noble gas, Al/Ga/In/Tl,
+        # an exotic-valence centre,...) is COUNTED in the chain
+        # length but SILENTLY SKIPPED by _build_hetero_prefix
+        # (phantom carbon + dropped atom -> wrong constitution:
+        # CHF2 -> "1-fluoroethan-1-yl", commit d3590326 for the
+        # halogen instance). Sent instead to _discover_branches ->
+        # _leaf_shortcut (a monovalent halogen renders fluoro/
+        # chloro/bromo/iodo; an unspellable element fails closed).
+        # Generalizes the terminal-halogen exclusion to the whole
+        # non-skeletal class -- see _SKELETAL_SPINE_ELEMENTS.
+    if _is_nitro_root(ctx.mol, j):
+        return False, False
+    if _is_azide_root(ctx.mol, j):
+        return False, False  # M2: azide N_alpha is always the ``azido`` branch leaf,
+        # never threaded into the chain (its +1/-1 internal
+        # charge carries no trace as a plain ``aza`` -- nitro
+        # case, generalised). Ring path already branches it.
+    if _is_diazo_root(ctx.mol, j):
+        return False, False  # M2: diazo N_beta likewise -- always the ``diazo`` leaf.
+    if _is_diazonium_root(ctx.mol, j):
+        return False, False  # the diazonium N is always the ``diazonio`` leaf (its charge is genuine)
+    if _is_isocyano_root(ctx.mol, j):
+        return False, False  # M2 inc3: the isocyanide N (R-[N+]#[C-]) is always the
+        # ``isocyano`` branch leaf, never threaded into the chain
+        # (its N+ would drop the internal charge as a plain aza).
+    if _is_nitrooxy_root(ctx.mol, j):
+        return False, False  # M2 inc2: the ester O of a nitrate ester -O-NO2 is always
+        # the anchor of the ``nitrooxy`` branch leaf (which carries
+        # the whole -O-N(+)(=O)[O-] group + its internal charges),
+        # never threaded into the chain as a plain skeletal ``oxa``
+        # (which would strand the nitro N+/O- as an unconsumed
+        # internal charge -> void -- the nitro case, generalised).
+    if _is_phosphinate_oxide_root(ctx.mol, j):
+        return False, False
+    if ctx.azanidyl_forms and _is_azanide_root(ctx, j):
+        return False, False  #: an anionic nitrogen roots an 'azanidyl' prefix, never a chain atom
+    if ctx.chain_forms and _is_cyano_root(ctx.mol, j):
+        return False, True  # roadmap item 12a: a nitrile carbon is the anchor of the 'cyano'
+        # prefix the Blue Book), never a chain member
+        # with its nitrogen threaded as '1-azamethan-1-ylidyne'
+    if ctx.ps_forms and _is_oxoacid_group_root(ctx.mol, j):
+        return False, False  #: a P/S oxoacid group (and its O/NH linker) is always
+        # a branch prefix (phosphono, sulfooxy,...), never skeletal 'a' atoms
+    if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom, ctx.azanidyl_forms) is not None:
+        return False, False  # terminal charged atom a charged-leaf owns -> branch, not
+        # spine (a carbanion / heteroatom-hydride anion this leaf
+        # does NOT own stays threadable -> skeletal -ide/-uide)
+    return True, False
 
 
 # ===========================================================================

@@ -6720,25 +6720,8 @@ def _find_carboxylate_chain(mol, anion_site: Dict):
         if nbr.GetSymbol() == 'O':
             carboxylate_os.add(nbr.GetIdx())
 
-    def _longest_chain(start_idx, visited):
-        """DFS to find longest carbon chain."""
-        best = [start_idx]
-        a = mol.GetAtomWithIdx(start_idx)
-        for nbr in a.GetNeighbors():
-            nidx = nbr.GetIdx()
-            if nidx in visited or nidx in carboxylate_os:
-                continue
-            if nbr.GetSymbol() != 'C':
-                continue
-            visited.add(nidx)
-            sub = _longest_chain(nidx, visited)
-            candidate = [start_idx] + sub
-            if len(candidate) > len(best):
-                best = candidate
-            visited.discard(nidx)
-        return best
-
-    chain = _longest_chain(carboxyl_c, {carboxyl_c})
+    from .carbon_path import first_longest_carbon_path   # a branch and bound, the same path as the plain DFS
+    chain = first_longest_carbon_path(mol, carboxyl_c, carboxylate_os)
 
     # Find double bonds along the chain and their locants
     double_bond_locs = []
