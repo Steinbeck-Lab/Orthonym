@@ -25,6 +25,7 @@ from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 from ..perception.molcache import atoms_of, bonds_of
+from .cage_analysis_memo import memoised_cage_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -796,6 +797,7 @@ def _double_bond_labels_agree(mol, canon, match) -> bool:
     return True
 
 
+@memoised_cage_analysis   # one analysis per cage and context in a naming call, side effects replayed
 def analyze_cage_universal(
     mol, cage_atoms=None, allow_mancude: bool = False,
     spiro_atom: Optional[int] = None,
