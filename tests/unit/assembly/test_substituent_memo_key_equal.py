@@ -6,6 +6,8 @@ and the peptide handler's attempt changes a fragment's name). The ambient state 
 breadth-flag components that dd759cc50 (a lever, 2026-09-17) appended on purpose."""
 import itertools
 import pytest
+
+from orthonym.assembly.fragment_key import external_bond_cips
 from rdkit import Chem
 from orthonym.assembly import substituent_enumerator as se
 from orthonym.assembly import memo
@@ -141,7 +143,10 @@ def test_key_identical_to_reference(smi):
                     assert key[:10] == ref
                     # engine_prefix_ordering appended the mark of a general-engine run (the engine's
                     # allow_mancude decides the ordering names of the prefixes it numbers): False here
-                    assert key[10:] == (False, se._mol_graph_key(mol), renaming_state())
+                    # the CIP labels of the bonds that join the fragment to the rest (2026-11-24): an '-ylidene' prefix
+                    # cites the E/Z of its joining double bond, which is outside the fragment
+                    assert key[10:] == (False, se._mol_graph_key(mol), renaming_state(),
+                                        external_bond_cips(mol, frag))
     finally:
         memo.pop_scope(tok)
 

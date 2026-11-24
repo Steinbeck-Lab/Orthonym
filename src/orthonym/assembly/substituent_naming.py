@@ -7969,6 +7969,8 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
             j = b.GetOtherAtomIdx(i)
             if j > i and j in sub_set:
                 cips.append((j, b.GetProp('_CIPCode') if b.HasProp('_CIPCode') else None))
+            elif j not in sub_set:      # a joining bond: an '-ylidene' prefix cites its E/Z (2026-11-24)
+                cips.append(("out", j, b.GetProp('_CIPCode') if b.HasProp('_CIPCode') else None))
     if parent_chain is None:
         parent = None
     elif isinstance(parent_chain, (set, frozenset)):

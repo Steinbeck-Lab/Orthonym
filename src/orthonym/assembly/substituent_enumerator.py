@@ -1063,7 +1063,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     can only be used with molecules that have a single fragment", and logs the refusal
     on every call: the question is asked here, so it is not put to RDKit).
     """
-    from .fragment_key import key_parts
+    from .fragment_key import external_bond_cips, key_parts
     from .nested_memo import renaming_state
     # The structural components (the rooted fragment SMILES and the walks over the fragment atoms' bonds, kept for
     # the naming scope: ``assembly.fragment_key``). The rest of the comments of this key:
@@ -1092,7 +1092,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     return (smi, attach_in_frag, ext_free_valence,
             bool(allow_mancude), best_effort_val, atom_cips, bond_cips,
             ext_bond_orders, frozenset(frag_atoms), attach_idx,
-            engine_orders_with_mancude(), graph_key, renaming_state())
+            engine_orders_with_mancude(), graph_key, renaming_state(), external_bond_cips(mol, frag_atoms))
 
 
 def name_substituent_for_ordering(mol, frag_atoms, attach_idx):

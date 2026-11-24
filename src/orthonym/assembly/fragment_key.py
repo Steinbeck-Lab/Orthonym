@@ -152,6 +152,23 @@ def structural_parts_unrestricted(mol, frag_atoms, attach_idx):
     return (smi, attach_in_frag, ext_free_valence, atom_cips, bond_cips, ext_bond_orders, _mol_graph_key(mol))
 
 
+def external_bond_cips(mol, frag_atoms) -> tuple:
+    """``(bond index, _CIPCode)`` of every bond with one end in ``frag_atoms`` (a memo key part).
+
+    The key of ``name_substituent`` holds the labels of the bonds INSIDE the fragment; the double bond that joins an
+    '-ylidene' prefix to its parent is outside it, and the prefix cites its E/Z (or leaves it to the parent) by the
+    label it finds there. Measured 2026-11-24 (``ORTHONYM_MEMO=verify``): a prefix named before the stereo was
+    assigned ('(2Z)-...-2-ylidene') was served after it, where the naming gives the prefix without '(2Z)'."""
+    frag = set(frag_atoms)
+    atoms = atoms_of(mol)
+    out = set()
+    for i in frag:        # the fragment atoms' own bonds only (a scan of every bond cost ~70% of a key on 190 bonds)
+        for b in atoms[i].GetBonds():
+            if b.GetOtherAtomIdx(i) not in frag:
+                out.add((b.GetIdx(), _cip(b)))
+    return tuple(sorted(out))
+
+
 def key_parts(mol, frag_atoms, attach_idx):
     """The structural half of the ``name_substituent`` memo key (see:func:`structural_parts`): from the scope's cache
     where the molecule is cached there, else computed as it always was."""
