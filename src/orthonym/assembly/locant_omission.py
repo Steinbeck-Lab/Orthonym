@@ -1066,6 +1066,11 @@ _ISOTOPIC_NAMING_SCOPE: "contextvars.ContextVar[Optional[str]]" = contextvars.Co
 )
 
 
+def isotopic_scope_reason() -> Optional[str]:
+    """The reason of the open isotopic naming scope, or None outside one (a memo key tag, ``assembly.memo._ck``)."""
+    return _ISOTOPIC_NAMING_SCOPE.get()
+
+
 @contextlib.contextmanager
 def isotopic_naming_scope(reason: str = "isotope"):
     """Declare that an isotopic descriptor will be spliced into this naming scope.

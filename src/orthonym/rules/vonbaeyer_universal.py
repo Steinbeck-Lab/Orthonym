@@ -165,6 +165,11 @@ def lifted_ring_ceiling_scope():
         _LIFTED_CEILINGS.reset(token)
 
 
+def pin_ceilings_only() -> bool:
+    """True inside ``pin_ceilings_scope`` (a memo key tag, ``assembly.memo._ck``)."""
+    return _PIN_CEILINGS_ONLY.get()
+
+
 def lifted_ceilings_active() -> bool:
     """True inside ``lifted_ring_ceiling_scope``."""
     return _LIFTED_CEILINGS.get()

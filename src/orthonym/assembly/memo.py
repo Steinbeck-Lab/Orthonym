@@ -31,7 +31,7 @@ from collections import OrderedDict
 
 from ..metrics.provenance import wider_tier_ctx
 from ..rules.isotope_alternative import alternative_skeleton_active
-from .locant_omission import retained_c2_unit_has_isotope_label, unnumbered_label_scope_active
+from .locant_omission import isotopic_scope_reason, retained_c2_unit_has_isotope_label, unnumbered_label_scope_active
 
 #: verify-mode mismatch log (process-global, across scopes). A ``MemoMismatch`` is
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
@@ -130,6 +130,18 @@ dropped_forms_var = contextvars.ContextVar("orthonym_dropped_forms", default=fro
 suffix_nitrogen_hydron_var = contextvars.ContextVar("orthonym_suffix_nitrogen_hydron", default=False)
 
 
+_VB = []
+
+
+def _cage_ceiling_scopes():
+    """``(pin ceilings only, lifted ceilings)`` of the running call (``rules.vonbaeyer_universal``; imported on the first
+    call, as that module imports the naming machinery)."""
+    if not _VB:
+        from ..rules import vonbaeyer_universal
+        _VB.append(vonbaeyer_universal)
+    return _VB[0].pin_ceilings_only(), _VB[0].lifted_ceilings_active()
+
+
 def _ck(namespace, key):
     """The cache key for ``(namespace, key)`` in the current run (see above)."""
     if namespace in _PROMOTION_INDEPENDENT:
@@ -156,6 +168,17 @@ def _ck(namespace, key):
         # retained name does not number (``locant_omission.label_on_unnumbered_position``); the isotope path
         # renames the skeleton in that scope inside the call that named it without
         tag = tag + ("systematic-unnumbered",)
+    reason = isotopic_scope_reason()
+    if reason is not None:
+        # the skeleton of a labelled molecule is named with its labels stripped inside this scope (``rules.isotopes``),
+        # where a producer may refuse or spell otherwise; a value computed there is not the plain one (lead 2026-11-24:
+        # a 'substituent' sentinel stored there was served to the plain naming of the same prefix)
+        tag = tag + ("isotopic:" + reason,)
+    pin_only, lifted = _cage_ceiling_scopes()
+    if pin_only:
+        tag = tag + ("pin-ceilings",)      # every cage analysis takes the PIN ceilings (``vonbaeyer_universal``)
+    if lifted:
+        tag = tag + ("lifted-ceilings",)   # the late best-effort offer's larger ring-system ceilings
     if alternative_skeleton_active():
         # the series, senior-hub and multiplied-anion ester producers make no offer in that scope
         # (``rules.isotope_alternative``); the namer renames a labelled skeleton in it inside the call that named it without
