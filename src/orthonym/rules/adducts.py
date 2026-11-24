@@ -360,6 +360,50 @@ def _parse_reproduces_depiction(name: str, mol) -> bool:
         return False
 
 
+# The elements of a part that may be read back by its key (``_parts_reproduce_depiction``): the organic nonmetals.
+_KEYED_PART_ELEMENTS = frozenset({'H', 'C', 'N', 'O', 'P', 'S', 'Se', 'F', 'Cl', 'Br', 'I'})
+
+
+def _parts_reproduce_depiction(name: str, mol) -> bool:
+    """True iff OPSIN reads ``name`` back part by part to the drawn parts, a mobile H or a charge-separated drawing
+    inside one metal-free part aside.
+
+    Each part of a adduct is a compound of its own, and its name is verified alone to its full standard
+    InChIKey (``_name_component``). The parts pair one to one: a part that holds a metal or only one heavy atom must
+    be drawn exactly as read, and so must a part with an element outside ``_KEYED_PART_ELEMENTS`` (OPSIN balances the charges of such parts itself: '[Cu+]I', '[Ge]' read as '[Ge+]',
+    'N.Cl' against '[NH4+].[Cl-]'); any other part must have the drawn part's standard InChIKey and net charge ('C[P+](=O)[O-]' read as
+    'CP(=O)=O', a guanidine tautomer). The key does not see a protonation site or a radical: the namer's exit gate
+    (``_shipped_name_round_trip``) still checks those on the whole name.
+    """
+    from orthonym.namer import _same_canonical_smiles
+    try:
+        parsed = _adduct_opsin_read(name)
+        reread = Chem.MolFromSmiles(parsed) if parsed else None
+        if reread is None or _has_stereo_text(parsed):
+            return False
+
+        def _parts(m):
+            exact, keyed = [], []
+            for fm in Chem.GetMolFrags(m, asMols=True):
+                if fm.GetNumHeavyAtoms() <= 1 or any(a.GetSymbol() not in _KEYED_PART_ELEMENTS
+                                                     for a in fm.GetAtoms()):
+                    exact.append(Chem.MolToSmiles(fm))
+                else:
+                    key = Chem.MolToInchiKey(fm)
+                    if not key:
+                        return None
+                    keyed.append((key, Chem.GetFormalCharge(fm), Chem.MolToSmiles(fm)))
+            return sorted(exact), sorted(keyed)
+        drawn, read = _parts(mol), _parts(reread)
+        if drawn is None or read is None or len(drawn[0]) != len(read[0]):
+            return False
+        if not all(_same_canonical_smiles(a, b) for a, b in zip(drawn[0], read[0])):
+            return False
+        return [k[:2] for k in drawn[1]] == [k[:2] for k in read[1]]
+    except Exception:
+        return False
+
+
 def split_components(mol) -> Optional[List[Tuple[str, int]]]:
     """Split a multi-fragment mol into deduped (canonical_smiles, count).
 
@@ -1705,6 +1749,8 @@ def _name_adduct_body(mol, canonical_smiles: Optional[str] = None,
                 general_fallback=general_fallback, allow_aromatic_general=allow_aromatic_general,
                 general_fallback_unverified=general_fallback_unverified)
                 if general_fallback or general_fallback_unverified else None)
+            if _name is None and _parts_reproduce_depiction(_assemble_adduct_name(named), mol):
+                _name = _assemble_adduct_name(named)
             if _name is None:
                 return None
         _label_mixed_adduct(_name, ordered)
