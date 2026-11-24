@@ -496,7 +496,8 @@ def _name_component(frag_smi: str, style: str, *,
         name = cached_nested_call("adduct_component", key, once, replay_budgets=False) if memoised else once()
         if (name is not None or not retry_allowed or not general_fallback_unverified
                 or getattr(_FRESH_FRAME, "active", False) or hang_budget_trips() != trips
-                or (_heavy_atoms(frag_smi) > _FRESH_FRAME_MAX_HEAVY_ATOMS and not _has_exotic_centre(frag_smi))):
+                or (_heavy_atoms(frag_smi) > _FRESH_FRAME_MAX_HEAVY_ATOMS and not _has_exotic_centre(frag_smi)
+                    and not getattr(_FRESH_FRAME, "uncapped", False))):
             return name
         if memoised:     # the retry is memoised too, its None included: a repeat of the producer names it once
             return cached_nested_call("adduct_component_fresh_frame", key,
@@ -1581,10 +1582,29 @@ def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mo
         _COMPONENT_ADDUCT_SCOPE.reset(token)
 
 
+def _component_word(smi: str, style: str) -> Optional[str]:
+    """The name of one multi-atom component in the last producer, with the hang budgets of one compound."""
+    from orthonym.assembly.fragment_naming import own_hang_budgets
+    with own_hang_budgets():
+        return _name_component(smi, style, general_fallback=True, allow_aromatic_general=True,
+                               general_fallback_unverified=True, charged_ok=True, ions_ok=True)
+
+
+def _large_plain_component(smi: str) -> bool:
+    """A component over the fresh-frame cap without an exotic centre: the last producer retries it in the fresh frame
+    (``_FRESH_FRAME.uncapped``) only once every other component of the mixture has a name. A part that only the
+    top-level producers name ('O-[2,5-di(decyl)phenyl] phosphorodithioate', '[bis(3-methylphenyl)phosphanyl]
+    sulfanide') is "named as a compound of its own", the Blue Book), and a mixture with another part
+    left unnamed spends no retry (2b plan, -complete.md: 29 of 420 rows slowed by more than 15 s without it).
+    Only for a mixture named by the outermost ``name`` (``name_scope_depth``): a producer that names the pieces of
+    one molecule as a mixture (the hydrazone cut of ``composer._name_oxime_or_hydrazone``) gets no such retry, and
+    not after a part tripped a hang budget."""
+    return _heavy_atoms(smi) > _FRESH_FRAME_MAX_HEAVY_ATOMS and not _has_exotic_centre(smi)
+
+
 def _component_adduct_words_and_name(components: List[Tuple[str, int]], frag_mols, mol, style: str) -> Optional[str]:
     """The words of the components of at most one heavy atom first (cheap; any one without a name ends it), then the
     names of the others, then the read-back of the whole name."""
-    from orthonym.assembly.fragment_naming import own_hang_budgets
     ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
     gated = _gated_hydrogen_components(mol)
     words: Dict[str, str] = {}
@@ -1595,12 +1615,27 @@ def _component_adduct_words_and_name(components: List[Tuple[str, int]], frag_mol
             if not word:
                 return None
             words[smi] = word
+    from orthonym.assembly.fragment_naming import hang_budget_trips, name_scope_depth
+    put_aside: List[str] = []
     for smi, _count in ordered:
         if smi in words:
             continue
-        with own_hang_budgets():
-            word = _name_component(smi, style, general_fallback=True, allow_aromatic_general=True,
-                                   general_fallback_unverified=True, charged_ok=True, ions_ok=True)
+        trips = hang_budget_trips()
+        word = _component_word(smi, style)
+        if (not word and _large_plain_component(smi) and name_scope_depth() <= 1
+                and hang_budget_trips() == trips):
+            put_aside.append(smi)     # every other component is named first, so no large retry is spent in vain
+            continue
+        if not word or is_failure_name(word):
+            return None
+        words[smi] = word
+    for smi in put_aside:
+        uncapped = getattr(_FRESH_FRAME, "uncapped", False)
+        _FRESH_FRAME.uncapped = True
+        try:
+            word = _component_word(smi, style)
+        finally:
+            _FRESH_FRAME.uncapped = uncapped
         if not word or is_failure_name(word):
             return None
         words[smi] = word

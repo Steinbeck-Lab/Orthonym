@@ -98,10 +98,12 @@ def test_fresh_frame_restores_the_naming_state():
         del fn._fragment_guard.probe_attr
 
 
-# A component larger than the fresh-frame cap (15 heavy atoms) is retried only when it has a charged or radical atom
-# outside C, N, O, S, P, Se and the halogens (``adducts._has_exotic_centre``): the producers of such a centre
-# (stannylium, alumanylium) run for the caller's whole input only. A large component without one that fails nested
-# fails alone too, and a retry would cost a whole search (2026-11-18 PubChem rerun-5 triage item 2b).
+# A component larger than the fresh-frame cap (15 heavy atoms) is retried at once when it has a charged or radical
+# atom outside C, N, O, S, P, Se and the halogens (``adducts._has_exotic_centre``): the producers of such a centre
+# (stannylium, alumanylium) run for the caller's whole input only. Any other large component the nested naming
+# leaves without a name is retried only once every other component has a name (``adducts._large_plain_component``,
+# lane rm6 2026-11-24), so a mixture with another part unnamed spends no large retry (2026-11-18 PubChem rerun-5
+# triage item 2b).
 _LARGE_ROWS = [
     ("C1CCC(CC1)[Sn+](C2CCCCC2)C3CCCCC3.C1=CC=C2C(=C1)C=CC(=C2C(=O)O)[O-]",
      "1-carboxy-2-oxidonaphthalene—tricyclohexylstannylium (1/1)"),
@@ -117,10 +119,13 @@ def test_large_component_with_an_exotic_centre_is_retried(smiles, expected):
     assert name_is_rt_exact(res["name"], smiles)
 
 
-def test_without_the_exotic_centre_gate_the_large_component_declines(monkeypatch):
-    """Mutation: the cap applied to every large component again, the stannylium mixture has no name."""
+def test_without_both_retries_the_large_component_declines(monkeypatch):
+    """Mutation: the cap applied to every large component again (no exotic-centre retry, no retry once the others are
+    named), the stannylium mixture has no name; with the late retry alone it keeps its name."""
     from orthonym.rules import adducts
     monkeypatch.setattr(adducts, "_has_exotic_centre", lambda smiles: False)
+    assert name_best_effort(_LARGE_ROWS[0][0])["name"] == _LARGE_ROWS[0][1]
+    monkeypatch.setattr(adducts, "_large_plain_component", lambda smiles: False)
     assert name_best_effort(_LARGE_ROWS[0][0])["name"] is None
 
 
@@ -146,10 +151,13 @@ def test_a_radical_centre_is_retried_only_where_opsin_reads_radical_adducts(monk
         assert _has_exotic_centre("[B]c1ccc(S(=O)(=O)c2ccccc2)cc1") is enabled
 
 
-@pytest.mark.parametrize("exotic", [False, True])
-def test_a_large_plain_component_spends_no_retry(monkeypatch, exotic):
-    """Spy: a large component without an exotic centre that the nested naming leaves without a name is not named
-    again in the fresh frame; the same input with the gate forced open is (the trace's positive control)."""
+@pytest.mark.parametrize("smiles,retry", [
+    ("CCCCCCCCCCCCCCCCCC(=O)O.O", True),               # every other part named: the large one is retried
+    ("CCCCCCCCCCCCCCCCCC(=O)O.CC(=O)O.O", False),      # another part left unnamed: no large retry is spent
+])
+def test_a_large_plain_component_is_retried_only_once_the_others_are_named(monkeypatch, smiles, retry):
+    """Spy: a large component without an exotic centre that the nested naming leaves without a name is named again in
+    the fresh frame only when every other component has a name."""
     from orthonym.rules import adducts
     real = adducts._name_component_once
     retried = []
@@ -158,9 +166,9 @@ def test_a_large_plain_component_spends_no_retry(monkeypatch, exotic):
         if adducts._heavy_atoms(frag_smi) > adducts._FRESH_FRAME_MAX_HEAVY_ATOMS:
             retried.append(getattr(adducts._FRESH_FRAME, "active", False))
             return None
+        if frag_smi == "CC(=O)O":
+            return None
         return real(frag_smi, *a, **k)
     monkeypatch.setattr(adducts, "_name_component_once", once)
-    if exotic:
-        monkeypatch.setattr(adducts, "_has_exotic_centre", lambda smiles: True)
-    name_best_effort("CCCCCCCCCCCCCCCCCC(=O)O.O")
-    assert retried and any(retried) is exotic, retried
+    name_best_effort(smiles)
+    assert retried and any(retried) is retry, retried
