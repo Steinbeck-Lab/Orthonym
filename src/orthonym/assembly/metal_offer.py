@@ -468,8 +468,9 @@ def name_with_metal_offer(namer, fn, offer, args, kwargs) -> str:
     Better is the higher rank (:func:`form_result_rank`: the label, and for two failures the
     decline that says a name exists below the PIN, which a wider tier returns); on equal ranks a
     drawing that gives a name stands over one that gives none, and of two that give a name the one
-    nearer the ionic drawing, so two drawings of one compound with one standard InChIKey get one
-    name; when none gives a name, the drawing as written, as before. The result is never lower than
+    later in the offer (the ionic drawing of a bonded input; the bonded drawing of an ionically drawn
+    organometallic cation, 'oxolane—trichlorido(methyl)titanium (1/1)'), so two drawings of one compound
+    with one standard InChIKey get one name; when none gives a name, the drawing as written, as before. The result is never lower than
     the one the drawing as written gave, so no name that exists without the rewrite is lost or
     lowered. The name of another drawing is recorded as a non-PIN label
     (:func:`record_metal_rewrite_non_pin`) during its run. Each run goes through every gate, the
@@ -531,7 +532,8 @@ def name_with_metal_offer(namer, fn, offer, args, kwargs) -> str:
         return isinstance(out, str) and bool(out) and not is_failure_name(out)
 
     def preference(result):
-        # position 0 is the drawing as written, a larger position is nearer the ionic drawing
+        # position 0 is the drawing as written; a larger position is a later drawing of the offer (the ionic drawing of
+        # a bonded input, the bonded drawing of an ionically drawn organometallic cation)
         position, _string, _order, out, result_rank = result
         is_name = names(out)
         return (result_rank, is_name, position if is_name else -position)

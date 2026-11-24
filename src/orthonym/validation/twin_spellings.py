@@ -366,10 +366,20 @@ def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[s
     out, and no OPSIN reads a locant before an axial descriptor (dan2097/opsin#356)."""
     found = twin_of(name)
     if found is not None and found[1] in (("halido_o",), ("preselected_cage",), ("axial_locant",)):
+        if _ADDUCT_NAME.fullmatch(name) and not _twin_reproduces_depiction(found[0], smiles):
+            return None   # an adduct: the key does not see where a charge sits (``adducts._parse_reproduces_depiction``)
         return twin_round_trip(name, smiles)
     return (uide_twin_round_trip(name, smiles) or long_count_round_trip(name, smiles)
             or (thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None)
             or component_order_round_trip(name, smiles) or hydrogen_word_round_trip(name, smiles))
+
+
+def _twin_reproduces_depiction(twin: str, smiles: Optional[str]) -> bool:
+    """True when OPSIN reads ``twin`` to exactly the drawn structure of ``smiles`` (``adducts._parse_reproduces_depiction``)."""
+    from rdkit import Chem
+    from ..rules.adducts import _parse_reproduces_depiction
+    mol = Chem.MolFromSmiles(smiles) if smiles else None
+    return mol is not None and bool(_parse_reproduces_depiction(twin, mol))
 
 
 def _opsin_reads(name: str, radical: bool) -> bool:

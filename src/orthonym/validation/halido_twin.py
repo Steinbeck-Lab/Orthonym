@@ -33,11 +33,20 @@ _HALIDO = re.compile(r"(chlor|brom|fluor|iod)ido")
 HAPTO_DESCRIPTOR = re.compile(r"[ηκμ]")
 
 
+#: an adduct name: components joined by em dashes, then the proportions ('tricyclohexylphosphane—benzylidene...
+#: ruthenium (2/1)',
+_ADDUCT = re.compile(r"(?P<body>[^—]+(?:—[^—]+)+)(?P<ratio> \(\d+(?:/\d+)+\))")
+
+
 def halido_twin(name: str) -> str:
     """The 'chloro' spelling of an additive organometallic name with 'chlorido' ligands, or ``name`` itself
-    when it is no such name. Pure and deterministic."""
+    when it is no such name; in an adduct name, of each such component ('tricyclohexylphosphane—benzylidene-
+    dichlororuthenium (2/1)'). Pure and deterministic."""
     if not name or HAPTO_DESCRIPTOR.search(name) or _HALIDO.search(name) is None:
         return name
+    adduct = _ADDUCT.fullmatch(name)
+    if adduct is not None:
+        return "—".join(halido_twin(part) for part in adduct.group("body").split("—")) + adduct.group("ratio")
     from ..namer import _ORGANOMETALLIC_ADDITIVE_PIN_RE
     if name not in _BONDED_HALIDO_NAMES and _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name) is None:
         return name
