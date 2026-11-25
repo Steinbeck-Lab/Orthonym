@@ -46,36 +46,172 @@ def _group_prefix(mol, atoms, group_idx: int, anion_idx: int):
 
 def hetero_group_chalcogenide(mol, style: str = 'pin') -> str:
     """'<group>oxidanide' (sulfanide, selanide) for the only ion of ``mol``: a single chalcogen anion on a heteroatom
-    that is no carbon; '' on any decline."""
+    that is no carbon, or the anions of one carbon-free centre (``one_centre_chalcogenides``); '' on any decline. The first
+    of ``hetero_group_chalcogenide_spellings``."""
+    spellings = hetero_group_chalcogenide_spellings(mol, style)
+    return spellings[0] if spellings else ''
+
+
+def hetero_group_chalcogenide_spellings(mol, style: str = 'pin') -> list:
+    """Every spelling of the anion that reads back to ``mol`` itself, the preferred first: for a carbon-free oxoacid group
+    the retained prefix ('sulfinooxidanide' for HSO3-: 'sulfino', "Retained traditional prefixes",
+    the Blue Book, ":17971 sulfino (preselected prefix)"), then the group named by the substituent namers
+    ('(1-hydroxy-2-oxa-1-thiaeth-1-en-1-yl)oxidanide', the spelling these anions shipped with), then the anions of one
+    carbon-free centre (``one_centre_chalcogenides``). A caller that offers spellings (``adducts._component_spellings_once``)
+    offers them in this order, so a mixture whose join the first one does not repair keeps the next one."""
+    out = []
+    for name in (_single_anion_spellings(mol) or one_centre_chalcogenides(mol)):
+        if name and name not in out:
+            out.append(name)
+    from ..metrics.provenance import record_non_pin_fragment
+    for name in out:
+        record_non_pin_fragment(name)
+    return out
+
+
+def _single_anion_spellings(mol) -> list:
+    """The spellings of a single chalcogen anion on a heteroatom group (the module docstring), each read back;  when
+    ``mol`` is not of that shape."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
-        return ''
+        return []
     charged = [a for a in mol.GetAtoms() if a.GetFormalCharge()]
     if len(charged) != 1 or charged[0].GetFormalCharge() != -1:
-        return ''
+        return []
     anion = charged[0]
     parent = _PARENT.get(anion.GetSymbol())
     heavy = [nb for nb in anion.GetNeighbors() if nb.GetSymbol() != 'H']
     if (parent is None or anion.IsInRing() or anion.GetTotalNumHs() or anion.GetNumRadicalElectrons()
             or len(heavy) != 1 or heavy[0].GetSymbol() == 'C'
             or any(a.GetNumRadicalElectrons() or a.GetIsotope() for a in mol.GetAtoms())):
-        return ''
+        return []
     group = heavy[0]
     from .ions import _has_metal
     if group.GetSymbol() == 'H' or _has_metal(mol):
-        return ''   # a metal or a heavy element (the one predicate of ``ions``): the salt and complex producers' business
+        return []   # a metal or a heavy element (the one predicate of ``ions``): the salt and complex producers' business
     atoms = _group_atoms(mol, anion.GetIdx(), group.GetIdx())
-    prefix = _group_prefix(mol, atoms, group.GetIdx(), anion.GetIdx()) if atoms else None
-    if not prefix:
-        return ''
+    if not atoms:
+        return []
+    prefixes = []
+    if not any(a.GetSymbol() == 'C' for a in mol.GetAtoms()):
+        # a carbon-free P/S oxoacid group: its retained prefix ('sulfino', 'sulfo'), asked for carbon-free groups only, so
+        # the organic anions this producer names (the late rescue of ``charged_fallback``) keep their spelling
+        from .oxoacid_group_prefix import oxoacid_group_prefix
+        try:
+            prefixes.append(oxoacid_group_prefix(mol, atoms, group.GetIdx()))
+        except Exception:   # noqa: BLE001 -- a prefix that fails is no spelling; the next one is asked
+            pass
+    prefixes.append(_group_prefix(mol, atoms, group.GetIdx(), anion.GetIdx()))
     from ..assembly.prefix_marks import mononuclear_substituent_block
-    block = mononuclear_substituent_block([prefix], max_count=8)   #,:7272
-    name = f"{block}{parent}" if block else ''
     from .charged_router import _charge_sites_rt_ok
-    if not name or not _charge_sites_rt_ok(name, mol):
-        return ''
-    from ..metrics.provenance import record_non_pin_fragment
-    record_non_pin_fragment(name)
-    return name
+    out = []
+    for prefix in prefixes:
+        block = mononuclear_substituent_block([prefix], max_count=8) if prefix else None   #,:7272
+        name = f"{block}{parent}" if block else ''
+        if name and name not in out and _charge_sites_rt_ok(name, mol):
+            out.append(name)
+    return out
+
+
+#: the parent hydride of each centre ``one_centre_chalcogenides`` names "Mononuclear parent hydrides", Table 2.1)
+_CENTRE_HYDRIDE = {'N': 'azane', 'P': 'phosphane', 'As': 'arsane', 'S': 'sulfane', 'Se': 'selane', 'B': 'borane',
+                   'Cl': 'chlorane', 'Br': 'bromane', 'I': 'iodane'}
+#: the terminal ligands a centre may carry beside its anions: the oxo and amino groups and the halogens
+_HALO = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+#: the suffix of a group with 1-4 free valences "Substituent groups": 'yl', 'diyl', 'triyl', 'tetrayl')
+_FREE_VALENCE = {1: 'yl', 2: 'diyl', 3: 'triyl', 4: 'tetrayl'}
+_COMPLEX_MULTIPLIER = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
+#: the halogen acid groups by their oxo count: "Substituent groups derived from halogen acids"
+#: (the Blue Book): "OCl– chlorosyl (preselected prefix)... O2Cl– chloryl (preselected prefix)... O3Cl– perchloryl
+#: (preselected prefix)... The corresponding Br, F and I groups are named in a similar manner."
+_HALOGEN_ACID_GROUP = {1: '{x}osyl', 2: '{x}yl', 3: 'per{x}yl'}
+_HALOGEN_ROOT = {'Cl': 'chlor', 'Br': 'brom', 'I': 'iod'}
+
+
+def one_centre_chalcogenides(mol) -> list:
+    """The spellings of the anions of one carbon-free centre Z named on the anionic parent hydride of the chalcogen, the centre a prefix:
+    'oxo-λ4-sulfanediylbis(oxidanide)' (sulfite), 'phosphanetriyltris(oxidanide)' (phosphite),
+    'aminophosphanediylbis(oxidanide)', 'perchloryloxidanide' (perchlorate); [] on any decline.
+
+    P-72.2.2.2.4 "Anionic centers on other characteristic groups" (BlueBookV2.md:41069) names an anionic centre on a group
+    "on the basis of the corresponding anionic parent hydrides"; these anions are oxoacid anions, which that rule leaves to
+    the acid endings, so the names are valid but no PIN and are recorded so. They are spelled so for the adduct names of
+    a mixture, where OPSIN reads the 'sulfite' / 'perchlorate' word as the neutral acid.
+
+    The centre Z (an element of ``_CENTRE_HYDRIDE``, not in a ring) carries k terminal anions of one chalcogen (charge -1,
+    no hydrogen) and otherwise only oxo, amino, halogen and hydrogen. RDKit reads a halate as its charge-separated drawing
+    ('O=Cl(=O)(=O)[O-]' -> Z+3 beside four O-): a halogen centre of charge +n beside n+1 or more oxide anions is read as
+    n oxo groups and the rest anions, the λ drawing that shares its standard InChIKey (a charged centre of another
+    element is declined: a nitrate is no 'λ5-azanyl' group). The bonding number of Z is cited as λn
+    where it is not the standard one (P-14.1.3, ``lambda_convention.STANDARD_BONDING_NUMBER``). The first spelling that
+    OPSIN reads back to ``mol`` itself is offered (``charged_router._charge_sites_rt_ok``), the preselected prefix of the
+    group first ('perchloryloxidanide', 'phosphoryltris(oxidanide)'), then the λ drawing of the centre."""
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return []
+    if any(a.GetSymbol() == 'C' or a.GetNumRadicalElectrons() or a.GetIsotope() for a in mol.GetAtoms()):
+        return []
+    from .ions import _has_metal
+    if _has_metal(mol):
+        return []
+    anions = [a for a in mol.GetAtoms() if a.GetFormalCharge() == -1 and a.GetSymbol() in _PARENT
+              and a.GetDegree() == 1 and not a.GetTotalNumHs()]
+    centres = {a.GetNeighbors()[0].GetIdx() for a in anions}
+    if not anions or len(centres) != 1 or len({a.GetSymbol() for a in anions}) != 1:
+        return []
+    centre = mol.GetAtomWithIdx(centres.pop())
+    plus = centre.GetFormalCharge()
+    if centre.GetSymbol() not in _CENTRE_HYDRIDE or centre.IsInRing() or plus < 0:
+        return []
+    anion_ids = {a.GetIdx() for a in anions}
+    if any(a.GetFormalCharge() and a.GetIdx() != centre.GetIdx() and a.GetIdx() not in anion_ids for a in mol.GetAtoms()):
+        return []
+    if plus and (centre.GetSymbol() not in _HALO or anions[0].GetSymbol() != 'O' or len(anions) < plus + 1):
+        return []
+    if len(anions) == 1 and not plus:
+        return []   # one anion on a neutral centre: the group-prefix path's shape ('chlorooxidanide'), never respelled here
+    ligands = ['oxo'] * plus
+    for nb in centre.GetNeighbors():
+        if nb.GetIdx() in anion_ids:
+            continue
+        bond = mol.GetBondBetweenAtoms(centre.GetIdx(), nb.GetIdx()).GetBondType()
+        if nb.GetDegree() != 1 or nb.GetFormalCharge():
+            return []
+        if nb.GetSymbol() == 'O' and bond == Chem.BondType.DOUBLE:
+            ligands.append('oxo')
+        elif nb.GetSymbol() == 'N' and bond == Chem.BondType.SINGLE and nb.GetTotalNumHs() == 2:
+            ligands.append('amino')
+        elif nb.GetSymbol() in _HALO and bond == Chem.BondType.SINGLE:
+            ligands.append(_HALO[nb.GetSymbol()])
+        else:
+            return []
+    free = len(anions) - plus
+    bonding = int(round(sum(b.GetBondTypeAsDouble() for b in centre.GetBonds()))) + centre.GetTotalNumHs() + plus
+    from .lambda_convention import LAMBDA, STANDARD_BONDING_NUMBER
+    if free not in _FREE_VALENCE or (free > 1 and free not in _COMPLEX_MULTIPLIER):
+        return []
+    lam = f"{LAMBDA}{bonding}-" if bonding != STANDARD_BONDING_NUMBER.get(centre.GetSymbol()) else ''
+    hydride = _CENTRE_HYDRIDE[centre.GetSymbol()]
+    group = (hydride[:-1] if free == 1 else hydride) + _FREE_VALENCE[free]   # 'sulfanyl', 'sulfanediyl'
+    parent = _PARENT[anions[0].GetSymbol()]
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    block = mononuclear_substituent_block(ligands, max_count=4) if ligands else ''
+    if block is None:
+        return []
+    candidates = []
+    # the preselected prefix of the group first: a halogen acid group (above) or phosphoryl, '–P(O)<',
+    # Table 5.1, the Blue Book: "phosphoryl (preselected prefix)"); 'sulfinyl' / 'sulfonyl' are not
+    # offered, OPSIN reads 'sulfinylbis(oxidanide)' as no anion inside an adduct name
+    if centre.GetSymbol() in _HALOGEN_ROOT and free == 1 and set(ligands) == {'oxo'} and len(ligands) in _HALOGEN_ACID_GROUP:
+        candidates.append(_HALOGEN_ACID_GROUP[len(ligands)].format(x=_HALOGEN_ROOT[centre.GetSymbol()]) + parent)
+    if centre.GetSymbol() == 'P' and ligands == ['oxo'] and free == 3:
+        candidates.append(f"phosphoryl{_COMPLEX_MULTIPLIER[free]}({parent})")
+    # the λ drawing of the centre; the first cited ligand has no enclosing marks,:7272)
+    prefix = f"{block}{'-' if block and lam else ''}{lam}{group}"
+    if free == 1:
+        candidates.append(f"({prefix}){parent}" if (block or lam) else f"{prefix}{parent}")
+    else:
+        candidates.append(f"{prefix}{_COMPLEX_MULTIPLIER[free]}({parent})")
+    from .charged_router import _charge_sites_rt_ok
+    return [name for name in candidates if _charge_sites_rt_ok(name, mol)]
 
 
 def carbon_group_azanide(mol, style: str = 'pin') -> str:

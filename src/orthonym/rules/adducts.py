@@ -1100,17 +1100,20 @@ def _component_spellings_once(frag_smi: str, primary: str, style: str, flags: di
     # a carbon-free anion, in a best-effort request: its name on the anionic parent hydride,
     # ``rules.hetero_group_anions``: 'chlorooxidanide' for hypochlorite), which OPSIN keeps charged inside an adduct
     # name, where it reads the '-ite' / '-ate' word as the neutral acid ('3-methylpentane—hypochlorite (1/1)' -> HOCl
-    # beside the alkane). Offered after every other spelling, so a mixture that another spelling repairs keeps its name.
+    # beside the alkane). Offered after every other spelling, so a mixture that another spelling repairs keeps its name;
+    # each spelling of the anion in the producer's order ('sulfinooxidanide' before the group named by the substituent
+    # namers, ``hetero_group_chalcogenide_spellings``), so a join the first does not repair keeps the next.
     from orthonym.metrics.provenance import best_effort_request_ctx
     if (best_effort_request_ctx.get() and Chem.GetFormalCharge(frag) < 0
             and not any(a.GetSymbol() == "C" for a in frag.GetAtoms())):
         try:
-            from .hetero_group_anions import hetero_group_chalcogenide
+            from .hetero_group_anions import hetero_group_chalcogenide_spellings
             with own_hang_budgets():
-                hydride = hetero_group_chalcogenide(frag, style)
-            if hydride and hydride not in seen and verify_or_none(hydride, frag_smi) is not None:
-                seen.add(hydride)
-                out.append((2, hydride))
+                hydrides = hetero_group_chalcogenide_spellings(frag, style)
+            for hydride in hydrides:
+                if hydride not in seen and verify_or_none(hydride, frag_smi) is not None:
+                    seen.add(hydride)
+                    out.append((2, hydride))
         except (Exception, PerfBudgetExceeded):
             pass
     if lam_spelling is not None and lam_spelling[0] == 2:
