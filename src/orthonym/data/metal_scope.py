@@ -212,9 +212,11 @@ GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 GROUP_2_DISCONNECT = ("Be", "Ca", "Sr", "Ba", "Ra")
 
 #: the metals admitted to ``ZERO_VALENT`` alone: the 28 of the 30 most frequent metals of PubChem's
-#: neutral-atom drawings that the panel of the lane named with no wrong name (Ar and Bi named none)
+#: neutral-atom drawings that the panel of the lane named with no wrong name (Ar and Bi named none); germanium and
+#: antimony from the Ge/Sb lane (2026-11-25: 275 of 300 PubChem leftover rows named, none lost, 3,300 general rows and
+#: their organic compounds, 'tetramethylgermane', 'triphenylstibane', unchanged)
 ZERO_VALENT_METALS = ("Ir", "Y", "Pt", "Fe", "W", "Zr", "Ti", "V", "Pd", "Hf", "Co", "U", "Ni", "Al", "Cu",
-                      "Ru", "Re", "Rh", "Sn", "Mn", "Mo", "Cr", "Rf", "Au", "Pb", "Ac", "Ag", "Fm")
+                      "Ru", "Re", "Rh", "Sn", "Mn", "Mo", "Cr", "Rf", "Au", "Pb", "Ac", "Ag", "Fm", "Ge", "Sb")
 
 #: the Group 13 metals named on their parent hydrides ('trimethylalumane',, the Blue Book): their cation
 #: drawn beside its anion is joined to it (``CONNECT_ANION``, ``perception.metals``); an ion keeps the metal name

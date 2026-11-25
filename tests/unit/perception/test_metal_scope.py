@@ -329,5 +329,8 @@ def test_zero_valent_metals_are_admitted_to_that_and_the_element_name_alone():
         assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT, ELEMENT}), frozenset()), symbol
         assert is_named_metal(symbol) is False, symbol
         alone.append(symbol)
-    assert alone == ["Rf", "Ac", "Fm"], alone               # no other lane admitted these
+    # germanium and antimony: the Ge/Sb lane (2026-11-25), a neutral atom beside ions ('antimony(0)'); measured on 300
+    # PubChem leftover rows (275 named, 268 read back by OPSIN main, the 7 others carry the hydron and dihydrogen words
+    # every admitted metal ships), 3,300 general rows unchanged, their organic compounds unchanged
+    assert alone == ["Rf", "Ac", "Fm", "Ge", "Sb"], alone   # no other lane admitted these
     assert _out("[Tc+2].CC(=O)[O-].CC(=O)[O-]") is True                     # no salt mechanism for technetium

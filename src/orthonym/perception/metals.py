@@ -315,6 +315,19 @@ _HALIDE_SMARTS_KEYS: FrozenSet[str] = frozenset({
 })
 
 
+#: the metalloids: a bond to one of them counts toward a metal's oxidation number although the table may hold an
+#: entry for it (germanium and antimony joined ``ZERO_VALENT`` on 2026-11-25 for their neutral atoms; the Ge=M of a
+#: germylidene complex, 'dichlorido(dimethylgermylidene)hafnium', is a ligand bond like the Si=M of a silylidene)
+_METALLOIDS = frozenset({"B", "Si", "Ge", "As", "Sb", "Te"})
+
+
+def _counts_toward_oxidation_number(other) -> bool:
+    """Whether a bond to ``other`` counts toward the oxidation number of the metal it joins: not a bond between two
+    metals of the table, unless ``other`` is a metalloid."""
+    symbol = other.GetSymbol()
+    return symbol not in METAL_SCOPE or symbol in _METALLOIDS
+
+
 def bonded_valence_ok(mol: "Chem.Mol", metal_idx: int) -> bool:
     """True when the oxidation number of the metal atom ``metal_idx`` as drawn (its formal charge, plus the orders of
     its bonds, dative bonds aside, to atoms that are not metals of the table, plus its hydrogen atoms) is one of the charges of its cations in
@@ -322,7 +335,7 @@ def bonded_valence_ok(mol: "Chem.Mol", metal_idx: int) -> bool:
     bonded producers that name a drawing outside the ionic one ask the table first."""
     metal = mol.GetAtomWithIdx(metal_idx)
     bonds = sum(b.GetBondTypeAsDouble() for b in metal.GetBonds()
-                if b.GetBondType() != Chem.BondType.DATIVE and b.GetOtherAtom(metal).GetSymbol() not in METAL_SCOPE)
+                if b.GetBondType() != Chem.BondType.DATIVE and _counts_toward_oxidation_number(b.GetOtherAtom(metal)))
     number = metal.GetFormalCharge() + bonds + metal.GetTotalNumHs()
     return float(number).is_integer() and has_valence(metal.GetSymbol(), int(number))
 
