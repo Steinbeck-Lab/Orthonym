@@ -73,8 +73,11 @@ def test_tin_and_lead_cations_are_named_on_their_parent_hydrides(smiles, expecte
 
 @pytest.mark.parametrize("smiles", [
     "C[Sn+]C",            # +1 and two bonds: not the cation of the mononuclear hydride (3 bonds at +1)
-    "C[Sn+2]C",
-    "C1CC[Sn+]C1",        # a ring atom is a skeletal atom of a ring parent hydride, not of this one
+    # C[Sn+2]C left this list (2026-11-25): the dication of the parent hydride, named at best-effort by
+    # rules/multiply_charged_centres ('dimethyl-λ4-stannanebis(ylium)', "Cationic centers in parent
+    # hydrides", the Blue Book: "Di- and polycations... the suffix 'ylium' and the multiplying prefixes 'bis',
+    # 'tris'"), read back exact by OPSIN; tests/unit/rules/test_tin_lead_multiply_charged_cations.py pins it
+    "C1CC[Sn+]C1",       # a ring atom is a skeletal atom of a ring parent hydride, not of this one
 ])
 def test_a_tin_cation_that_is_not_the_ylium_of_the_parent_hydride_is_declined(smiles):
     """The producer keeps its checks for a metal (bonds plus hydrogens one less than the standard bonding number, no
