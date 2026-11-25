@@ -1044,7 +1044,8 @@ def _component_spellings_once(frag_smi: str, primary: str, style: str, flags: di
     1 -- the λ-convention name of a divalent or trivalent radical component (``rules.lambda_component``),
     1 -- the engine's late general-engine recovery name
     (``Orthonym._engine_recovery_spelling``), 2 -- the universal floor's verified
-    spelling (``t4_coverage._verified_universal_floor``). Each reads back by
+    spelling (``t4_coverage._verified_universal_floor``), 2 -- in a best-effort request, a carbon-free anion's name
+    on its anionic parent hydride (``rules.hetero_group_anions``), after the floor's. Each reads back by
     itself to the component's full InChIKey (``verify_or_none``) and differs from
     ``primary`` and from the other. A one-atom component has no other spelling but its λ name.
     Best-effort tier only (the caller gates). Never raises: a spelling that runs its hang
@@ -1094,7 +1095,24 @@ def _component_spellings_once(frag_smi: str, primary: str, style: str, flags: di
     except (Exception, PerfBudgetExceeded):
         floor = None
     if floor and floor not in seen:
+        seen.add(floor)
         out.append((2, floor))
+    # a carbon-free anion, in a best-effort request: its name on the anionic parent hydride,
+    # ``rules.hetero_group_anions``: 'chlorooxidanide' for hypochlorite), which OPSIN keeps charged inside an adduct
+    # name, where it reads the '-ite' / '-ate' word as the neutral acid ('3-methylpentane—hypochlorite (1/1)' -> HOCl
+    # beside the alkane). Offered after every other spelling, so a mixture that another spelling repairs keeps its name.
+    from orthonym.metrics.provenance import best_effort_request_ctx
+    if (best_effort_request_ctx.get() and Chem.GetFormalCharge(frag) < 0
+            and not any(a.GetSymbol() == "C" for a in frag.GetAtoms())):
+        try:
+            from .hetero_group_anions import hetero_group_chalcogenide
+            with own_hang_budgets():
+                hydride = hetero_group_chalcogenide(frag, style)
+            if hydride and hydride not in seen and verify_or_none(hydride, frag_smi) is not None:
+                seen.add(hydride)
+                out.append((2, hydride))
+        except (Exception, PerfBudgetExceeded):
+            pass
     if lam_spelling is not None and lam_spelling[0] == 2:
         out.append(lam_spelling)
     return out
