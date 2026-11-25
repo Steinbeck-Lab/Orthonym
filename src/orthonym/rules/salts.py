@@ -17,6 +17,7 @@ Key naming patterns:
 - Stoichiometry: multiplicative prefixes for repeated ions (diacetate)
 """
 
+import contextvars
 import itertools
 import re
 from collections import Counter
@@ -1543,6 +1544,13 @@ def _breaks_a_pin_spelling_rule_with_a_retained_name_at_hand(mol, name: str, sty
     return bool(check_pin_spelling(mol, name))
 
 
+#: True while a part of an ionic mixture is named as drawn (``rules.adducts._zwitterion_drawn_name``): the
+#: best-effort neutral-form fallback of:func:`name_zwitterion` is skipped, so the producers that keep the drawn charges
+#: name the part. "Ionic centers in the same parent structure" (the Blue Book): zwitterionic compounds
+#: "are not considered as neutral compounds"; a mixture name cites the names of its components,:4667).
+NO_NEUTRAL_ZWITTERION_FALLBACK = contextvars.ContextVar("orthonym_no_neutral_zwitterion_fallback", default=False)
+
+
 def name_zwitterion(mol, style: str = 'pin') -> str:
     """
     Name a zwitterionic compound.
@@ -1613,6 +1621,8 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     from ..metrics.provenance import best_effort_ctx
     if not best_effort_ctx.get():
         return ''  # DEFAULT / PIN tier: azaniumyl PIN (above) or abstain
+    if NO_NEUTRAL_ZWITTERION_FALLBACK.get():
+        return ''  # a mixture part named as drawn (``rules.adducts._zwitterion_drawn_name``)
 
     # --- BEST-EFFORT tier only: non-PIN neutral-form fallback ----------------
     # A net-zero amino-acid-shaped zwitterion neutralizes IN PLACE to the SAME

@@ -1582,6 +1582,79 @@ def _component_adduct_name_once(components: List[Tuple[str, int]], frag_mols, mo
         _COMPONENT_ADDUCT_SCOPE.reset(token)
 
 
+def _best_effort_request() -> bool:
+    """True in a best-effort request (``provenance.best_effort_request_ctx``): the only tier where a zwitterion part
+    alone takes its neutral-form name (``salts.name_zwitterion``), so the only tier the rename below acts in. The
+    flags passed down to a nested mixture naming are not the request's tier (a complete-tier request reached the
+    widened path with the best-effort flags)."""
+    from orthonym.metrics.provenance import best_effort_request_ctx
+    return bool(best_effort_request_ctx.get())
+
+
+def _protons_where_drawn(name: str, mol) -> bool:
+    """False when OPSIN's reading of ``name`` puts a hydron on another atom than the drawing does: the namer's exit
+    gate (``namer._shipped_name_round_trip``, ``validation.protonation_identity``) refuses such a name, so the mixture
+    path tries the zwitterion parts as drawn (:func:`_zwitterion_drawn_name`) before it."""
+    from orthonym.validation.protonation_identity import protonation_site_verdict
+    parsed = _adduct_opsin_read(name)
+    return bool(parsed) and protonation_site_verdict(Chem.MolToSmiles(mol), parsed, name) != "mismatch"
+
+
+def _zwitterion_drawn_name(ordered, named, mol, style: str) -> Optional[str]:
+    """The mixture name with each multi-atom part of true zwitterion character renamed as drawn, when it reproduces
+    the drawing exactly (``_parse_reproduces_depiction``); else None (the caller goes on as before).
+
+    The part alone is named in its neutral form at best-effort (``salts.name_zwitterion``'s fallback, the same
+    standard InChIKey), and inside the mixture that name fails the namer's exit gate, which checks where the protons
+    sit ('[Li+].CC(C)(C)C(C1=[NH+]C2=C(C=CC=C2[O-])C=C1)C(C)(C)C': 26 rows of the join-failure census). Here the part
+    is named once more as a fresh outermost naming (own memo scope) with that fallback off
+    (``salts.NO_NEUTRAL_ZWITTERION_FALLBACK``): "Ionic centers in the same parent structure"
+    (the Blue Book), zwitterionic compounds "are not considered as neutral compounds", and the mixture cites
+    the names of its components,:4667)."""
+    from orthonym.assembly.fragment_naming import name_in_fresh_frame
+    from orthonym.perception.ions import _has_true_zwitterion_character
+    from .salts import NO_NEUTRAL_ZWITTERION_FALLBACK
+    redo = []
+    for i, (smi, _count) in enumerate(ordered):
+        part = Chem.MolFromSmiles(smi)
+        if part is not None and part.GetNumHeavyAtoms() > 1 and _has_true_zwitterion_character(part):
+            redo.append(i)
+    if not redo:
+        return None
+    from orthonym.assembly.fragment_naming import _fragment_guard, hang_budget_trips
+    from orthonym.assembly.nested_memo import cached_nested_call, renaming_state
+    renamed = list(named)
+    for i in redo:
+        smi = ordered[i][0]
+
+        def once(smi=smi):
+            token = NO_NEUTRAL_ZWITTERION_FALLBACK.set(True)   # set inside: the fresh frame starts an empty context
+            try:
+                return _name_component_once(smi, style, general_fallback=True, allow_aromatic_general=True,
+                                            general_fallback_unverified=True, charged_ok=True, ions_ok=True)
+            finally:
+                NO_NEUTRAL_ZWITTERION_FALLBACK.reset(token)
+
+        def fresh():
+            # a hang trip inside counts for nothing outside (the retry ladders of the caller read the count), and
+            # its word is not used: the call then leaves the naming as if it had not run
+            trips = hang_budget_trips()
+            word = name_in_fresh_frame(once)
+            if hang_budget_trips() != trips:
+                _fragment_guard.hang_budget_trips = trips
+                return None
+            return word
+        # memoised, its None included: the cascade asks the mixture once per tier (review of rm7: 4 renames of a
+        # part that names nothing, 1.5 s -> 3.4 s)
+        word = cached_nested_call("adduct_zwitterion_as_drawn", (smi, style, _naming_context(), renaming_state()),
+                                  fresh, replay_budgets=False)
+        if not word or is_failure_name(word):
+            return None
+        renamed[i] = (word, renamed[i][1])
+    name = _assemble_adduct_name(renamed)
+    return name if name != _assemble_adduct_name(named) and _parse_reproduces_depiction(name, mol) else None
+
+
 def _component_word(smi: str, style: str) -> Optional[str]:
     """The name of one multi-atom component in the last producer, with the hang budgets of one compound."""
     from orthonym.assembly.fragment_naming import own_hang_budgets
@@ -1786,6 +1859,8 @@ def _name_adduct_body(mol, canonical_smiles: Optional[str] = None,
                 if general_fallback or general_fallback_unverified else None)
             if _name is None and _parts_reproduce_depiction(_assemble_adduct_name(named), mol):
                 _name = _assemble_adduct_name(named)
+            if _best_effort_request() and (_name is None or not _protons_where_drawn(_name, mol)):
+                _name = _zwitterion_drawn_name(ordered, named, mol, style) or _name   # today's name stays first
             if _name is None:
                 return None
         _label_mixed_adduct(_name, ordered)
