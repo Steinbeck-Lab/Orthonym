@@ -89,11 +89,15 @@ def test_the_metalloid_partner_is_for_group_1_and_2_only():
     assert single_bond_metal_heteroatom_sites(Chem.MolFromSmiles("[Na][SiH3]")) is None
 
 
-def test_no_rewrite_beside_a_chemical_radical(best_effort):
-    """CID 87702906 (a charge-unbalanced record with a silylene beside Cl[Zr]Cl): every read-back of a molecule with a
-    chemical radical compares the whole graph (validation/radical_identity.py), and the graph of the ionic drawing is
-    not the input's, so no check could confirm the name against the drawing as written: no DISCONNECT name."""
+def test_the_ionic_drawing_beside_an_untouched_chemical_radical(best_effort):
+    """CID 87702906 (a charge-unbalanced record with a silylene beside Cl[Zr]Cl). The radical sits in a part that holds no
+    site of the rewrite, so the ionic drawing is offered (2026-11-25; it was declined while any radical blocked every
+    rewrite): the parts stay as drawn, the count of atoms and charges compares every atom's radical electrons, hydrogens
+    and charge in both drawings, and the name is judged against the ionic drawing by whole graph
+    (validation/radical_identity.py). Checked independently: OPSIN (radicals read) gives the ionic drawing by graph, with
+    stereo, and the input's standard InChIKey. A name of another drawing, so below the PIN."""
     smiles = ("CC1=CC2=C([CH-]1)C=C(C(=C2C3=CC=CC=C3)C)C.CC1=CC2=C([CH-]1)C=C(C(=C2C3=CC=CC=C3)C)C."
               "C1=CC=C2C(=C1)C3=CC=C[C-]=C3[Si]2.Cl[Zr]Cl")
     row = best_effort.name_tiered(smiles)
-    assert row["tier"] == "abstain" or "zirconium(2+)" not in (row["name"] or "")
+    assert row["tier"] == "systematic_verified" and not row["is_pin"], row
+    assert row["name"].endswith("-6-ide—chloride—zirconium(2+) (2/1/2/1)"), row

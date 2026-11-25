@@ -393,10 +393,24 @@ def _metal_spelling_checked(mol, sites, kind) -> Optional[Tuple[str, Tuple[int, 
         if not kind.moved_radical:
             # a chemical radical elsewhere in the molecule (a silylene, an aminyl) makes every read-back compare the
             # whole graph (``validation.radical_identity``), and the graph of the rewritten drawing is not the
-            # input's: no check could confirm the name against the drawing as written, so it is not rewritten
+            # input's: no check could confirm the name against the drawing as written, so it is not rewritten. The one
+            # exception is the ionic drawing (DISCONNECT) when every radical centre lies in a part of the drawing that
+            # holds no site and the ionic drawing gives the radical-join rewrite no site: the rewrite breaks only site
+            # bonds, so those parts stay as drawn, the count of atoms and charges below compares every atom's radical
+            # electrons, hydrogens and charge in both drawings, and the name of the ionic drawing is judged against that
+            # drawing by whole graph ('chloride—zirconium(4+)—dimethylsilylidene...' for a zirconocene dichloride beside
+            # its silylene bridge). An ionic drawing a carbon radical could join to its metal ('[Cl-].[Cu+].[CH3]') is
+            # judged against the joined drawing instead (``validation.radical_identity``), so it is not offered
             from ..validation.radical_identity import _is_radical_centre
-            if any(_is_radical_centre(atom) for atom in mol.GetAtoms()):
-                return None
+            radicals = {atom.GetIdx() for atom in mol.GetAtoms() if _is_radical_centre(atom)}
+            if radicals:
+                site_atoms = {idx for site in sites for idx in site}
+                if kind is not _DISCONNECT_KIND or any(
+                        radicals & set(frag) and site_atoms & set(frag) for frag in Chem.GetMolFrags(mol)):
+                    return None
+                from ..perception.metals import radical_join_sites
+                if radical_join_sites(kind.rewrite(mol, sites)) is not None:
+                    return None
 
         def ledger_ok(rewritten):
             if kind.bonds_are_formed:
