@@ -736,13 +736,18 @@ def _name_mononuclear_hydride_regimes(mol) -> Optional[str]:
 # The regimes above name the pure-organyl hubs; this one names only what they leave:
 # a hub whose carbon-attached organyl holds a heteroatom, or a molecule with more
 # than one hub atom.
+# Boron comes next in the same order (B >... > O > S > C), so an acyclic B bonded to
+# carbon, hydrogen and halogen only is the parent too: 'bromo(chloro)(phenyl)borane
+# (PIN)' (:35752), 'chlorodi(methyl)borane (PIN)' (:25866); not
+# '(dimethylboranyl)cyclohexane'. A B with any other neighbour or in a ring is no hub
+# (:func:`_boron_hub`): a boron acid or ester or a ring of its own.
 _SENIOR_HUB_RANK = {'P': 1, 'As': 2, 'Sb': 3, 'Bi': 4,
-                    'Si': 5, 'Ge': 6, 'Sn': 7, 'Pb': 8}
+                    'Si': 5, 'Ge': 6, 'Sn': 7, 'Pb': 8, 'B': 9}
 # (:25860): "The prefixes 'bromo', 'chloro', 'fluoro', and 'iodo' are
 # used to name halogen compounds when the halogen atoms are attached to B, Al, In,
 # Ga, Tl, Si, Ge, Sn, Pb, and Bi" -- the hubs of this producer that take a halogen
 # prefix.
-_SENIOR_HUB_HALO = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'Bi'})
+_SENIOR_HUB_HALO = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'Bi', 'B'})
 # Group 14 hubs take an alkoxy prefix ('methoxydi(methyl)...silane'); on P/As/Sb/Bi
 # an -O-R group makes an ester of a noncarbon oxoacid, not this class.
 _SENIOR_HUB_ALKOXY = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
@@ -795,7 +800,9 @@ def _senior_hub_ligand(mol, hub, nbr) -> Optional[tuple]:
         return None
     ring_info = mol.GetRingInfo()
     in_ring = any(ring_info.NumAtomRings(i) > 0 for i in frag)
-    has_hub = any(mol.GetAtomWithIdx(i).GetSymbol() in _SENIOR_HUB_RANK for i in frag)
+    # a boron in the organyl is a 'boranyl' prefix of it, named as before ('[2-(dimethylboranyl)ethyl]')
+    has_hub = any(mol.GetAtomWithIdx(i).GetSymbol() in _SENIOR_HUB_RANK
+                  and mol.GetAtomWithIdx(i).GetSymbol() != 'B' for i in frag)
     if not hetero:
         name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
     elif not in_ring and has_hub:
@@ -816,13 +823,23 @@ def _senior_hub_ligand(mol, hub, nbr) -> Optional[tuple]:
 _BELOW_HUB = frozenset({'B', 'Al', 'Ga', 'In', 'Tl'})
 
 
+def _boron_hub(atom) -> bool:
+    """A B atom that is a hub: acyclic, singly bonded, and bonded to carbon, hydrogen and halogen only.
+    Any other B (a ring atom, a boron acid or ester, a B=C or B-N bond) is a junior atom, as the other elements of
+    ``_BELOW_HUB``."""
+    return (not atom.IsInRing()
+            and all(b.GetBondType() == Chem.BondType.SINGLE for b in atom.GetBonds())
+            and all(n.GetSymbol() == 'C' or n.GetSymbol() in _HALOGENS for n in atom.GetNeighbors()))
+
+
 def _scan_senior_hubs(mol, junior=frozenset()) -> Optional[list]:
-    """The mononuclear hub atoms (acyclic, singly bonded P/As/Sb/Bi/Si/Ge/Sn/Pb) of a neutral
+    """The mononuclear hub atoms (acyclic, singly bonded P/As/Sb/Bi/Si/Ge/Sn/Pb; a B of:func:`_boron_hub`) of a neutral
     one-component molecule whose every other atom is carbon, hydrogen, a terminal halogen, an
     ether-type chalcogen link or an atom of ``junior``; None for any other shape."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
     hubs = []
+    other_boron = False
     for a in atoms_of(mol):
         sym = a.GetSymbol()
         if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
@@ -842,6 +859,11 @@ def _scan_senior_hubs(mol, junior=frozenset()) -> Optional[list]:
                            for b in a.GetBonds())):
                 return None
             continue
+        if sym == 'B' and not _boron_hub(a):
+            if sym in junior:
+                other_boron = True
+                continue
+            return None
         if sym in _SENIOR_HUB_RANK:
             if a.IsInRing() or any(b.GetBondType() != Chem.BondType.SINGLE
                                    for b in a.GetBonds()):
@@ -851,18 +873,24 @@ def _scan_senior_hubs(mol, junior=frozenset()) -> Optional[list]:
         if sym in junior:
             continue
         return None
+    # "Systems composed of rings and chains" (the Blue Book): "When a ring and a chain contain the
+    # same senior element, the ring is chosen as parent" -- a borinane or dioxaborolane ring outranks a borane hub
+    # ('1-[4-(dimethylboranyl)phenyl]borinane'), and a boron acid or ester is a class of its own: with any
+    # other B in the molecule, no B is a hub.
+    if other_boron:
+        hubs = [h for h in hubs if h.GetSymbol() != 'B']
     return hubs
 
 
 def senior_hub_parent_expected(mol) -> bool:
     """True when the PIN of ``mol`` is named on a senior mononuclear hub, the Blue Book):
-    no principal characteristic group, and a P/As/Sb/Bi/Si/Ge/Sn/Pb atom that outranks carbon and every
+    no principal characteristic group, and a P/As/Sb/Bi/Si/Ge/Sn/Pb/B atom that outranks carbon and every
     other atom of the molecule, in the shapes:func:`_name_senior_atom_hub` and the regimes ahead of it
     name. A name of such a molecule on a carbon parent ('1-(methylselanyl)-2-(trimethylsilyl)ethane')
     is correct but is not the PIN. Not these molecules: a skeletal replacement name owns four or more
     heterounits,:23348), a catenated hydride is another parent, and a hub bonded to a
     chalcogen other than the alkoxy oxygen of a Group 14 hub or to a halogen it does not take is a
-    class the producers leave. The elements below the hubs (B, Al, Ga, In, Tl) anywhere else in the molecule
+    class the producers leave. The elements below the hubs (a B that is no hub, Al, Ga, In, Tl) anywhere else in the molecule
     leave the hub the senior atom: 'trimethyl[4-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)phenyl]silane' is the
     PIN, as the book's 'trimethyl[(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)methyl]stannane (PIN) (Sn is senior
     to B)',:37479)."""
@@ -894,7 +922,7 @@ def senior_hub_parent_expected(mol) -> bool:
 
 
 def _name_senior_atom_hub(mol) -> Optional[str]:
-    """: name a molecule on its senior mononuclear P/As/Sb/Bi/Si/Ge/Sn/Pb
+    """: name a molecule on its senior mononuclear P/As/Sb/Bi/Si/Ge/Sn/Pb/B
     hub when no principal characteristic group is present and every other atom is
     prefix-only. Fail-closed: None for any other shape, and None inside
     ``isotope_alternative.alternative_skeleton``."""

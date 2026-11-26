@@ -1046,6 +1046,7 @@ def get_alkyl_name(carbon_count: int) -> str:
 from ..data.chain_names import multiplying_prefix  # noqa: E402
 from ..data.locant_text import render_locants  # noqa: E402
 from ..data.multipliers import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS  # noqa: E402,F401 (re-exported)
+from .multiplied_leader import multiplied_enclosed_leader  # noqa: E402 ('bis[2,4,6-tri(propan-2-yl)phenyl]')
 
 
 def simple_multiplier_word(n: int) -> Optional[str]:
@@ -2736,7 +2737,7 @@ def is_substituted_substituent(
     # 'bis(trifluoromethyl)methoxy'): substituted, so 'bis' (c),:7035) and
     # enclosing marks,:7232). The enclosure predicates ask this same
     # predicate through is_substituted_contracted_alkoxy.
-    return _splits_into_two_units(body) or _contracted_alkoxy_root_is_a_prefix(body)
+    return _splits_into_two_units(body) or _contracted_alkoxy_root_is_a_prefix(body) or multiplied_enclosed_leader(body)
 
 
 def _set_aside_italicized_prefix(body: str) -> Tuple[str, bool]:

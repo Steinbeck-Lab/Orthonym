@@ -818,8 +818,16 @@ def _scoped_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: bo
     # heteroatom). Gate on the sigma-attach atom being carbon.
     from ..perception.metals import is_metal_element
     _syms = [mol.GetAtomWithIdx(a).GetSymbol() for a in atoms]
+    # Boron is named on borane in the same way when no principal group outranks it,
+    # the Blue Book: "... Pb > B >... > C... applied... to choose between rings and chains"),
+    # so its all-carbon organyl ('cyclohexyldi(methyl)borane', not '(dimethylboranyl)cyclohexane') is
+    # named by the same composer.
+    # Inside the isotope second pass (``isotope_alternative.alternative_skeleton``) the senior-hub producers
+    # are withheld, so the B hub is too ('{[(13C)methyl](methyl)boranyl}cyclohexane' keeps its name).
+    from .isotope_alternative import alternative_skeleton_active
     _g14_allcarbon = (
-        is_group14 and naming_system == 'hydride_parent'
+        (is_group14 or (metal_symbol == 'B' and not alternative_skeleton_active()))
+        and naming_system == 'hydride_parent'
         and all(s == 'C' for s in _syms))
     _g12_metalloid_ok = (
         naming_system == 'metal_direct'
