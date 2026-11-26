@@ -136,6 +136,8 @@ _ORGANYL_HUBS = frozenset({'As', 'Sb', 'Bi', 'Al', 'Ga', 'In', 'Tl', 'I'})
 # multiplying prefix di/tri/... does NOT count for ordering).
 _HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
 _HALOGENS = frozenset(_HALO_PREFIX)
+#: the hub elements whose halogen compounds (the Blue Book) names with halogen prefixes
+_PREFIX_HALIDE_HUBS = frozenset({'B', 'Al', 'In', 'Ga', 'Tl', 'Si', 'Ge', 'Sn', 'Pb', 'Bi'})
 
 # Hubs that accept the MIXED halogen + organyl regime /
 # /: a hub bearing BOTH terminal halogen(s) AND pure-organyl group(s).
@@ -166,6 +168,15 @@ _GROUP15_HYDRIDE_PARENT = {'As': 'arsane', 'Sb': 'stibane', 'Bi': 'bismuthane'}
 _PNICTOGEN_AMINE_STEM = {'P': 'phosphane', **_GROUP15_HYDRIDE_PARENT}
 
 
+def _carbon_free_input_part(mol) -> bool:
+    """True when ``mol`` holds no carbon and is the input of the running ``name`` call or one of its parts (not a
+    group cut out of a larger molecule for a substituent prefix)."""
+    if any(a.GetSymbol() == 'C' for a in atoms_of(mol)):
+        return False
+    from ..assembly.universal_substituent import _the_input_or_one_of_its_fragments
+    return _the_input_or_one_of_its_fragments(mol)
+
+
 def _find_unique_hub(mol):
     """Return the unique nameable hub atom, or None.
 
@@ -174,6 +185,19 @@ def _find_unique_hub(mol):
     hub -> None)."""
     hubs = [a for a in atoms_of(mol)
             if a.GetSymbol() != 'H' and a.GetSymbol() in _HUB_STEMS]
+    if len(hubs) > 1:
+        # iodine is a hub element of its own ('λ3-iodane'), so an iodide (SnI4, AlI3, BiI3, Me2SnI2) has several
+        # hub-eligible atoms; a terminal iodine (one bond, neutral, no hydrogen) is an 'iodo' substituent of the one
+        # hub that is no halogen, as chlorine is ('tetrachlorostannane'; 'tetraiodostannane')
+        core = [a for a in hubs if not (a.GetSymbol() in _HALOGENS and a.GetDegree() == 1
+                                        and not a.GetFormalCharge() and not a.GetTotalNumHs())]
+        if len(core) == 1 and core[0].GetSymbol() not in _HALOGENS and (
+                core[0].GetSymbol() in _PREFIX_HALIDE_HUBS or _carbon_free_input_part(mol)):
+            # gives halogen prefixes on the ten elements of ``_PREFIX_HALIDE_HUBS``; an iodide of P, As, S,
+            # Se, Te is named so only as a carbon-free compound or part (never a PIN,, not as the group of a
+            # larger molecule ('triiodo-λ4-sulfanyl' would reach the PIN path;, the Blue Book: halogens
+            # on phosphorus or chalcogen atoms make acid halides or esters of inorganic acids)
+            return core[0]
     return hubs[0] if len(hubs) == 1 else None
 
 
@@ -599,11 +623,17 @@ def _name_mononuclear_hydride_regimes(mol) -> Optional[str]:
     if not any(n.GetSymbol() != 'H' for n in hub.GetNeighbors()):
         return _assemble("", lam, stem)
 
-    # --- All-halogen regime (every hub element; hub degree >= 2 excludes the
-    # diatomic interhalogens ICl/IBr). Halogens are simple substituents:
-    # alphanumerical concatenation with NO enclosing marks. ---
+    # --- All-halogen regime (every hub element at degree >= 2, which excludes the
+    # diatomic interhalogens ICl/IBr). One halogen on the hub only for the
+    # elements "Halogen atoms attached to heteroatoms" (the Blue Book)
+    # names with halogen prefixes, "B, Al, In, Ga, Tl, Si, Ge, Sn, Pb, and Bi"
+    # ([AlH2]Cl -> chloroalumane, Cl[SnH3] -> chlorostannane); a halide of P, S,
+    # As, Se... is a functional-class compound ('CH3-S-Cl methyl thiohypochlorite
+    # (PIN)', 'CH3-PH-Cl methylphosphinous chloride (PIN)',:25888-:25892), so a
+    # one-halogen hub of those keeps declining here. Halogens are simple
+    # substituents: alphanumerical concatenation with NO enclosing marks. ---
     halo_counts = _classify_halogens(mol, hub)
-    if halo_counts is not None and hub.GetDegree() >= 2:
+    if halo_counts is not None and (hub.GetDegree() >= 2 or hub.GetSymbol() in _PREFIX_HALIDE_HUBS):
         halo_parts = []
         for symbol in sorted(halo_counts, key=lambda s: _HALO_PREFIX[s]):
             halo_name = _HALO_PREFIX[symbol]
