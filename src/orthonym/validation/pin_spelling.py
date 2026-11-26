@@ -90,6 +90,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_natural_products",
     "orthonym.validation.spelling.checks_p_oxoacid_parent",
     "orthonym.validation.spelling.checks_halo_chalcogen",
+    "orthonym.validation.spelling.checks_cyanate_ester",
 )
 
 _loaded = False
