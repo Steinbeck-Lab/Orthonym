@@ -36,6 +36,7 @@ import logging
 from typing import Any, Optional
 
 from ..name_tree import NameTreeNode, NamingResult
+from .thiocyanate import _is_thiocyanate, name_thiocyanate  # tried by the ester hook beside a junior group
 
 logger = logging.getLogger(__name__)
 
@@ -228,11 +229,11 @@ def name_ester_family(
     # their name for the molecule.
     _fg = getattr(features, 'functional_groups', None) or {}
     if getattr(features, 'principal_group', None) is not None and (
-            _fg.get('nitrooxy') or _fg.get('nitrite')):
+            _fg.get('nitrooxy') or _fg.get('nitrite') or _fg.get('thiocyanate')):
         from .nitrate_ester import _is_nitrate_ester, name_nitrate_ester
         from .nitrite_ester import _is_nitrite_ester, name_nitrite_ester
         for _pred, _namer in ((_is_nitrate_ester, name_nitrate_ester),
-                              (_is_nitrite_ester, name_nitrite_ester)):
+                              (_is_nitrite_ester, name_nitrite_ester), (_is_thiocyanate, name_thiocyanate)):
             if _pred(features):
                 _res = _namer(features, mol, style=style)
                 if _res is not None:

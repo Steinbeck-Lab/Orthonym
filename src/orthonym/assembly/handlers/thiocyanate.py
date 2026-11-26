@@ -37,7 +37,20 @@ def _is_thiocyanate(features: Any) -> bool:
     if not fg.get('thiocyanate'):
         return False
     pg = getattr(features, 'principal_group', None)
-    return pg is None
+    if pg is None:
+        return True
+    # An ester class 9, the Blue Book) outranks a junior principal group, so one thiocyanate
+    # names the molecule in the functional-class form, '2-hydroxyethyl thiocyanate', as '2-hydroxyethyl nitrate'
+    #,:32035: the prefix only "in the presence of a characteristic group having seniority for
+    # citation as suffix"). Two or more thiocyanates take a multiplied ester word this handler does not build.
+    # Only an ester of an organyl: HS-S-CN is 'dithioperoxycyanic acid', the Blue Book), no ester.
+    from .nitrite_ester import principal_group_is_junior_to_esters
+    if len(fg['thiocyanate']) != 1 or not principal_group_is_junior_to_esters(pg):
+        return False
+    mol = getattr(features, 'mol', None)
+    s_idx, nitrile_c = fg['thiocyanate'][0][:2]
+    return mol is not None and any(n.GetSymbol() == 'C' and n.GetIdx() != nitrile_c
+                                   for n in mol.GetAtomWithIdx(s_idx).GetNeighbors())
 
 
 def name_thiocyanate(
