@@ -694,9 +694,9 @@ def _azanidyl_rung(mol, atom_work_budget: int, **spelling) -> Optional[Universal
     chooses the parent of a PIN). A standard InChIKey does not see which nitrogen of an amide, urea or guanidine
     carries the charge, so the name ships only when OPSIN reads it back to the drawn constitution with the charges
     on the drawn atoms (canonical SMILES without stereo; the caller's full-key check covers the stereo)."""
-    from .metal_offer import INSIDE_METAL_REWRITE
-    if INSIDE_METAL_REWRITE.get():
-        return None  # a metal drawn bonded to the nitrogen keeps the name of its drawing ('diisothiocyanatozinc')
+    # (no decline inside a metal rewrite: a metal drawn bonded to the nitrogen keeps the name of its drawing through
+    # ``rules.ylidene_azanide`` ('diisothiocyanatozinc'), and the free amide anions of an ionic drawing ('[N-]', '[NH-]'
+    # beside 'Cl[Ru+3]') are named here, as at top level)
     if not any(a.GetSymbol() == "N" and a.GetFormalCharge() == -1 for a in mol.GetAtoms()):
         return None
     # the best-effort tier only, and a polyanion only: an anion of one centre is the anion producers', which the
