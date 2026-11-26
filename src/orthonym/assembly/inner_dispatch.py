@@ -445,7 +445,7 @@ def dispatch_inner(
         # "The senior parent structure, whether cyclic or acyclic, has the senior atom..."
         # (the Blue Book, N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O > S >
         # Se > Te > C): with no principal characteristic group the PIN of a molecule with a P/As/Sb/Bi/Si/
-        # Ge/Sn/Pb hub is named on the hub's parent hydride. A handler's name for it is built on a carbon
+        # Ge/Sn/Pb/B hub is named on the hub's parent hydride. A handler's name for it is built on a carbon
         # parent -- correct, not the PIN -- so it is labelled below the PIN and kept
         # ('1-(methylselanyl)-2-(trimethylsilyl)ethane' for trimethyl[2-(methylselanyl)ethyl]silane).
         _carbon_parent = getattr(result, "name", None)

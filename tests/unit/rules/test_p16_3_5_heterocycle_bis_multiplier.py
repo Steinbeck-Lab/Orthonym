@@ -84,3 +84,18 @@ def test_tert_butyl_keeps_its_hyphen_and_simple_multiplier():
     load-bearing, so it is asserted end-to-end on a heterocyclic parent too.
     """
     assert name_compound("CC(C)(C)c1cccc(C(C)(C)C)n1") == "2,6-di-tert-butylpyridine"
+
+
+# A multiplied, enclosed prefix in front of the core ('2,4,6-tri(propan-2-yl)phenyl', 'di(propan-2-yl)amino')
+# is a substituted prefix: (a) gives 'bis', not 'di[2,4,6-tri(propan-2-yl)phenyl]'. 'propan-2-yl' and
+# 'di(propan-2-yl)' alone stay simple.
+@pytest.mark.parametrize("name,expected", [
+    ("2,4,6-tri(propan-2-yl)phenyl", "bis[2,4,6-tri(propan-2-yl)phenyl]"),
+    ("3,5-di(propan-2-yl)phenyl", "bis[3,5-di(propan-2-yl)phenyl]"),
+    ("di(propan-2-yl)amino", "bis[di(propan-2-yl)amino]"),
+    ("propan-2-yl", "di(propan-2-yl)"),
+    ("2,4,6-trimethylphenyl", "bis(2,4,6-trimethylphenyl)"),
+])
+def test_multiplied_enclosed_leader_takes_bis(name, expected):
+    from orthonym.assembly.naming_utils import multiplied_component
+    assert multiplied_component(2, name, name) == expected

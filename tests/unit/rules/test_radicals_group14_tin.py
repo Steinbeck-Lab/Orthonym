@@ -119,7 +119,10 @@ def test_the_tin_atom_of_a_phosphonate_is_the_parent_of_its_radical_name():
     smiles = "CC(C)OP(=O)(C(C[Sn]Cl)P(=O)(OC(C)C)OC(C)C)OC(C)C"
     res = name_breadth(smiles)
     name = res.get("name")
-    assert name == "chloro(2,2-di{bis[(propan-2-yl)oxy]phosphoryl}ethyl)stannylidene", res
+    # 'bis{...}', not 'di{...}': 'bis[(propan-2-yl)oxy]phosphoryl' is substituted (a);,
+    # the Blue Book, "For compound or complex substituent groups... 'bis', 'tris', 'tetrakis-'"), and the
+    # compound prefix is then alphabetized at its first letter 'b', before 'chloro'.
+    assert name == "(2,2-bis{bis[(propan-2-yl)oxy]phosphoryl}ethyl)(chloro)stannylidene", res
     assert res.get("tier") != "pin_verified", res
     assert "stanna" not in name, name
     assert name_is_rt_exact(name, smiles), name

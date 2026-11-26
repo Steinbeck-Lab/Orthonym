@@ -273,6 +273,91 @@ HETERO_CONTROL_ROWS = [
 ]
 
 
+# Boron is the next hub,:18917, '... Pb > B > Al > Ga > In > Tl > O > S > Se > Te > C'; "applied...
+# to choose between rings and chains"): an acyclic B bonded to carbon, hydrogen and halogen only is the parent
+# when no principal characteristic group decides first. 'chlorodi(methyl)borane (PIN)',:25866),
+# 'bromo(chloro)(phenyl)borane (PIN)' (:35752); the first cited prefix takes no marks,:7272).
+BORON_ROWS = [
+    ("CB(C)C1CCCCC1", "cyclohexyldi(methyl)borane"),
+    ("CB(C)CCl", "(chloromethyl)di(methyl)borane"),
+    ("CB(C)CCCl", "(2-chloroethyl)di(methyl)borane"),
+    ("CB(C)C1CCCO1", "dimethyl(oxolan-2-yl)borane"),                    # B is senior to O
+    ("CB(C)CC=C", "dimethyl(prop-2-en-1-yl)borane"),
+    ("CB(C)c1ccc(Cl)cc1", "(4-chlorophenyl)di(methyl)borane"),
+    ("ClB(Cl)CCCl", "dichloro(2-chloroethyl)borane"),
+    # a substituted aryl prefix takes 'bis' (a)), never 'di[2,4,6-tri(propan-2-yl)phenyl]'
+    ("CCCCC=CB(c1c(C(C)C)cc(C(C)C)cc1C(C)C)c1c(C(C)C)cc(C(C)C)cc1C(C)C",
+     "(hex-1-en-1-yl)bis[2,4,6-tri(propan-2-yl)phenyl]borane"),
+    ("C[Si](C)(c1c(C(C)C)cc(C(C)C)cc1C(C)C)c1c(C(C)C)cc(C(C)C)cc1C(C)C",
+     "dimethylbis[2,4,6-tri(propan-2-yl)phenyl]silane"),
+]
+BORON_NOT_PIN_ROWS = [
+    ("CB(C)C1CCCCC1", "(dimethylboranyl)cyclohexane"),
+    ("CB(C)CCl", "chloro(dimethylboranyl)methane"),
+    ("CB(C)CCCl", "1-chloro-2-(dimethylboranyl)ethane"),
+    ("CB(C)C1CCCO1", "2-(dimethylboranyl)oxolane"),
+]
+BORON_CONTROL_ROWS = [
+    ("CB(C)c1ccccc1", "dimethyl(phenyl)borane"),
+    ("ClB(C)C", "chlorodi(methyl)borane"),                              #:25866
+    ("CB(C)c1ccncc1", "4-(dimethylboranyl)pyridine"),                   # N is senior to B
+    ("CB(C)CCO", "2-(dimethylboranyl)ethan-1-ol"),                      # a principal group decides first
+    ("OB(O)C1CCCCC1", "cyclohexylboronic acid"),
+    ("ClCCCB1CCCCC1", "1-(3-chloropropyl)borinane"),                     # a ring B is a ring parent
+    ("CB(C)c1ccc(cc1)[Si](C)(C)C", "[4-(dimethylboranyl)phenyl]tri(methyl)silane"),   # Si is senior to B
+    # "Systems composed of rings and chains" (:19340): "When a ring and a chain contain the same senior
+    # element, the ring is chosen as parent" -- a ring B outranks the borane hub
+    ("CB(C)c1ccc(B2CCCCC2)cc1", "1-[4-(dimethylboranyl)phenyl]borinane"),
+    ("CB(C)c1ccc(B2OC(C)(C)C(C)(C)O2)cc1", "2-[4-(dimethylboranyl)phenyl]-4,4,5,5-tetramethyl-1,3,2-dioxaborolane"),
+]
+
+
+@pytest.mark.parametrize("smiles,pin", BORON_ROWS + BORON_CONTROL_ROWS)
+def test_boron_parent_pin(smiles, pin):
+    assert_pin_at_both_tiers(smiles, pin)
+
+
+@pytest.mark.parametrize("smiles,non_pin", BORON_NOT_PIN_ROWS)
+def test_boron_parent_not_pin(smiles, non_pin):
+    assert_not_pin_labelled(smiles, non_pin)
+
+
+def test_two_boron_hubs_the_engine_does_not_multiply_are_below_the_pin():
+    """'1,8-bis(dimethylboranyl)naphthalene' is correct; its PIN is named on borane,, which the
+    multiplicative namer does not build here, so the carbon-parent name is labelled below the PIN."""
+    default = name_default("CB(C)c1cccc2cccc(B(C)C)c12")
+    assert default.get("tier") != "pin_verified" and not default.get("is_pin"), default
+    breadth = name_breadth("CB(C)c1cccc2cccc(B(C)C)c12")
+    assert breadth.get("name") and not breadth.get("is_pin"), breadth
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("[13CH3]B(C)C1CCCCC1", "{[(13C)methyl](methyl)boranyl}cyclohexane"),
+    ("[2H]C([2H])([2H])B(C)C1CCCCC1", "{[(2H3)methyl](methyl)boranyl}cyclohexane"),
+])
+def test_an_isotope_labelled_borane_keeps_its_best_effort_name(smiles, name):
+    """The isotope second pass withholds the senior-hub producers (``isotope_alternative``); the B hub of the
+    organometallic namer is withheld there too, so the labelled molecule keeps its name below the PIN."""
+    breadth = name_breadth(smiles)
+    assert breadth.get("name") == name and not breadth.get("is_pin"), breadth
+
+
+def test_senior_hub_parent_expected_boron():
+    from rdkit import Chem
+
+    from orthonym.rules.mononuclear_hydrides import senior_hub_parent_expected
+    for smi in ("CB(C)C1CCCCC1", "CB(C)CCl", "CB(C)C1CCCO1", "CB(C)c1cccc2cccc(B(C)C)c12"):
+        assert senior_hub_parent_expected(Chem.MolFromSmiles(smi)), smi
+    for smi in ("CB(C)CCO",                       # a principal group
+                "CB(C)c1ccncc1",                  # N is senior to B
+                "COB(OC)C1CCCCC1",                # a boronic ester: B bonded to O is no hub
+                "ClCCCB1CCCCC1",                  # a ring B
+                "CB(C)CCB1CCCCC1",                # a ring B beside the hub: the ring is the parent
+                "COB(OC)CCB(C)C",                 # a boronic ester beside the hub
+                "CC1(C)OB(CCCl)OC1(C)C"):
+        assert not senior_hub_parent_expected(Chem.MolFromSmiles(smi)), smi
+
+
 @pytest.mark.parametrize("smiles,pin", HETERO_ROWS + HETERO_CONTROL_ROWS)
 def test_hetero_parent_pin(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
