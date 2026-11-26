@@ -65,4 +65,51 @@ def name_noncarbon_ester_handler(
     )
 
 
-__all__ = ["name_noncarbon_ester_handler", "_is_noncarbon_ester"]
+def _is_ring_n_pseudoester(features: Any) -> bool:
+    """Predicate: an ester of a carboxylic acid on a ring N "N(cyclic)", the Blue Book) and no group
+    of a class senior to the esters: "salts > acids > anhydrides > esters"; another ester declines)."""
+    if not (getattr(features, "functional_groups", None) or {}).get("ring_n_pseudoester"):
+        return False
+    from .nitrite_ester import principal_group_is_junior_to_esters
+    mol = getattr(features, "mol", None)
+    if mol is None or not principal_group_is_junior_to_esters(getattr(features, "principal_group", None)):
+        return False
+    from rdkit import Chem
+    paired = {i for s in ('[N+](=O)[O-]', '[#7]=[N+]=[N-]', '[#6]=[N+]=[N-]')        # nitro, azido, diazo: no ions
+              for m in mol.GetSubstructMatches(Chem.MolFromSmarts(s)) for i in m}
+    if any(a.GetNumRadicalElectrons() or (a.GetFormalCharge() and a.GetIdx() not in paired) for a in mol.GetAtoms()):
+        return False
+    # another ester (a carbamate or carbonate too: 'tert-butyl {2-[...]-2-oxoethyl}carbamate') or a salt, acid or
+    # anhydride: which ester names the molecule is not decided here "salts > acids > anhydrides > esters")
+    from ...validation.spelling.checks_ring_n_pseudoester import _SENIOR_OR_OTHER_ESTER
+    return not any(mol.HasSubstructMatch(p) for p in _SENIOR_OR_OTHER_ESTER)
+
+
+def name_ring_n_pseudoester_handler(
+    features: Any, mol: Any = None, style: str = "pin",
+) -> Optional[NamingResult]:
+    """Offer '<ring-N-yl> <acid>ate' ('2,5-dioxopyrrolidin-1-yl acetate', as 'borinan-1-yl acetate (PIN)'); None lets
+    the ring producers name the molecule as before."""
+    matches = (getattr(features, "functional_groups", None) or {}).get("ring_n_pseudoester") or []
+    if not matches:
+        return None
+    from ...rules.esters import name_noncarbon_ester
+    from ..candidate_pool import get_current_pool
+    name = name_noncarbon_ester(features.mol, matches[0], tuple(matches[1:]))
+    if not name or ('cyclo[' in name and '^' in name):
+        # a von Baeyer ring-N prefix where the ring producers keep the fusion name ('1-(acetyloxy)benzo[cd]indol-
+        # 2(1H)-one', not '3-oxo-2-azatricyclo[6.3.1.0^4,12]...-2-yl acetate'): leave the molecule to them
+        return None
+    cand = get_current_pool().add(name, "ring_n_pseudoester", features)
+    if cand is None:
+        return None
+    return NamingResult(
+        name=cand.name,
+        tree=NameTreeNode(parent_stem=cand.name, class_id="noncarbon_ester",
+                          iupac_section_cite="P-65.6.3.4.1", fragment_legacy=cand.name),
+        atom_to_locant_hint=None,
+    )
+
+
+__all__ = ["name_noncarbon_ester_handler", "_is_noncarbon_ester", "name_ring_n_pseudoester_handler",
+           "_is_ring_n_pseudoester"]

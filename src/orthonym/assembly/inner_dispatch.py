@@ -1522,6 +1522,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# (the Blue Book, "N(cyclic)"): an ester on a ring N, offered ahead of the ring producers.
+from .handlers.noncarbon_ester import _is_ring_n_pseudoester, name_ring_n_pseudoester_handler  # noqa: E402
+
+_register_inner(
+    handler_id="ring_n_pseudoester",
+    priority=1494,
+    predicate=_is_ring_n_pseudoester,
+    handler=name_ring_n_pseudoester_handler,
+    iupac_section="P-65.6.3.4.1",
+    description="Ester on a ring N ('2,5-dioxopyrrolidin-1-yl acetate'); None lets the ring producers name it.",
+    side_effect_inventory=(),
+)
+
 from .handlers.ester_family import _is_ester_family, name_ester_family  # noqa: E402
 
 _register_inner(
