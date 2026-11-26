@@ -251,6 +251,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     # non-carbon-ester handler (build the neutral carboxylic acid -> '-ate' +
     # organyl-Z substituent). Ranked at the ester tier.
     "pseudoester": "[CX3](=O)[OX2][Si,Ge,Sn,Pb,B,Al,Ga,In,Tl,P,As,Sb,Bi]",
+    # (the Blue Book) lists "N(cyclic)" too: an open ester O on a neutral ring N is a traditional
+    # ester ('2,5-dioxopyrrolidin-1-yl cyclohexanecarboxylate', as 'borinan-1-yl acetate (PIN)'); an open-chain N is
+    # not ('1-[(dimethylamino)oxy]ethan-1-one (PIN)',:32068), nor a ring O on N (a cyclic hydroxamate). Kept apart from
+    # 'pseudoester' (no principal-group rank): the ring_n_pseudoester handler offers the ester name ahead of the ring
+    # producers, which keep their name when it cannot be built. Match tuple as 'pseudoester'.
+    "ring_n_pseudoester": "[CX3](=O)[OX2;!R][#7;R;+0]",
     # W3-P07: SULFONIC / SULFINIC esters R-SO2-O-R' / R-S(=O)-O-R'
     # ('methyl methanesulfonate'). No carbonyl -> the 'ester' pattern never
     # matches; without these the molecule reads 'unknown'. The recursive
