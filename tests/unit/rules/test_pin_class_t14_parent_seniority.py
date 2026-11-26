@@ -342,6 +342,76 @@ def test_an_isotope_labelled_borane_keeps_its_best_effort_name(smiles, name):
     assert breadth.get("name") == name and not breadth.get("is_pin"), breadth
 
 
+# A prefix-only N group on a carbon arm (nitro, nitroso, isocyanato, isothiocyanato, azido, diazo, isocyano) is no class
+# of (:18158) and never a parent, so the hub stays the senior atom,:18917; 'isocyanato' is
+# "attached directly to a parent hydride",,:26003). A ring N (class 21) outranks Si; a nitrate, nitrite or
+# N-nitroso amide is an ester or amide class of its own.
+N_GROUP_HUB_ROWS = [
+    ("C[Si](C)(C)c1ccc([N+](=O)[O-])cc1", "trimethyl(4-nitrophenyl)silane"),
+    ("C[Si](C)(C)CN=[N+]=[N-]", "(azidomethyl)tri(methyl)silane"),
+    ("C[Ge](C)(C)c1ccc([N+](=O)[O-])cc1", "trimethyl(4-nitrophenyl)germane"),
+    ("CB(C)CCCN=[N+]=[N-]", "(3-azidopropyl)di(methyl)borane"),
+    ("C[Si](C)(C)C#C[N+](=O)[O-]", "trimethyl(nitroethynyl)silane"),
+    ("CP(C)c1ccc([N+](=O)[O-])cc1", "dimethyl(4-nitrophenyl)phosphane"),
+    ("C[Sn](C)(C)c1ccc([N+](=O)[O-])cc1", "trimethyl(4-nitrophenyl)stannane"),
+    ("CB(Cl)c1ccc([N+](=O)[O-])cc1", "chloro(methyl)(4-nitrophenyl)borane"),
+]
+# Carbon-parent names of the class whose hub name the PIN tier does not build yet (the ligand namer declines an open-chain
+# isocyanato/isothiocyanato/nitroso arm, a diazo carbon on the hub, two tied hubs): correct, labelled below the PIN;
+# the hub name stays a missed PIN, not a wrong one.
+N_GROUP_CARBON_PARENT_ROWS = [
+    ("CC[Si](CC)(CC)CCCN=C=O", "1-isocyanato-3-(triethylsilyl)propane"),
+    ("CCO[Si](CCCN=C=S)(OCC)OCC", "1-isothiocyanato-3-(triethoxysilyl)propane"),
+    ("CCO[Si](CCCN=O)(OCC)OCC", "1-nitroso-3-(triethoxysilyl)propane"),
+    ("CP(C)CCCN=C=O", "1-(dimethylphosphanyl)-3-isocyanatopropane"),
+    ("C[Si](C)(C)C(=[N+]=[N-])c1ccccc1", "[diazo(trimethylsilyl)methyl]benzene"),
+    ("C[As](C)C(=[N+]=[N-])[As](C)C", "diazobis(dimethylarsanyl)methane"),
+    ("C[Si](C)(C)CC[N+]#[C-]", "1-isocyano-2-(trimethylsilyl)ethane"),
+    ("C[Si](C)(C)c1cc(cc([N+](=O)[O-])c1)[Si](C)(C)C", "1-nitro-3,5-bis(trimethylsilyl)benzene"),   # two tied hubs
+]
+N_GROUP_CONTROL_ROWS = [
+    ("C[Si](C)(C)c1ccc([N+](=O)[O-])nc1", "2-nitro-5-(trimethylsilyl)pyridine"),      # ring N is senior to Si
+    ("C[Si](C)(C)Oc1ccc([N+](=O)[O-])cc1", "trimethyl(4-nitrophenoxy)silane"),
+]
+
+
+@pytest.mark.parametrize("smiles,pin", N_GROUP_HUB_ROWS + N_GROUP_CONTROL_ROWS)
+def test_n_group_hub_parent_pin(smiles, pin):
+    assert_pin_at_both_tiers(smiles, pin)
+
+
+@pytest.mark.parametrize("smiles,carbon_parent", N_GROUP_CARBON_PARENT_ROWS)
+def test_n_group_carbon_parent_is_labelled_below_the_pin(smiles, carbon_parent):
+    default = name_default(smiles)
+    assert default.get("tier") != "pin_verified" and not default.get("is_pin"), default
+    breadth = name_breadth(smiles)
+    assert breadth.get("name") and breadth.get("tier") != "pin_verified" and not breadth.get("is_pin"), breadth
+
+
+@pytest.mark.parametrize("smiles", ["C[Si](C)(C)CCO[N+](=O)[O-]", "C[Si](C)(C)CCON=O", "CN(N=O)CC[Si](C)(C)C",
+                                    "C[Si](C)(C)c1ccc([N+](=O)[O-])nc1", "O=C=N[AsH2]"])
+def test_n_groups_of_another_class_leave_the_hub_test(smiles):
+    from rdkit import Chem
+
+    from orthonym.rules.mononuclear_hydrides import senior_hub_parent_expected
+    assert not senior_hub_parent_expected(Chem.MolFromSmiles(smiles)), smiles
+
+
+@pytest.mark.parametrize("smiles", [
+    "C[N+](C)([O-])CC[Si](C)(C)C",            # amine N-oxide
+    "C[N+]([O-])=CC[Si](C)(C)C",              # nitrone
+    "C[Si](C)(C)c1ccc(cc1)[N+]#N",            # diazonium
+    "C[Si](C)(C)CCN[N+](=O)[O-]",             # nitramine
+    "C[Si](C)(C)c1ccc(cc1)N=[N+]([O-])c1ccccc1",   # azoxy
+    "C[Si](C)(C)CCOC#N",                      # cyanate
+])
+def test_other_nitrogen_groups_are_no_prefix_only_n_group(smiles):
+    from rdkit import Chem
+
+    from orthonym.rules.mononuclear_hydrides import _prefix_only_n_group_atoms
+    assert not _prefix_only_n_group_atoms(Chem.MolFromSmiles(smiles)), smiles
+
+
 def test_senior_hub_parent_expected_boron():
     from rdkit import Chem
 
