@@ -832,16 +832,40 @@ def _boron_hub(atom) -> bool:
             and all(n.GetSymbol() == 'C' or n.GetSymbol() in _HALOGENS for n in atom.GetNeighbors()))
 
 
-def _scan_senior_hubs(mol, junior=frozenset()) -> Optional[list]:
+# The prefix-only nitrogen groups on a carbon atom: nitro, nitroso, isocyanato, isothiocyanato, azido, diazo, isocyano.
+# None of them is a class of (the Blue Book) or a parent; each is cited only as a prefix
+# ('isocyanato' is "attached directly to a parent hydride",,:26003), so a senior hub stays the senior atom of
+# the molecule. Only the group atoms match: a ring N, a nitrate or nitrite (an ester, O-N), an N-nitroso amide
+# or a group on the hub itself is another class.
+_N_GROUP_SMARTS = tuple(Chem.MolFromSmarts(s) for s in (
+    '[#6]-[N;!R;+1](=O)-[O-]', '[#6]-[N;!R;+0](=O)=O', '[#6]-[N;!R;X2]=O', '[#6]-[N;!R;X2]=C=[O,S]',
+    '[#6]-[N;!R]=[N;!R;+1]=[N;!R;-1]', '[#6]=[N;!R;+1]=[N;!R;-1]', '[#6]-[N;!R;+1]#[C;-1]'))
+
+
+def _prefix_only_n_group_atoms(mol) -> frozenset:
+    """The atoms (all but the carbon they hang on) of the prefix-only N groups of ``_N_GROUP_SMARTS``."""
+    found = set()
+    for pat in _N_GROUP_SMARTS:
+        for match in mol.GetSubstructMatches(pat):
+            found.update(match[1:])
+    return frozenset(found)
+
+
+def _scan_senior_hubs(mol, junior=frozenset(), n_groups: bool = False) -> Optional[list]:
     """The mononuclear hub atoms (acyclic, singly bonded P/As/Sb/Bi/Si/Ge/Sn/Pb; a B of:func:`_boron_hub`) of a neutral
     one-component molecule whose every other atom is carbon, hydrogen, a terminal halogen, an
-    ether-type chalcogen link or an atom of ``junior``; None for any other shape."""
+    ether-type chalcogen link or an atom of ``junior`` (with ``n_groups``, also an atom of a prefix-only N group on
+    carbon,:func:`_prefix_only_n_group_atoms`); None for any other shape. The isotope second pass
+    (``isotope_alternative``) asks without the N groups."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
     hubs = []
     other_boron = False
+    group_atoms = _prefix_only_n_group_atoms(mol) if n_groups else frozenset()
     for a in atoms_of(mol):
         sym = a.GetSymbol()
+        if a.GetIdx() in group_atoms:
+            continue
         if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
             return None
         if sym in ('C', 'H'):
@@ -895,7 +919,7 @@ def senior_hub_parent_expected(mol) -> bool:
     PIN, as the book's 'trimethyl[(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)methyl]stannane (PIN) (Sn is senior
     to B)',:37479)."""
     try:
-        hubs = _scan_senior_hubs(mol, _BELOW_HUB)
+        hubs = _scan_senior_hubs(mol, _BELOW_HUB, n_groups=True)
         if not hubs:
             return False
         hub_ids = {h.GetIdx() for h in hubs}
@@ -930,7 +954,7 @@ def _name_senior_atom_hub(mol) -> Optional[str]:
     if alternative_skeleton_active():
         return None
     try:
-        hubs = _scan_senior_hubs(mol, _BELOW_HUB)
+        hubs = _scan_senior_hubs(mol, _BELOW_HUB, n_groups=True)
         if not hubs:
             return None
         hub_ids = {h.GetIdx() for h in hubs}
@@ -958,9 +982,10 @@ def _name_senior_atom_hub(mol) -> Optional[str]:
             return None
         hub = best[0]
         hub_idx = hub.GetIdx()
-        # Chalcogen links: between two carbons, or an alkoxy O on a Group 14 hub.
+        # Chalcogen links: between two carbons, or an alkoxy O on a Group 14 hub (the O and S of an N group are no link).
+        group_atoms = _prefix_only_n_group_atoms(mol)
         for a in atoms_of(mol):
-            if a.GetSymbol() in _CHALCOGEN_ETHER:
+            if a.GetSymbol() in _CHALCOGEN_ETHER and a.GetIdx() not in group_atoms:
                 for n in a.GetNeighbors():
                     if n.GetSymbol() == 'C' or n.GetSymbol() in _BELOW_HUB:
                         continue
