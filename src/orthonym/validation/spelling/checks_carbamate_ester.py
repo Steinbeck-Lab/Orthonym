@@ -21,6 +21,7 @@ import re
 from rdkit import Chem
 
 from ..pin_spelling import SpellingFailure, register
+from .checks_polyol_ester import _on_one_parent
 
 # the N of an azide or an isocyanate on the carbonyl makes another acid: 'carbonazidic acid (PIN)',:30834),
 # 'ethyl carbonazidate', not a carbamate
@@ -56,3 +57,81 @@ def carbamate_ester_name_check(mol, name):
         return None
     return SpellingFailure('P-65.6.3.2.1', "a carbamate ester is the senior class (P-41 class 9); its functional-class "
                                            "ester name is the PIN, not a name with an '(alkoxycarbonyl)' prefix")
+
+
+# ------------------------------------------------------------------ two or more carbamate esters
+#: Two or more carbamate esters have a name of their own: a ring-N one is the ester of a ring carboxylic acid, senior to
+#: the carbamic (carbonic) acid of an open N,:29886, 'pyrrolidine-1-carboxylic acid (PIN)'; 7a before
+#: 7b,:18172/:18174), so the name ends in '-carboxylate'; open NH carbamates on one parent, or esters of one polyol, take
+#: a multiplicative name: carbamic acid is a functional parent with substitutable hydrogen (d),:5166),
+#: "Multiplicative nomenclature is preferred to substitutive nomenclature",:23178), and of its esters "Method
+#: (1) leads to preferred IUPAC names" ('ethyl methyl 3,3'-oxydibenzoate (PIN)',,:31794-:31803;
+#: 'propane-1,3-diyl bis(chloroacetate) (PIN)',,:31819). A name that cites one carbamate ester as a
+#: prefix ('benzyl (4-{[(benzyloxy)carbonyl]amino}phenyl)carbamate', PIN 'dibenzyl 1,4-phenylenebis(carbamate)') is then
+#: correct but no PIN.
+_CARBAMATE_GROUP = Chem.MolFromSmarts('[#7;!$(N=[N+]=[N-]);!$(N=N#N);!$(N=C=[O,S,Se,Te])][CX3;!R](=O)[OX2;!R][#6]')
+_S_CARBAMATE = Chem.MolFromSmarts('[#7][CX3](=O)[SX2][#6]')
+_CARBAMATE_PREFIX = re.compile(r"oxy[\]\)\}]*carbonyl[\]\)\}]*amino|carbamoyl[\]\)\}]*oxy")
+
+
+def _nh_carbon(mol, n_idx, c_idx):
+    """The one carbon of an NH carbamate N (single bonds, not an acyl or imidoyl carbon), else None."""
+    n = mol.GetAtomWithIdx(n_idx)
+    if n.GetTotalNumHs() != 1 or n.GetDegree() != 2 or any(b.GetBondTypeAsDouble() != 1 for b in n.GetBonds()):
+        return None
+    other = [a for a in n.GetNeighbors() if a.GetIdx() != c_idx]
+    if len(other) != 1 or other[0].GetAtomicNum() != 6:
+        return None
+    if any(b.GetBondTypeAsDouble() == 2 and b.GetOtherAtom(other[0]).GetAtomicNum() in (7, 8, 16)
+           for b in other[0].GetBonds()):
+        return None
+    return other[0].GetIdx()
+
+
+@register('P-65.6.3.3.2.2.1')
+def multi_carbamate_ester_name_check(mol, name):
+    """Two or more carbamate esters named with one of them cited as a prefix, where a ring-N carboxylate or a
+    multiplicative name exists."""
+    if not name:
+        return None
+    groups = mol.GetSubstructMatches(_CARBAMATE_GROUP)
+    if len({g[1] for g in groups}) < 2 or mol.HasSubstructMatch(_S_CARBAMATE):
+        return None
+    paired = {i for p in _CHARGE_PAIRS for m in mol.GetSubstructMatches(p) for i in m}
+    if len(Chem.GetMolFrags(mol)) != 1 or any(a.GetNumRadicalElectrons() or a.GetIsotope()
+                                              or (a.GetFormalCharge() and a.GetIdx() not in paired)
+                                              for a in mol.GetAtoms()):
+        return None
+    if any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()) or any(
+            b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
+        return None
+    if any(mol.HasSubstructMatch(p) for p in _SENIOR_OR_OTHER_ESTER):
+        return None
+    end = name.strip()
+    if any(mol.GetAtomWithIdx(g[0]).IsInRing() for g in groups):
+        # (method (1) of one diol may cite the carbamate anion last: 'ethane-1,2-diyl azetidine-1-carboxylate
+        # methylcarbamate',,:31831)
+        if not re.search(r'carboxylate(?![a-z])', end):
+            return SpellingFailure('P-65.1.2.2.2', "the ester of a ring-N carboxylic acid is senior to an open carbamate "
+                                                   "(carbonic) ester: the name ends in '-carboxylate'")
+        return None
+    if not _CARBAMATE_PREFIX.search(end):
+        return None
+    n_carbons = [_nh_carbon(mol, g[0], g[1]) for g in groups]
+    o_carbons = {g[4] for g in groups}      # (N, C, =O, O, the carbon on O)
+    # unequal ester groups on unequal NH carbons: no multiplicative name says which sits where ('R R'
+    # (4-methyl-1,3-phenylene)bis(carbamate)'); the book prints no such name, so the check stays out
+    cut = Chem.FragmentOnBonds(mol, [mol.GetBondBetweenAtoms(g[3], g[4]).GetIdx() for g in groups],
+                               dummyLabels=[(0, 0)] * len(groups))
+    cut.UpdatePropertyCache(strict=False)
+    frag_of = {a: f for f, atoms in enumerate(Chem.GetMolFrags(cut)) for a in atoms}
+    esters = {Chem.MolFragmentToSmiles(cut, [a for a, f in frag_of.items() if f == frag_of[g[4]]]) for g in groups}
+    rank = list(Chem.CanonicalRankAtoms(cut, breakTies=False))      # the core with the ester groups cut off
+    equal = len(esters) == 1 or (None not in n_carbons and len({rank[c] for c in n_carbons}) == 1)
+    if (equal and None not in n_carbons and len(set(n_carbons)) == len(n_carbons) and _on_one_parent(mol, n_carbons)) or (
+            len(o_carbons) == len(groups) and _on_one_parent(mol, o_carbons)):
+        return SpellingFailure('P-65.6.3.3.2.2.1', "two or more carbamate esters on one parent take a multiplicative "
+                                                   "name ('dibenzyl 1,4-phenylenebis(carbamate)', 'propane-1,3-diyl "
+                                                   "dicarbamate'); a name citing one of them as a prefix is no PIN")
+    return None
+
