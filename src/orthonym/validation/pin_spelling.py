@@ -96,6 +96,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_amine_beside_amide",
     "orthonym.validation.spelling.checks_suffix_class_prefix",
     "orthonym.validation.spelling.checks_amide_class_prefix",
+    "orthonym.validation.spelling.checks_multiplied_locants",
 )
 
 _loaded = False
