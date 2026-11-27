@@ -24,12 +24,13 @@ from rdkit import Chem
 from ..pin_spelling import SpellingFailure, register
 
 _PRINCIPAL = tuple(Chem.MolFromSmarts(s) for s in (
-    '[CX3](=[O,S])[OX2H1,SX2H1]', '[CX3](=[O,S])[#7]', '[CX2]#[NX1]', '[CX3H1](=O)', '[#6][CX3](=O)[#6]',
+    '[CX3](=[O,S])[OX2H1,SX2H1]', '[CX3](=[O,S])[#7]', '[CX2]#[NX1]', '[CX3H1](=O)', '[CX3](=O)([#6])[#6]',
     '[OX2H1][#6]', '[SX2H1][#6]', '[NX3;H2,H1;!$(N[#6]=[O,S,N])][#6]', '[SX4](=O)(=O)[OX2H1,#7]',
-    '[#6][NX2]=[CX2]=[OX1]', '[#6][NX2]=[CX2]=[SX1]', '[CX3](=O)[NX3][NX3]'))
+    '[NX2](=[CX2]=[OX1])[#6]', '[NX2](=[CX2]=[SX1])[#6]', '[CX3](=O)[NX3][NX3]'))
 #: a name already multiplicative (primed locants, 'di(' / 'bis[' units, a 'diyl' linker) or a phane name
 _NOT_JUDGED_NAME = re.compile(r"'|(?:di|bis|tri|tris|tetrakis)[(\[]|diyl|phane|(?:di|bis)(?:benzene|pyridine|thiophene|furan)\b"
-                              r"|(?:oxy|sulfanyl|sulfinyl|sulfonyl|methylene|selanyl|tellanyl|selenonyl|seleninyl)(?:di|bis)")
+                              r"|(?:oxy|sulfanyl|sulfinyl|sulfonyl|methylene|selanyl|tellanyl|selenonyl|seleninyl)(?:di|bis)"
+                              r"|[)\]](?:di|bis|tri|tris)[a-z]")        # '(1,3-phenylene)dimethanamine'
 
 
 def _link_atoms(mol):
@@ -72,7 +73,7 @@ def _halves(mol, link, ends):
 @register('P-51.3.1')
 def multiplicative_required_check(mol, name):
     """Two identical parent structures on one symmetric link atom are named substitutively."""
-    if not name or ' ' in name.strip() or _NOT_JUDGED_NAME.search(name):
+    if not name or ' ' in re.sub(r' acid$', '', name.strip()) or _NOT_JUDGED_NAME.search(name):
         return None
     if len(Chem.GetMolFrags(mol)) != 1 or any(a.GetFormalCharge() or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
         return None
@@ -96,7 +97,146 @@ def multiplicative_required_check(mol, name):
             continue                    # an alkane unit
         if not has_ring and (hetero & (halves[0][1] | halves[1][1])):
             continue                    # a chain with another hetero atom: a replacement name may be the parent
-        return SpellingFailure('P-51.3.1', "two identical parent structures on a symmetric link take a multiplicative "
-                                           "name ('2,2'-sulfonyldithiophene', '3,3'-oxydi(propane-1,2-diol)'); a "
-                                           "substitutive name is no PIN")
+        if principal & atoms and not _carried(mol, atoms, principal):
+            continue                    # 'dicarbonic acid': the groups have no parent carbon in the half
+        return _FAILURE
+    if principal and _twins_on_a_centre(mol, principal, hetero):
+        return _FAILURE
     return None
+
+
+_FAILURE = SpellingFailure('P-51.3.1', "two identical parent structures on a symmetric link take a multiplicative name "
+                                       "('2,2'-sulfonyldithiophene', 'N,N'-(1,4-phenylene)dibenzamide'); a substitutive "
+                                       "name is no PIN")
+#: elements a multiplicative centre may hold (a Si, Ge, B, P... centre is a parent hydride: 'disiloxane')
+_CENTRE_ELEMENTS = (6, 7, 8, 9, 16, 17, 34, 35, 52, 53)
+#: an atom that would carry a suffix: a carbon doubly bonded to O, S, Se or N (ring ketones, lactones and lactams
+#: included), an OH, SH or acyclic NH / NH2
+_SUFFIXABLE = Chem.MolFromSmarts('[$([#6]=[O,S,Se,N]),$([OX2H1]),$([SX2H1]),$([NX3;H1,H2;!R])]')
+#: (pattern, index) of the carbon that a suffix or prefix group owns ('carboxylic acid', 'carbonitrile', 'isocyanato')
+_GROUP_CARBON = tuple((Chem.MolFromSmarts(s), i) for s, i in (
+    ('[CX3](=[O,S])[OX2H1,SX2H1]', 0), ('[CX3](=[O,S])[#7]', 0), ('[CX2]#[NX1]', 0), ('[CX3H1](=O)', 0),
+    ('[NX2]=[CX2]=[O,S]', 1)))
+
+
+def _group_carbon(atom) -> bool:
+    """A carbon a suffix group owns: C=O, C=S or C=N with a hetero atom on it (acid, amide, imidic acid, ester), an
+    aldehyde CH=O, a nitrile carbon, or the carbon of an isocyanate. A ketone C=O between two carbons is skeletal."""
+    if atom.GetAtomicNum() != 6:
+        return False
+    multiple = [b for b in atom.GetBonds() if b.GetBondTypeAsDouble() >= 2
+                and b.GetOtherAtom(atom).GetAtomicNum() in (7, 8, 16, 34)]
+    if not multiple:
+        return False
+    if any(b.GetBondTypeAsDouble() == 3 for b in multiple) or atom.GetTotalNumHs() == 1:
+        return True
+    heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+    return any(n.GetAtomicNum() != 6 and mol_bond_single(atom, n) for n in heavy)
+
+
+def mol_bond_single(a, b) -> bool:
+    bond = a.GetOwningMol().GetBondBetweenAtoms(a.GetIdx(), b.GetIdx())
+    return bond is not None and bond.GetBondTypeAsDouble() == 1
+
+
+def _carried(mol, half, principal) -> bool:
+    """Every principal group of the half sits on a skeletal carbon of the half (its parent): a -COOH, -CONHR or -CN
+    whose carbon hangs on the centre is the centre's suffix ('N1,N4-dimethylbenzene-1,4-dicarboxamide', 'dicarbonic
+    acid'), not a parent structure of its own."""
+    for p in principal & half:
+        atom = mol.GetAtomWithIdx(p)
+        owners = [atom] if _group_carbon(atom) else [n for n in atom.GetNeighbors() if _group_carbon(n)]
+        if owners:
+            carriers = {n.GetIdx() for o in owners for n in o.GetNeighbors()
+                        if n.GetAtomicNum() == 6 and not _group_carbon(n)}
+        else:
+            carriers = {n.GetIdx() for n in atom.GetNeighbors() if n.GetAtomicNum() == 6}
+        if not carriers & half:
+            return False
+    return True
+
+
+def _amide_n(atom) -> bool:
+    """A nitrogen on a C=X carbon (an amide, urea or amidine nitrogen)."""
+    return any(n.GetAtomicNum() == 6 and any(b.GetBondTypeAsDouble() == 2 for b in n.GetBonds())
+               for n in atom.GetNeighbors())
+
+
+def _sides(mol):
+    """For every acyclic single bond, both sides: (isomeric SMILES with a dummy, atom set, side atom, other atom)."""
+    out = []
+    for b in mol.GetBonds():
+        if b.IsInRing() or b.GetBondTypeAsDouble() != 1:
+            continue
+        cut = Chem.FragmentOnBonds(mol, [b.GetIdx()], dummyLabels=[(1, 1)])
+        frags = Chem.GetMolFrags(cut, asMols=False, sanitizeFrags=False)
+        for side, other in ((b.GetEndAtom(), b.GetBeginAtom()), (b.GetBeginAtom(), b.GetEndAtom())):
+            atoms = next(f for f in frags if side.GetIdx() in f)
+            real = frozenset(i for i in atoms if i < mol.GetNumAtoms())
+            out.append((Chem.MolFragmentToSmiles(cut, list(atoms), isomericSmiles=True, canonical=True), real, side,
+                        other))
+    return out
+
+
+def _twins_on_a_centre(mol, principal, hetero) -> bool:
+    """Two identical halves, each holding principal groups, on a centre of two or more atoms (a ring such as phenylene,
+    or a multi-atom link) that holds none: (:23178); (:5186) "Any simple polyvalent substituent
+    group... may be used as a multiplicative substituent group"; '3,3'-(1,4-phenylene)di(propan-1-ol) (PIN)' (:25171).
+    A cut between two acyclic carbons would split one chain (the chain is the parent) and is not read."""
+    # a half is a parent structure only with a carbon of its own: a lone -COOH, -CHO, -CN, -CONH2 or -NCO is the
+    # suffix (or prefix) group of the centre ('benzene-1,4-dicarboxylic acid', 'pyridine-2,6-dicarbonitrile')
+    group_c = {m[i] for p, i in _GROUP_CARBON for m in mol.GetSubstructMatches(p)}
+    suffixable = {m[0] for m in mol.GetSubstructMatches(_SUFFIXABLE)}
+    rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    systems = []
+    for ring in mol.GetRingInfo().AtomRings():
+        merged = set(ring)
+        rest = [x for x in systems if not (x & merged)]
+        for x in systems:
+            if x & merged:
+                merged |= x
+        systems = rest + [merged]
+    sides = [x for x in _sides(mol) if x[1] & principal and len(x[1]) * 2 < mol.GetNumAtoms()
+             and any(mol.GetAtomWithIdx(k).GetAtomicNum() == 6 and k not in group_c for k in x[1])]
+    for i, (smi1, a1, h1, c1) in enumerate(sides):
+        for smi2, a2, h2, c2 in sides[i + 1:]:
+            if smi1 != smi2 or a1 & a2 or not principal <= (a1 | a2):
+                continue
+            centre = set(range(mol.GetNumAtoms())) - a1 - a2
+            if len(centre) < 2 or c1.GetIdx() not in centre or c2.GetIdx() not in centre:
+                continue
+            if any(not c.IsInRing() and c.GetAtomicNum() == 6 and not h.IsInRing() and h.GetAtomicNum() == 6
+                   for c, h in ((c1, h1), (c2, h2))):
+                continue                # the cut would split one carbon chain
+            if any(h.GetAtomicNum() not in (6, 7) or (h.GetAtomicNum() == 7 and not h.IsInRing() and not _amide_n(h))
+                   for h in (h1, h2)):
+                continue                # a half attached by an amine N, an O,... is not read
+            if any(a.GetAtomicNum() not in _CENTRE_ELEMENTS or (a.GetAtomicNum() == 7 and not a.IsInRing())
+                   or k in suffixable for k, a in ((k, mol.GetAtomWithIdx(k)) for k in centre)):
+                continue                # the centre would carry a suffix of its own (a ring C=O, an OH,...)
+            has_ring = any(mol.GetAtomWithIdx(k).IsInRing() for k in a1)
+            if not has_ring and (hetero & (a1 | a2) or len(hetero) >= 4):
+                continue                # replacement ('a') names may be the parent
+            if not _a_multiplicative_group(mol, c1.GetIdx(), c2.GetIdx(), centre, rank, systems):
+                continue
+            if not _carried(mol, set(a1), principal):
+                continue
+            return True
+    return False
+
+
+def _a_multiplicative_group(mol, c1, c2, centre, rank, systems) -> bool:
+    """ (1)-(2) and (:5238): the link is one simple group -- the path between the two
+    attachment atoms runs inside one ring system or along acyclic carbons only (substituted or not, symmetrical or not,
+    ,:5208) -- or a concatenated group whose arms are identical about a central group (the two attachment
+    atoms are equivalent). '-CH2-C6H4-O-' is neither."""
+    if c1 == c2:
+        return True                     # one atom carries both halves: a simple group ('ethane-1,1-diyl')
+    path = Chem.GetShortestPath(mol, c1, c2)
+    if not set(path) <= centre:
+        return False
+    if any(set(path) <= ring_system for ring_system in systems):
+        return True
+    if all(not mol.GetAtomWithIdx(k).IsInRing() and mol.GetAtomWithIdx(k).GetAtomicNum() == 6 for k in path):
+        return True
+    return rank[c1] == rank[c2]
