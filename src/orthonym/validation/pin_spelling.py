@@ -93,6 +93,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_cyanate_ester",
     "orthonym.validation.spelling.checks_ring_n_pseudoester",
     "orthonym.validation.spelling.checks_carbamate_ester",
+    "orthonym.validation.spelling.checks_amine_beside_amide",
 )
 
 _loaded = False
