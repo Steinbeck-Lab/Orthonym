@@ -123,7 +123,16 @@ def test_a_second_amide_of_the_ring_is_no_prefix_of_a_pin(smiles):
 
 def test_a_ring_lactam_is_no_second_amide():
     """A lactam C=O belongs to its ring, so the guard against a second amide leaves it alone (end check CT7: the sample
-    row below lost its name when the guard counted the ring C=O)."""
-    row = tier_row("CN1C[C@]23C=CC(O2)C(C3C1=O)C(=O)NC4=CC=CC=C4OCCCC5=CC=CC=C5", "pin")
-    assert row["tier"] == "pin_verified", row
+    row below lost its name when the guard counted the ring C=O). The row keeps its name at the wider tiers.
+
+    Its name is built on an aniline parent ('N-[...-7-carbonyl]-2-(3-phenylpropoxy)aniline') although the molecule holds
+    an acyclic anilide C(=O)NH-aryl: amides class 11, the Blue Book) outrank amines (class 19,
+    :18192), the senior parent carries the principal characteristic group,:18875), and "names expressing
+    N-substitution by a phenyl group on an amide are preferred IUPAC names",:32849). So that name is no
+    PIN (this test asserted pin_verified until the spelling check, checks_amine_beside_amide.py)."""
+    smiles = "CN1C[C@]23C=CC(O2)C(C3C1=O)C(=O)NC4=CC=CC=C4OCCCC5=CC=CC=C5"
+    wide = tier_row(smiles, "best-effort")
+    assert wide["name"] and wide["tier"] not in ("abstain", None), wide
+    pin = tier_row(smiles, "pin")
+    assert not (pin["tier"] == "pin_verified" and pin["name"].endswith("aniline")), pin
 
