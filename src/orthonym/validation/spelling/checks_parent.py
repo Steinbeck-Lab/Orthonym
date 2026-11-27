@@ -309,6 +309,9 @@ _CLASS_SMARTS = [
     (15, 'ketone', '[CX3;R](=O)[N,O,S;R]'),
     (15, 'ketone', '[#6][CX3](=S)[#6]'),
     (15, 'ketone', '[CX3;R](=S)[N,O,S;R]'),
+    # "'Hidden' amides" (:33125): an acyl on a ring N is a pseudoketone, "preferred IUPAC names are constructed
+    # accordingly" ('1-(piperidin-1-yl)ethan-1-one (PIN)',:33129), class 16
+    (15, 'ketone', '[#6][CX3;!R](=[O,S])[#7;R]'),
     (16, 'alcohol', '[OX2H1][#6;!$(C=[O,S,N])]'),
     (16, 'alcohol', '[SX2H1][#6;!$(C=[O,S,N])]'),
     (17, 'hydroperoxide', '[OX2H1][OX2]'),

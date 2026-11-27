@@ -18,6 +18,9 @@ pytestmark = pytest.mark.unit
     ("C1=CC2=C3C(=C1)C(=C(C3=CC=C2)O)O", "1,2-dihydroxyacenaphthylene"),             # a multiplied prefix
     ("O=C1C(=O)C2CCC1C21CC1", "2,3-dioxospiro[bicyclo[2.2.1]heptane-7,1'-cyclopropane]"),
     ("O=C1CC2CCC(C1)C21OCCO1", "3-oxospiro[bicyclo[3.2.1]octane-8,2'-[1,3]dioxolane]"),  # a ketone as 'oxo'
+    # an acyl on a ring N is a pseudoketone "'Hidden' amides",:33125), senior to the alcohol: the PIN is
+    # '1-[2-(hydroxymethyl)piperidin-1-yl]ethan-1-one' (this row was listed as passing, read as an amide, before)
+    ("OCC1CCCCN1C(C)=O", "1-acetyl-2-(hydroxymethyl)piperidine"),
 ])
 def test_a_prefix_only_name_is_flagged(smiles, name):
     failure = suffix_class_as_prefix_check(Chem.MolFromSmiles(smiles), name)
@@ -34,7 +37,6 @@ def test_a_prefix_only_name_is_flagged(smiles, name):
     ("OCC1OC(O)C(O)C(O)C1O", "glucopyranose"),                             # a retained name: not read
     ("CC1(C)OC(=O)CC1O", "4-hydroxy-5,5-dimethyloxolan-2-one"),
     ("NCCO.Cl", "2-aminoethan-1-ol hydrochloride"),
-    ("OCC1CCCCN1C(C)=O", "1-acetyl-2-(hydroxymethyl)piperidine"),        # an amide (ring-N acyl) is senior
     ("OCC1CCC(C#N)CC1", "4-(hydroxymethyl)cyclohexane-1-carbonitrile"),
     ("OCCc1ccncc1", "2-(pyridin-4-yl)ethan-1-ol"),
 ])
