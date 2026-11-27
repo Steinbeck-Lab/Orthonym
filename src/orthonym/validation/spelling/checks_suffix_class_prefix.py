@@ -27,9 +27,12 @@ _TRIGGERS = tuple(Chem.MolFromSmarts(s) for s in (
     '[#6][OX2][OX2H1]',                                     # hydroperoxides
     '[#6;!$([#6]=[O,S,N]);!$([#6]#*)][OX2H1]',             # alcohols and phenols
     '[#6][CX3](=O)[#6]',                                    # ketones
+    '[#6][CX3;!R](=[O,S])[#7;R]',                           # an acyl on a ring N: a pseudoketone,:33125)
 ))
 _SENIOR_OR_OTHER = tuple(Chem.MolFromSmarts(s) for s in (
-    '[CX3](=[O,S,Se])[O,S,Se,#7,F,Cl,Br,I]',               # acids, esters, anhydrides, amides, lactones, lactams, halides
+    '[CX3](=[O,S,Se])[O,S,Se,F,Cl,Br,I]',                  # acids, esters, anhydrides, lactones, acyl halides
+    '[CX3](=[O,S,Se])[#7;!R]', '[CX3;R](=[O,S,Se])[#7]',   # amides, carbamates, lactams (an acyl on a ring N is none)
+    '[CX3](=[O,S,Se])([#7;R])[!#6]',                       # ureas and carbamates of a ring N
     '[!#6;!#1;!#7;!#8][OX2H1,SX2H1]',                      # acids of noncarbon centres
     '[SX4](=O)(=O)[#7;!R]', '[SX3](=O)[#7;!R]',            # sulfonamides, sulfinamides (a sulfonyl on a ring N is none)
     '[CX3](=[NX2])([#7])[#7]',                              # guanidines
@@ -41,7 +44,7 @@ _CHARGE_PAIRS = tuple(Chem.MolFromSmarts(s) for s in ('[N+](=O)[O-]', '[#7]=[N+]
 _HYDRIDE_END = re.compile(r'(?:ane|ene|yne|ole|ine)[)\]}]*$')
 _NOT_A_HYDRIDE_END = re.compile(r'(?:amine|imine|aniline|guanidine|hydroxylamine|hydrazine|amidine|toluidine)[)\]}]*$')
 _PREFIX_WORD = re.compile(r'(?<![a-z])(?:di|tri|tetra|penta|hexa|bis|tris)?(?:sulfanyl|hydroperoxy|hydroxy|oxo)'
-                          r'|(?:acetyl|benzoyl|oyl|carbonyl)(?![a-z])')   # acyl words: a ketone
+                          r'|(?:acetyl|benzoyl|oyl|carbonyl)(?!oxy|amino|sulfanyl|imino)')   # acyl words: a ketone
 
 
 @register('P-44.1.1')
