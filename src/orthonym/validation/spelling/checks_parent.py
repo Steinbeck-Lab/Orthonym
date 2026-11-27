@@ -291,6 +291,11 @@ _CLASS_SMARTS = [
     (9, 'acid_halide', '[CX3](=O)[F,Cl,Br,I]'),
     (10, 'amide', '[CX3](=O)-!@[NX3;!R;!$(N-N)]'),
     (10, 'amide', '[SX4](=O)(=O)-!@[NX3;!R;!$(N-N)]'),
+    # the chalcogen analogues rank with their oxygen class: (:18184) "11 Amides [in the order of the
+    # corresponding acids]" (thioamides, thioureas); (:29585) "Ketones, pseudoketones and heterones, and their
+    # chalcogen analogues in the order =O > =S > =Se > =Te, are senior to hydroxy compounds and their chalcogen
+    # analogues, amines, and imines"
+    (10, 'amide', '[CX3](=S)-!@[NX3;!R;!$(N-N)]'),
     # (a hydrazine nitrogen on the carbon makes it a carbonic hydrazide, 'hydrazinecarboximidohydrazide', class 12)
     (10, 'guanidine', '[NX3;!R;!$(N-N)][CX3;!R](=[NX2;!R])[NX3;!R;!$(N-N)]'),
     # (the Blue Book) "12 Hydrazides", after the amides: R-CO-NH-N< with R a carbon (the ester and
@@ -302,6 +307,8 @@ _CLASS_SMARTS = [
     (14, 'aldehyde', '[CX3H1](=O)[#6]'),
     (15, 'ketone', '[#6][CX3](=O)[#6]'),
     (15, 'ketone', '[CX3;R](=O)[N,O,S;R]'),
+    (15, 'ketone', '[#6][CX3](=S)[#6]'),
+    (15, 'ketone', '[CX3;R](=S)[N,O,S;R]'),
     (16, 'alcohol', '[OX2H1][#6;!$(C=[O,S,N])]'),
     (16, 'alcohol', '[SX2H1][#6;!$(C=[O,S,N])]'),
     (17, 'hydroperoxide', '[OX2H1][OX2]'),
