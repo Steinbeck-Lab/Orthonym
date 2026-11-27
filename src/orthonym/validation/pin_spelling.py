@@ -95,6 +95,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_carbamate_ester",
     "orthonym.validation.spelling.checks_amine_beside_amide",
     "orthonym.validation.spelling.checks_suffix_class_prefix",
+    "orthonym.validation.spelling.checks_amide_class_prefix",
 )
 
 _loaded = False
