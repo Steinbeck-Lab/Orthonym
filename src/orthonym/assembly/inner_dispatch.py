@@ -421,11 +421,14 @@ def dispatch_inner(
         # "In the presence of a characteristic group having seniority over guanidine (see
         # item 11 in "): '2-[(diaminomethylidene)amino]ethan-1-ol' for
         # N-(2-hydroxyethyl)guanidine.
-        if (entry.handler_id not in ("urea", "guanidine")
+        if (entry.handler_id not in ("urea", "thiourea", "guanidine")
                 and getattr(features, "principal_group", None) is not None):
             from .handlers.guanidine import guanidine_parent_expected
+            from .handlers.thiourea import thiourea_parent_expected
             from .handlers.urea import urea_parent_expected
-            if urea_parent_expected(features) or guanidine_parent_expected(features):
+            if (urea_parent_expected(features)
+                    or thiourea_parent_expected(features)
+                    or guanidine_parent_expected(features)):
                 _junior = getattr(result, "name", None)
                 if _junior:
                     from ..metrics.provenance import record_non_pin_label

@@ -346,7 +346,7 @@ _NAME_CLASS = [
     (re.compile(r"guanidine$"), 10.7, 'guanidine'),
     (re.compile(r"(?:carbohydrazide|hydrazide)$"), 11, 'hydrazide'),
     (re.compile(r"(?:nitrile|carbonitrile)$"), 13, 'nitrile'),
-    (re.compile(r"(?:carbaldehyde|[a-z]al)$"), 14, 'aldehyde'),
+    (re.compile(r"(?:aldehyde|[a-z]al)$"), 14, 'aldehyde'),
     (re.compile(r"(?:one)$"), 15, 'ketone'),
     (re.compile(r"(?:ol|thiol)$"), 16, 'alcohol'),
     (re.compile(r"(?:amine)$"), 18, 'amine'),
