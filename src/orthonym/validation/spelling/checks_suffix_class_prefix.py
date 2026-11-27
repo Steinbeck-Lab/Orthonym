@@ -28,11 +28,16 @@ _TRIGGERS = tuple(Chem.MolFromSmarts(s) for s in (
     '[#6;!$([#6]=[O,S,N]);!$([#6]#*)][OX2H1]',             # alcohols and phenols
     '[#6][CX3](=O)[#6]',                                    # ketones
     '[#6][CX3;!R](=[O,S])[#7;R]',                           # an acyl on a ring N: a pseudoketone,:33125)
+    # a ring C=O/C=S on a ring heteroatom (lactam, lactone, cyclic carbonate, heterone) and a thioketone: class 16,
+    # 'piperidin-2-one (PIN)',:28267), 'azepane-2-thione (PIN)',:29551)
+    '[#6X3;R](=[O,S,Se,Te])@[!#6;R]', '[#6][CX3](=[S,Se,Te])[#6]',   # (aromatic c(=O|S) too)
 ))
 _SENIOR_OR_OTHER = tuple(Chem.MolFromSmarts(s) for s in (
-    '[CX3](=[O,S,Se])[O,S,Se,F,Cl,Br,I]',                  # acids, esters, anhydrides, lactones, acyl halides
-    '[CX3](=[O,S,Se])[#7;!R]', '[CX3;R](=[O,S,Se])[#7]',   # amides, carbamates, lactams (an acyl on a ring N is none)
-    '[CX3](=[O,S,Se])([#7;R])[!#6]',                       # ureas and carbamates of a ring N
+    # acids, open esters and anhydrides, acyl halides (a lactone or cyclic anhydride is a pseudoketone, class 16: none)
+    '[CX3](=[O,S,Se])[OX2H1,SX2H1,SeX2H1]', '[CX3;!R](=[O,S,Se])[O,S,Se]', '[CX3](=[O,S,Se])[O,S,Se;!R]',
+    '[CX3](=[O,S,Se])[F,Cl,Br,I]',
+    '[CX3](=[O,S,Se])[#7;!R]',                             # open amides and carbamates (a lactam or ring-N acyl is none)
+    '[CX3;!R](=[O,S,Se])([#7;R])[!#6]',                    # ureas and carbamates of a ring N (an acyclic carbonyl C)
     '[!#6;!#1;!#7;!#8][OX2H1,SX2H1]',                      # acids of noncarbon centres
     '[SX4](=O)(=O)[#7;!R]', '[SX3](=O)[#7;!R]',            # sulfonamides, sulfinamides (a sulfonyl on a ring N is none)
     '[CX3](=[NX2])([#7])[#7]',                              # guanidines
@@ -41,9 +46,9 @@ _SENIOR_OR_OTHER = tuple(Chem.MolFromSmarts(s) for s in (
 ))
 _CHARGE_PAIRS = tuple(Chem.MolFromSmarts(s) for s in ('[N+](=O)[O-]', '[#7]=[N+]=[N-]', '[#6]=[N+]=[N-]'))
 #: bare parent-hydride endings; the amine-type and retained parents among them are listed apart
-_HYDRIDE_END = re.compile(r'(?:ane|ene|yne|ole|ine)[)\]}]*$')
+_HYDRIDE_END = re.compile(r'(?:ane|ene|yne|ole|ine|furan|pyran|oxepin|thiepin|dioxin|oxathiin|dioxepin)[)\]}]*$')
 _NOT_A_HYDRIDE_END = re.compile(r'(?:amine|imine|aniline|guanidine|hydroxylamine|hydrazine|amidine|toluidine)[)\]}]*$')
-_PREFIX_WORD = re.compile(r'(?<![a-z])(?:di|tri|tetra|penta|hexa|bis|tris)?(?:sulfanyl|hydroperoxy|hydroxy|oxo)'
+_PREFIX_WORD = re.compile(r'(?<![a-z])(?:di|tri|tetra|penta|hexa|bis|tris)?(?:sulfanyl|selanylidene|tellanylidene|hydroperoxy|hydroxy|oxo)'
                           r'|(?:acetyl|benzoyl|oyl|carbonyl)(?!oxy|amino|sulfanyl|imino)')   # acyl words: a ketone
 
 
