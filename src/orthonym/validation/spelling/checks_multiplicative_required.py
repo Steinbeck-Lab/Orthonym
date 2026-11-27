@@ -42,7 +42,7 @@ def _link_atoms(mol):
         heavy = [n for n in a.GetNeighbors() if n.GetAtomicNum() > 1]
         if any(n.GetAtomicNum() not in (6, 8) for n in heavy):
             continue                    # a link between Si, Ge, B,... atoms belongs to a parent hydride ('disiloxane')
-        if a.GetAtomicNum() in (8, 34, 52) and a.GetDegree() == 2 and all(n.GetAtomicNum() == 6 for n in heavy):
+        if a.GetAtomicNum() in (8, 34, 52) and len(heavy) == 2 and all(n.GetAtomicNum() == 6 for n in heavy):
             yield a, heavy
         elif a.GetAtomicNum() == 16:
             oxo = [n for n in heavy if n.GetAtomicNum() == 8 and n.GetDegree() == 1]
@@ -50,7 +50,7 @@ def _link_atoms(mol):
             if len(rest) == 2 and all(n.GetAtomicNum() == 6 for n in rest) and len(oxo) <= 2 and all(mol.GetBondBetweenAtoms(a.GetIdx(), o.GetIdx()).GetBondTypeAsDouble() == 2
                                                        for o in oxo):
                 yield a, rest
-        elif a.GetAtomicNum() == 6 and a.GetDegree() == 2 and a.GetTotalNumHs() == 2:
+        elif a.GetAtomicNum() == 6 and len(heavy) == 2 and a.GetTotalNumHs() == 2:
             if all(n.IsInRing() for n in heavy):
                 yield a, heavy
 
