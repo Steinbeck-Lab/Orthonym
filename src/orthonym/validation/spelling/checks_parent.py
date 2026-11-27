@@ -280,6 +280,13 @@ def n_aryl_parent_check(mol, name):
 #: carbonyl are ring ketones ('cyclic amides are named as heterocycles',:18184). A guanidine
 #: ranks with the amides, class 11: "In the presence of a characteristic group having seniority
 #: over guanidine (see item 11 in ",:34266)
+#: Inside class 11 the amides follow their acids:18184 "in the order of the corresponding acids"): 7a carboxylic,
+#: then sulfonic (:18172), then 7b carbonic (:18174); Table 4.4 lists 'carboxamide' (16,:18759) before 'sulfonamide'
+#: (19,:18769). So a carboxamide (10) outranks a sulfonamide (10.3), which outranks a urea or other carbonic amide
+#: (10.6, 'N-carbamoylbenzenesulfonamide (PIN)',:33362), which outranks guanidine, the carbonimidic diamide (10.7,
+#: 'N-carbamimidoylacetamide (PIN)'... '(not N-acetylguanidine)',,:34296; 'N-carbamimidoylurea (PIN)
+#:... (not N-carbamoylguanidine)'). A carbonyl carbon with a second N, O or S is a carbonic one.
+_NOT_CARBONIC = '!$(C(=[O,S])(-[#7,#8,#16])-[#7,#8,#16])'
 _CLASS_SMARTS = [
     (6, 'acid', '[CX3](=[O,S])[OX2H1,SX2H1]'),
     (6, 'acid', '[SX4](=O)(=O)[OX2H1]'),
@@ -289,25 +296,30 @@ _CLASS_SMARTS = [
     (8, 'ester', '[CX3](=O)-!@[OX2][#6]'),
     (8, 'ester', '[SX4](=O)(=O)-!@[OX2][#6]'),
     (9, 'acid_halide', '[CX3](=O)[F,Cl,Br,I]'),
-    (10, 'amide', '[CX3](=O)-!@[NX3;!R;!$(N-N)]'),
-    (10, 'amide', '[SX4](=O)(=O)-!@[NX3;!R;!$(N-N)]'),
+    (10, 'amide', f'[CX3;{_NOT_CARBONIC}](=O)-!@[NX3;!R;!$(N-N)]'),
+    # (a carbon on the sulfur: a sulfamide is an amide of sulfuric acid, class 7d, junior to carbonic 7b,:18178;
+    # 'N,N-dimethylsulfuric diamide (PIN)',:35813)
+    (10.3, 'sulfonamide', '[#6][SX4](=O)(=O)-!@[NX3;!R;!$(N-N)]'),
+    (10.6, 'urea', '[CX3](=[O,S])(-[#7,#8,#16])-!@[NX3;!R;!$(N-N)]'),
+    (10.6, 'urea', '[CX3](=[O,S])(-[#7,#8,#16])-!@[NX2]=[#6]'),
     # the chalcogen analogues rank with their oxygen class: (:18184) "11 Amides [in the order of the
     # corresponding acids]" (thioamides, thioureas); (:29585) "Ketones, pseudoketones and heterones, and their
     # chalcogen analogues in the order =O > =S > =Se > =Te, are senior to hydroxy compounds and their chalcogen
     # analogues, amines, and imines"
-    (10, 'amide', '[CX3](=S)-!@[NX3;!R;!$(N-N)]'),
+    (10, 'amide', f'[CX3;{_NOT_CARBONIC}](=S)-!@[NX3;!R;!$(N-N)]'),
     # an N-acyl or N-sulfonyl imine is an N-substituted amide, R-CO-N= / R-SO2-N=,:33054): its prefix form
     # is used only "When a group having preference for citation as a principal characteristic group is present"
     # ('methyl 4-[(methanesulfonyl)imino]cyclohexane-1-carboxylate (PIN)')
-    (10, 'amide', '[CX3](=[O,S])-!@[NX2]=[#6]'),
-    (10, 'amide', '[SX4](=O)(=O)-!@[NX2]=[#6]'),
+    (10, 'amide', f'[CX3;{_NOT_CARBONIC}](=[O,S])-!@[NX2]=[#6]'),
+    (10.3, 'sulfonamide', '[#6][SX4](=O)(=O)-!@[NX2]=[#6]'),
     # (a hydrazine nitrogen on the carbon makes it a carbonic hydrazide, 'hydrazinecarboximidohydrazide', class 12)
-    (10, 'guanidine', '[NX3;!R;!$(N-N)][CX3;!R](=[NX2;!R])[NX3;!R;!$(N-N)]'),
+    (10.7, 'guanidine', '[NX3;!R;!$(N-N)][CX3;!R](=[NX2;!R])[NX3;!R;!$(N-N)]'),
     # (the Blue Book) "12 Hydrazides", after the amides: R-CO-NH-N< with R a carbon (the ester and
     # the amide of hydrazinecarboxylic acid have their own classes)
     (11, 'hydrazide', '[#6][CX3](=[O,S])-!@[NX3;!R]-[N;!R;!$(N=[O,N])]'),
     # an N-nitroso or N-diazenyl amide is an amide (the N=O / N=N is a prefix on its nitrogen,
-    (10, 'amide', '[CX3](=O)-!@[NX3;!R]-[N;!R]=[O,N]'),
+    (10, 'amide', f'[CX3;{_NOT_CARBONIC}](=O)-!@[NX3;!R]-[N;!R]=[O,N]'),
+    (10.6, 'urea', '[CX3](=O)(-[#7,#8,#16])-!@[NX3;!R]-[N;!R]=[O,N]'),
     (13, 'nitrile', '[#6][CX2]#[NX1]'),
     (14, 'aldehyde', '[CX3H1](=O)[#6]'),
     (15, 'ketone', '[#6][CX3](=O)[#6]'),
@@ -328,7 +340,10 @@ _CLASS_PAT = [(r, c, Chem.MolFromSmarts(s)) for r, c, s in _CLASS_SMARTS]
 _NITRO = Chem.MolFromSmarts('[N+](=O)[O-]')
 _NAME_CLASS = [
     (re.compile(r"(?:oic|carboxylic|sulfonic|sulfinic|phosphonic|carbothioic|carbodithioic|ic) acid$"), 6, 'acid'),
-    (re.compile(r"(?:amide|carboxamide|sulfonamide)$"), 10, 'amide'),
+    (re.compile(r"sulfonamide$"), 10.3, 'sulfonamide'),
+    (re.compile(r"(?:amide|carboxamide)$"), 10, 'amide'),
+    (re.compile(r"urea$"), 10.6, 'urea'),
+    (re.compile(r"guanidine$"), 10.7, 'guanidine'),
     (re.compile(r"(?:carbohydrazide|hydrazide)$"), 11, 'hydrazide'),
     (re.compile(r"(?:nitrile|carbonitrile)$"), 13, 'nitrile'),
     (re.compile(r"(?:carbaldehyde|[a-z]al)$"), 14, 'aldehyde'),

@@ -202,7 +202,7 @@ def parent_group_count_check(mol, name) -> Optional[SpellingFailure]:
     cls, count = cited
     # the senior class present: the class table, which holds the primary and the N-alkyl amines only,
     # plus the amines of this check; the name must cite that class, else the class checks decide
-    ranks = [rank for rank, _c, pat in _CLASS_PAT if mol.HasSubstructMatch(pat)]
+    ranks = [int(rank) for rank, _c, pat in _CLASS_PAT if mol.HasSubstructMatch(pat)]   # (10.3, 10.6, 10.7: class 11)
     if _groups(mol, 'amine'):
         ranks.append(_RANK['amine'])
     if not ranks or min(ranks) != _RANK[cls]:
