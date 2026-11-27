@@ -296,6 +296,11 @@ _CLASS_SMARTS = [
     # chalcogen analogues in the order =O > =S > =Se > =Te, are senior to hydroxy compounds and their chalcogen
     # analogues, amines, and imines"
     (10, 'amide', '[CX3](=S)-!@[NX3;!R;!$(N-N)]'),
+    # an N-acyl or N-sulfonyl imine is an N-substituted amide, R-CO-N= / R-SO2-N=,:33054): its prefix form
+    # is used only "When a group having preference for citation as a principal characteristic group is present"
+    # ('methyl 4-[(methanesulfonyl)imino]cyclohexane-1-carboxylate (PIN)')
+    (10, 'amide', '[CX3](=[O,S])-!@[NX2]=[#6]'),
+    (10, 'amide', '[SX4](=O)(=O)-!@[NX2]=[#6]'),
     # (a hydrazine nitrogen on the carbon makes it a carbonic hydrazide, 'hydrazinecarboximidohydrazide', class 12)
     (10, 'guanidine', '[NX3;!R;!$(N-N)][CX3;!R](=[NX2;!R])[NX3;!R;!$(N-N)]'),
     # (the Blue Book) "12 Hydrazides", after the amides: R-CO-NH-N< with R a carbon (the ester and
