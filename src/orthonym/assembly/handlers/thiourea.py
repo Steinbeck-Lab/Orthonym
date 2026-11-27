@@ -23,19 +23,88 @@ from typing import Any, Optional
 from ..name_tree import NameTreeNode, NamingResult
 
 
-def _is_thiourea(features: Any) -> bool:
-    """Chalcogen-urea FG present AND no principal characteristic group.
+def _thiourea_principal_rank(features: Any) -> Optional[str]:
+    """'senior' when a plain chalcogen-urea is the parent class against a
+    perceived principal group (``urea_is_senior_to``), else None.
 
-    Mirrors ``_is_urea``. The ``principal_group is None`` clause is what keeps
-    this handler off acid-bearing molecules such as
-    ``CNC(=S)NCCC(=O)O`` — there the carboxylic acid is senior
-    class 5 vs the amide class 11), so the thiourea is demoted to the
-    ``(methylcarbamothioyl)amino`` PREFIX built by
-    ``substituent_prefix_forms.get_n_substituted_carbamothioylamino_prefix``.
+    Mirrors ``handlers.urea._urea_principal_rank``: thiourea ranks as an
+    amide of carbonic acid (P-41 class 11, P-66.1.6.1.3), junior to urea
+    (=O > =S), acids, esters, acid halides, and 7a amides, and senior to
+    hydrazides, cyclic imides, nitriles, aldehydes, ketones, alcohols,
+    thiols, amines, and imines.
     """
+    from rdkit import Chem
+
+    from .urea import acyclic_imide_present, urea_is_senior_to
+
     fg = getattr(features, 'functional_groups', None) or {}
-    return (bool(fg.get('thiourea'))
-            and getattr(features, 'principal_group', None) is None)
+    matches = fg.get('thiourea') or ()
+    principal = getattr(features, 'principal_group', None)
+    mol = getattr(features, 'mol', None)
+    if not matches or principal is None or mol is None:
+        return None
+    if fg.get('urea') or fg.get('nitrooxy') or fg.get('nitrite'):
+        return None
+    if not urea_is_senior_to(principal):
+        return None
+    if principal == "imide" and acyclic_imide_present(mol, fg.get('imide')):
+        return None
+    for match in matches:
+        if len(match) < 4:
+            return None
+        c_idxs = [i for i in match if mol.GetAtomWithIdx(i).GetSymbol() == 'C']
+        n_idxs = [i for i in match if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        if len(c_idxs) != 1 or len(n_idxs) != 2:
+            return None
+        c_idx = c_idxs[0]
+        for n_idx in n_idxs:
+            for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+                if nb.GetIdx() == c_idx or nb.GetAtomicNum() == 1:
+                    continue
+                sym = nb.GetSymbol()
+                if sym == 'N':
+                    nitroso = (nb.GetDegree() == 2 and any(
+                        b.GetBondType() == Chem.BondType.DOUBLE
+                        and b.GetOtherAtom(nb).GetSymbol() == 'O'
+                        for b in nb.GetBonds()))
+                    if not nitroso:
+                        return None
+                elif sym == 'C' and any(
+                        b.GetBondType() == Chem.BondType.DOUBLE
+                        and b.GetOtherAtom(nb).GetSymbol() in ('O', 'S', 'Se', 'Te', 'N')
+                        for b in nb.GetBonds()):
+                    return None
+    return 'senior'
+
+
+def thiourea_parent_expected(features: Any) -> bool:
+    """True when the PIN of this molecule is a chalcogen-urea name while
+    another group was perceived as principal (``_thiourea_principal_rank``);
+    used to label any other handler's name below the PIN.
+    """
+    try:
+        return _thiourea_principal_rank(features) == 'senior'
+    except Exception:  # noqa: BLE001 -- no answer: no label change
+        return False
+
+
+def _is_thiourea(features: Any) -> bool:
+    """Chalcogen-urea FG present AND no principal group senior to thiourea.
+
+    Mirrors ``handlers.urea._is_urea``: handles a plain chalcogen-urea when
+    no senior characteristic group (or urea / nitrooxy / nitrite) is present.
+    """
+    from .urea import _PRINCIPALS_JUNIOR_TO_UREA_ABOVE_NITRILE
+
+    fg = getattr(features, 'functional_groups', None) or {}
+    if not fg.get('thiourea') or fg.get('urea') or fg.get('nitrooxy') or fg.get('nitrite'):
+        return False
+    principal = getattr(features, 'principal_group', None)
+    if principal is None:
+        return True
+    if principal in _PRINCIPALS_JUNIOR_TO_UREA_ABOVE_NITRILE:
+        return False
+    return thiourea_parent_expected(features)
 
 
 def name_thiourea(
