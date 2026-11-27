@@ -153,13 +153,19 @@ def test_an_ester_group_spelled_oxo_alkoxy_methyl_is_no_pin_spelling():
         assert not non_pin_vocabulary(name), name
 
 
-# (C2) a partial ester of a phosphorus or sulfur oxoacid is an ester of class 9 ranked by its acid (7d), below the carbamate
-# (7b) and the carboxylic ester (7a)
+# (C2) a partial ester of a phosphorus or sulfur oxoacid beside an amide: the partial ester is the parent
 _PARTIAL_ESTERS = {
+    "CC(=O)Nc1ccc(OP(=O)(O)O)cc1": "4-acetamidophenyl dihydrogen phosphate",
+}
+# UNVERIFIED (ruling 2026-11-27, two a review readings, ~75%): beside a carboxylic or carbamate ester the free P-OH / S-OH
+# keeps the compound an acid class 7d above class 9;:36999 '(acetyloxy)phosphonic acid (PIN)' over the
+# class 8 anhydride;:40993 'hydrogen salts'), so the PIN would be the 'hydrogen' ester
+# ('3-methoxy-3-oxopropyl hydrogen sulfate'); the book prints no PIN holding both groups. The carboxylic-ester name is
+# kept, below the PIN label (validation/spelling/checks_acid_beside_ester.py). Open item: internal notes
+_PARTIAL_ESTERS_BESIDE_AN_ESTER = {
     "COC(=O)Nc1ccc(OP(=O)(O)O)cc1": "methyl [4-(phosphonooxy)phenyl]carbamate",
     "CCOC(=O)Nc1ccc(OS(=O)(=O)O)cc1": "ethyl [4-(sulfooxy)phenyl]carbamate",
     "COC(=O)CCOS(=O)(=O)O": "methyl 3-(sulfooxy)propanoate",
-    "CC(=O)Nc1ccc(OP(=O)(O)O)cc1": "4-acetamidophenyl dihydrogen phosphate",
 }
 
 
@@ -167,7 +173,8 @@ _PARTIAL_ESTERS = {
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("smiles", sorted(_PARTIAL_ESTERS))
 def test_a_partial_ester_of_a_noncarbon_oxoacid_ranks_by_its_acid(smiles, tier):
-    """(C2) Decided by the book, not by the free hydrogen: (the Blue Book) "The seniority order of anions
+    """(C2) The partial ester beside an amide is the parent. (Beside a carboxylic or carbamate ester the ruling changed on
+    2026-11-27, UNVERIFIED: see _PARTIAL_ESTERS_BESIDE_AN_ESTER; the text below is the earlier reading.) (the Blue Book) "The seniority order of anions
     is corresponding to that of acids (see seniority order of acids in ", (:35916) "Partial acid esters of
     polybasic acids are named by citing alkyl groups... followed by the word 'hydrogen'" (an ester name) and
     (:55180), the book's phosphatidylethanolamine named on its carboxylic esters with the phosphate in a prefix. The
@@ -179,6 +186,18 @@ def test_a_partial_ester_of_a_noncarbon_oxoacid_ranks_by_its_acid(smiles, tier):
     row = _tiered_namer("pin", tier).name_tiered(smiles)
     assert row["name"] == _PARTIAL_ESTERS[smiles], row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
+    assert_full_rt(row["name"], smiles)
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", sorted(_PARTIAL_ESTERS_BESIDE_AN_ESTER))
+def test_a_partial_ester_beside_an_ester_keeps_its_name_below_the_pin_label(smiles):
+    """UNVERIFIED ruling (see _PARTIAL_ESTERS_BESIDE_AN_ESTER): the ester name is kept at best-effort, with no PIN label."""
+    from orthonym.cli import _tiered_namer
+    from tests.support.rt_assert import assert_full_rt
+    row = _tiered_namer("pin", "best-effort").name_tiered(smiles)
+    assert row["name"] == _PARTIAL_ESTERS_BESIDE_AN_ESTER[smiles], row
+    assert row["tier"] != "pin_verified" and not row["is_pin"], row
     assert_full_rt(row["name"], smiles)
 
 

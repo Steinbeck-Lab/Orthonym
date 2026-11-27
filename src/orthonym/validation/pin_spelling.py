@@ -97,6 +97,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_suffix_class_prefix",
     "orthonym.validation.spelling.checks_amide_class_prefix",
     "orthonym.validation.spelling.checks_multiplied_locants",
+    "orthonym.validation.spelling.checks_acid_beside_ester",
 )
 
 _loaded = False

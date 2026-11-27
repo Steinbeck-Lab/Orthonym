@@ -18,10 +18,6 @@ _INOSITYL = "O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O"   # 1D-myo-inosit
 
 
 @pytest.mark.parametrize("smiles,name", [
-    #: the diacyl phosphatidylinositol, both acyl groups the same
-    ("CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)(O)" + _INOSITYL[0] + _INOSITYL[1:] + ")OC(=O)CCCCCCCCCCCCCCC",
-     "(2R)-3-[(hydroxy{[(1S,2R,3R,4S,5S,6R)-2,3,4,5,6-pentahydroxycyclohexyl]oxy}phosphoryl)oxy]propane-1,2-diyl "
-     "dihexadecanoate"),
     # the glycerophosphoinositol anion: the functional-class diester anion
     ("O=P([O-])(OC[C@H](O)CO)" + _INOSITYL,
      "(2R)-2,3-dihydroxypropyl (1S,2R,3R,4S,5S,6R)-2,3,4,5,6-pentahydroxycyclohexyl phosphate"),
@@ -32,6 +28,21 @@ def test_inositol_phosphate_esters_are_named(smiles, name):
             row = Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
             assert row["name"] == name, (tier, row["name"])
             assert row["tier"] == "pin_unverified"
+
+
+def test_a_phosphatidylinositol_keeps_its_name_below_the_pin_label():
+    """: the diacyl phosphatidylinositol, both acyl groups the same. Changed asserted value (ABE 2026-11-27; user:
+    decide by the Blue Book): its free P-OH is senior to the carboxylic esters,:18162, acids 7 above esters
+    9), and (:50943) gives no PIN for the name, so it is kept at best-effort with no PIN label
+    (validation/spelling/checks_acid_beside_ester.py, read on the lipid route); the PIN tier declines it."""
+    smiles = "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)(O)" + _INOSITYL[0] + _INOSITYL[1:] + ")OC(=O)CCCCCCCCCCCCCCC"
+    name = ("(2R)-3-[(hydroxy{[(1S,2R,3R,4S,5S,6R)-2,3,4,5,6-pentahydroxycyclohexyl]oxy}phosphoryl)oxy]propane-1,2-diyl "
+            "dihexadecanoate")
+    with jvm_slots(1, purpose="inositol-phospholipids"):
+        row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        assert row["name"] == name, row["name"]
+        assert row["tier"] not in ("pin_verified", "pin_unverified"), row["tier"]
+        assert Orthonym(style="pin", **_emit_tier_flags("pin")).name_tiered(smiles)["tier"] == "abstain"
 
 
 def test_only_the_word_mode_strips_a_block_after_a_space():

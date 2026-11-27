@@ -12,6 +12,10 @@ from rdkit import Chem
 #: carbohydrate, amino-acid and peptide routes are read by every check relabel 2026-10-31).
 _SPELLING_CHECK_SKIPPED_CLASSES = ()
 _SPELLING_CHECK_P100_ONLY_CLASSES = ("LIPID", "NATURAL_PRODUCT")
+#: and, on the lipid route, the class order of a free acid beside the acyl esters: a phospholipid with a free P-OH
+#: named on its carboxylic esters ("...(hydroxyphosphoryl)oxy...propane-1,2-diyl dihexadecanoate") is no PIN
+#: (validation/spelling/checks_acid_beside_ester.py,; ruling UNVERIFIED, internal notes)
+_ROUTE_EXTRA_RULES = {("LIPID", "P-65.6.3.2.3")}
 
 
 def pin_spelling_rows(dispatch_class: Optional[str], smiles: str, name: str) -> list:
@@ -21,6 +25,6 @@ def pin_spelling_rows(dispatch_class: Optional[str], smiles: str, name: str) -> 
     from ..pin_spelling import check_pin_spelling
     failures = check_pin_spelling(Chem.MolFromSmiles(smiles), name)
     if dispatch_class in _SPELLING_CHECK_P100_ONLY_CLASSES:
-        failures = [f for f in failures if f.rule == "P-100"]
+        failures = [f for f in failures if f.rule == "P-100" or (dispatch_class, f.rule) in _ROUTE_EXTRA_RULES]
     return [{"rule": f.rule, "detail": f.detail} for f in failures]
 
