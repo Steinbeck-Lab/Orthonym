@@ -702,7 +702,7 @@ _LABEL_RANK = {"pin_verified": 4, "pin_unverified": 3, "systematic_verified": 2,
 _DEFAULT_TIER_POLICY_OFF = contextvars.ContextVar("orthonym_default_tier_policy_off",
                                                   default=False)
 
-from .validation.spelling.route_scope import pin_spelling_rows as _pin_spelling_rows  # routes
+from .validation.spelling.route_scope import pin_spelling_rows as _pin_spelling_rows; from .rules.ring_parent_seniority import ring_parent_seniority_rows as _ring_parent_rows  # noqa: E702 -- routes; ring parent
 
 # (a phase): the constitutional self-consistency gate. After the
 # parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
@@ -6251,7 +6251,7 @@ class Orthonym:
                 and name and not is_failure_name(name)
                 and not _is_np_list and not _is_coord_list):
             _checked = _pin_spelling_rows(
-                getattr(getattr(self, "_last_dispatch_class", None), "name", None), smiles, name)
+                getattr(getattr(self, "_last_dispatch_class", None), "name", None), smiles, name) or _ring_parent_rows(smiles, name)
             if _checked:
                 tier, is_pin = SYSTEMATIC_VERIFIED, False
                 logger.info("name_tiered lowered %r: %s", name,
