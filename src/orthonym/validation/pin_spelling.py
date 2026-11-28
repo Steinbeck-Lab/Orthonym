@@ -99,6 +99,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_multiplied_locants",
     "orthonym.validation.spelling.checks_acid_beside_ester",
     "orthonym.validation.spelling.checks_multiplicative_required",
+    "orthonym.validation.spelling.checks_twin_ring_parent",
 )
 
 _loaded = False
