@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from .benzene_parent_tie import note_unresolved_benzene_tie as _note_tie  # an undecided tie
 from ..data.chain_names import multiplying_prefix
 from ..assembly.group14_chalcogen_prefix import ring_group14_chalcogen_substituent
 from ..assembly.naming_utils import (
@@ -5965,7 +5966,8 @@ def _preferred_benzene_parent_ring(mol):
             scored.append((ring_atoms, nm))
     if not scored:
         return None
-    return min(scored, key=lambda rn: _alphanumerical_name_key(rn[1]))
+    return _note_tie(mol, scored, min(scored, key=lambda rn: _alphanumerical_name_key(rn[1])), is_benzene_ring,
+                     _alphanumerical_name_key)
 
 
 def record_biphenyl_parent_label(mol, ring_atoms, name) -> None:
