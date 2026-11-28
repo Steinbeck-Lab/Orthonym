@@ -105,3 +105,92 @@ def twin_ring_parent_check(mol, name):
         return SpellingFailure('P-45.2.2', f"the parent ring has the locant set {','.join(map(str, locs))}, the other "
                                            f"benzene ring {','.join(map(str, min(sets)))}: the lower set is the parent")
     return None
+
+
+# ------------------------------------------------------------------ twin rings that carry the suffix group
+#: the retained benzene parents and the group each expresses as its suffix (on the ring carbon numbered 1)
+_SUFFIX_PARENT = {
+    'phenol': Chem.MolFromSmarts('c[OX2H1]'),
+    'aniline': Chem.MolFromSmarts('c[NX3H2]'),
+    'benzoic': Chem.MolFromSmarts('c[CX3](=O)[OX2H1]'),
+    'benzonitrile': Chem.MolFromSmarts('c[CX2]#[NX1]'),
+    'benzaldehyde': Chem.MolFromSmarts('c[CX3H1]=O'),
+}
+
+
+def _suffix_ring_locants(mol, ring, suffix_atom) -> tuple:
+    """The lowest locant set of the ring's other substituents with the suffix carbon numbered 1 (two directions)."""
+    cycle = next(list(r) for r in mol.GetRingInfo().AtomRings() if set(r) == set(ring))
+    start = cycle.index(suffix_atom)
+    counts = [sum(1 for n in mol.GetAtomWithIdx(i).GetNeighbors() if n.GetIdx() not in ring and n.GetAtomicNum() > 1)
+              for i in cycle]
+    counts[start] -= 1
+    best = None
+    for step in (1, -1):
+        locs = sorted(pos + 1 for pos in range(6) for _ in range(counts[(start + step * pos) % 6]))
+        if best is None or locs < best:
+            best = locs
+    return tuple(best)
+
+
+@register('P-45.2')
+def twin_suffix_ring_parent_check(mol, name):
+    """Of two benzene rings that each carry the suffix group of a retained benzene parent ('phenol', 'aniline',
+    'benzoic acid', 'benzonitrile', 'benzaldehyde'), the name's parent has fewer prefixes, or as many with a higher
+    locant set: '4-chloro-2-[(3-cyanophenyl)methyl]benzonitrile (PIN) [not 3-[(5-chloro-2-cyanophenyl)methyl]
+    benzonitrile]' (the Blue Book), (:21698)."""
+    if not name or ' ' in name.strip().replace(' acid', '') or "'" in name or P10.search(name):
+        return None
+    parsed = read_units(name)
+    if parsed is None:
+        return None
+    tops = [p for p in parsed[2] if p.unit.encl is None and p.parent in _SUFFIX_PARENT]
+    if len(tops) != 1:
+        return None
+    top = tops[0]
+    if top.endings or top.hydro or top.repl or top.ih or top.multiplied:
+        return None
+    count, locs = 0, []
+    for x in top.prefixes:
+        if any(not loc.isdigit() for loc in x.locs) or not x.locs:
+            return None
+        count += max(len(x.locs), x.mult)
+        locs += [int(loc) for loc in x.locs]
+    if not count or len(locs) != count:
+        return None
+    nitro = {i for m in mol.GetSubstructMatches(_NITRO) for i in m}
+    if len(Chem.GetMolFrags(mol)) != 1 or any((a.GetFormalCharge() and a.GetIdx() not in nitro)
+                                              or a.GetNumRadicalElectrons() or a.GetIsotope() for a in mol.GetAtoms()):
+        return None
+    ring_count = {}
+    for r in mol.GetRingInfo().AtomRings():
+        for i in r:
+            ring_count[i] = ring_count.get(i, 0) + 1
+    # isolated benzene rings only: the benzo ring of a fused system is no 'phenol' parent ('...-1H-inden-3-yl]phenol')
+    benzenes = [set(m) for m in mol.GetSubstructMatches(_BENZENE) if all(ring_count.get(i) == 1 for i in m)]
+    on_ring = {}
+    for m in mol.GetSubstructMatches(_SUFFIX_PARENT[top.parent]):
+        ring = next((frozenset(r) for r in benzenes if m[0] in r), None)
+        if ring is None or ring in on_ring:
+            return None                 # a group off a benzene ring, or two on one ring
+        on_ring[ring] = m[0]
+    if len(on_ring) != 2:
+        return None
+    (ra, sa), (rb, sb) = on_ring.items()
+    if ra & rb or any(mol.GetBondBetweenAtoms(i, j) for i in ra for j in rb):
+        return None
+    n = [sum(1 for i in r for nb in mol.GetAtomWithIdx(i).GetNeighbors() if nb.GetIdx() not in r and nb.GetAtomicNum() > 1)
+         - 1 for r in (ra, rb)]
+    if n[0] != n[1]:
+        if count == min(n) and count != max(n):
+            return SpellingFailure('P-45.2.1', f"the parent ring carries {count} prefixes, the other ring with the "
+                                               f"same suffix {max(n)}: the ring with more prefixes is the parent")
+        return None
+    if count != n[0]:
+        return None
+    sets = [_suffix_ring_locants(mol, ra, sa), _suffix_ring_locants(mol, rb, sb)]
+    mine = tuple(sorted(locs))
+    if sets[0] != sets[1] and mine == max(sets) and mine != min(sets):
+        return SpellingFailure('P-45.2.2', f"the parent ring has the locant set {','.join(map(str, mine))}, the other "
+                                           f"ring with the same suffix {','.join(map(str, min(sets)))}")
+    return None

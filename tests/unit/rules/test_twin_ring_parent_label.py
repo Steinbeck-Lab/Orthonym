@@ -39,3 +39,27 @@ def test_an_oh_with_an_explicit_hydrogen_does_not_break_the_twin_check():
     mol = Chem.MolFromSmiles("[H]OCCO[H]", sanitize=True)
     mol = Chem.AddHs(mol)
     assert multiplicative_required_check(mol, "ethane-1,2-diol") is None
+
+
+from orthonym.validation.spelling.checks_twin_ring_parent import twin_suffix_ring_parent_check  # noqa: E402
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("OC(=O)c1ccccc1Oc1cccc(c1)C(=O)O", "3-(2-carboxyphenoxy)benzoic acid"),
+    ("Nc1c(Cl)cccc1Cc1ccc(N)c(Cl)c1", "2-[(4-amino-3-chlorophenyl)methyl]-6-chloroaniline"),
+    ("Oc1ccc(C2NCCNC2c2c(Cl)cc(O)cc2Cl)c(F)c1", "4-[3-(2,6-dichloro-4-hydroxyphenyl)piperazin-2-yl]-3-fluorophenol"),
+    ("N#Cc1ccc(Cl)cc1Cc1cccc(C#N)c1", "3-[(5-chloro-2-cyanophenyl)methyl]benzonitrile"),       # the book's 'not' name
+])
+def test_a_suffix_twin_on_the_junior_ring_is_flagged(smiles, name):
+    assert twin_suffix_ring_parent_check(Chem.MolFromSmiles(smiles), name) is not None, name
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("N#Cc1ccc(Cl)cc1Cc1cccc(C#N)c1", "4-chloro-2-[(3-cyanophenyl)methyl]benzonitrile"),       #:21614
+    ("OC(=O)c1ccccc1Oc1cccc(c1)C(=O)O", "2-(3-carboxyphenoxy)benzoic acid"),
+    ("Oc1ccc(Cc2ccc(O)cc2)cc1", "4,4'-methylenediphenol"),                                      # multiplicative
+    ("Oc1ccc(Oc2ccc(O)cc2Cl)cc1", "3-chloro-4-(4-hydroxyphenoxy)phenol"),                       # more prefixes win
+    ("Oc1ccc(cc1)C1=C(Cc2cc(O)ccc12)c1cccnc1", "4-[6-hydroxy-2-(pyridin-3-yl)-1H-inden-3-yl]phenol"),   # a fused ring
+])
+def test_suffix_twin_names_on_the_senior_ring_pass(smiles, name):
+    assert twin_suffix_ring_parent_check(Chem.MolFromSmiles(smiles), name) is None, name
