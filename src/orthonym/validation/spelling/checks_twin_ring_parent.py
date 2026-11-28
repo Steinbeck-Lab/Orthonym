@@ -194,3 +194,85 @@ def twin_suffix_ring_parent_check(mol, name):
         return SpellingFailure('P-45.2.2', f"the parent ring has the locant set {','.join(map(str, mine))}, the other "
                                            f"ring with the same suffix {','.join(map(str, min(sets)))}")
     return None
+
+
+# ------------------------------------------------------------------ aniline twins with N-substituents
+_AMINE_N = Chem.MolFromSmarts('[NX3;!R;+0;!$(N-[#6,#16,#15]=[O,S,N]);!$(N-[#7,#8])]')
+
+
+def _aniline_key(mol, ring, n_idx, ring_atom):
+    """(prefix count, lowest locant set with 'N' as 0) of the ring as an aniline parent: its ring prefixes plus the
+    substituents on the nitrogen,:3195, an italic letter locant is lower than a numeral)."""
+    n_subs = sum(1 for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors() if nb.GetIdx() != ring_atom and nb.GetAtomicNum() > 1)
+    cycle = next(list(r) for r in mol.GetRingInfo().AtomRings() if set(r) == set(ring))
+    start = cycle.index(ring_atom)
+    counts = [sum(1 for nb in mol.GetAtomWithIdx(i).GetNeighbors() if nb.GetIdx() not in ring and nb.GetAtomicNum() > 1)
+              for i in cycle]
+    counts[start] -= 1
+    best = None
+    for step in (1, -1):
+        locs = sorted([0] * n_subs + [pos + 1 for pos in range(6) for _ in range(counts[(start + step * pos) % 6])])
+        if best is None or locs < best:
+            best = locs
+    return n_subs + sum(counts), tuple(best)
+
+
+@register('P-45.2')
+def aniline_twin_parent_check(mol, name):
+    """Of two benzene rings that each carry an amine nitrogen (their own, or one N they share), the 'aniline' name's
+    parent has fewer prefixes (N-substituents counted), or as many with a higher locant set: '4-methoxy-N-
+    phenylaniline (PIN)' (the Blue Book); "the locant set 'N,2' in the PIN is lower than '2,5'" (:21704)."""
+    if not name or ' ' in name.strip() or "'" in name or P10.search(name):
+        return None
+    parsed = read_units(name)
+    if parsed is None:
+        return None
+    tops = [p for p in parsed[2] if p.unit.encl is None and p.parent == 'aniline']
+    if len(tops) != 1:
+        return None
+    top = tops[0]
+    if top.endings or top.hydro or top.repl or top.ih or top.multiplied:
+        return None
+    count, locs = 0, []
+    for x in top.prefixes:
+        if not x.locs or any(not (loc.isdigit() or loc == 'N') for loc in x.locs):
+            return None
+        count += max(len(x.locs), x.mult)
+        locs += [0 if loc == 'N' else int(loc) for loc in x.locs]
+    if not count or len(locs) != count:
+        return None
+    nitro = {i for m in mol.GetSubstructMatches(_NITRO) for i in m}
+    if len(Chem.GetMolFrags(mol)) != 1 or any((a.GetFormalCharge() and a.GetIdx() not in nitro)
+                                              or a.GetNumRadicalElectrons() or a.GetIsotope() for a in mol.GetAtoms()):
+        return None
+    ring_count = {}
+    for r in mol.GetRingInfo().AtomRings():
+        for i in r:
+            ring_count[i] = ring_count.get(i, 0) + 1
+    benzenes = [frozenset(m) for m in mol.GetSubstructMatches(_BENZENE) if all(ring_count.get(i) == 1 for i in m)]
+    carriers = []                       # (ring, amine N, ring atom on the N)
+    for (n_idx,) in mol.GetSubstructMatches(_AMINE_N):
+        for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            ring = next((r for r in benzenes if nb.GetIdx() in r), None)
+            if ring is not None:
+                carriers.append((ring, n_idx, nb.GetIdx()))
+    if len(carriers) != 2 or carriers[0][0] == carriers[1][0]:
+        return None                     # exactly two benzene rings, each on one amine N
+    (ra, na, aa), (rb, nb_, ab) = carriers
+    if ra & rb or any(mol.GetBondBetweenAtoms(i, j) for i in ra for j in rb):
+        return None
+    keys = [_aniline_key(mol, ra, na, aa), _aniline_key(mol, rb, nb_, ab)]
+    n = [k[0] for k in keys]
+    if n[0] != n[1]:
+        if count == min(n) and count != max(n):
+            return SpellingFailure('P-45.2.1', f"the aniline parent carries {count} prefixes (N-substituents counted), "
+                                               f"the other amine-bearing ring {max(n)}")
+        return None
+    if count != n[0]:
+        return None
+    sets = [k[1] for k in keys]
+    mine = tuple(sorted(locs))
+    if sets[0] != sets[1] and mine == max(sets) and mine != min(sets):
+        return SpellingFailure('P-45.2.2', "the aniline parent has the higher locant set ('N' is lower than any "
+                                           "numeral); the other amine-bearing ring is the parent")
+    return None

@@ -63,3 +63,27 @@ def test_a_suffix_twin_on_the_junior_ring_is_flagged(smiles, name):
 ])
 def test_suffix_twin_names_on_the_senior_ring_pass(smiles, name):
     assert twin_suffix_ring_parent_check(Chem.MolFromSmiles(smiles), name) is None, name
+
+
+from orthonym.validation.spelling.checks_twin_ring_parent import aniline_twin_parent_check  # noqa: E402
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("CN(C)C1=CC=C(C=C1)CC2=CC=C(C=C2)N", "4-{[4-(dimethylamino)phenyl]methyl}aniline"),            # count 1 < 3
+    ("CN(C)C1=CC=CC=C1SC2=C(C=C(C=C2)I)N", "2-{[2-(dimethylamino)phenyl]sulfanyl}-5-iodoaniline"),  # count 2 < 3
+    ("C1=CC=C(C(=C1)NC2=CC=C(C=C2)Cl)[N+](=O)[O-]", "4-chloro-N-(2-nitrophenyl)aniline"),          # N,4 > N,2
+    ("C1=CC(=C(C=C1F)F)NC2=CC(=CC(=C2)F)F", "N-(2,4-difluorophenyl)-3,5-difluoroaniline"),         # N,3,5 > N,2,4
+])
+def test_an_aniline_twin_on_the_junior_ring_is_flagged(smiles, name):
+    assert aniline_twin_parent_check(Chem.MolFromSmiles(smiles), name) is not None, name
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("COc1ccc(Nc2ccccc2)cc1", "4-methoxy-N-phenylaniline"),                                       #:21610
+    ("C1=CC=C(C(=C1)NC2=CC=C(C=C2)Cl)[N+](=O)[O-]", "N-(4-chlorophenyl)-2-nitroaniline"),
+    ("COC1=CC=C(C=C1)NC2=CC=C(C=C2)Cl", "4-chloro-N-(4-methoxyphenyl)aniline"),                   # equal sets: not judged
+    ("CC(=O)Nc1ccc(Nc2ccccc2)cc1", "N-[4-(phenylamino)phenyl]acetamide"),                         # an amide name
+    ("Nc1ccc(Cc2ccc(N)cc2)cc1", "4,4'-methylenedianiline"),                                       # multiplicative
+])
+def test_aniline_twin_names_on_the_senior_ring_pass(smiles, name):
+    assert aniline_twin_parent_check(Chem.MolFromSmiles(smiles), name) is None, name
